@@ -23,6 +23,9 @@ def cube_config_to_dict(cfg: CubeConfig) -> dict:
     return {
         "cube_side_m": float(cfg.cube_side_m),
         "marker_size_m": float(cfg.marker_size_m),
+        "marker_size_by_id": {str(k): float(v) for k, v in getattr(cfg, "marker_size_by_id", {}).items()},
+        "marker_center_m": {str(k): [float(x) for x in v] for k, v in getattr(cfg, "marker_center_m", {}).items()},
+        "marker_inset_m": float(getattr(cfg, "marker_inset_m", 0.0)),
         "dictionary_name": str(cfg.dictionary_name),
         "marker_ids": [int(x) for x in cfg.marker_ids],
         "id_to_face": {str(k): str(v) for k, v in cfg.id_to_face.items()},
@@ -64,6 +67,9 @@ def cube_config_mismatch_keys(expected: CubeConfig, actual: CubeConfig) -> List[
     keys = [
         "cube_side_m",
         "marker_size_m",
+        "marker_size_by_id",
+        "marker_center_m",
+        "marker_inset_m",
         "dictionary_name",
         "marker_ids",
         "id_to_face",
@@ -78,6 +84,13 @@ def cube_config_from_dict(data: dict, base_cfg: Optional[CubeConfig] = None) -> 
     cfg = clone_cube_config(base_cfg or get_default_cube_config())
     cfg.cube_side_m = float(data.get("cube_side_m", cfg.cube_side_m))
     cfg.marker_size_m = float(data.get("marker_size_m", cfg.marker_size_m))
+    if "marker_size_by_id" in data:
+        cfg.marker_size_by_id = {int(k): float(v) for k, v in data["marker_size_by_id"].items()}
+    if "marker_center_m" in data:
+        cfg.marker_center_m = {
+            int(k): tuple(float(x) for x in v) for k, v in data["marker_center_m"].items()
+        }
+    cfg.marker_inset_m = float(data.get("marker_inset_m", getattr(cfg, "marker_inset_m", 0.0)))
     cfg.dictionary_name = str(data.get("dictionary_name", cfg.dictionary_name))
     cfg.marker_ids = tuple(int(x) for x in data.get("marker_ids", list(cfg.marker_ids)))
     if "id_to_face" in data:

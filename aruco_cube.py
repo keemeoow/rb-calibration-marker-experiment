@@ -97,14 +97,22 @@ def depth_metrics_to_fields(metrics: Optional[Dict[str, Any]]) -> Dict[str, Any]
 # ─────────────────────── Cube Geometry ───────────────────────
 
 class ArucoCubeModel:
-    """3D geometry of a cube with ArUco markers on 5 faces."""
+    """3D geometry of a marker cube (AprilTag/ArUco) with per-marker sizes.
+
+    All lengths are in meters (m). Markers may have different sizes (e.g. the
+    25mm top tags vs 51mm side tags on the 59mm cube), and two markers may
+    share a face at different centers, so corners are built per-marker rather
+    than from a single shared template.
+    """
 
     def __init__(self, cfg: CubeConfig):
         self.cfg = cfg
-        d = cfg.cube_side_m / 2.0
-        s = cfg.marker_size_m / 2.0
+        d = cfg.cube_side_m / 2.0   # half bounding-cube edge (m)
 
-        # face definitions: (center, u-axis, v-axis, normal) in object frame
+        # Per-face orientation, expressed in the object frame.
+        # Tuple = (geometric_face_center, u_axis, v_axis, normal).
+        # The geometric_face_center is only a fallback; the real per-marker
+        # center comes from cfg.marker_center_m (see marker_pose_in_rig).
         self.face_defs = {
             "+Z": (np.array([0, 0, d]), np.array([1, 0, 0]), np.array([0, 1, 0]), np.array([0, 0, 1])),
             "-Z": (np.array([0, 0, -d]), np.array([1, 0, 0]), np.array([0, 1, 0]), np.array([0, 0, -1])),
@@ -114,7 +122,20 @@ class ArucoCubeModel:
             "-Y": (np.array([0, -d, 0]), np.array([1, 0, 0]), np.array([0, 0, 1]), np.array([0, -1, 0])),
         }
 
-        self.local_corners = np.array([
+    def marker_size(self, marker_id: int) -> float:
+        """Physical edge length (m) of marker_id. Falls back to cfg.marker_size_m."""
+        mid = int(marker_id)
+        size_by_id = getattr(self.cfg, "marker_size_by_id", {}) or {}
+        return float(size_by_id.get(mid, self.cfg.marker_size_m))
+
+    def local_corners_for(self, marker_id: int) -> np.ndarray:
+        """4 marker-local corners (m), in the marker's own plane (z=0).
+
+        Same corner convention as the legacy shared template, but sized per
+        marker. Order matches detector order after corner_reorder is applied.
+        """
+        s = self.marker_size(marker_id) / 2.0
+        return np.array([
             [s, -s, 0], [-s, -s, 0], [-s, s, 0], [s, s, 0]
         ], dtype=np.float64)
 
@@ -137,7 +158,19 @@ class ArucoCubeModel:
             return np.asarray(self.cfg.marker_pose_4x4[mid], dtype=np.float64).reshape(4, 4)
 
         face = self.cfg.id_to_face[mid]
-        c, u, v, n = self.face_defs[face]
+        c_face, u, v, n = self.face_defs[face]
+
+        # Per-marker center (m) overrides the geometric face center so that
+        # multiple tags can share a face and side tags can sit off-center in z.
+        center_by_id = getattr(self.cfg, "marker_center_m", {}) or {}
+        c = np.asarray(center_by_id.get(mid, c_face), dtype=np.float64).reshape(3)
+
+        # Optional recess/inset along the inward face normal (m). Currently 0
+        # (marker plane on the CAD outer surface); kept here as the single hook
+        # point for a future depth correction.
+        inset = float(getattr(self.cfg, "marker_inset_m", 0.0) or 0.0)
+        if inset != 0.0:
+            c = c - inset * (n / (np.linalg.norm(n) + 1e-12))
 
         roll = np.deg2rad(float(self.cfg.face_roll_deg.get(mid, 0.0)))
         Rr = rot_axis_angle(n, roll)
@@ -154,10 +187,15 @@ class ArucoCubeModel:
         return T
 
     def marker_corners_in_rig(self, marker_id: int) -> np.ndarray:
-        """4 corners of marker_id in the cube (object/rig) frame. Shape (4,3)."""
+        """4 corners of marker_id in the cube (object/rig) frame. Shape (4,3).
+
+        Uses this marker's own size (top vs side tags differ), so the 3D
+        correspondences fed to solvePnP are physically correct per marker.
+        """
         T_OM = self.marker_pose_in_rig(marker_id)
+        local_corners = self.local_corners_for(marker_id)
         pts = []
-        for p in self.local_corners:
+        for p in local_corners:
             ph = np.array([p[0], p[1], p[2], 1.0], dtype=np.float64)
             pts.append((T_OM @ ph)[:3])
         return np.asarray(pts, dtype=np.float64)
@@ -757,3 +795,53 @@ class ArucoCubeTarget:
         if return_reproj:
             return ok_final, rvec, tvec, used, reproj
         return ok_final, rvec, tvec, used
+
+
+# ──────────────────────── Sanity check ───────────────────────
+
+def print_cube_sanity_check(cfg: Optional[CubeConfig] = None, tol_m: float = 1e-9) -> bool:
+    """Print per-marker size + object-frame center and verify against the
+    59mm AprilTag cube CAD spec. All values are in meters (m).
+
+    Returns True if every marker matches the expected size/center.
+    Run directly:  python aruco_cube.py
+    """
+    from config import get_default_cube_config
+    cfg = cfg or get_default_cube_config()
+    model = ArucoCubeModel(cfg)
+
+    # Expected (size_m, center_xyz_m) per marker id, from the CAD/measured spec.
+    expected = {
+        0: (0.025, (0.0, -0.014, 0.0295)),   # top, y=-14mm
+        1: (0.025, (0.0,  0.014, 0.0295)),   # top, y=+14mm
+        2: (0.051, ( 0.0295, 0.0,   -0.001)),  # +X side
+        3: (0.051, (0.0,    0.0295, -0.001)),  # +Y side
+        4: (0.051, (-0.0295, 0.0,   -0.001)),  # -X side
+        5: (0.051, (0.0,   -0.0295, -0.001)),  # -Y side
+    }
+
+    print("=== Marker cube sanity check (units: meters) ===")
+    print(f"cube_side_m = {cfg.cube_side_m} (expect 0.059)")
+    print(f"dictionary  = {cfg.dictionary_name}")
+    print(f"{'id':>3} {'face':>4} {'size_m':>8}  center_m (x, y, z)          status")
+
+    all_ok = (abs(cfg.cube_side_m - 0.059) <= tol_m)
+    for mid in sorted(expected):
+        exp_size, exp_center = expected[mid]
+        size = model.marker_size(mid)
+        center = model.marker_pose_in_rig(mid)[:3, 3]
+        size_ok = abs(size - exp_size) <= tol_m
+        center_ok = bool(np.allclose(center, np.asarray(exp_center), atol=tol_m))
+        ok = size_ok and center_ok
+        all_ok = all_ok and ok
+        face = cfg.id_to_face.get(mid, "?")
+        status = "OK" if ok else ("BAD size" if not size_ok else "BAD center")
+        print(f"{mid:>3} {face:>4} {size:>8.4f}  "
+              f"({center[0]:+.4f}, {center[1]:+.4f}, {center[2]:+.4f})   {status}")
+
+    print(f"\nRESULT: {'ALL MATCH CAD SPEC' if all_ok else 'MISMATCH (see BAD rows)'}")
+    return bool(all_ok)
+
+
+if __name__ == "__main__":
+    print_cube_sanity_check()

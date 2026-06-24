@@ -12,43 +12,133 @@ from typing import Dict, List, Optional, Tuple
 import numpy as np
 
 
+# ════════════════════════════════════════════════════════════════════════════
+#  USER-EDITABLE MARKER IDs  ─  AprilTag 59mm cube
+# ────────────────────────────────────────────────────────────────────────────
+#  If you re-print the cube with different AprilTag IDs, edit ONLY this block.
+#  Everything downstream (face mapping, sizes, object-frame centers) is keyed
+#  off these constants, so nothing else needs to change.
+#
+#  Cube net (looking from above, +Z up):
+#                 ┌───────────────┐
+#                 │  TOP  +Z face │   two small 25mm tags, stacked along Y:
+#                 │  [POS_Y_ID]   │     center y = +14mm
+#                 │  [NEG_Y_ID]   │     center y = -14mm
+#                 └───────────────┘
+#   side faces carry one large 51mm tag each (+X, +Y, -X, -Y).
+# ════════════════════════════════════════════════════════════════════════════
+TOP_MARKER_NEG_Y_ID = 0   # top face, tag whose center is at y = -14mm
+TOP_MARKER_POS_Y_ID = 1   # top face, tag whose center is at y = +14mm
+SIDE_MARKER_POS_X_ID = 2  # +X side face
+SIDE_MARKER_POS_Y_ID = 3  # +Y side face
+SIDE_MARKER_NEG_X_ID = 4  # -X side face
+SIDE_MARKER_NEG_Y_ID = 5  # -Y side face
+
+# Physical AprilTag sizes (printed black-square outer edge). UNITS: meters (m).
+TOP_MARKER_SIZE_M = 0.025   # 25mm  (the two top tags)
+SIDE_MARKER_SIZE_M = 0.051  # 51mm  (the four side tags)
+# ════════════════════════════════════════════════════════════════════════════
+
+
 @dataclass
 class CubeConfig:
-    """ArUco cube target configuration."""
-    cube_side_m: float = 0.03          # cube edge length (m) - 30mm
-    marker_size_m: float = 0.022       # marker size on each face (m) - 22mm
-    dictionary_name: str = "DICT_4X4_50"
-    marker_ids: Tuple[int, ...] = (0, 1, 2, 3, 4)
+    """AprilTag marker-cube target configuration.
 
-    # marker_id -> face name
-    # Cube net:
-    #         [ID0=+Z]
-    #   [ID1=+X][ID2=+Y][ID3=-X][ID4=-Y]
+    Physical CAD/measured definition (UNITS in field names: *_m = meters):
+      - overall bounding cube : 59 x 59 x 59 mm
+      - lower body            : 59 x 59 x 57 mm   (carries the 4 side tags)
+      - upper narrow shelf    : 31 x 59 x  2 mm   (carries the 2 top tags)
+      - grips (ignored here)  : 10 x  2 x 0.3 mm  on the upper shelf sides
+      - recess depth          : 0.1 mm  (see marker_inset_m note below)
+
+    Object-frame convention (kept identical to the legacy ArUco cube):
+      - origin at the geometric center of the 59mm bounding cube
+      - +Z up, so top face z = +29.5mm, bottom face z = -29.5mm
+      - per-marker orientation comes from the face it sits on (face_defs in
+        aruco_cube.py) plus face_roll_deg; per-marker CENTER comes from
+        marker_center_m so two tags can share one face.
+    """
+    cube_side_m: float = 0.059          # bounding-cube edge length (m) - 59mm
+    # NOTE: top and side tags differ in size, so marker_size_m is only a
+    # fallback. Real per-tag sizes live in marker_size_by_id below.
+    marker_size_m: float = SIDE_MARKER_SIZE_M   # fallback marker size (m)
+    dictionary_name: str = "DICT_APRILTAG_36h11"  # AprilTag 36h11 family
+    marker_ids: Tuple[int, ...] = (
+        TOP_MARKER_NEG_Y_ID, TOP_MARKER_POS_Y_ID,
+        SIDE_MARKER_POS_X_ID, SIDE_MARKER_POS_Y_ID,
+        SIDE_MARKER_NEG_X_ID, SIDE_MARKER_NEG_Y_ID,
+    )
+
+    # marker_id -> face name (which face the tag's plane lies on)
     id_to_face: Dict[int, str] = field(default_factory=lambda: {
-        0: "+Z",
-        1: "+X",
-        2: "+Y",
-        3: "-X",
-        4: "-Y",
+        TOP_MARKER_NEG_Y_ID: "+Z",
+        TOP_MARKER_POS_Y_ID: "+Z",
+        SIDE_MARKER_POS_X_ID: "+X",
+        SIDE_MARKER_POS_Y_ID: "+Y",
+        SIDE_MARKER_NEG_X_ID: "-X",
+        SIDE_MARKER_NEG_Y_ID: "-Y",
     })
 
-    # The validated cube definition uses a single shared local-corner convention,
-    # so image corners are consumed in detector order by default.
+    # Per-marker physical size. UNITS: meters (m). Used to build that marker's
+    # 3D corner coordinates (see ArucoCubeModel.marker_corners_in_rig).
+    marker_size_by_id: Dict[int, float] = field(default_factory=lambda: {
+        TOP_MARKER_NEG_Y_ID: TOP_MARKER_SIZE_M,
+        TOP_MARKER_POS_Y_ID: TOP_MARKER_SIZE_M,
+        SIDE_MARKER_POS_X_ID: SIDE_MARKER_SIZE_M,
+        SIDE_MARKER_POS_Y_ID: SIDE_MARKER_SIZE_M,
+        SIDE_MARKER_NEG_X_ID: SIDE_MARKER_SIZE_M,
+        SIDE_MARKER_NEG_Y_ID: SIDE_MARKER_SIZE_M,
+    })
+
+    # Per-marker CENTER in the cube/object frame. UNITS: meters (m).
+    # This overrides the geometric face-center, which is required because:
+    #   - the two top tags share the +Z face but sit at y = +/-14mm
+    #   - the side tags sit on the 57mm lower body, so their center is at
+    #     z = -1mm (lower-body center), NOT z = 0 (full-cube center).
+    # Derivation of side z: lower body spans z = -29.5 .. +27.5mm -> center -1mm.
+    marker_center_m: Dict[int, Tuple[float, float, float]] = field(default_factory=lambda: {
+        # top tags: x=0, z=+29.5mm, 3-25-3-25-3 layout along Y -> y=+/-14mm
+        TOP_MARKER_NEG_Y_ID: (0.0, -0.014, 0.0295),
+        TOP_MARKER_POS_Y_ID: (0.0,  0.014, 0.0295),
+        # side tags: centered on the 57mm lower body -> z = -1mm
+        SIDE_MARKER_POS_X_ID: ( 0.0295, 0.0,   -0.001),
+        SIDE_MARKER_POS_Y_ID: (0.0,    0.0295, -0.001),
+        SIDE_MARKER_NEG_X_ID: (-0.0295, 0.0,   -0.001),
+        SIDE_MARKER_NEG_Y_ID: (0.0,   -0.0295, -0.001),
+    })
+
+    # Maps detector corner order to each marker's local [0,1,2,3] order.
+    # Identity by default; adjust only if a printed tag is rotated/mirrored.
     corner_reorder: Dict[int, list] = field(default_factory=lambda: {
-        0: [0, 1, 2, 3],
-        1: [0, 1, 2, 3],
-        2: [0, 1, 2, 3],
-        3: [0, 1, 2, 3],
-        4: [0, 1, 2, 3],
+        TOP_MARKER_NEG_Y_ID: [0, 1, 2, 3],
+        TOP_MARKER_POS_Y_ID: [0, 1, 2, 3],
+        SIDE_MARKER_POS_X_ID: [0, 1, 2, 3],
+        SIDE_MARKER_POS_Y_ID: [0, 1, 2, 3],
+        SIDE_MARKER_NEG_X_ID: [0, 1, 2, 3],
+        SIDE_MARKER_NEG_Y_ID: [0, 1, 2, 3],
     })
 
-    # per-marker in-plane rotation (deg) validated against the physical cube
+    # Per-marker in-plane rotation (deg) about the face normal.
+    # NOTE: these depend on how each AprilTag was oriented when printed and
+    # must be validated against the physical cube. Defaulting to 0 here.
     face_roll_deg: Dict[int, float] = field(default_factory=lambda: {
-        0: 0.0, 1: 270.0, 2: 0.0, 3: 90.0, 4: 180.0
+        TOP_MARKER_NEG_Y_ID: 0.0,
+        TOP_MARKER_POS_Y_ID: 0.0,
+        SIDE_MARKER_POS_X_ID: 0.0,
+        SIDE_MARKER_POS_Y_ID: 0.0,
+        SIDE_MARKER_NEG_X_ID: 0.0,
+        SIDE_MARKER_NEG_Y_ID: 0.0,
     })
+
+    # Optional: marker recess / inset along the face inward normal. UNITS: m.
+    # The tags are recessed 0.1mm below the CAD surface. For now the marker
+    # plane is defined ON the CAD outer surface (inset = 0). To model the
+    # recess later, set this > 0 and apply it as a depth correction in
+    # ArucoCubeModel.marker_pose_in_rig (currently NOT applied).
+    marker_inset_m: float = 0.0
 
     # Optional explicit rigid pose of each marker in the cube/object frame.
-    # When present, this overrides face-based geometry construction for that
+    # When present, this overrides face+center geometry construction for that
     # marker. corner_reorder is still used to map detector corners to the
     # marker's local [0,1,2,3] order.
     marker_pose_4x4: Dict[int, list] = field(default_factory=dict)

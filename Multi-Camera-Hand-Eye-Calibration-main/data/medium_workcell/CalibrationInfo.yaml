@@ -1,0 +1,22 @@
+# Number of cameras you want to calibrate
+number_of_cameras: 4
+# Camera folder name where pose and image subfolders are located
+camera_folder_prefix: camera
+# Pattern type used
+pattern_type: checkerboard
+
+# Number of rows
+number_of_rows: 4
+# Number of columns
+number_of_columns: 3
+# Pattern size
+size: 0.05
+
+# Resize factor
+resize_factor: 1
+# Store reprojected corners: 0 to remove visualization, 1 if you want to store them
+visual_error: 1
+# Calibration type: 0 eye-in-hand, 1 eye-on-base
+calibration_setup: 1
+
+
