@@ -38,7 +38,7 @@ from typing import Dict, List, Optional, Any, Tuple
 import cv2
 import numpy as np
 
-from aruco_cube import ArucoCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt, inv_T
+from apriltag_cube import AprilTagCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt, inv_T
 from calibration_runtime_utils import (
     copy_depth_fields,
     cube_selection_profile_kwargs,
@@ -485,7 +485,7 @@ def stored_cube_pose_candidates(cinfo: dict,
     return candidates
 
 
-def estimate_image_cube_pose_candidates(cube: ArucoCubeTarget,
+def estimate_image_cube_pose_candidates(cube: AprilTagCubeTarget,
                                         img: np.ndarray,
                                         K: np.ndarray,
                                         D: np.ndarray,
@@ -1527,7 +1527,7 @@ def main():
     print("=" * 60)
 
     pnp_obs: Dict[int, Dict[int, dict]] = {ci: {} for ci in all_cam_ids}
-    cube = ArucoCubeTarget(cfg)
+    cube = AprilTagCubeTarget(cfg)
 
     for cap in meta.get("captures", []):
         eid = int(cap.get("event_id", -1))
@@ -2463,7 +2463,7 @@ def main():
     # Summary
     # ══════════════════════════════════════════════════════════
     summary = {
-        "calibration_type": "unified_charuco_cube",
+        "calibration_type": "unified_chapriltag_cube",
         "handeye_data_source": "charuco" if use_charuco else "cube_pnp",
         "gripper_cam_idx": int(gripper_cam_idx),
         "ref_fixed_cam_idx": int(ref_fixed) if ref_fixed is not None else None,

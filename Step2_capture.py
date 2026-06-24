@@ -6,7 +6,7 @@ Step 2: 멀티카메라 캘리브레이션용 캡처 수집.
   1. 로봇이 큐브를 놓고 `set`을 실행하면 set 기준 pose를 저장한다.
   2. 같은 set에서 그리퍼 카메라를 여러 자세로 이동시키며 촬영한다.
   3. 각 이벤트에서 모든 카메라(그리퍼 + 고정)가 동시에 color/depth를 저장한다.
-  4. ArUco cube / gripper ChArUco를 즉시 검출하고 pose 후보와 품질 지표를 meta.json에 기록한다.
+  4. AprilTag cube / gripper ChArUco를 즉시 검출하고 pose 후보와 품질 지표를 meta.json에 기록한다.
   5. `set_index`, robot pose, set_cube_center_6dof, capture gate 결과를 함께 저장한다.
 
 실행 명령어:
@@ -73,7 +73,7 @@ import cv2
 import numpy as np
 
 from camera import RealSenseCamera
-from aruco_cube import ArucoCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt
+from apriltag_cube import AprilTagCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt
 from charuco_utils import CharucoTarget
 from config import CubeConfig, CharucoBoardConfig, get_default_cube_config
 from calibration_runtime_utils import resolve_cube_config_for_run
@@ -592,7 +592,7 @@ def marker_aspect_ratio(img_pts: np.ndarray) -> float:
 
 
 def estimate_per_marker_poses(
-    cube: ArucoCubeTarget,
+    cube: AprilTagCubeTarget,
     corners_list: list,
     ids: np.ndarray,
     K: np.ndarray,
@@ -875,7 +875,7 @@ def main():
         cube_config_json=args.cube_config_json,
         default_cfg=get_default_cube_config(),
     )
-    cube = ArucoCubeTarget(cfg)
+    cube = AprilTagCubeTarget(cfg)
     _cube_ids = set(cfg.marker_ids)  # {0,1,2,3,4} — filter out board markers
     print(f"[INFO] Cube config source: {cube_cfg_source}")
     print(f"[INFO] Cube id_to_face: {cfg.id_to_face}")

@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 
-from aruco_cube import ArucoCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt
+from apriltag_cube import AprilTagCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt
 from charuco_utils import CharucoTarget
 from config import (
     CharucoBoardConfig,
@@ -451,7 +451,7 @@ def build_cube_pose_candidates(root_folder: str,
                                cinfo: dict,
                                K: np.ndarray,
                                D: np.ndarray,
-                               cube: ArucoCubeTarget,
+                               cube: AprilTagCubeTarget,
                                meta_reproj_thr: float = 3.0,
                                solve_reproj_thr: float = 5.0,
                                min_aspect: float = 0.0,
@@ -865,7 +865,7 @@ def build_capture_cube_candidate_map(cap: dict,
                                      root_folder: str,
                                      K_map: Dict[int, np.ndarray],
                                      D_map: Dict[int, np.ndarray],
-                                     cube: ArucoCubeTarget,
+                                     cube: AprilTagCubeTarget,
                                      gripper_cam_idx: Optional[int],
                                      include_meta: bool = False,
                                      depth_scale_map: Optional[Dict[int, float]] = None,
@@ -898,7 +898,7 @@ def build_event_cube_selection(meta: dict,
                                include_meta: bool = False,
                                selection_profile: str = "default",
                                include_depth_pose_candidate: bool = False) -> Dict[int, Dict[int, dict]]:
-    cube = ArucoCubeTarget(cube_cfg)
+    cube = AprilTagCubeTarget(cube_cfg)
     K_map, D_map, depth_scale_map = {}, {}, {}
     for ci in all_cam_ids:
         K_map[ci], D_map[ci], depth_scale_map[ci] = load_intrinsics_with_depth_scale(intrinsics_dir, ci)

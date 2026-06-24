@@ -1,18 +1,18 @@
-# Unified Multi-Fixed-Camera + Robot Hand-Eye + ArUco Cube Calibration
+# Unified Multi-Fixed-Camera + Robot Hand-Eye + AprilTag Cube Calibration
 
 ## Overview
 
 This pipeline calibrates a system consisting of:
 - **N fixed cameras** (RealSense, mounted around workspace)
 - **1 robot gripper camera** (RealSense, eye-in-hand)
-- **ArUco cube** (calibration target)
+- **AprilTag cube** (calibration target)
 
 ### Coordinate Frames
 ```
 Base (Robot)
  ├── Gripper (EE) ── gTc ──> Gripper Camera
  │                              │
- │                         sees ArUco Cube
+ │                         sees AprilTag Cube
  │                              │
  ├── bTo (cube in base) <──────-┘
  │
@@ -28,7 +28,7 @@ Base (Robot)
 | Step | Script | Description |
 |------|--------|-------------|
 | 1 | `Step1_dump_all_intrinsics.py` | Dump intrinsics for all cameras (fixed + gripper) |
-| 2 | `Step2_capture_cube_poses.py` | Capture ArUco cube from all cameras + record robot joints |
+| 2 | `Step2_capture_cube_poses.py` | Capture AprilTag cube from all cameras + record robot joints |
 | 3 | `Step3_calibrate_all.py` | Compute: fixed cam extrinsics, hand-eye (gTc), fixed-to-base transforms |
 | 4 | `Step4_verify_and_fuse.py` | Verify calibration accuracy, optionally fuse point clouds |
 

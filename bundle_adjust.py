@@ -29,7 +29,7 @@ from scipy.spatial.transform import Rotation
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT))
 
-from aruco_cube import ArucoCubeModel, inv_T
+from apriltag_cube import AprilTagCubeModel, inv_T
 from config import CubeConfig
 from calibration_runtime_utils import (
     load_intrinsics_color,
@@ -72,7 +72,7 @@ def collect_observations(meta, root_folder, intrinsics_dir, all_cam_ids,
     for ci in all_cam_ids:
         K_map[ci], D_map[ci] = load_intrinsics_color(intrinsics_dir, ci)
 
-    model = ArucoCubeModel(cube_cfg)
+    model = AprilTagCubeModel(cube_cfg)
 
     obs = []
     for cap in meta.get("captures", []):

@@ -114,7 +114,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--root_folder", required=True, help="Path to session/ directory containing meta.json + camN/")
     ap.add_argument("--intrinsics_dir", required=True, help="Path to intrinsics/ with camN.npz files")
-    # 동일 환경 (같은 ArucoCube + ChArUco 보드) 반복 실행이라 5 method 비교 불필요.
+    # 동일 환경 (같은 AprilTag cube + ChArUco 보드) 반복 실행이라 5 method 비교 불필요.
     # HE-refine 패치로 모든 method 가 같은 답으로 수렴함을 확인 → TSAI 단독 실행.
     # 비교가 필요하면 --methods TSAI,PARK,HORAUD,ANDREFF,DANIILIDIS 처럼 명시.
     ap.add_argument("--methods", default="TSAI",

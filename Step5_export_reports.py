@@ -25,7 +25,7 @@ from typing import Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 
-from aruco_cube import ArucoCubeTarget, inv_T, rodrigues_to_Rt
+from apriltag_cube import AprilTagCubeTarget, inv_T, rodrigues_to_Rt
 from calibration_runtime_utils import (
     build_capture_cube_candidate_map,
     build_cube_pose_candidates,
@@ -195,7 +195,7 @@ def compute_cross_camera_metrics(meta: dict, transforms: Dict[str, np.ndarray],
     cube = None
     K_map, D_map, depth_scale_map = {}, {}, {}
     if use_current_cube:
-        cube = ArucoCubeTarget(cube_cfg)
+        cube = AprilTagCubeTarget(cube_cfg)
         for ci in all_cam_ids:
             K_map[ci], D_map[ci], depth_scale_map[ci] = load_intrinsics_with_depth_scale(intrinsics_dir, ci)
     profile_kwargs = cube_selection_profile_kwargs(selection_profile)
@@ -264,7 +264,7 @@ def compute_cross_camera_metrics(meta: dict, transforms: Dict[str, np.ndarray],
 def compute_reprojection_metrics(meta: dict, transforms: Dict[str, np.ndarray], intrinsics_dir: str,
                                  all_cam_ids: List[int], root_folder: str, gripper_cam_idx: Optional[int],
                                  cube_cfg: CubeConfig, include_meta: bool = False) -> dict:
-    cube = ArucoCubeTarget(cube_cfg)
+    cube = AprilTagCubeTarget(cube_cfg)
     K_map, D_map, depth_scale_map = {}, {}, {}
     for ci in all_cam_ids:
         K_map[ci], D_map[ci], depth_scale_map[ci] = load_intrinsics_with_depth_scale(intrinsics_dir, ci)
