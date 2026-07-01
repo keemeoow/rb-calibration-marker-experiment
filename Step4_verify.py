@@ -47,7 +47,7 @@ if not os.environ.get("FORCE_GUI"):
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-from apriltag_cube import AprilTagCubeTarget, AprilTagCubeModel, rodrigues_to_Rt, inv_T
+from aruco_cube import ArucoCubeTarget, ArucoCubeModel, rodrigues_to_Rt, inv_T
 from calibration_runtime_utils import (
     build_event_cube_selection,
     build_capture_cube_candidate_map,
@@ -434,7 +434,7 @@ def test_cross_camera_consistency(meta, transforms, all_cam_ids, gripper_cam_idx
     cube = None
     K_map, D_map, depth_scale_map = {}, {}, {}
     if use_current_cube:
-        cube = AprilTagCubeTarget(cube_cfg)
+        cube = ArucoCubeTarget(cube_cfg)
         for ci in all_cam_ids:
             K_map[ci], D_map[ci], depth_scale_map[ci] = load_intrinsics_with_depth_scale(intrinsics_dir, ci)
     profile_kwargs = cube_selection_profile_kwargs(selection_profile)
@@ -512,7 +512,7 @@ def test_reprojection(meta, transforms, intrinsics_dir, all_cam_ids, root_folder
     print("=" * 60)
 
     cfg = cube_cfg or resolve_cube_config_for_run(root_folder, default_cfg=get_default_cube_config())[0]
-    cube = AprilTagCubeTarget(cfg)
+    cube = ArucoCubeTarget(cfg)
     K_map, D_map, depth_scale_map = {}, {}, {}
     for ci in all_cam_ids:
         K_map[ci], D_map[ci], depth_scale_map[ci] = load_intrinsics_with_depth_scale(intrinsics_dir, ci)
@@ -682,7 +682,7 @@ def collect_cube_candidate_diagnostics(meta, transforms, intrinsics_dir, root_fo
         return []
 
     cfg = cube_cfg or resolve_cube_config_for_run(root_folder, default_cfg=get_default_cube_config())[0]
-    cube = AprilTagCubeTarget(cfg)
+    cube = ArucoCubeTarget(cfg)
     K_map, D_map, depth_scale_map = {}, {}, {}
     for ci in all_cam_ids:
         K_map[ci], D_map[ci], depth_scale_map[ci] = load_intrinsics_with_depth_scale(intrinsics_dir, ci)
@@ -948,8 +948,8 @@ def collect_marker_override_diagnostics(meta, transforms, intrinsics_dir, root_f
         return {}
 
     cfg = cube_cfg or resolve_cube_config_for_run(root_folder, default_cfg=get_default_cube_config())[0]
-    model = AprilTagCubeModel(cfg)
-    cube = AprilTagCubeTarget(cfg)
+    model = ArucoCubeModel(cfg)
+    cube = ArucoCubeTarget(cfg)
     reorder_to_name = {tuple(v): k for k, v in DIAG_CORNER_PERMUTATIONS.items()}
 
     K_map, D_map = {}, {}

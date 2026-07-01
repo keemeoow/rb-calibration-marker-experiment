@@ -1,114 +1,61 @@
 # config.py
-"""Project configuration and the single source of truth for the 59mm AprilTag cube.
+"""
+캘리브레이션 파이프라인 공통 설정.
 
-Units: every field ending with ``_m`` is meters.
-Only edit the marker-ID block when the cube is reprinted with different IDs.
+이 파일의 CubeConfig dataclass가 큐브 모델의 단일 source of truth다.
+동일한 물리 큐브를 계속 사용할 경우, 별도 override 없이 이 정의를 그대로 사용한다.
+예외적으로 다른 큐브/실험 정의가 필요할 때만 명시적인 JSON override를 사용한다.
 """
 
 from dataclasses import dataclass, field
-from typing import Dict, Tuple
-
-
-# =============================================================================
-# USER-EDITABLE MARKER IDS / SIZES — AprilTag 59mm calibration cube
-# -----------------------------------------------------------------------------
-# Edit only this block when reprinting tags with different IDs.
-# Top face has two 25mm tags on +Z, centered at y=-14mm and y=+14mm.
-# Four side faces have one 51mm tag each.
-# =============================================================================
-TOP_MARKER_NEG_Y_ID = 0   # +Z top face, center: (0, -14, +29.5) mm
-TOP_MARKER_POS_Y_ID = 1   # +Z top face, center: (0, +14, +29.5) mm
-SIDE_MARKER_POS_X_ID = 2  # +X side face, center: (+29.5, 0, -1) mm
-SIDE_MARKER_POS_Y_ID = 3  # +Y side face, center: (0, +29.5, -1) mm
-SIDE_MARKER_NEG_X_ID = 4  # -X side face, center: (-29.5, 0, -1) mm
-SIDE_MARKER_NEG_Y_ID = 5  # -Y side face, center: (0, -29.5, -1) mm
-
-TOP_MARKER_SIZE_M = 0.025
-SIDE_MARKER_SIZE_M = 0.051
-# =============================================================================
+from typing import Dict, List, Optional, Tuple
+import numpy as np
 
 
 @dataclass
 class CubeConfig:
-    """Physical definition of the 59 x 59 x 59mm AprilTag cube.
+    """ArUco cube target configuration."""
+    cube_side_m: float = 0.03          # cube edge length (m) - 30mm
+    marker_size_m: float = 0.022       # marker size on each face (m) - 22mm
+    dictionary_name: str = "DICT_4X4_50"
+    marker_ids: Tuple[int, ...] = (0, 1, 2, 3, 4)
 
-    Object frame:
-      - origin: center of the full 59mm bounding cube
-      - +Z: upward; top surface z = +29.5mm
-      - side marker centers are at z = -1mm because the 57mm lower body spans
-        z = -29.5mm .. +27.5mm.
-    """
-
-    cube_side_m: float = 0.059
-    marker_size_m: float = SIDE_MARKER_SIZE_M  # fallback only
-    dictionary_name: str = "DICT_APRILTAG_36h11"
-
-    marker_ids: Tuple[int, ...] = (
-        TOP_MARKER_NEG_Y_ID,
-        TOP_MARKER_POS_Y_ID,
-        SIDE_MARKER_POS_X_ID,
-        SIDE_MARKER_POS_Y_ID,
-        SIDE_MARKER_NEG_X_ID,
-        SIDE_MARKER_NEG_Y_ID,
-    )
-
+    # marker_id -> face name
+    # Cube net:
+    #         [ID0=+Z]
+    #   [ID1=+X][ID2=+Y][ID3=-X][ID4=-Y]
     id_to_face: Dict[int, str] = field(default_factory=lambda: {
-        TOP_MARKER_NEG_Y_ID: "+Z",
-        TOP_MARKER_POS_Y_ID: "+Z",
-        SIDE_MARKER_POS_X_ID: "+X",
-        SIDE_MARKER_POS_Y_ID: "+Y",
-        SIDE_MARKER_NEG_X_ID: "-X",
-        SIDE_MARKER_NEG_Y_ID: "-Y",
+        0: "+Z",
+        1: "+X",
+        2: "+Y",
+        3: "-X",
+        4: "-Y",
     })
 
-    marker_size_by_id: Dict[int, float] = field(default_factory=lambda: {
-        TOP_MARKER_NEG_Y_ID: TOP_MARKER_SIZE_M,
-        TOP_MARKER_POS_Y_ID: TOP_MARKER_SIZE_M,
-        SIDE_MARKER_POS_X_ID: SIDE_MARKER_SIZE_M,
-        SIDE_MARKER_POS_Y_ID: SIDE_MARKER_SIZE_M,
-        SIDE_MARKER_NEG_X_ID: SIDE_MARKER_SIZE_M,
-        SIDE_MARKER_NEG_Y_ID: SIDE_MARKER_SIZE_M,
+    # The validated cube definition uses a single shared local-corner convention,
+    # so image corners are consumed in detector order by default.
+    corner_reorder: Dict[int, list] = field(default_factory=lambda: {
+        0: [0, 1, 2, 3],
+        1: [0, 1, 2, 3],
+        2: [0, 1, 2, 3],
+        3: [0, 1, 2, 3],
+        4: [0, 1, 2, 3],
     })
 
-    marker_center_m: Dict[int, Tuple[float, float, float]] = field(default_factory=lambda: {
-        TOP_MARKER_NEG_Y_ID: (0.0, -0.014, 0.0295),
-        TOP_MARKER_POS_Y_ID: (0.0, 0.014, 0.0295),
-        SIDE_MARKER_POS_X_ID: (0.0295, 0.0, -0.001),
-        SIDE_MARKER_POS_Y_ID: (0.0, 0.0295, -0.001),
-        SIDE_MARKER_NEG_X_ID: (-0.0295, 0.0, -0.001),
-        SIDE_MARKER_NEG_Y_ID: (0.0, -0.0295, -0.001),
-    })
-
-    # Detector corner order correction. Keep identity unless a printed tag is
-    # physically rotated/mirrored and you have verified the required order.
-    corner_reorder: Dict[int, Tuple[int, int, int, int]] = field(default_factory=lambda: {
-        TOP_MARKER_NEG_Y_ID: (0, 1, 2, 3),
-        TOP_MARKER_POS_Y_ID: (0, 1, 2, 3),
-        SIDE_MARKER_POS_X_ID: (0, 1, 2, 3),
-        SIDE_MARKER_POS_Y_ID: (0, 1, 2, 3),
-        SIDE_MARKER_NEG_X_ID: (0, 1, 2, 3),
-        SIDE_MARKER_NEG_Y_ID: (0, 1, 2, 3),
-    })
-
-    # In-plane rotation around each face normal, degrees. Validate physically.
+    # per-marker in-plane rotation (deg) validated against the physical cube
     face_roll_deg: Dict[int, float] = field(default_factory=lambda: {
-        TOP_MARKER_NEG_Y_ID: 0.0,
-        TOP_MARKER_POS_Y_ID: 0.0,
-        SIDE_MARKER_POS_X_ID: 0.0,
-        SIDE_MARKER_POS_Y_ID: 0.0,
-        SIDE_MARKER_NEG_X_ID: 0.0,
-        SIDE_MARKER_NEG_Y_ID: 0.0,
+        0: 0.0, 1: 270.0, 2: 0.0, 3: 90.0, 4: 180.0
     })
 
-    # Recess hook. Default 0.0 means marker plane is the CAD outer surface.
-    # Set to 0.0001 only if you explicitly want to model 0.1mm inset depth.
-    marker_inset_m: float = 0.0
-
-    # Optional explicit marker pose override: marker_id -> 4x4 T_object_marker.
+    # Optional explicit rigid pose of each marker in the cube/object frame.
+    # When present, this overrides face-based geometry construction for that
+    # marker. corner_reorder is still used to map detector corners to the
+    # marker's local [0,1,2,3] order.
     marker_pose_4x4: Dict[int, list] = field(default_factory=dict)
 
 
 def get_default_cube_config() -> CubeConfig:
+    """Return a fresh copy of the canonical cube definition (CubeConfig dataclass defaults)."""
     return CubeConfig()
 
 
@@ -118,16 +65,18 @@ def get_default_cube_config_source() -> str:
 
 @dataclass
 class CharucoBoardConfig:
-    squares_x: int = 11
-    squares_y: int = 7
-    square_length_m: float = 0.025
-    marker_length_m: float = 0.018
-    dictionary_name: str = "DICT_4X4_250"
-    marker_id_start: int = 6  # cube uses 0..5 by default
+    """ChArUco board target configuration (for eye-in-hand / gripper camera)."""
+    squares_x: int = 11           # number of squares in X
+    squares_y: int = 7            # number of squares in Y
+    square_length_m: float = 0.025   # checker square side (m) - 25mm
+    marker_length_m: float = 0.018   # ArUco marker side (m) - 18mm
+    dictionary_name: str = "DICT_4X4_250"  # 7x11 board needs ~39 markers
+    marker_id_start: int = 5      # reserve cube IDs 0~4
 
 
 @dataclass
 class CameraStreamConfig:
+    """RealSense stream config."""
     color_w: int = 640
     color_h: int = 480
     depth_w: int = 640
@@ -137,19 +86,30 @@ class CameraStreamConfig:
 
 @dataclass
 class RobotConfig:
+    """Robot communication config."""
     host: str = "192.168.0.23"
     port: int = 12348
+    # Euler convention for your robot (ZYX intrinsic = extrinsic XYZ)
+    # robot_poses format: [x_mm, y_mm, z_mm, rz_deg, ry_deg, rx_deg]
     euler_order: str = "ZYX"
 
 
 @dataclass
 class CalibrationConfig:
+    """Calibration parameters."""
+    # ArUco detection
     min_markers: int = 1
     reproj_max_px: float = 10.0
     use_ransac: bool = True
-    handeye_method: int = 4  # cv2.CALIB_HAND_EYE_PARK
-    ref_fixed_cam_idx: int = 1
-    gripper_cam_idx: int = 0
+
+    # Hand-eye
+    handeye_method: int = 4   # cv2.CALIB_HAND_EYE_PARK
+
+    # Multi-cam
+    ref_fixed_cam_idx: int = 1       # which fixed camera is the reference
+    gripper_cam_idx: int = 0         # which cam index is the gripper camera
+
+    # Point cloud fusion
     z_min: float = 0.2
     z_max: float = 1.5
     stride: int = 4

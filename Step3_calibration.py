@@ -38,7 +38,7 @@ from typing import Dict, List, Optional, Any, Tuple
 import cv2
 import numpy as np
 
-from apriltag_cube import AprilTagCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt, inv_T
+from aruco_cube import ArucoCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt, inv_T
 from calibration_runtime_utils import (
     copy_depth_fields,
     cube_selection_profile_kwargs,
@@ -243,12 +243,14 @@ def load_robot_poses_from_meta(meta):
         T = None
         if "robot_pose_matrix_4x4" in cap:
             T = try_parse_T44(cap.get("robot_pose_matrix_4x4"))
-        if T is None and "capture_pose_matrix_4x4" in cap:
-            T = try_parse_T44(cap.get("capture_pose_matrix_4x4"))
+        if T is None:
+            m44 = cap.get("capture_gripper_pose_matrix_4x4", cap.get("capture_pose_matrix_4x4"))
+            if m44 is not None:
+                T = try_parse_T44(m44)
         if T is None:
             p6 = try_parse_pose6(cap.get("robot_pose_6dof"))
             if p6 is None:
-                p6 = try_parse_pose6(cap.get("capture_pose_6dof"))
+                p6 = try_parse_pose6(cap.get("capture_gripper_pose_6dof", cap.get("capture_pose_6dof")))
             if p6 is not None:
                 T = euler_deg_to_matrix(*p6)
         if T is not None:
@@ -485,7 +487,7 @@ def stored_cube_pose_candidates(cinfo: dict,
     return candidates
 
 
-def estimate_image_cube_pose_candidates(cube: AprilTagCubeTarget,
+def estimate_image_cube_pose_candidates(cube: ArucoCubeTarget,
                                         img: np.ndarray,
                                         K: np.ndarray,
                                         D: np.ndarray,
@@ -1151,7 +1153,7 @@ def build_gripper_base_pose_model(meta: dict,
         if eid not in cap_by_eid or eid not in robot_T:
             continue
         cap = cap_by_eid[eid]
-        pose6 = try_parse_pose6(cap.get("capture_pose_6dof"))
+        pose6 = try_parse_pose6(cap.get("capture_gripper_pose_6dof", cap.get("capture_pose_6dof")))
         if pose6 is None:
             pose6 = try_parse_pose6(cap.get("robot_pose_6dof"))
         if pose6 is None:
@@ -1527,7 +1529,7 @@ def main():
     print("=" * 60)
 
     pnp_obs: Dict[int, Dict[int, dict]] = {ci: {} for ci in all_cam_ids}
-    cube = AprilTagCubeTarget(cfg)
+    cube = ArucoCubeTarget(cfg)
 
     for cap in meta.get("captures", []):
         eid = int(cap.get("event_id", -1))
@@ -2463,7 +2465,7 @@ def main():
     # Summary
     # ══════════════════════════════════════════════════════════
     summary = {
-        "calibration_type": "unified_chapriltag_cube",
+        "calibration_type": "unified_charuco_cube",
         "handeye_data_source": "charuco" if use_charuco else "cube_pnp",
         "gripper_cam_idx": int(gripper_cam_idx),
         "ref_fixed_cam_idx": int(ref_fixed) if ref_fixed is not None else None,

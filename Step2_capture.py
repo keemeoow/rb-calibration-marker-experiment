@@ -6,17 +6,20 @@ Step 2: 멀티카메라 캘리브레이션용 캡처 수집.
   1. 로봇이 큐브를 놓고 `set`을 실행하면 set 기준 pose를 저장한다.
   2. 같은 set에서 그리퍼 카메라를 여러 자세로 이동시키며 촬영한다.
   3. 각 이벤트에서 모든 카메라(그리퍼 + 고정)가 동시에 color/depth를 저장한다.
-  4. AprilTag cube / gripper ChArUco를 즉시 검출하고 pose 후보와 품질 지표를 meta.json에 기록한다.
+  4. ArUco cube / gripper ChArUco를 즉시 검출하고 pose 후보와 품질 지표를 meta.json에 기록한다.
   5. `set_index`, robot pose, set_cube_center_6dof, capture gate 결과를 함께 저장한다.
 
-실행 명령어:
-python Step2_capture.py   \
+명령어:
+python Step2_capture.py \
     --root_folder ./data/session \
     --intrinsics_dir ./intrinsics \
     --use_robot --manual_robot \
     --robot_ip 192.168.0.23 --robot_port 12348 \
     --show --save_depth
 
+"""
+
+"""
 [서버코드 작동법] (큐브 위치별 멀티 캘리브레이션)
 # ── 1. 큐브를 바닥에 놓고 위치 저장 ──
 > set                         # 큐브 위치 #0 저장 (TCP, 관절값, 큐브 중점)
@@ -44,19 +47,6 @@ python Step2_capture.py   \
 참고:
   - depth 저장은 기본 ON이다. 끄려면 `--no-save-depth`를 사용한다.
   - downstream Step3는 여기 저장된 set_cube_center_6dof와 depth 품질 지표를 prior/selection에 사용한다.
-
-PC waypoint step mode:
-  python Step2_capture.py \
-      --root_folder ./data/session \
-      --intrinsics_dir ./intrinsics \
-      --use_robot \
-      --waypoint_file ./data/session/capture_waypoints.json
-
-  Controls in the preview window:
-    ENTER : move robot to the next saved waypoint
-    SPACE : capture at the current robot pose
-    ESC/q : quit
-
 """
 
 import os
@@ -73,7 +63,7 @@ import cv2
 import numpy as np
 
 from camera import RealSenseCamera
-from apriltag_cube import AprilTagCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt
+from aruco_cube import ArucoCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt
 from charuco_utils import CharucoTarget
 from config import CubeConfig, CharucoBoardConfig, get_default_cube_config
 from calibration_runtime_utils import resolve_cube_config_for_run
@@ -84,53 +74,12 @@ from cube_config_utils import (
     cube_configs_equivalent,
     load_cube_config_from_meta,
 )
-from robot_comm import PlaceCaptureClient, euler_deg_to_matrix
+from robot_comm import euler_deg_to_matrix
 
 
 def ensure_dir(p: str) -> str:
     os.makedirs(p, exist_ok=True)
     return p
-
-
-def _as_pose6(value) -> Optional[List[float]]:
-    if not isinstance(value, list) or len(value) != 6:
-        return None
-    try:
-        return [float(x) for x in value]
-    except Exception:
-        return None
-
-
-def normalize_waypoint_file_payload(payload) -> Tuple[List[dict], dict]:
-    if isinstance(payload, list):
-        return payload, {}
-    if isinstance(payload, dict):
-        waypoints = payload.get("waypoints")
-        if isinstance(waypoints, list):
-            return waypoints, payload
-    raise ValueError("Unsupported waypoint file format")
-
-
-def resolve_waypoint_motion(wp: dict, bundle: dict) -> Tuple[List[float], List[float], str, str]:
-    # Legacy generator format: {"place": [...], "capture": [...]}
-    place_pose = _as_pose6(wp.get("place"))
-    capture_pose = _as_pose6(wp.get("capture"))
-    if place_pose is not None and capture_pose is not None:
-        return place_pose, capture_pose, "tcp", "tcp"
-
-    # Replay format mirrored from robot server: prefer joints when available.
-    place_pose = _as_pose6(wp.get("place_joints"))
-    capture_pose = _as_pose6(wp.get("capture_joints"))
-    if place_pose is not None and capture_pose is not None:
-        return place_pose, capture_pose, "joint", "joint"
-
-    # Fallbacks when only TCP is available.
-    place_pose = _as_pose6(wp.get("place_tcp")) or _as_pose6(bundle.get("set_tcp"))
-    capture_pose = _as_pose6(wp.get("capture_tcp"))
-    if place_pose is not None and capture_pose is not None:
-        return place_pose, capture_pose, "tcp", "tcp"
-
-    raise ValueError(f"Waypoint is missing usable place/capture poses: keys={sorted(wp.keys())}")
 
 
 def annotate_image(bgr, cube, cam_idx, is_gripper, n_markers, ids, corners,
@@ -184,11 +133,13 @@ def annotate_image(bgr, cube, cam_idx, is_gripper, n_markers, ids, corners,
 
 
 def wait_for_start_command_capture(cams, cam_order, gripper_cam_idx,
-                                     extra_lines: Optional[List[str]] = None) -> bool:
+                                     extra_lines: Optional[List[str]] = None,
+                                     frame_builder=None, cube=None) -> bool:
     """캘리브레이션 캡처 시작 전 cv2 프리뷰 + 'start' 입력 대기.
 
-    아르코 큐브 / charuco 오버레이는 표시하지 않고, 단순 4-캠 raw 프리뷰 만
-    띄운다 (사용자가 카메라 시야/노출만 확인). 터미널에서:
+    `frame_builder`가 주어지면 각 카메라에서 인식되는 ArUco 큐브/보드/ChArUco
+    마커를 실시간으로 오버레이해서 보여준다 (마커 인식 상태까지 확인 가능).
+    주어지지 않으면 단순 4-캠 raw 프리뷰만 띄운다. 터미널에서:
       start  -> 캡처 메인 루프 진입 (창은 닫지 않고 후속 모드에서 같은 창 갱신)
       quit   -> 캡처 시작 안 하고 종료 (창 닫음)
     Returns: True 시작 / False 사용자 취소.
@@ -229,40 +180,69 @@ def wait_for_start_command_capture(cams, cam_order, gripper_cam_idx,
 
     win = "Capture Preview"
     while not start_event.is_set() and not quit_event.is_set():
-        tiles = []
-        tile_h = tile_w = None
-        for ci in cam_order:
-            cam = cams.get(ci)
-            color = None
-            if cam is not None:
-                color, _depth, _ts = cam.get_latest()
-            if color is not None:
-                if tile_h is None:
-                    tile_h, tile_w = color.shape[:2]
-                disp = color.copy()
-                tag = "GRIP" if (gripper_cam_idx is not None and ci == gripper_cam_idx) else "FIX"
-                col = (0, 200, 255) if tag == "GRIP" else (0, 255, 0)
-                cv2.putText(disp, f"cam{ci} [{tag}]", (10, 28),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, col, 2)
-                tiles.append(disp)
+        # frame_builder가 있으면 마커 검출 오버레이가 포함된 quad를 만든다.
+        if frame_builder is not None:
+            preview_frames = {}
+            for ci in cam_order:
+                cam = cams.get(ci)
+                if cam is None:
+                    continue
+                color, depth, ts_ms = cam.get_latest()
+                if color is None:
+                    continue
+                try:
+                    preview_frames[ci] = frame_builder(
+                        ci, color, depth, ts_ms,
+                        include_marker_poses=False,
+                        include_charuco_pose=False,
+                        log_pose_status=False,
+                    )
+                except Exception:
+                    continue
+            if preview_frames:
+                quad = make_quad_image(preview_frames, cam_order, cube, gripper_cam_idx)
             else:
-                if tile_h is None:
-                    tile_h, tile_w = 480, 640
-                blank = np.zeros((tile_h, tile_w, 3), dtype=np.uint8)
-                cv2.putText(blank, f"cam{ci} N/A", (20, tile_h // 2),
+                quad = np.zeros((480, 640, 3), dtype=np.uint8)
+                cv2.putText(quad, "no frames", (20, 240),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
-                tiles.append(blank)
-        while len(tiles) < 4:
-            tiles.append(np.zeros((tile_h or 480, tile_w or 640, 3), dtype=np.uint8))
-        tiles = tiles[:4]
-        top = cv2.hconcat([tiles[0], tiles[1]])
-        bot = cv2.hconcat([tiles[2], tiles[3]])
-        quad = cv2.vconcat([top, bot])
+        else:
+            tiles = []
+            tile_h = tile_w = None
+            for ci in cam_order:
+                cam = cams.get(ci)
+                color = None
+                if cam is not None:
+                    color, _depth, _ts = cam.get_latest()
+                if color is not None:
+                    if tile_h is None:
+                        tile_h, tile_w = color.shape[:2]
+                    disp = color.copy()
+                    tag = "GRIP" if (gripper_cam_idx is not None and ci == gripper_cam_idx) else "FIX"
+                    col = (0, 200, 255) if tag == "GRIP" else (0, 255, 0)
+                    cv2.putText(disp, f"cam{ci} [{tag}]", (10, 28),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, col, 2)
+                    tiles.append(disp)
+                else:
+                    if tile_h is None:
+                        tile_h, tile_w = 480, 640
+                    blank = np.zeros((tile_h, tile_w, 3), dtype=np.uint8)
+                    cv2.putText(blank, f"cam{ci} N/A", (20, tile_h // 2),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+                    tiles.append(blank)
+            while len(tiles) < 4:
+                tiles.append(np.zeros((tile_h or 480, tile_w or 640, 3), dtype=np.uint8))
+            tiles = tiles[:4]
+            top = cv2.hconcat([tiles[0], tiles[1]])
+            bot = cv2.hconcat([tiles[2], tiles[3]])
+            quad = cv2.vconcat([top, bot])
 
         # footer
         foot_h = 28 + 26 * (1 + (len(extra_lines) if extra_lines else 0))
         foot = np.zeros((foot_h, quad.shape[1], 3), dtype=np.uint8)
-        cv2.putText(foot, "[WAITING] Type 'start' + ENTER in terminal to begin",
+        wait_txt = ("[WAITING] live marker overlay — Type 'start' + ENTER in terminal to begin"
+                    if frame_builder is not None
+                    else "[WAITING] Type 'start' + ENTER in terminal to begin")
+        cv2.putText(foot, wait_txt,
                     (12, 22), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 255), 1)
         if extra_lines:
             y = 48
@@ -592,7 +572,7 @@ def marker_aspect_ratio(img_pts: np.ndarray) -> float:
 
 
 def estimate_per_marker_poses(
-    cube: AprilTagCubeTarget,
+    cube: ArucoCubeTarget,
     corners_list: list,
     ids: np.ndarray,
     K: np.ndarray,
@@ -779,8 +759,6 @@ def main():
     parser.add_argument("--use_robot", action="store_true")
     parser.add_argument("--robot_ip", type=str, default="192.168.0.23")
     parser.add_argument("--robot_port", type=int, default=12348)
-    parser.add_argument("--waypoint_file", type=str, default=None,
-                        help="JSON file with list of {place, capture} waypoint pairs")
     parser.add_argument("--manual_robot", action="store_true",
                         help="Manual robot mode: server sends capture commands interactively (use with robot_calb.py)")
     parser.add_argument("--settle_time", type=float, default=1.5,
@@ -875,7 +853,7 @@ def main():
         cube_config_json=args.cube_config_json,
         default_cfg=get_default_cube_config(),
     )
-    cube = AprilTagCubeTarget(cfg)
+    cube = ArucoCubeTarget(cfg)
     _cube_ids = set(cfg.marker_ids)  # {0,1,2,3,4} — filter out board markers
     print(f"[INFO] Cube config source: {cube_cfg_source}")
     print(f"[INFO] Cube id_to_face: {cfg.id_to_face}")
@@ -908,23 +886,10 @@ def main():
 
     # (Board marker detection uses charuco.detect() directly — no separate detector needed)
 
-    # ─── 웨이포인트 로드 ───
-    waypoint_list: List[dict] = []
-    waypoint_bundle: dict = {}
-    if args.waypoint_file:
-        with open(args.waypoint_file, "r") as f:
-            waypoint_payload = json.load(f)
-        waypoint_list, waypoint_bundle = normalize_waypoint_file_payload(waypoint_payload)
-        print(f"[INFO] Loaded {len(waypoint_list)} waypoints from {args.waypoint_file}")
-
     # ─── 로봇 클라이언트 ───
     # start 게이트 전에 연결을 끝내서 cv2 창이 응답 없음 상태가 되지 않도록 한다.
-    robot_client: Optional[PlaceCaptureClient] = None
     manual_sock = None
-    if args.use_robot and not args.manual_robot:
-        robot_client = PlaceCaptureClient(args.robot_ip, args.robot_port)
-        robot_client.connect()
-    elif args.use_robot and args.manual_robot:
+    if args.use_robot and args.manual_robot:
         import socket as _sock
         manual_sock = _sock.socket(_sock.AF_INET, _sock.SOCK_STREAM)
         manual_sock.settimeout(None)
@@ -1090,30 +1055,27 @@ def main():
         if args.use_robot:
             extra.append(f"robot {args.robot_ip}:{args.robot_port}"
                          + (" (manual)" if args.manual_robot else ""))
-        if waypoint_list:
-            extra.append(f"{len(waypoint_list)} waypoints loaded")
-        if not wait_for_start_command_capture(cams, cam_order, gripper_cam_idx, extra):
+        if not wait_for_start_command_capture(cams, cam_order, gripper_cam_idx, extra,
+                                               frame_builder=build_frame_record, cube=cube):
             for cam in cams.values():
                 cam.stop()
             cv2.destroyAllWindows()
             return
 
     print("\nControls:")
-    if args.use_robot and waypoint_list and not args.manual_robot:
-        print("  ENTER : move robot to next saved waypoint")
-        print("  SPACE : capture at current robot pose")
-    else:
-        print("  SPACE : manual capture (if in manual mode)")
+    print("  SPACE : manual capture (if in manual mode)")
     print("  ESC/q : quit\n")
 
     def do_capture(
-        capture_pose_6dof: Optional[List[float]] = None,
+        capture_gripper_pose_6dof: Optional[List[float]] = None,
         place_pose_6dof: Optional[List[float]] = None,
-        pose_index: Optional[int] = None,
-        grip_target_tvec: Optional[List[float]] = None,
-        robot_joints_6dof: Optional[List[float]] = None,
+        capture_index: Optional[int] = None,
+        capture_robot_joints_6dof: Optional[List[float]] = None,
         set_cube_center_6dof: Optional[List[float]] = None,
         set_index: Optional[int] = None,
+        cube_gripped: Optional[bool] = None,
+        capture_block: Optional[str] = None,
+        grasp_id: Optional[int] = None,
     ) -> Tuple[bool, dict]:
         """모든 카메라에서 마커별 포즈 추정과 함께 촬영."""
         nonlocal event_id
@@ -1171,7 +1133,7 @@ def main():
         fid = int(event_id)
         cap_rec: dict = {
             "event_id": fid,
-            "pose_index": pose_index,
+            "capture_index": capture_index,
             "capture_span_ms": float(capture_span_ms),
             "capture_gate": gate,
             "cams": {},
@@ -1180,29 +1142,34 @@ def main():
         # 로봇 포즈 데이터
         # capture_pose = 이미지 촬영 시 현재 로봇 TCP
         # Step3에서 참조: robot_pose_6dof / robot_pose_matrix_4x4
-        robot_tcp = capture_pose_6dof or place_pose_6dof
+        robot_tcp = capture_gripper_pose_6dof or place_pose_6dof
         if robot_tcp is not None:
             tcp_f = [float(x) for x in robot_tcp]
             cap_rec["robot_pose_6dof"] = tcp_f        # Step3 compatible
-            cap_rec["capture_pose_6dof"] = tcp_f      # new2 format
+            cap_rec["capture_gripper_pose_6dof"] = tcp_f
             try:
                 T44 = euler_deg_to_matrix(*tcp_f).tolist()
                 cap_rec["robot_pose_matrix_4x4"] = T44  # Step3 compatible
-                cap_rec["capture_pose_matrix_4x4"] = T44
+                cap_rec["capture_gripper_pose_matrix_4x4"] = T44
             except Exception:
                 pass
 
-        if grip_target_tvec is not None:
-            cap_rec["grip_target_tvec"] = [float(x) for x in grip_target_tvec]
-
-        if robot_joints_6dof is not None:
-            cap_rec["robot_joints_6dof"] = [float(x) for x in robot_joints_6dof]
+        if capture_robot_joints_6dof is not None:
+            cap_rec["capture_robot_joints_6dof"] = [float(x) for x in capture_robot_joints_6dof]
 
         if set_cube_center_6dof is not None:
             cap_rec["set_cube_center_6dof"] = [float(x) for x in set_cube_center_6dof]
 
         if set_index is not None:
             cap_rec["set_index"] = set_index
+
+        # capture-block tags so Step3 can separate (a) placement vs (b) eye-to-hand frames
+        if cube_gripped is not None:
+            cap_rec["cube_gripped"] = bool(cube_gripped)
+        if capture_block is not None:
+            cap_rec["capture_block"] = str(capture_block)
+        if grasp_id is not None:
+            cap_rec["grasp_id"] = int(grasp_id)
 
         if place_pose_6dof is not None and place_pose_6dof != robot_tcp:
             cap_rec["place_pose_6dof"] = [float(x) for x in place_pose_6dof]
@@ -1406,29 +1373,33 @@ def main():
                             continue
 
                         if cmd == "capture":
-                            capture_tcp = msg.get("capture_pose_6dof")
-                            pose_idx = msg.get("pose_index", event_id)
-                            g_tvec = msg.get("grip_target_tvec")
-                            r_joints = msg.get("robot_joints_6dof")
+                            capture_tcp = msg.get("capture_gripper_pose_6dof")
+                            pose_idx = msg.get("capture_index", event_id)
+                            r_joints = msg.get("capture_robot_joints_6dof")
                             s_cube = msg.get("set_cube_center_6dof")
                             s_idx = msg.get("set_index")
                             m_set_joints = msg.get("set_joints")
                             m_set_tcp = msg.get("set_tcp")
                             m_place_joints = msg.get("place_joints")
+                            m_gripped = msg.get("cube_gripped")
+                            m_block = msg.get("capture_block")
+                            m_grasp = msg.get("grasp_id")
 
-                            print(f"\n[ManualRobot] Capture signal received (pose_index={pose_idx}, set_index={s_idx})")
+                            print(f"\n[ManualRobot] Capture signal received (capture_index={pose_idx}, set_index={s_idx})")
                             if capture_tcp:
                                 print(f"  TCP: {capture_tcp}")
                             if r_joints:
                                 print(f"  Joints: {r_joints}")
 
                             saved, gate = do_capture(
-                                capture_pose_6dof=capture_tcp,
-                                pose_index=pose_idx,
-                                grip_target_tvec=g_tvec,
-                                robot_joints_6dof=r_joints,
+                                capture_gripper_pose_6dof=capture_tcp,
+                                capture_index=pose_idx,
+                                capture_robot_joints_6dof=r_joints,
                                 set_cube_center_6dof=s_cube,
                                 set_index=s_idx,
+                                cube_gripped=m_gripped,
+                                capture_block=m_block,
+                                grasp_id=m_grasp,
                             )
 
                             status = "success" if saved else "skipped"
@@ -1450,10 +1421,10 @@ def main():
                                 wp_set_cube_center = s_cube
 
                             wp_entry = {
-                                "pose_index": pose_idx,
+                                "capture_index": pose_idx,
                                 "capture_joints": r_joints,
                                 "capture_tcp": capture_tcp,
-                                "cube_center_6dof": msg.get("cube_center_pose_6dof"),
+                                "cube_center_6dof": msg.get("capture_cube_center_6dof"),
                                 "set_index": s_idx,
                             }
                             if m_place_joints is not None:
@@ -1465,64 +1436,6 @@ def main():
                             else:
                                 print(f"[SKIP] Capture {pose_idx} skipped")
 
-                        elif cmd == "detect":
-                            if gripper_cam_idx is None or gripper_cam_idx not in cams:
-                                resp = json.dumps({"ok": False, "reason": "no_gripper_cam"})
-                                try:
-                                    manual_sock.sendall((resp + "\n").encode("utf-8"))
-                                except OSError:
-                                    break
-                                continue
-                            if gripper_cam_idx not in cam_intrinsics:
-                                resp = json.dumps({"ok": False, "reason": "no_intrinsics"})
-                                try:
-                                    manual_sock.sendall((resp + "\n").encode("utf-8"))
-                                except OSError:
-                                    break
-                                continue
-
-                            g_color, g_depth, _ = cams[gripper_cam_idx].get_latest()
-                            if g_color is None:
-                                resp = json.dumps({"ok": False, "reason": "no_image"})
-                                try:
-                                    manual_sock.sendall((resp + "\n").encode("utf-8"))
-                                except OSError:
-                                    break
-                                continue
-
-                            g_K, g_D, g_depth_scale = cam_intrinsics[gripper_cam_idx]
-                            detect_info = detect_cube_markers_in_frame(
-                                g_color, cube,
-                                cube_ids=cfg.marker_ids,
-                                charuco=charuco,
-                                is_gripper=True,
-                                board_mask_pad_px=float(args.board_mask_pad_px),
-                            )
-                            det_ok, det_rv, det_tv, det_used = cube.solve_pnp_cube(
-                                detect_info["cube_image"], g_K, g_D, use_ransac=False, min_markers=1,
-                                reproj_thr_mean_px=10.0,
-                                min_aspect=float(args.gripper_cube_min_aspect),
-                                depth_u16=g_depth, depth_scale=g_depth_scale)
-
-                            if det_ok:
-                                resp = json.dumps({
-                                    "ok": True,
-                                    "tvec": det_tv.flatten().tolist(),
-                                    "rvec": det_rv.flatten().tolist(),
-                                    "used_ids": [int(x) for x in det_used],
-                                })
-                                print(f"[Detect] tvec=[{det_tv[0][0]:.4f}, {det_tv[1][0]:.4f}, {det_tv[2][0]:.4f}] ids={det_used}")
-                            else:
-                                resp = json.dumps({"ok": False, "reason": "detection_failed",
-                                                   "n_markers": len(det_used) if det_used else 0})
-                                print(
-                                    f"[Detect] Failed (cube_ids={det_used}, "
-                                    f"raw_ids={detect_info['raw_ids']}, mask={detect_info['board_mask_applied']})"
-                                )
-                            try:
-                                manual_sock.sendall((resp + "\n").encode("utf-8"))
-                            except OSError:
-                                break
                         else:
                             print(f"[ManualRobot] Unknown command: {cmd}")
                 except Exception as e:
@@ -1605,189 +1518,6 @@ def main():
 
             print(f"\n[DONE] Manual robot capture complete. {event_id} captures saved.")
 
-        elif args.use_robot and waypoint_list:
-            # ─── Robot waypoint step mode (ENTER=move, SPACE=capture) ───
-            print("[MODE] Robot waypoint step mode")
-            print(f"[INFO] {len(waypoint_list)} waypoints loaded")
-            print("[INFO] Press ENTER to move to the next waypoint, then SPACE to save the capture.\n")
-
-            waypoint_cursor = 0
-            pending_capture = None
-            status_line = "Press ENTER to move the robot to waypoint 1."
-
-            def build_live_preview_frames() -> Dict[int, dict]:
-                live_frames: Dict[int, dict] = {}
-                for ci, cam in cams.items():
-                    color, depth, ts_ms = cam.get_latest()
-                    if color is None:
-                        continue
-                    live_frames[ci] = build_frame_record(
-                        ci, color, depth, ts_ms,
-                        include_marker_poses=False,
-                        include_charuco_pose=False,
-                        log_pose_status=False,
-                    )
-                return live_frames
-
-            try:
-                while True:
-                    live_frames = build_live_preview_frames()
-                    quad = make_quad_image(live_frames, cam_order, cube, gripper_cam_idx)
-                    gate = evaluate_capture_gate(
-                        live_frames,
-                        capture_gate_cfg,
-                        gripper_cam_idx=gripper_cam_idx,
-                    )
-                    gate_lines = build_capture_gate_lines(gate, gripper_cam_idx, live_frames)
-                    footer_h = 28 * (2 + len(gate_lines)) + 16
-                    footer = np.zeros((footer_h, quad.shape[1], 3), dtype=np.uint8)
-                    if waypoint_cursor < len(waypoint_list):
-                        next_pose_index = waypoint_list[waypoint_cursor].get("pose_index", waypoint_cursor)
-                        next_set_index = waypoint_list[waypoint_cursor].get("set_index")
-                        next_txt = f"Next waypoint: idx={waypoint_cursor + 1}/{len(waypoint_list)} pose_index={next_pose_index} set_index={next_set_index}"
-                    else:
-                        next_txt = f"Next waypoint: completed ({len(waypoint_list)}/{len(waypoint_list)})"
-                    cv2.putText(footer, next_txt, (12, 24),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.62, (255, 255, 255), 2)
-                    cv2.putText(footer, status_line, (12, 54),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.60, (0, 255, 255), 2)
-                    for line_idx, gate_line in enumerate(gate_lines):
-                        color = (0, 255, 0) if (line_idx == 0 and gate["pass"]) else (
-                            (0, 0, 255) if line_idx == 0 else (255, 255, 255)
-                        )
-                        cv2.putText(
-                            footer,
-                            gate_line,
-                            (12, 84 + line_idx * 28),
-                            cv2.FONT_HERSHEY_SIMPLEX,
-                            0.56,
-                            color,
-                            2,
-                        )
-                    preview = cv2.vconcat([quad, footer])
-                    cv2.imshow("Capture Preview", preview)
-
-                    key = cv2.waitKey(30) & 0xFF
-                    if key in (27, ord('q')):
-                        if pending_capture is not None:
-                            try:
-                                robot_client.send_captured("aborted", reason="user quit before capture")
-                            except Exception:
-                                pass
-                        break
-
-                    if key in (10, 13):
-                        if pending_capture is not None:
-                            status_line = "Capture is pending. Press SPACE to save before moving again."
-                            print("[WARN] Capture is pending. Press SPACE before requesting the next waypoint.")
-                            continue
-                        if waypoint_cursor >= len(waypoint_list):
-                            status_line = "All waypoints completed. Press q to quit."
-                            print("[INFO] All waypoints have already been processed.")
-                            continue
-
-                        wp = waypoint_list[waypoint_cursor]
-                        try:
-                            place_pose, capture_pose, place_kind, capture_kind = resolve_waypoint_motion(
-                                wp, waypoint_bundle)
-                        except Exception as e:
-                            status_line = f"Waypoint parse failed: {e}"
-                            print(f"[ERROR] Failed to parse waypoint {waypoint_cursor + 1}: {e}")
-                            continue
-
-                        extra_fields = {}
-                        if wp.get("pose_index") is not None:
-                            extra_fields["pose_index"] = int(wp["pose_index"])
-                        if wp.get("set_index") is not None:
-                            extra_fields["set_index"] = int(wp["set_index"])
-                        if _as_pose6(wp.get("capture_tcp")) is not None:
-                            extra_fields["capture_tcp"] = _as_pose6(wp.get("capture_tcp"))
-                        if _as_pose6(wp.get("cube_center_6dof")) is not None:
-                            extra_fields["cube_center_6dof"] = _as_pose6(wp.get("cube_center_6dof"))
-
-                        print(f"\n[Robot] Move request {waypoint_cursor + 1}/{len(waypoint_list)}")
-                        print(f"  pose_index: {wp.get('pose_index', waypoint_cursor)} set_index: {wp.get('set_index')}")
-                        print(f"  place ({place_kind}):   {place_pose}")
-                        print(f"  capture ({capture_kind}): {capture_pose}")
-
-                        try:
-                            ok, actual_capture_tcp, actual_place_tcp = robot_client.run_single_waypoint(
-                                place_pose,
-                                capture_pose,
-                                place_kind=place_kind,
-                                capture_kind=capture_kind,
-                                extra_fields=extra_fields,
-                            )
-                        except Exception as e:
-                            print(f"[ERROR] Robot communication error: {e}")
-                            break
-
-                        if not ok:
-                            print("[INFO] Robot quit or error.")
-                            break
-
-                        pending_capture = {
-                            "waypoint": wp,
-                            "actual_capture_tcp": actual_capture_tcp,
-                            "actual_place_tcp": actual_place_tcp,
-                        }
-                        status_line = (
-                            f"Robot is at pose_index={wp.get('pose_index', waypoint_cursor)}. "
-                            "Press SPACE to capture."
-                        )
-                        print("[INFO] Robot reached capture pose. Press SPACE to save images.")
-                        continue
-
-                    if key == 32:  # SPACE
-                        if pending_capture is None:
-                            status_line = "No robot pose is active. Press ENTER first."
-                            print("[WARN] No active waypoint. Press ENTER to move the robot first.")
-                            continue
-
-                        wp = pending_capture["waypoint"]
-                        capture_tcp = pending_capture["actual_capture_tcp"] or _as_pose6(wp.get("capture_tcp"))
-                        place_tcp = pending_capture["actual_place_tcp"]
-                        saved, gate = do_capture(
-                            capture_pose_6dof=capture_tcp,
-                            place_pose_6dof=place_tcp,
-                            pose_index=int(wp.get("pose_index", waypoint_cursor)),
-                            robot_joints_6dof=_as_pose6(wp.get("capture_joints")),
-                            set_cube_center_6dof=(
-                                _as_pose6(wp.get("cube_center_6dof")) or
-                                _as_pose6(waypoint_bundle.get("set_cube_center"))
-                            ),
-                            set_index=wp.get("set_index"),
-                        )
-
-                        capture_status = "success" if saved else "skipped"
-                        try:
-                            robot_client.send_captured(capture_status, reason=gate.get("reason"))
-                        except Exception as e:
-                            print(f"[ERROR] Failed to acknowledge capture: {e}")
-                            break
-
-                        if saved:
-                            print(f"[OK] Waypoint {waypoint_cursor + 1} captured successfully")
-                            status_line = f"Capture saved for waypoint {waypoint_cursor + 1}. Press ENTER for the next waypoint."
-                        else:
-                            print(f"[WARN] Waypoint {waypoint_cursor + 1} capture skipped")
-                            status_line = (
-                                f"Capture skipped for waypoint {waypoint_cursor + 1}: "
-                                f"{gate.get('reason', 'unknown')}"
-                            )
-
-                        waypoint_cursor += 1
-                        pending_capture = None
-
-            finally:
-                try:
-                    robot_client.wait_for_ready()
-                    robot_client.send_quit()
-                except Exception:
-                    pass
-
-            print(f"\n[DONE] Robot waypoint step capture complete. {event_id} captures saved.")
-
         else:
             # ─── Manual mode ───
             print("[MODE] Manual capture (press SPACE)")
@@ -1845,8 +1575,6 @@ def main():
     finally:
         for cam in cams.values():
             cam.stop()
-        if robot_client:
-            robot_client.close()
         cv2.destroyAllWindows()
 
     print(f"\n[DONE] Total captures: {event_id}")
