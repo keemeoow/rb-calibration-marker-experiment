@@ -18,10 +18,10 @@ from typing import Dict, Tuple
 # =============================================================================
 TOP_MARKER_NEG_Y_ID = 0   # +Z top face, center: (0, -14, +29.5) mm
 TOP_MARKER_POS_Y_ID = 1   # +Z top face, center: (0, +14, +29.5) mm
-SIDE_MARKER_POS_X_ID = 4  # +X side face, center: (+29.5, 0, -1) mm
-SIDE_MARKER_POS_Y_ID = 5  # +Y side face, center: (0, +29.5, -1) mm
-SIDE_MARKER_NEG_X_ID = 6  # -X side face, center: (-29.5, 0, -1) mm
-SIDE_MARKER_NEG_Y_ID = 7  # -Y side face, center: (0, -29.5, -1) mm
+SIDE_MARKER_POS_X_ID = 2  # +X side face, center: (+29.5, 0, -1) mm
+SIDE_MARKER_POS_Y_ID = 3  # +Y side face, center: (0, +29.5, -1) mm
+SIDE_MARKER_NEG_X_ID = 4  # -X side face, center: (-29.5, 0, -1) mm
+SIDE_MARKER_NEG_Y_ID = 5  # -Y side face, center: (0, -29.5, -1) mm
 
 TOP_MARKER_SIZE_M = 0.025
 SIDE_MARKER_SIZE_M = 0.051
@@ -127,4 +127,4 @@ class CharucoBoardConfig:
     square_length_m: float = 0.025
     marker_length_m: float = 0.018
     dictionary_name: str = "DICT_4X4_250"
-    marker_id_start: int = 8  # cube uses 0,1,4,5,6,7; keep Charuco IDs separate
+    marker_id_start: int = 8  # cube uses 0,1,2,3,4,5; keep Charuco IDs separate
