@@ -25,7 +25,7 @@ from typing import Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 
-from aruco_cube import ArucoCubeTarget, inv_T, rodrigues_to_Rt
+from apriltag_cube import AprilTagCubeTarget, inv_T, rodrigues_to_Rt
 from calibration_runtime_utils import (
     build_capture_cube_candidate_map,
     build_cube_pose_candidates,
@@ -35,6 +35,7 @@ from calibration_runtime_utils import (
     load_intrinsics_color,
     load_intrinsics_with_depth_scale,
     load_robot_pose_from_capture,
+    rotation_error_deg,
     resolve_cube_config_for_run,
     select_consistent_event_cube_candidates,
     select_primary_cube_candidate,
@@ -54,12 +55,6 @@ from Step4_verify import collect_cube_candidate_diagnostics
 def ensure_dir(path: str) -> str:
     os.makedirs(path, exist_ok=True)
     return path
-
-
-def rotation_error_deg(Ra: np.ndarray, Rb: np.ndarray) -> float:
-    dR = Ra @ Rb.T
-    c = np.clip((np.trace(dR) - 1.0) / 2.0, -1.0, 1.0)
-    return float(np.degrees(np.arccos(c)))
 
 
 load_calib = load_calib_dir
@@ -195,7 +190,7 @@ def compute_cross_camera_metrics(meta: dict, transforms: Dict[str, np.ndarray],
     cube = None
     K_map, D_map, depth_scale_map = {}, {}, {}
     if use_current_cube:
-        cube = ArucoCubeTarget(cube_cfg)
+        cube = AprilTagCubeTarget(cube_cfg)
         for ci in all_cam_ids:
             K_map[ci], D_map[ci], depth_scale_map[ci] = load_intrinsics_with_depth_scale(intrinsics_dir, ci)
     profile_kwargs = cube_selection_profile_kwargs(selection_profile)
@@ -264,7 +259,7 @@ def compute_cross_camera_metrics(meta: dict, transforms: Dict[str, np.ndarray],
 def compute_reprojection_metrics(meta: dict, transforms: Dict[str, np.ndarray], intrinsics_dir: str,
                                  all_cam_ids: List[int], root_folder: str, gripper_cam_idx: Optional[int],
                                  cube_cfg: CubeConfig, include_meta: bool = False) -> dict:
-    cube = ArucoCubeTarget(cube_cfg)
+    cube = AprilTagCubeTarget(cube_cfg)
     K_map, D_map, depth_scale_map = {}, {}, {}
     for ci in all_cam_ids:
         K_map[ci], D_map[ci], depth_scale_map[ci] = load_intrinsics_with_depth_scale(intrinsics_dir, ci)

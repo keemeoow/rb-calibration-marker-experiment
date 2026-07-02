@@ -358,41 +358,145 @@ class AprilTagCubeTarget:
         return (ok_final, rvec, tvec, used, reproj) if return_reproj else (ok_final, rvec, tvec, used)
 
 
-EXPECTED_59MM_CUBE = {
-    0: (0.025, (0.0, -0.014, 0.0295)),
-    1: (0.025, (0.0, 0.014, 0.0295)),
-    2: (0.051, (0.0295, 0.0, -0.001)),
-    3: (0.051, (0.0, 0.0295, -0.001)),
-    4: (0.051, (-0.0295, 0.0, -0.001)),
-    5: (0.051, (0.0, -0.0295, -0.001)),
+# Outward normal of each cube face in the object frame. A marker's local +Z
+# axis (T_object_marker[:3, 2]) must equal the normal of the face it sits on.
+FACE_OUTWARD_NORMAL: Dict[str, np.ndarray] = {
+    "+X": np.array([1.0, 0.0, 0.0]),
+    "-X": np.array([-1.0, 0.0, 0.0]),
+    "+Y": np.array([0.0, 1.0, 0.0]),
+    "-Y": np.array([0.0, -1.0, 0.0]),
+    "+Z": np.array([0.0, 0.0, 1.0]),
+    "-Z": np.array([0.0, 0.0, -1.0]),
 }
 
+# Which cartesian axis is "out of plane" for each face, and its sign.
+_FACE_AXIS = {"+X": (0, +1), "-X": (0, -1), "+Y": (1, +1), "-Y": (1, -1), "+Z": (2, +1), "-Z": (2, -1)}
 
-def print_cube_sanity_check(cfg: Optional[CubeConfig] = None, tol_m: float = 1e-9) -> bool:
+
+def charuco_marker_ids(charuco_cfg) -> set:
+    """IDs an OpenCV CharucoBoard occupies: start .. start + floor(sx*sy/2) - 1."""
+    count = (int(charuco_cfg.squares_x) * int(charuco_cfg.squares_y)) // 2
+    start = int(getattr(charuco_cfg, "marker_id_start", 0))
+    return set(range(start, start + count))
+
+
+def validate_cube_config(
+    cfg: Optional[CubeConfig] = None,
+    charuco_cfg=None,
+    tol_m: float = 1e-6,
+) -> Tuple[bool, List[str]]:
+    """Validate that the CubeConfig is physically self-consistent.
+
+    Checks (each failure is appended to ``problems``):
+      1. marker IDs are unique
+      2. every marker size matches its face group (+Z top vs. side face)
+      3. every marker center lies on its declared face plane
+      4. each marker's local +Z axis equals the face outward normal
+      5. no marker ID collides with the Charuco board ID range
+      6. all four corners of every marker fall inside the cube face bounds
+
+    Units are meters throughout. Returns ``(ok, problems)``.
+    """
+    from config import TOP_MARKER_SIZE_M, SIDE_MARKER_SIZE_M
+
     cfg = cfg or get_default_cube_config()
     model = AprilTagCubeModel(cfg)
-    all_ok = abs(float(cfg.cube_side_m) - 0.059) <= tol_m
+    problems: List[str] = []
+
+    d = float(cfg.cube_side_m) / 2.0
+    inset = float(getattr(cfg, "marker_inset_m", 0.0) or 0.0)
+
+    # 1) unique IDs
+    ids = [int(m) for m in cfg.marker_ids]
+    dupes = sorted({m for m in ids if ids.count(m) > 1})
+    if dupes:
+        problems.append(f"[unique] duplicate marker IDs: {dupes}")
+
+    # 5) charuco collision (compute once)
+    if charuco_cfg is None:
+        try:
+            from config import CharucoBoardConfig
+            charuco_cfg = CharucoBoardConfig()
+        except Exception:
+            charuco_cfg = None
+    charuco_ids = charuco_marker_ids(charuco_cfg) if charuco_cfg is not None else set()
+    collide = sorted(set(ids) & charuco_ids)
+    if collide:
+        problems.append(
+            f"[collision] cube IDs {collide} overlap Charuco range "
+            f"[{min(charuco_ids)}..{max(charuco_ids)}]; raise CharucoBoardConfig.marker_id_start"
+        )
+
+    for mid in ids:
+        face = cfg.id_to_face.get(mid)
+        if face is None:
+            problems.append(f"[face] id {mid} has no id_to_face entry")
+            continue
+        if face not in _FACE_AXIS:
+            problems.append(f"[face] id {mid} has unknown face '{face}'")
+            continue
+
+        # 2) size matches face group
+        size = model.marker_size(mid)
+        expected_size = TOP_MARKER_SIZE_M if face == "+Z" else SIDE_MARKER_SIZE_M
+        if abs(size - expected_size) > tol_m:
+            problems.append(
+                f"[size] id {mid} on face {face}: size {size:.4f}m != expected {expected_size:.4f}m"
+            )
+
+        pose = model.marker_pose_in_rig(mid)
+        center = pose[:3, 3]
+        normal = pose[:3, 2]
+
+        # 3) center lies on the face plane (out-of-plane coord == +/-(d - inset))
+        axis, sign = _FACE_AXIS[face]
+        expected_coord = sign * (d - inset)
+        if abs(center[axis] - expected_coord) > tol_m:
+            problems.append(
+                f"[center] id {mid} on face {face}: axis-{axis} coord {center[axis]:+.4f} "
+                f"!= face plane {expected_coord:+.4f}"
+            )
+
+        # 4) marker normal == face outward normal
+        if not np.allclose(normal, FACE_OUTWARD_NORMAL[face], atol=1e-6):
+            problems.append(
+                f"[normal] id {mid} on face {face}: marker +Z {np.round(normal, 4).tolist()} "
+                f"!= face normal {FACE_OUTWARD_NORMAL[face].tolist()}"
+            )
+
+        # 6) all corners inside the cube bounding box (fit on the face)
+        corners = model.marker_corners_in_rig(mid)
+        if np.any(np.abs(corners) > d + tol_m):
+            worst = float(np.max(np.abs(corners)))
+            problems.append(
+                f"[bounds] id {mid} on face {face}: a corner reaches {worst:.4f}m > half-cube {d:.4f}m"
+            )
+
+    return (len(problems) == 0), problems
+
+
+def print_cube_sanity_check(cfg: Optional[CubeConfig] = None, charuco_cfg=None, tol_m: float = 1e-6) -> bool:
+    cfg = cfg or get_default_cube_config()
+    model = AprilTagCubeModel(cfg)
+    ok, problems = validate_cube_config(cfg, charuco_cfg=charuco_cfg, tol_m=tol_m)
 
     print("=== AprilTag 59mm cube sanity check ===")
-    print(f"cube_side_m = {cfg.cube_side_m:.6f}  dictionary = {cfg.dictionary_name}")
-    print(f"{'id':>3} {'face':>4} {'size_m':>8}  {'center_m':>32}  status")
-    for mid in cfg.marker_ids:
-        mid = int(mid)
+    print(f"cube_side_m = {cfg.cube_side_m:.6f}  dictionary = {cfg.dictionary_name}  "
+          f"marker_inset_m = {getattr(cfg, 'marker_inset_m', 0.0):.4f}")
+    print(f"{'id':>3} {'face':>4} {'size_m':>8}  {'center_m':>26}  {'normal':>14}")
+    for mid in (int(m) for m in cfg.marker_ids):
         size = model.marker_size(mid)
-        center = model.marker_pose_in_rig(mid)[:3, 3]
-        expected = EXPECTED_59MM_CUBE.get(mid)
-        if expected is None:
-            ok = True
-            status = "SKIP(no fixed expected)"
-        else:
-            exp_size, exp_center = expected
-            ok = abs(size - exp_size) <= tol_m and np.allclose(center, exp_center, atol=tol_m)
-            status = "OK" if ok else "BAD"
-        all_ok = all_ok and ok
+        pose = model.marker_pose_in_rig(mid)
+        c, n = pose[:3, 3], pose[:3, 2]
         print(f"{mid:>3} {cfg.id_to_face.get(mid, '?'):>4} {size:>8.4f}  "
-              f"({center[0]:+.4f}, {center[1]:+.4f}, {center[2]:+.4f})  {status}")
-    print(f"RESULT: {'ALL MATCH CAD SPEC' if all_ok else 'MISMATCH'}")
-    return bool(all_ok)
+              f"({c[0]:+.4f},{c[1]:+.4f},{c[2]:+.4f})  ({n[0]:+.0f},{n[1]:+.0f},{n[2]:+.0f})")
+    if ok:
+        print("RESULT: OK - cube config is physically self-consistent")
+    else:
+        print("RESULT: MISMATCH")
+        for p in problems:
+            print(f"  - {p}")
+    return bool(ok)
 
 
 if __name__ == "__main__":

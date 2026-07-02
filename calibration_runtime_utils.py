@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 
-from aruco_cube import ArucoCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt
+from apriltag_cube import AprilTagCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt
 from charuco_utils import CharucoTarget
 from config import (
     CharucoBoardConfig,
@@ -56,38 +56,6 @@ def observation_weight(cand: dict,
     face_w = candidate_face_weight(cand, single_face_weight)
     depth_p = candidate_depth_penalty(cand, missing_penalty=float(depth_penalty_max))
     return marker_support * face_w / err_mean / (1.0 + float(depth_penalty_factor) * depth_p)
-
-
-def robust_consensus_weights(rows: List[dict],
-                             pose_avg_fn,
-                             irls_iters: int = 2,
-                             dampening_mm: float = 5.0,
-                             dampening_deg: float = 2.0) -> Tuple[List[float], np.ndarray]:
-    """IRLS-style robust re-weighting for multi-camera consensus.
-
-    Each row is {"T_base_obj": (4,4), "weight": float}. After 'irls_iters' passes
-    of (compute weighted pose → re-weight by 1/(1+dt/dampening_mm+dr/dampening_deg)),
-    return the final weights and consensus pose. Cameras far from the consensus get
-    automatically down-weighted without being excluded.
-    """
-    if len(rows) < 2:
-        ws = [float(r["weight"]) for r in rows]
-        T_avg = pose_avg_fn([r["T_base_obj"] for r in rows], ws) if rows else None
-        return ws, T_avg
-    Ts = [r["T_base_obj"] for r in rows]
-    base_ws = [float(r["weight"]) for r in rows]
-    ws = list(base_ws)
-    T_avg = pose_avg_fn(Ts, ws)
-    for _ in range(max(int(irls_iters), 1)):
-        new_ws = []
-        for T, bw in zip(Ts, base_ws):
-            dt_mm = float(np.linalg.norm(T[:3, 3] - T_avg[:3, 3]) * 1000.0)
-            dr = rotation_error_deg(T[:3, :3], T_avg[:3, :3])
-            damp = 1.0 / (1.0 + dt_mm / max(dampening_mm, 1e-6) + dr / max(dampening_deg, 1e-6))
-            new_ws.append(bw * damp)
-        ws = new_ws
-        T_avg = pose_avg_fn(Ts, ws)
-    return ws, T_avg
 
 
 def filter_candidates_for_camera_role(candidates: List[dict],
@@ -455,13 +423,12 @@ def build_cube_pose_candidates(root_folder: str,
                                cinfo: dict,
                                K: np.ndarray,
                                D: np.ndarray,
-                               cube: ArucoCubeTarget,
+                               cube: AprilTagCubeTarget,
                                meta_reproj_thr: float = 3.0,
                                solve_reproj_thr: float = 5.0,
                                min_aspect: float = 0.0,
                                include_meta: bool = False,
-                               depth_scale: Optional[float] = None,
-                               include_depth_pose_candidate: bool = False) -> List[dict]:
+                               depth_scale: Optional[float] = None) -> List[dict]:
     candidates: List[dict] = []
     cpnp = cinfo.get("cube_pnp")
     if include_meta and cpnp and cpnp.get("ok"):
@@ -516,28 +483,6 @@ def build_cube_pose_candidates(root_folder: str,
             "source": "multi",
             **depth_metrics_to_fields(reproj.get("depth_metrics")),
         })
-
-    if bool(include_depth_pose_candidate):
-        ok_depth, depth_pose = cube.solve_pose_from_depth(
-            cube_img,
-            depth,
-            depth_scale,
-            K,
-            D,
-            min_aspect=float(min_aspect),
-            min_valid_per_marker=3,
-            min_valid_points=6,
-            max_reproj_mean_px=float(solve_reproj_thr),
-        )
-        if ok_depth and depth_pose is not None:
-            candidates.append({
-                "T_C_O": np.asarray(depth_pose["T_C_O"], dtype=np.float64),
-                "err_mean": float(depth_pose["err_mean"]),
-                "n_points": int(depth_pose["n_points"]),
-                "used_ids": [int(x) for x in depth_pose.get("used_ids", [])],
-                "source": "depth_svd",
-                **depth_metrics_to_fields(depth_pose.get("depth_metrics")),
-            })
 
     if ids is None:
         return candidates
@@ -869,11 +814,10 @@ def build_capture_cube_candidate_map(cap: dict,
                                      root_folder: str,
                                      K_map: Dict[int, np.ndarray],
                                      D_map: Dict[int, np.ndarray],
-                                     cube: ArucoCubeTarget,
+                                     cube: AprilTagCubeTarget,
                                      gripper_cam_idx: Optional[int],
                                      include_meta: bool = False,
-                                     depth_scale_map: Optional[Dict[int, float]] = None,
-                                     include_depth_pose_candidate: bool = False) -> Dict[int, List[dict]]:
+                                     depth_scale_map: Optional[Dict[int, float]] = None) -> Dict[int, List[dict]]:
     event_candidate_map: Dict[int, List[dict]] = {}
     for ci_str, cinfo in cap.get("cams", {}).items():
         ci = int(ci_str)
@@ -884,8 +828,7 @@ def build_capture_cube_candidate_map(cap: dict,
             root_folder, cinfo, K_map[ci], D_map[ci], cube,
             meta_reproj_thr=meta_thr, solve_reproj_thr=5.0,
             min_aspect=0.0, include_meta=include_meta,
-            depth_scale=None if depth_scale_map is None else depth_scale_map.get(ci),
-            include_depth_pose_candidate=include_depth_pose_candidate)
+            depth_scale=None if depth_scale_map is None else depth_scale_map.get(ci))
         candidates = filter_candidates_for_camera_role(candidates, ci, gripper_cam_idx)
         if candidates:
             event_candidate_map[ci] = candidates
@@ -900,9 +843,8 @@ def build_event_cube_selection(meta: dict,
                                gripper_cam_idx: Optional[int],
                                cube_cfg: CubeConfig,
                                include_meta: bool = False,
-                               selection_profile: str = "default",
-                               include_depth_pose_candidate: bool = False) -> Dict[int, Dict[int, dict]]:
-    cube = ArucoCubeTarget(cube_cfg)
+                               selection_profile: str = "default") -> Dict[int, Dict[int, dict]]:
+    cube = AprilTagCubeTarget(cube_cfg)
     K_map, D_map, depth_scale_map = {}, {}, {}
     for ci in all_cam_ids:
         K_map[ci], D_map[ci], depth_scale_map[ci] = load_intrinsics_with_depth_scale(intrinsics_dir, ci)
@@ -915,8 +857,7 @@ def build_event_cube_selection(meta: dict,
             continue
         event_candidate_map = build_capture_cube_candidate_map(
             cap, root_folder, K_map, D_map, cube, gripper_cam_idx,
-            include_meta=include_meta, depth_scale_map=depth_scale_map,
-            include_depth_pose_candidate=include_depth_pose_candidate)
+            include_meta=include_meta, depth_scale_map=depth_scale_map)
         refined = select_consistent_event_cube_candidates(
             cap, event_candidate_map, transforms, gripper_cam_idx, **profile_kwargs) if event_candidate_map else {}
         if refined:

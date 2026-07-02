@@ -47,7 +47,7 @@ if not os.environ.get("FORCE_GUI"):
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-from aruco_cube import ArucoCubeTarget, ArucoCubeModel, rodrigues_to_Rt, inv_T
+from apriltag_cube import AprilTagCubeTarget, AprilTagCubeModel, rodrigues_to_Rt, inv_T
 from calibration_runtime_utils import (
     build_event_cube_selection,
     build_capture_cube_candidate_map,
@@ -59,6 +59,7 @@ from calibration_runtime_utils import (
     load_intrinsics_color,
     load_intrinsics_with_depth_scale,
     load_robot_pose_from_capture,
+    rotation_error_deg,
     resolve_cube_config_for_run,
     select_consistent_event_cube_candidates,
     select_primary_cube_candidate,
@@ -90,12 +91,6 @@ def build_named_corner_permutations():
 
 
 DIAG_CORNER_PERMUTATIONS = build_named_corner_permutations()
-
-
-def rotation_error_deg(Ra, Rb):
-    dR = Ra @ Rb.T
-    c = np.clip((np.trace(dR) - 1.0) / 2.0, -1.0, 1.0)
-    return float(np.degrees(np.arccos(c)))
 
 
 load_calib = load_calib_dir
@@ -434,7 +429,7 @@ def test_cross_camera_consistency(meta, transforms, all_cam_ids, gripper_cam_idx
     cube = None
     K_map, D_map, depth_scale_map = {}, {}, {}
     if use_current_cube:
-        cube = ArucoCubeTarget(cube_cfg)
+        cube = AprilTagCubeTarget(cube_cfg)
         for ci in all_cam_ids:
             K_map[ci], D_map[ci], depth_scale_map[ci] = load_intrinsics_with_depth_scale(intrinsics_dir, ci)
     profile_kwargs = cube_selection_profile_kwargs(selection_profile)
@@ -512,7 +507,7 @@ def test_reprojection(meta, transforms, intrinsics_dir, all_cam_ids, root_folder
     print("=" * 60)
 
     cfg = cube_cfg or resolve_cube_config_for_run(root_folder, default_cfg=get_default_cube_config())[0]
-    cube = ArucoCubeTarget(cfg)
+    cube = AprilTagCubeTarget(cfg)
     K_map, D_map, depth_scale_map = {}, {}, {}
     for ci in all_cam_ids:
         K_map[ci], D_map[ci], depth_scale_map[ci] = load_intrinsics_with_depth_scale(intrinsics_dir, ci)
@@ -682,7 +677,7 @@ def collect_cube_candidate_diagnostics(meta, transforms, intrinsics_dir, root_fo
         return []
 
     cfg = cube_cfg or resolve_cube_config_for_run(root_folder, default_cfg=get_default_cube_config())[0]
-    cube = ArucoCubeTarget(cfg)
+    cube = AprilTagCubeTarget(cfg)
     K_map, D_map, depth_scale_map = {}, {}, {}
     for ci in all_cam_ids:
         K_map[ci], D_map[ci], depth_scale_map[ci] = load_intrinsics_with_depth_scale(intrinsics_dir, ci)
@@ -948,19 +943,27 @@ def collect_marker_override_diagnostics(meta, transforms, intrinsics_dir, root_f
         return {}
 
     cfg = cube_cfg or resolve_cube_config_for_run(root_folder, default_cfg=get_default_cube_config())[0]
-    model = ArucoCubeModel(cfg)
-    cube = ArucoCubeTarget(cfg)
+    model = AprilTagCubeModel(cfg)
+    cube = AprilTagCubeTarget(cfg)
     reorder_to_name = {tuple(v): k for k, v in DIAG_CORNER_PERMUTATIONS.items()}
 
     K_map, D_map = {}, {}
     for ci in all_cam_ids:
         K_map[ci], D_map[ci] = load_intrinsics_color(intrinsics_dir, ci)
 
-    face_obj = {}
-    for face in DIAG_FACES:
-        c, u, v, _ = model.face_defs[face]
-        face_obj[face] = np.asarray(
-            [c + u * p[0] + v * p[1] for p in model.local_corners],
+    def candidate_marker_corners_in_cube(mid: int, face: str) -> np.ndarray:
+        """Cube/object-frame 3D corners (m) under the hypothesis that marker `mid`
+        sits on `face`. Uses marker `mid`'s own size (top tags 25mm vs side tags
+        51mm) so the recovered pose scale is correct. Center is the marker's
+        configured center on its real face, else the geometric face center for
+        alternate-face hypotheses. Corner order follows local_corners_for."""
+        c_face, u, v, _ = model.face_defs[face]
+        if face == cfg.id_to_face.get(int(mid)):
+            center = np.asarray(cfg.marker_center_m.get(int(mid), c_face), dtype=np.float64)
+        else:
+            center = np.asarray(c_face, dtype=np.float64)
+        return np.asarray(
+            [center + u * p[0] + v * p[1] for p in model.local_corners_for(int(mid))],
             dtype=np.float64)
 
     per_marker_obs = defaultdict(list)
@@ -1040,12 +1043,13 @@ def collect_marker_override_diagnostics(meta, transforms, intrinsics_dir, root_f
 
         rankings = []
         for face in DIAG_FACES:
+            obj_corners = candidate_marker_corners_in_cube(mid, face)
             for perm_name, reorder in DIAG_CORNER_PERMUTATIONS.items():
                 rows = []
                 for row in obs:
                     try:
                         n_sol, rvecs, tvecs, reproj_errs = cv2.solvePnPGeneric(
-                            face_obj[face].reshape(-1, 1, 3),
+                            obj_corners.reshape(-1, 1, 3),
                             row["corners"][reorder].reshape(-1, 1, 2),
                             K_map[row["cam_idx"]], D_map[row["cam_idx"]],
                             flags=cv2.SOLVEPNP_IPPE)

@@ -48,9 +48,10 @@ import numpy as np
 from scipy.optimize import least_squares
 from scipy.spatial.transform import Rotation as R
 
-from aruco_cube import ArucoCubeTarget, rodrigues_to_Rt
+from apriltag_cube import AprilTagCubeTarget, inv_T, rodrigues_to_Rt
 from calibration_runtime_utils import (
     copy_depth_fields,
+    rotation_error_deg,
     filter_candidates_for_camera_role,
     get_capture_set_index,
     get_capture_set_cube_center_transform_raw,
@@ -70,14 +71,6 @@ from robot_comm import euler_deg_to_matrix
 def ensure_dir(path: str) -> str:
     os.makedirs(path, exist_ok=True)
     return path
-
-
-def inv_T(T: np.ndarray) -> np.ndarray:
-    T = np.asarray(T, dtype=np.float64)
-    out = np.eye(4, dtype=np.float64)
-    out[:3, :3] = T[:3, :3].T
-    out[:3, 3] = -out[:3, :3] @ T[:3, 3]
-    return out
 
 
 def make_T(rotvec: np.ndarray, t: np.ndarray) -> np.ndarray:
@@ -105,12 +98,6 @@ def se3_log_residual(T_err: np.ndarray, rot_scale_m_per_rad: float = 0.05) -> np
     r[:3] = T_err[:3, 3]
     r[3:] = R.from_matrix(T_err[:3, :3]).as_rotvec() * float(rot_scale_m_per_rad)
     return r
-
-
-def rotation_error_deg(Ra: np.ndarray, Rb: np.ndarray) -> float:
-    dR = Ra @ Rb.T
-    c = np.clip((np.trace(dR) - 1.0) / 2.0, -1.0, 1.0)
-    return float(np.degrees(np.arccos(c)))
 
 
 def weighted_se3_average(T_list: List[np.ndarray], weights: Optional[List[float]] = None) -> np.ndarray:
@@ -365,7 +352,7 @@ def stored_cube_pose_candidates(
     return candidates
 
 
-def get_marker_object_corners(cube: ArucoCubeTarget, marker_id: int) -> Optional[np.ndarray]:
+def get_marker_object_corners(cube: AprilTagCubeTarget, marker_id: int) -> Optional[np.ndarray]:
     """Adapter for project-specific cube model APIs.
 
     Expected output order must match cube.model.reorder_image_corners(marker_id, corners).
@@ -375,7 +362,7 @@ def get_marker_object_corners(cube: ArucoCubeTarget, marker_id: int) -> Optional
     mid = int(marker_id)
 
     method_names = [
-        "marker_corners_in_rig",  # this project's ArucoCubeModel accessor (paired with reorder_image_corners)
+        "marker_corners_in_rig",  # this project's AprilTagCubeModel accessor (paired with reorder_image_corners)
         "get_marker_object_corners",
         "marker_object_corners",
         "get_marker_corners_3d",
@@ -422,7 +409,7 @@ def get_marker_object_corners(cube: ArucoCubeTarget, marker_id: int) -> Optional
 def detect_corner_observations(
     root: str,
     meta: Dict[str, Any],
-    cube: ArucoCubeTarget,
+    cube: AprilTagCubeTarget,
     K_map: Dict[int, np.ndarray],
     D_map: Dict[int, np.ndarray],
     all_cam_ids: List[int],
@@ -502,10 +489,10 @@ def detect_corner_observations(
             reason = (f"0 corner observations because no images could be read "
                       f"({n_imgs_missing} missing/unreadable rgb paths)")
         elif n_detections == 0:
-            reason = "0 corner observations because no ArUco markers were detected in any image"
+            reason = "0 corner observations because no AprilTag markers were detected in any image"
         elif n_obj_corner_fail >= max(1, n_detections - n_aspect_reject):
             reason = ("0 corner observations because cube model 3D marker corners were unavailable "
-                      "(adapt get_marker_object_corners() to your ArucoCubeTarget model)")
+                      "(adapt get_marker_object_corners() to your AprilTagCubeTarget model)")
         else:
             reason = (f"0 corner observations after filtering: {n_aspect_reject} aspect-rejected, "
                       f"{n_obj_corner_fail}/{n_detections} missing object corners")
@@ -513,7 +500,7 @@ def detect_corner_observations(
 
 
 def estimate_image_cube_pose(
-    cube: ArucoCubeTarget,
+    cube: AprilTagCubeTarget,
     img: np.ndarray,
     K: np.ndarray,
     D: np.ndarray,
@@ -547,7 +534,7 @@ def estimate_image_cube_pose(
 def load_pose_observations(
     root: str,
     meta: Dict[str, Any],
-    cube: ArucoCubeTarget,
+    cube: AprilTagCubeTarget,
     K_map: Dict[int, np.ndarray],
     D_map: Dict[int, np.ndarray],
     all_cam_ids: List[int],
@@ -659,43 +646,6 @@ def initialize_ref_object_poses(
     for eid, pairs in by_event.items():
         out[eid] = weighted_se3_average([p[0] for p in pairs], [p[1] for p in pairs])
     return out
-
-
-def initialize_base_from_priors(
-    pose_obs: List[PoseObs],
-    fixed_cam_ids: List[int],
-    set_priors: Dict[int, np.ndarray],
-    robust: bool,
-) -> Tuple[Dict[int, np.ndarray], Dict[int, np.ndarray], Dict[str, Any]]:
-    """Initialize T_base_Ci and event object poses from nominal T_base_O_set priors."""
-    T_base_C: Dict[int, np.ndarray] = {}
-    diag: Dict[str, Any] = {}
-    for ci in fixed_cam_ids:
-        Ts, ws = [], []
-        for o in pose_obs:
-            if o.cam != ci or o.set_idx is None or o.set_idx not in set_priors:
-                continue
-            # T_base_Ci = T_base_O_prior * inv(T_Ci_O)
-            Ts.append(set_priors[o.set_idx] @ inv_T(o.T_C_O))
-            ws.append(1.0 / max(o.err_px, 1e-9))
-        if not Ts:
-            continue
-        if robust:
-            T, st = robust_se3_average(Ts, ws)
-        else:
-            T = weighted_se3_average(Ts, None)
-            st = {"num_total": len(Ts), "num_inliers": len(Ts), "inlier_ratio": 1.0}
-        T_base_C[ci] = T
-        diag[f"T_base_C{ci}"] = st
-
-    T_base_O_event: Dict[int, np.ndarray] = {}
-    by_event: Dict[int, List[Tuple[np.ndarray, float]]] = defaultdict(list)
-    for o in pose_obs:
-        if o.cam in T_base_C:
-            by_event[o.event].append((T_base_C[o.cam] @ o.T_C_O, 1.0 / max(o.err_px, 1e-9)))
-    for eid, pairs in by_event.items():
-        T_base_O_event[eid] = weighted_se3_average([p[0] for p in pairs], [p[1] for p in pairs])
-    return T_base_C, T_base_O_event, diag
 
 
 def load_nominal_set_cube_pose6(meta: Dict[str, Any]) -> Dict[int, List[float]]:
@@ -1516,7 +1466,7 @@ def main() -> None:
     )
     meta_cfg, _ = load_cube_config_from_meta(root, default_cfg=cfg)
     reuse_stored = cube_configs_equivalent(meta_cfg, cfg)
-    cube = ArucoCubeTarget(cfg)
+    cube = AprilTagCubeTarget(cfg)
 
     all_cam_ids = sorted({
         int(k) for cap in meta.get("captures", [])

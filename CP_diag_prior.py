@@ -8,8 +8,8 @@ Caches pose observations so it is fast to re-run.
 import json, os, pickle
 import numpy as np
 
-import Step3_compare_calibrartion as S
-from aruco_cube import ArucoCubeTarget
+import CP_Step3_compare_calibrartion as S
+from apriltag_cube import AprilTagCubeTarget
 from config import get_default_cube_config
 from calibration_runtime_utils import (
     load_intrinsics_with_depth_scale, resolve_cube_config_for_run, get_capture_set_index,
@@ -24,7 +24,7 @@ meta = json.load(open(os.path.join(ROOT, "meta.json")))
 cfg, _ = resolve_cube_config_for_run(ROOT, "./data/session/calib_ablation", None, get_default_cube_config())
 meta_cfg, _ = load_cube_config_from_meta(ROOT, default_cfg=cfg)
 reuse_stored = cube_configs_equivalent(meta_cfg, cfg)
-cube = ArucoCubeTarget(cfg)
+cube = AprilTagCubeTarget(cfg)
 
 all_cam_ids = sorted({int(k) for cap in meta.get("captures", []) for k, v in cap.get("cams", {}).items() if v.get("saved")})
 gripper = int(meta.get("gripper_cam_idx"))

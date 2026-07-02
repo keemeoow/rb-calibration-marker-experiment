@@ -25,7 +25,6 @@ Step2_capture.py의 meta.json을 입력으로 받아:
 
 기본 정책:
   - 새 데이터도 기본 `calib_out` 경로에서 현재 안정형 파이프라인을 그대로 사용한다.
-  - `--enable_depth_pose_candidate`는 dimension/mesh 실험용 옵션이며 기본 OFF다.
 """
 
 import os
@@ -38,7 +37,7 @@ from typing import Dict, List, Optional, Any, Tuple
 import cv2
 import numpy as np
 
-from aruco_cube import ArucoCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt, inv_T
+from apriltag_cube import AprilTagCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt, inv_T
 from calibration_runtime_utils import (
     copy_depth_fields,
     cube_selection_profile_kwargs,
@@ -48,6 +47,7 @@ from calibration_runtime_utils import (
     get_object_anchor_key_for_set,
     load_intrinsics_with_depth_scale,
     resolve_cube_config_for_run,
+    rotation_error_deg,
     select_consistent_event_cube_candidates,
     select_primary_cube_candidate,
 )
@@ -87,12 +87,6 @@ def cleanup_legacy_public_outputs(out_dir: str) -> None:
                 pass
 
 
-def load_intrinsics(intr_dir: str, cam_idx: int):
-    p = os.path.join(intr_dir, f"cam{cam_idx}.npz")
-    d = np.load(p, allow_pickle=True)
-    return d["color_K"].astype(np.float64), d["color_D"].astype(np.float64)
-
-
 def _interp_se3(T_a: np.ndarray, T_b: np.ndarray, t: float) -> np.ndarray:
     """SE3 interpolation T_a -> T_b with step t ∈ [0,1].
     t=0: T_a, t=1: T_b. Translation linear, rotation slerp (via rotvec interp).
@@ -111,12 +105,6 @@ def _interp_se3(T_a: np.ndarray, T_b: np.ndarray, t: float) -> np.ndarray:
     rv_t = (1.0 - t) * rv_a + t * rv_b
     out[:3, :3] = _R.from_rotvec(rv_t).as_matrix()
     return out
-
-
-def rotation_error_deg(Ra: np.ndarray, Rb: np.ndarray) -> float:
-    dR = Ra @ Rb.T
-    c = np.clip((np.trace(dR) - 1.0) / 2.0, -1.0, 1.0)
-    return float(np.degrees(np.arccos(c)))
 
 
 def weighted_se3_average(T_list, w_list=None):
@@ -487,7 +475,7 @@ def stored_cube_pose_candidates(cinfo: dict,
     return candidates
 
 
-def estimate_image_cube_pose_candidates(cube: ArucoCubeTarget,
+def estimate_image_cube_pose_candidates(cube: AprilTagCubeTarget,
                                         img: np.ndarray,
                                         K: np.ndarray,
                                         D: np.ndarray,
@@ -495,8 +483,7 @@ def estimate_image_cube_pose_candidates(cube: ArucoCubeTarget,
                                         min_markers: int,
                                         min_aspect: float,
                                         depth_u16: Optional[np.ndarray] = None,
-                                        depth_scale: Optional[float] = None,
-                                        include_depth_pose_candidate: bool = False) -> List[dict]:
+                                        depth_scale: Optional[float] = None) -> List[dict]:
     candidates: List[dict] = []
 
     ok, rvec, tvec, used, reproj = cube.solve_pnp_cube(
@@ -515,28 +502,6 @@ def estimate_image_cube_pose_candidates(cube: ArucoCubeTarget,
             "source": "multi",
             **depth_metrics_to_fields(reproj.get("depth_metrics")),
         })
-
-    if bool(include_depth_pose_candidate):
-        ok_depth, depth_pose = cube.solve_pose_from_depth(
-            img,
-            depth_u16,
-            depth_scale,
-            K,
-            D,
-            min_aspect=float(min_aspect),
-            min_valid_per_marker=3,
-            min_valid_points=6,
-            max_reproj_mean_px=float(max_err),
-        )
-        if ok_depth and depth_pose is not None:
-            candidates.append({
-                "T_C_O": np.asarray(depth_pose["T_C_O"], dtype=np.float64),
-                "err_mean": float(depth_pose["err_mean"]),
-                "n_points": int(depth_pose["n_points"]),
-                "used_ids": [int(x) for x in depth_pose.get("used_ids", [])],
-                "source": "depth_svd",
-                **depth_metrics_to_fields(depth_pose.get("depth_metrics")),
-            })
 
     corners_list, ids = cube.detect(img)
     if ids is None:
@@ -1453,8 +1418,6 @@ def main():
     parser.add_argument("--fixed_board_refine_alpha", type=float, default=0.35)
     parser.add_argument("--cube_config_json", type=str, default=None,
                         help="Optional cube config JSON override. Leave unset to use the project's canonical cube definition.")
-    parser.add_argument("--enable_depth_pose_candidate", action="store_true",
-                        help="Experimental: include depth-SVD cube pose candidates; can improve dimension metrics but may reduce hand-eye stability")
     args = parser.parse_args()
 
     root = args.root_folder
@@ -1529,7 +1492,7 @@ def main():
     print("=" * 60)
 
     pnp_obs: Dict[int, Dict[int, dict]] = {ci: {} for ci in all_cam_ids}
-    cube = ArucoCubeTarget(cfg)
+    cube = AprilTagCubeTarget(cfg)
 
     for cap in meta.get("captures", []):
         eid = int(cap.get("event_id", -1))
@@ -1566,7 +1529,6 @@ def main():
                     min_aspect=min_aspect,
                     depth_u16=depth,
                     depth_scale=depth_scale_map.get(ci),
-                    include_depth_pose_candidate=bool(args.enable_depth_pose_candidate),
                 ) + candidates
 
             candidates = filter_candidates_for_camera_role(candidates, ci, gripper_cam_idx)

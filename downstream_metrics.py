@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 
-from aruco_cube import ArucoCubeTarget, inv_T
+from apriltag_cube import AprilTagCubeTarget, inv_T
 from calibration_runtime_utils import (
     build_event_cube_selection,
     get_event_base_camera_transform,
@@ -236,7 +236,7 @@ def compute_depth_cube_metrics(meta: dict,
     selection = build_event_cube_selection(
         meta, transforms, intrinsics_dir, root_folder, all_cam_ids, gripper_cam_idx,
         cube_cfg, include_meta=include_meta, selection_profile=selection_profile)
-    cube = ArucoCubeTarget(cube_cfg)
+    cube = AprilTagCubeTarget(cube_cfg)
     half_side = float(cube_cfg.cube_side_m) * 0.5
     mesh_rmse_mm = []
     dim_abs_err_mm = []

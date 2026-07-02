@@ -16,7 +16,7 @@ import cv2
 from collections import defaultdict
 from scipy.spatial.transform import Rotation as R
 
-import Step3_compare_calibrartion as S
+import CP_Step3_compare_calibrartion as S
 from calibration_runtime_utils import get_capture_set_index
 from robot_comm import euler_deg_to_matrix
 
