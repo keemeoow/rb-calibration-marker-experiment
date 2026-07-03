@@ -10,35 +10,12 @@ Step 2: 멀티카메라 캘리브레이션용 캡처 수집.
   5. `set_index`, robot pose, set_cube_center_6dof, capture gate 결과를 함께 저장한다.
 
 명령어:
-python Step2_capture.py \
-    --root_folder ./data/session \
-    --intrinsics_dir ./intrinsics \
-    --use_robot --manual_robot \
-    --robot_ip 192.168.0.23 --robot_port 12348 \
-    --show --save_depth
-
+python Step2_capture.py --root_folder ./data/session \
+    --intrinsics_dir ./intrinsics --use_robot --manual_robot \
+    --robot_ip 192.168.0.23 --robot_port 12348 --show --save_depth
 """
 
 """
-[서버코드 작동법] (큐브 위치별 멀티 캘리브레이션)
-# ── 1. 큐브를 바닥에 놓고 위치 저장 ──
-> set                         # 큐브 위치 #0 저장 (TCP, 관절값, 큐브 중점)
-
-# ── 2. 그리퍼 카메라 위치를 다양하게 이동하며 촬영 ──
-> p z,300                     # 위로 이동 (그리퍼 카메라가 큐브를 볼 수 있게)
-> c                           # 촬영 (set_index=0, 관절값 포함 PC 전송)
-> p x,100
-> p rz,45
-> c                           # 같은 큐브 위치에서 다른 각도로 촬영
-
-# ── 3. 큐브를 새 위치로 옮기고 반복 ──
-> set                         # 큐브 위치 #1 저장
-> p z,300
-> c                           # set_index=1로 촬영
-> ...
-
-# ── 4. 종료 ──
-> q
 
 저장 파일:
   - meta.json               : 캡처별 상세 (robot pose, set_index, set_cube_center_6dof, cube/board quality)
@@ -763,9 +740,11 @@ def main():
                         help="Manual robot mode: server sends capture commands interactively (use with robot_calb.py)")
     parser.add_argument("--settle_time", type=float, default=1.5,
                         help="Wait time (s) after robot signals capture before taking images")
-    # start gate
-    parser.add_argument("--no_start_gate", action="store_true",
-                        help="기본은 cv2 프리뷰 + 'start' 입력 대기. 이 플래그 시 즉시 시작.")
+    # start gate — 기본은 대기 없이 즉시 시작. --start_gate 를 줘야 프리뷰 + 'start' 대기.
+    parser.add_argument("--start_gate", action="store_true",
+                        help="시작 전 cv2 프리뷰 + 'start' 입력 대기 (기본: 대기 없이 즉시 시작)")
+    # (구) --no_start_gate: 이제 기본 동작이라 무시됨. 기존 명령 호환용으로만 수용.
+    parser.add_argument("--no_start_gate", action="store_true", help=argparse.SUPPRESS)
 
     args = parser.parse_args()
 
@@ -1049,8 +1028,8 @@ def main():
 
         return fr
 
-    # ── start 게이트: 첫 cv2 프리뷰 + 'start' 입력 대기 ──
-    if not args.no_start_gate:
+    # ── start 게이트(옵션): --start_gate 시에만 첫 cv2 프리뷰 + 'start' 입력 대기 ──
+    if args.start_gate:
         extra = []
         if args.use_robot:
             extra.append(f"robot {args.robot_ip}:{args.robot_port}"
@@ -1266,6 +1245,10 @@ def main():
             wp_set_tcp = None
             wp_set_cube_center = None
 
+            # PC-side teach recording (grip/pose/set). 서버가 recgrip/recpose/recset 시
+            # 전체 리스트를 보내면 여기서 세션 번호 붙은 파일로 PC 에만 저장한다.
+            teach = {"session": None}
+
             network_done = threading.Event()
             user_quit = threading.Event()
 
@@ -1275,22 +1258,33 @@ def main():
             def network_loop():
                 nonlocal wp_set_joints, wp_set_tcp, wp_set_cube_center
                 try:
+                    recv_buf = b""
                     while not network_done.is_set() and not user_quit.is_set():
-                        try:
-                            data = manual_sock.recv(8192)
-                        except _sock.timeout:
-                            continue
-                        except OSError as e:
-                            # 정상 종료 시 main thread가 socket을 닫아서 EBADF가 뜸 → 무시
-                            if not (user_quit.is_set() or network_done.is_set()):
-                                print(f"[ManualRobot] socket error: {e}")
-                            break
-                        if not data:
-                            print("[ManualRobot] Server disconnected.")
-                            break
+                        # Newline-delimited JSON framing: teach_save(전체 리스트) 처럼 큰
+                        # 메시지나 분할/합쳐 도착한 메시지도 버퍼에 모아 완전한 한 줄씩 처리.
+                        if b"\n" not in recv_buf:
+                            try:
+                                chunk = manual_sock.recv(65536)
+                            except _sock.timeout:
+                                continue
+                            except OSError as e:
+                                # 정상 종료 시 main thread가 socket을 닫아서 EBADF가 뜸 → 무시
+                                if not (user_quit.is_set() or network_done.is_set()):
+                                    print(f"[ManualRobot] socket error: {e}")
+                                break
+                            if not chunk:
+                                print("[ManualRobot] Server disconnected.")
+                                break
+                            recv_buf += chunk
+                            if b"\n" not in recv_buf:
+                                continue
 
+                        line, _, recv_buf = recv_buf.partition(b"\n")
+                        line = line.strip()
+                        if not line:
+                            continue
                         try:
-                            msg = json.loads(data.decode("utf-8").strip())
+                            msg = json.loads(line.decode("utf-8"))
                         except Exception as e:
                             print(f"[ManualRobot] JSON parse error: {e}")
                             continue
@@ -1299,6 +1293,36 @@ def main():
                         if cmd == "quit":
                             print("[ManualRobot] Server sent quit.")
                             break
+
+                        if cmd == "teach_save":
+                            # 로봇의 recgrip/recpose/recset 기록을 PC 에만 저장.
+                            # 서버 세션(재연결)마다 새 번호 파일 (grip_poses_NNN.json 등).
+                            kind = msg.get("kind")
+                            entries = msg.get("data")
+                            name = {"grip": "grip_poses", "pose": "capture_poses",
+                                    "set": "capture_sets"}.get(kind)
+                            if name is None or not isinstance(entries, list):
+                                print(f"[Teach] invalid teach_save (kind={kind})")
+                                continue
+                            if teach["session"] is None:
+                                n = 1
+                                while any(os.path.exists(os.path.join(
+                                        args.root_folder, f"{b}_{n:03d}.json"))
+                                        for b in ("grip_poses", "capture_poses", "capture_sets")):
+                                    n += 1
+                                teach["session"] = n
+                                os.makedirs(args.root_folder, exist_ok=True)
+                                print(f"[Teach] recording session #{n:03d} "
+                                      f"-> {args.root_folder}/*_{n:03d}.json")
+                            path = os.path.join(
+                                args.root_folder, f"{name}_{teach['session']:03d}.json")
+                            try:
+                                with open(path, "w") as tf:
+                                    json.dump({name: entries}, tf, indent=2)
+                                print(f"[Teach] {kind}: {len(entries)} entries -> {path}")
+                            except Exception as e:
+                                print(f"[Teach] save error: {e}")
+                            continue
 
                         if cmd == "request_waypoints":
                             wp_path = os.path.join(args.root_folder, "capture_waypoints.json")

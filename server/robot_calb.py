@@ -1,61 +1,3 @@
-"""
-로봇 캘리브레이션 서버 (Teach-and-Capture):
-  "수동 조작"으로 로봇을 이동/회전하면서 촬영하는 서버.
-
-명령어:
-  --- 이동 ---
-  p <축>,<값>       : TCP 상대 이동 (예: "p z,50", "p rz,15")
-  j <축>,<값>       : 관절 상대 이동 (예: "j d1,10")
-  gotop x,y,z[,rz,ry,rx]    : TCP 절대 좌표로 이동 (line motion)
-  gotoj d1,d2,d3,d4,d5,d6   : 관절 절대 좌표로 이동 (joint move)
-  goto  x,y,z[,rz,ry,rx]    : (gotop 별칭, 기존 호환)
-  show              : 현재 TCP 포즈 및 관절 값 표시
-  speed <0-100>     : 속도 설정 (클수록 빠름)
-
-  --- 촬영 ---
-  c                 : 현재 위치에서 촬영
-
-  --- 설정 ---
-  set               : 현재 TCP + 관절값 + 큐브 중점(Tool 4) 저장
-                      set_index (큐브 위치 #0, #1, ...) 자동 증가
-                      촬영 시 TCP, 관절값, set 정보를 PC로 전송
-
-  --- 그리퍼 ---
-  go                : 그리퍼 열기
-  gc                : 그리퍼 닫기
-
-  --- 되돌리기 ---
-  undo              : 마지막 이동 1회 되돌리기
-  undo <N>          : 마지막 N회 되돌리기
-  undo all          : 전체 되돌리기
-  undo <axis...>    : 특정 축만 되돌리기 (undo x ry rz)
-  undo set          : 어디서든 set 위치로 이동
-
-  --- 자동화 ---
-  start              : 멀티-set 자동 캡처 시작 (PC에서 waypoints 받음)
-  start <path>       : 로컬 파일에서 waypoints 로드 (테스트용)
-  start - <spd>      : PC에서 받기 + 속도 지정
-  start <path> <spd> : 로컬 + 속도 지정
-                      사전: 큐브가 그리퍼에 잡혀 있어야 함.
-                      플로우: PC로부터 capture_waypoints.json 받음
-                              -> +Z 30mm 초기 lift
-                              -> set의 place_joints로 이동 -> 그리퍼 오픈
-                              -> +Z 100mm 클리어런스 -> 각 capture_joints로 이동 후
-                                 좌표 표시 -> 사람이 'c'+Enter 로 확인하면 촬영
-                                 (s=skip, q=quit / --noconfirm 시 확인 없이 전자동)
-                                 (save gate 실패 시 자동 지터 없이 곧바로 manual
-                                  recovery: 사람이 jog로 옮겨 인식시킨 뒤 c로 재촬영)
-                              -> 다음 set로 큐브 이동 (재-그립 시 항상 place 위치
-                                 +Z 20mm 위에서 접근 후 하강하여 close +
-                                 +Z 30mm transit lift)
-                              -> 반복.
-
-  --- 종료 ---
-  q                 : 종료
-"""
-
-
-
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 
@@ -156,33 +98,14 @@ def get_cube_center():
     return tcp
 
 
-def save_capture_poses(path, poses):
-    """teach 뷰포인트 풀(joints+tcp+cube_center)을 JSON으로 저장 (recpose 명령용).
+def send_teach(conn, kind, data):
+    """teach 기록(recpose/recgrip/recset)을 PC로 전송해 PC에만 저장하도록 한다.
 
-    이 파일을 PC로 옮겨 웨이포인트 생성기(포즈 풀 -> set별 랜덤 배정)의 입력으로 쓴다.
+    kind: 'pose'(뷰포인트/A) | 'grip'(그립-스윕/B) | 'set'(큐브 배치).
+    로봇 로컬에는 저장하지 않는다. PC(Step2)가 받아서 세션 번호 붙은 파일로 기록한다.
+    매번 전체 리스트를 보내 PC가 파일을 통째로 갱신하게 한다(undo 도 동일).
     """
-    with open(path, 'w') as f:
-        json.dump({"capture_poses": poses}, f, indent=2)
-
-
-def save_capture_sets(path, sets):
-    """큐브 set 배치(place_joints+tcp+cube_center)를 JSON으로 저장 (recset 명령용).
-
-    이 파일을 PC로 옮겨 웨이포인트 생성기의 set 입력으로 쓴다. 큐브를 그립한 채
-    바닥에 놓은 자세에서 기록해야 place_joints/cube_center가 올바르다.
-    """
-    with open(path, 'w') as f:
-        json.dump({"capture_sets": sets}, f, indent=2)
-
-
-def save_grip_poses(path, poses):
-    """그립-스윕(eye-to-hand, block B) 포즈 풀을 JSON으로 저장 (recgrip 명령용).
-
-    큐브를 그립한 채 위로 올려 스윕하는 자세들. 고정 카메라가 움직이는 큐브를
-    관측하는 method (b) 데이터용. PC로 옮겨 웨이포인트 생성기의 --grip 입력으로 쓴다.
-    """
-    with open(path, 'w') as f:
-        json.dump({"grip_poses": poses}, f, indent=2)
+    send_json(conn, {"command": "teach_save", "kind": kind, "data": data})
 
 
 def get_joints():
@@ -819,12 +742,10 @@ def main():
         capture_block = "A_placement"
         grasp_id = 0
         cube_gripped = False
-        capture_poses = []           # recpose 로 기록하는 뷰포인트 풀 (웨이포인트 생성용)
-        poses_path = 'capture_poses.json'
-        capture_sets = []            # recset 으로 기록하는 큐브 set 배치 (웨이포인트 생성용)
-        sets_path = 'capture_sets.json'
-        grip_poses = []              # recgrip 으로 기록하는 그립-스윕(block B) 포즈 풀
-        grip_poses_path = 'grip_poses.json'
+        # teach 기록 리스트 (PC 로 전송해 PC 에만 저장; 로봇 로컬 파일 없음)
+        capture_poses = []           # recpose: A 뷰포인트 풀
+        capture_sets = []            # recset : 큐브 set 배치
+        grip_poses = []              # recgrip: B 그립-스윕 포즈 풀
 
         print ''
         print '=========================================='
@@ -1079,8 +1000,8 @@ def main():
                         # pose_index 재부여(0..N-1 유지)
                         for i, p in enumerate(capture_poses):
                             p['pose_index'] = i
-                        save_capture_poses(poses_path, capture_poses)
-                        print '[recpose] undo -> {} poses ({})'.format(len(capture_poses), poses_path)
+                        send_teach(conn, 'pose', capture_poses)
+                        print '[recpose] undo -> {} poses (sent to PC)'.format(len(capture_poses))
                     else:
                         print '[recpose] nothing to undo'
                 elif sub == 'list':
@@ -1095,13 +1016,13 @@ def main():
                         "cube_center_6dof": get_cube_center(),
                     }
                     capture_poses.append(pose)
-                    save_capture_poses(poses_path, capture_poses)
+                    send_teach(conn, 'pose', capture_poses)
                     print ''
                     print '[recpose] #{} saved'.format(pose['pose_index'])
                     print '  joints: {}'.format(fmt6(pose['capture_joints']))
                     print '  tcp:    {}'.format(fmt6(pose['capture_tcp']))
                     print '  cube:   {}'.format(fmt6(pose['cube_center_6dof']))
-                    print '  -> {} ({} poses total)'.format(poses_path, len(capture_poses))
+                    print '  -> sent to PC ({} poses total)'.format(len(capture_poses))
 
             # Record grip-sweep (eye-to-hand, block B) pose for waypoint gen.
             #   recgrip | rg           -> 현재(큐브 그립 상태) 스윕 포즈 기록
@@ -1115,8 +1036,8 @@ def main():
                         grip_poses.pop()
                         for i, p in enumerate(grip_poses):
                             p['pose_index'] = i
-                        save_grip_poses(grip_poses_path, grip_poses)
-                        print '[recgrip] undo -> {} poses ({})'.format(len(grip_poses), grip_poses_path)
+                        send_teach(conn, 'grip', grip_poses)
+                        print '[recgrip] undo -> {} poses (sent to PC)'.format(len(grip_poses))
                     else:
                         print '[recgrip] nothing to undo'
                 elif sub == 'list':
@@ -1131,13 +1052,13 @@ def main():
                         "cube_center_6dof": get_cube_center(),
                     }
                     grip_poses.append(pose)
-                    save_grip_poses(grip_poses_path, grip_poses)
+                    send_teach(conn, 'grip', grip_poses)
                     print ''
                     print '[recgrip] #{} saved (grip-sweep, block B)'.format(pose['pose_index'])
                     print '  joints: {}'.format(fmt6(pose['capture_joints']))
                     print '  tcp:    {}'.format(fmt6(pose['capture_tcp']))
                     print '  cube:   {}'.format(fmt6(pose['cube_center_6dof']))
-                    print '  -> {} ({} poses total)'.format(grip_poses_path, len(grip_poses))
+                    print '  -> sent to PC ({} poses total)'.format(len(grip_poses))
 
             # Record cube set placement (place_joints + cube center) for waypoint gen.
             #   recset | rs           -> 현재(큐브 그립+바닥에 놓은 상태) 기록
@@ -1151,8 +1072,8 @@ def main():
                         capture_sets.pop()
                         for i, sset in enumerate(capture_sets):
                             sset['set_index'] = i
-                        save_capture_sets(sets_path, capture_sets)
-                        print '[recset] undo -> {} sets ({})'.format(len(capture_sets), sets_path)
+                        send_teach(conn, 'set', capture_sets)
+                        print '[recset] undo -> {} sets (sent to PC)'.format(len(capture_sets))
                     else:
                         print '[recset] nothing to undo'
                 elif sub == 'list':
@@ -1167,13 +1088,13 @@ def main():
                         "set_cube_center_6dof": get_cube_center(),
                     }
                     capture_sets.append(sset)
-                    save_capture_sets(sets_path, capture_sets)
+                    send_teach(conn, 'set', capture_sets)
                     print ''
                     print '[recset] set#{} saved'.format(sset['set_index'])
                     print '  place_joints: {}'.format(fmt6(sset['place_joints']))
                     print '  place_tcp:    {}'.format(fmt6(sset['place_tcp']))
                     print '  cube_center:  {}'.format(fmt6(sset['set_cube_center_6dof']))
-                    print '  -> {} ({} sets total)'.format(sets_path, len(capture_sets))
+                    print '  -> sent to PC ({} sets total)'.format(len(capture_sets))
 
             else:
                 print 'Unknown: {}'.format(cmd)
