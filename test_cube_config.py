@@ -1,4 +1,4 @@
-# test_cube_capture.py
+# test_cube_config.py
 """
 큐브 정의 검증용 단독 테스트.
 
@@ -19,21 +19,22 @@ Intrinsics:
   기본은 RealSense 장치가 factory-calibrated 값을 직접 제공하므로 별도 교정
   파일 없이 동작한다. 교정한 값을 쓰고 싶으면 --intrinsics_dir + --cam_idx 지정.
 
-실행 예:
-  # 큐브 정의만 검사 (카메라/ pyrealsense2 불필요)
-  python test_cube_capture.py --config-only
+실행 명령어:
 
   # 연결된 RealSense 목록만 출력
-  python test_cube_capture.py --list
+  python test_cube_config.py --list
 
-  # 라이브 프리뷰(기본). 's' 저장, SPACE 상세리포트, 'q' 종료
-  python test_cube_capture.py
+  # 라이브 프리뷰(기본, 640x480). 's' 저장, SPACE 상세리포트, 'q' 종료
+  python test_cube_config.py
+
+  # 1280x720 고해상도로 (검출 정확도↑, 다중 카메라 대역폭 부담↑)
+  python test_cube_config.py --hd
 
   # 창 없이 한 프레임만 캡처/분석 후 저장 (헤드리스)
-  python test_cube_capture.py --once
+  python test_cube_config.py --once
 
   # 교정된 intrinsics 사용
-  python test_cube_capture.py --intrinsics_dir ../rb-ArucoCube_Robot_multi_calibration/intrinsics --cam_idx 0
+  python test_cube_config.py --intrinsics_dir ../rb-ArucoCube_Robot_multi_calibration/intrinsics --cam_idx 0
 """
 
 import os
@@ -273,9 +274,14 @@ def main() -> int:
                         help="교정된 intrinsics 폴더 (미지정 시 장치 factory 값 사용)")
     parser.add_argument("--cam_idx", type=int, default=0,
                         help="--intrinsics_dir 사용 시 cam{idx}.npz 인덱스")
-    parser.add_argument("--width", type=int, default=1280)
-    parser.add_argument("--height", type=int, default=720)
+    parser.add_argument("--width", type=int, default=640,
+                        help="color 폭 (기본 640; 카메라 4대 연결 시 안정적)")
+    parser.add_argument("--height", type=int, default=480,
+                        help="color 높이 (기본 480)")
     parser.add_argument("--fps", type=int, default=15)
+    parser.add_argument("--hd", action="store_true",
+                        help="1280x720 고해상도 사용 (--width/--height 무시). "
+                             "검출 정확도↑ 이지만 다중 카메라 USB 대역폭 부담↑")
     parser.add_argument("--once", action="store_true",
                         help="창 없이 한 프레임만 캡처/분석 후 저장하고 종료 (헤드리스)")
     parser.add_argument("--max-err", type=float, default=8.0,
@@ -289,6 +295,9 @@ def main() -> int:
     parser.add_argument("--out", default="cube_test_out",
                         help="주석 이미지/리포트 저장 폴더")
     args = parser.parse_args()
+
+    if args.hd:
+        args.width, args.height = 1280, 720
 
     # 큐브 정의 검사는 항상 먼저 (카메라와 무관하게 큐브가 '제대로 만들어졌는지' 확인)
     print("========== 큐브 정의 정합성 검사 ==========")
