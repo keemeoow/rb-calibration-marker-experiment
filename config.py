@@ -127,4 +127,4 @@ class CharucoBoardConfig:
     square_length_m: float = 0.025
     marker_length_m: float = 0.018
     dictionary_name: str = "DICT_4X4_250"
-    marker_id_start: int = 8  # cube uses 0,1,2,3,4,5; keep Charuco IDs separate
+    marker_id_start: int = 5  # 인쇄된 보드의 ArUco ID 시작값. 큐브(DICT_APRILTAG_36h11)와 다른 딕셔너리(DICT_4X4_250)라 ID 겹쳐도 무방
