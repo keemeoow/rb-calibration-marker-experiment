@@ -81,7 +81,7 @@ CUBE_SIZE_MM = 30.0
 CUBE_GRIP_DEPTH_MM = 2.0
 CUBE_CENTER_OFFSET_Z = CUBE_SIZE_MM / 2.0 - CUBE_GRIP_DEPTH_MM
 
-TOOL_GRIPPER_Z = 150.0
+TOOL_GRIPPER_Z = 113.5 # 기존에 150.0 이였음.
 TOOL_CUBE_CENTER_Z = TOOL_GRIPPER_Z - CUBE_CENTER_OFFSET_Z
 
 # 큐브를 잡을 때 항상 place 위치 +Z 위에서 접근 후 하강
@@ -695,7 +695,7 @@ def main():
         rb.settool(4, 0.0, 0.0, TOOL_CUBE_CENTER_Z, 0.0, 0.0, 0.0)
         rb.changetool(3)
         rb.use_mt(True)
-
+        
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((HOST, PORT))

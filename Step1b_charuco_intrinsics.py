@@ -21,23 +21,21 @@ depth 관련 필드(depth_K, depth_scale, R_depth_to_color 등)와 해상도/시
 동작:
   1) device_map.json 로드 (serial -> cam_idx, gripper_cam_idx)
   2) 연결된 각 카메라를 하나씩 열고, ChArUco 보드를 흔들며 다양한 각도/위치에서
-     프레임을 수집 (자동 그랩 + 수동 SPACE). 화면에 검출/커버리지/선명도 피드백.
+     프레임을 수집 (SPACE 로 수동 그랩). 화면에 검출/커버리지/선명도 피드백.
   3) board.matchImagePoints + cv2.calibrateCamera 로 2-pass(이상치 제거) 보정
   4) intrinsics/cam{idx}.npz 의 color_K/color_D 교체 (factory 값은 백업 보존)
   5) intrinsics/charuco_intrinsics_report.json 리포트 저장
 
 키 조작 (카메라별 수집 중):
-  SPACE : 현재 프레임 수동 그랩
-  a     : 자동 그랩 on/off
+  SPACE : 현재 프레임 그랩
   u     : 마지막 그랩 취소(undo)
   c/Enter: 이 카메라 수집 종료 -> 보정 실행
   s     : 이 카메라 건너뛰기 (factory 값 유지)
   q     : 전체 중단 (아무것도 쓰지 않음)
 
 명령어 예시:
-  python Step1b_charuco_intrinsics.py --intr_dir ./intrinsics --target_views 30
+  python Step1b_charuco_intrinsics.py --intr_dir ./intrinsics
   python Step1b_charuco_intrinsics.py --rational           # 8-계수 rational 모델
-  python Step1b_charuco_intrinsics.py --no-auto_grab       # 수동 그랩만
 """
 
 import os
@@ -160,8 +158,8 @@ def calibrate_intrinsics(board, accepted, image_size, flags, K0=None, D0=None):
 # ---------------------------------------------------------------------------
 # 라이브 수집 (카메라 1대)
 # ---------------------------------------------------------------------------
-def _draw_overlay(vis, coverage, n_accepted, target, sharp, blur_thr,
-                  auto_on, n_corners, cov_cols, cov_rows):
+def _draw_overlay(vis, coverage, n_accepted, sharp, blur_thr,
+                  n_corners, cov_cols, cov_rows):
     h, w = vis.shape[:2]
 
     # 커버리지 그리드
@@ -180,9 +178,9 @@ def _draw_overlay(vis, coverage, n_accepted, target, sharp, blur_thr,
 
     sharp_ok = sharp >= blur_thr
     lines = [
-        f"cam views: {n_accepted}/{target}   coverage: {covered}/{total_cells} cells",
+        f"cam views: {n_accepted}   coverage: {covered}/{total_cells} cells",
         f"charuco corners: {n_corners}   sharp: {sharp:.0f} ({'OK' if sharp_ok else 'BLUR'})",
-        f"auto-grab: {'ON' if auto_on else 'OFF'}   [SPACE]grab [a]auto [u]undo [c]done [s]skip [q]quit",
+        f"[SPACE]grab [u]undo [c]done [s]skip [q]quit",
     ]
     y = 22
     for i, t in enumerate(lines):
@@ -204,16 +202,13 @@ def collect_for_camera(cam, target, cam_idx, is_gripper, args, save_dir):
 
     accepted = []          # [(ch_corners, ch_ids), ...]
     coverage = np.zeros((args.cov_rows, args.cov_cols), dtype=int)
-    last_centroid = None
-    last_grab_t = 0.0
-    auto_on = bool(args.auto_grab)
     image_size = None
 
     if save_dir:
         os.makedirs(save_dir, exist_ok=True)
 
     print(f"\n[cam{cam_idx}] 보드를 카메라 앞에서 다양한 각도/거리/위치로 움직이세요. "
-          f"목표 {args.target_views}장. (c=보정, s=건너뛰기)")
+          f"원하는 만큼 그랩 후 c/Enter로 보정. (SPACE=그랩, c=보정, s=건너뛰기)")
 
     while True:
         color, _, _ = cam.get_latest()
@@ -236,20 +231,11 @@ def collect_for_camera(cam, target, cam_idx, is_gripper, args, save_dir):
         if ch_c is not None and ch_id is not None and n_corners > 0:
             cv2.aruco.drawDetectedCornersCharuco(vis, ch_c, ch_id, (0, 255, 255))
 
-        # 자동 그랩 판정
+        # grab 은 아래 SPACE 키에서만 True 로 바뀐다 (자동 그랩 없음 — 전부 수동).
         do_grab = False
-        centroid = None
-        if ch_c is not None and n_corners >= args.min_corners:
-            centroid = ch_c.reshape(-1, 2).mean(axis=0)
-            moved = (last_centroid is None) or \
-                    (float(np.linalg.norm(centroid - last_centroid)) > args.move_thresh)
-            now = time.time()
-            if (auto_on and sharp >= args.blur_thresh and moved
-                    and (now - last_grab_t) > args.grab_cooldown):
-                do_grab = True
 
-        _draw_overlay(vis, coverage, len(accepted), args.target_views, sharp,
-                      args.blur_thresh, auto_on, n_corners, args.cov_cols, args.cov_rows)
+        _draw_overlay(vis, coverage, len(accepted), sharp,
+                      args.blur_thresh, n_corners, args.cov_cols, args.cov_rows)
         cv2.imshow(win, vis)
 
         key = cv2.waitKey(1) & 0xFF
@@ -262,8 +248,6 @@ def collect_for_camera(cam, target, cam_idx, is_gripper, args, save_dir):
         elif key in (ord('c'), 13, 10):
             cv2.destroyWindow(win)
             return "done", accepted, image_size
-        elif key == ord('a'):
-            auto_on = not auto_on
         elif key == ord('u'):
             if accepted:
                 accepted.pop()
@@ -274,13 +258,10 @@ def collect_for_camera(cam, target, cam_idx, is_gripper, args, save_dir):
                         cc_col = min(args.cov_cols - 1, int(px * args.cov_cols / w))
                         cc_row = min(args.cov_rows - 1, int(py * args.cov_rows / h))
                         coverage[cc_row, cc_col] += 1
-                last_centroid = None
                 print(f"[cam{cam_idx}] undo -> {len(accepted)} views")
         elif key == ord(' '):
             if ch_c is not None and n_corners >= args.min_corners:
                 do_grab = True
-                if centroid is None:
-                    centroid = ch_c.reshape(-1, 2).mean(axis=0)
             else:
                 print(f"[cam{cam_idx}] 그랩 불가: charuco 코너 {n_corners} < "
                       f"{args.min_corners} (보드를 더 잘 보이게)")
@@ -291,15 +272,10 @@ def collect_for_camera(cam, target, cam_idx, is_gripper, args, save_dir):
                 cc_col = min(args.cov_cols - 1, int(px * args.cov_cols / w))
                 cc_row = min(args.cov_rows - 1, int(py * args.cov_rows / h))
                 coverage[cc_row, cc_col] += 1
-            last_centroid = centroid
-            last_grab_t = time.time()
             if save_dir:
                 fn = os.path.join(save_dir, f"view_{len(accepted):03d}.png")
                 cv2.imwrite(fn, color)
             print(f"[cam{cam_idx}] grab #{len(accepted)}  corners={n_corners}  sharp={sharp:.0f}")
-
-            if len(accepted) >= args.target_views:
-                print(f"[cam{cam_idx}] 목표 {args.target_views}장 도달. c/Enter로 보정하거나 계속 수집.")
 
 
 # ---------------------------------------------------------------------------
@@ -339,22 +315,14 @@ def main():
     parser = argparse.ArgumentParser(
         description="ChArUco 기반 color intrinsics 재캘리브레이션 (Step1 결과에 덮어쓰기)")
     parser.add_argument("--intr_dir", type=str, default="intrinsics")
-    parser.add_argument("--target_views", type=int, default=30,
-                        help="카메라당 목표 수집 장수")
     parser.add_argument("--min_views", type=int, default=12,
                         help="보정에 필요한 최소 수집 장수 (미만이면 건너뜀)")
     parser.add_argument("--min_corners", type=int, default=8,
                         help="한 프레임을 그랩하기 위한 최소 charuco 코너 수")
     parser.add_argument("--blur_thresh", type=float, default=60.0,
-                        help="Laplacian variance 최소값 (자동 그랩 선명도 기준)")
-    parser.add_argument("--move_thresh", type=float, default=25.0,
-                        help="자동 그랩 시 직전 그랩 대비 코너 중심 이동 최소 px")
-    parser.add_argument("--grab_cooldown", type=float, default=0.6,
-                        help="자동 그랩 최소 간격 (초)")
+                        help="Laplacian variance 기준값 (화면 sharp OK/BLUR 표시용)")
     parser.add_argument("--cov_cols", type=int, default=4)
     parser.add_argument("--cov_rows", type=int, default=3)
-    parser.add_argument("--auto_grab", action=argparse.BooleanOptionalAction, default=True,
-                        help="자동 그랩 사용 (--no-auto_grab 으로 수동만)")
     parser.add_argument("--save_images", action=argparse.BooleanOptionalAction, default=True,
                         help="수집 프레임을 intr_dir/charuco_capture/cam{idx}/ 에 저장")
     parser.add_argument("--reset_devices", action=argparse.BooleanOptionalAction, default=True,
