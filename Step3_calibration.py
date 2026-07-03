@@ -1404,11 +1404,16 @@ def main():
     parser.add_argument("--gripper_cam_idx", type=int, default=None)
     parser.add_argument("--ref_fixed_cam_idx", type=int, default=None)
     parser.add_argument("--handeye_method", type=str, default="AUTO")
+    parser.add_argument("--capture_block", type=str, default="ALL",
+                        choices=["ALL", "A_placement", "B_eyetohand"],
+                        help="특정 capture_block 만 사용해 캘리브 "
+                             "(A_placement=큐브 바닥에 놓음, B_eyetohand=큐브 그립 후 스윕). "
+                             "기본 ALL=전체. 태그 없는 프레임은 A_placement 로 간주.")
     parser.add_argument("--gripper_cube_min_markers", type=int, default=1)
     parser.add_argument("--gripper_cube_min_aspect", type=float, default=0.35)
     parser.add_argument("--fixed_cube_min_aspect", type=float, default=0.0,
                         help="Reject markers seen at aspect ratio < this from fixed cams. "
-                             "Higher values drop oblique markers but tested 0.5 hurt accuracy by 90% on real data.")
+                             "Higher values drop oblique markers but tested 0.5 hurt accuracy by 90%% on real data.")
     parser.add_argument("--event_anchor_min_cams", type=int, default=2,
                         help="Minimum cameras with cube visible per event for cube-anchor inclusion. "
                              "Tested 3 — caused -22%% pose_rep_max and 5x HE pos std (too few events for hand-eye).")
@@ -1429,6 +1434,26 @@ def main():
 
     with open(os.path.join(root, "meta.json"), "r") as f:
         meta = json.load(f)
+
+    # ─── capture_block 필터 (선택) ───
+    # 한 세션에 method (a) placement 와 method (b) eye-to-hand 스윕을 모두 찍었을 때,
+    # 로드 직후 여기서 한 번만 걸러주면 이후 모든 captures 반복이 필터된 집합을 본다.
+    # 태그가 없는 (구버전) 프레임은 로봇 서버 기본값이던 A_placement 로 간주한다.
+    sel_block = str(args.capture_block or "ALL").strip()
+    if sel_block.upper() != "ALL":
+        _all_caps = meta.get("captures", [])
+        _kept = [c for c in _all_caps
+                 if str(c.get("capture_block", "A_placement")) == sel_block]
+        print(f"[INFO] capture_block 필터='{sel_block}': "
+              f"{len(_kept)}/{len(_all_caps)} captures 사용")
+        if not _kept:
+            raise RuntimeError(
+                f"capture_block='{sel_block}' 에 해당하는 capture가 없습니다 "
+                f"(meta.json 의 capture_block 태그를 확인하세요).")
+        meta["captures"] = _kept
+    else:
+        print(f"[INFO] capture_block 필터=ALL (전체 {len(meta.get('captures', []))} captures)")
+
     cfg, cube_cfg_source = resolve_cube_config_for_run(
         root_folder=root,
         calib_dir=out_dir,

@@ -84,8 +84,10 @@ CUBE_CENTER_OFFSET_Z = CUBE_SIZE_MM / 2.0 - CUBE_GRIP_DEPTH_MM
 TOOL_GRIPPER_Z = 113.5 # 기존에 150.0 이였음.
 TOOL_CUBE_CENTER_Z = TOOL_GRIPPER_Z - CUBE_CENTER_OFFSET_Z
 
-# 큐브를 잡을 때 항상 place 위치 +Z 위에서 접근 후 하강
-GRIP_APPROACH_Z_MM = 20.0
+# 큐브를 잡을 때(재-그립) 항상 place 위치 +Z 위에서 접근 후 수직 하강하여 안전하게 잡는다.
+GRIP_APPROACH_Z_MM = 50.0
+# B(grip-sweep) TCP pose 로 line 이동 시: 목표 +Z 위로 먼저 간 뒤 하강 (급격한 직행 방지)
+TCP_APPROACH_Z_MM = 40.0
 # save gate 실패 시: 자동 지터 없이 곧바로 사람이 jog하는 manual_recover로 진입한다.
 
 TCP_AXIS_MAP = {'x': 'dx', 'y': 'dy', 'z': 'dz', 'rz': 'drz', 'ry': 'dry', 'rx': 'drx'}
@@ -152,6 +154,35 @@ def get_cube_center():
     tcp = rb.getpos().pos2list()[:6]
     rb.changetool(3)
     return tcp
+
+
+def save_capture_poses(path, poses):
+    """teach 뷰포인트 풀(joints+tcp+cube_center)을 JSON으로 저장 (recpose 명령용).
+
+    이 파일을 PC로 옮겨 웨이포인트 생성기(포즈 풀 -> set별 랜덤 배정)의 입력으로 쓴다.
+    """
+    with open(path, 'w') as f:
+        json.dump({"capture_poses": poses}, f, indent=2)
+
+
+def save_capture_sets(path, sets):
+    """큐브 set 배치(place_joints+tcp+cube_center)를 JSON으로 저장 (recset 명령용).
+
+    이 파일을 PC로 옮겨 웨이포인트 생성기의 set 입력으로 쓴다. 큐브를 그립한 채
+    바닥에 놓은 자세에서 기록해야 place_joints/cube_center가 올바르다.
+    """
+    with open(path, 'w') as f:
+        json.dump({"capture_sets": sets}, f, indent=2)
+
+
+def save_grip_poses(path, poses):
+    """그립-스윕(eye-to-hand, block B) 포즈 풀을 JSON으로 저장 (recgrip 명령용).
+
+    큐브를 그립한 채 위로 올려 스윕하는 자세들. 고정 카메라가 움직이는 큐브를
+    관측하는 method (b) 데이터용. PC로 옮겨 웨이포인트 생성기의 --grip 입력으로 쓴다.
+    """
+    with open(path, 'w') as f:
+        json.dump({"grip_poses": poses}, f, indent=2)
 
 
 def get_joints():
@@ -449,24 +480,107 @@ def run_auto_capture(rb, conn, waypoint_file=None, speed=30):
     _run_auto_multiset(rb, conn, data, speed, confirm=confirm)
 
 
+def _capture_at_pose(rb, conn, wp, sidx, place_j, set_cc,
+                     cube_gripped, capture_block, grasp_id, confirm, label=''):
+    """한 waypoint 로 이동 -> (확인) -> 촬영 -> 실패 시 manual recovery.
+
+    이동 방식: wp 에 'capture_joints' 가 있으면 관절 이동(rb.move), 없고 'capture_tcp'
+    만 있으면 TCP 직교 이동(rb.line). Phase A(placement)는 관절, Phase B(grip-sweep)는
+    set 위치로 평행이동된 TCP 를 쓰므로 line 으로 실행된다.
+
+    반환: 'success' | 'skip' | 'quit' | 'disconnect'
+    cube_gripped/capture_block/grasp_id 는 프레임 태그로 do_capture 에 전달되어
+    나중에 Step3 --capture_block 로 방법(a/b)을 분리 캘리브할 수 있게 한다.
+    """
+    cap_j = wp.get('capture_joints')
+    cap_tcp = wp.get('capture_tcp')
+    pose_idx = wp.get('capture_index', wp.get('pose_index'))
+    print ''
+    print '  -- {} capture (set={}, capture_index={}, block={}, move={}) --'.format(
+        label, sidx, pose_idx, capture_block, 'joint' if cap_j is not None else 'tcp')
+    try:
+        if cap_j is not None:
+            rb.move(Joint(*cap_j[:6]))
+        else:
+            # 안전 접근: 목표 TCP 의 +Z {approach}mm 위로 먼저 line 이동한 뒤 하강.
+            tgt = [float(x) for x in cap_tcp[:6]]
+            above = list(tgt)
+            above[2] += TCP_APPROACH_Z_MM
+            print '    (+Z {:.0f}mm approach above then descend)'.format(TCP_APPROACH_Z_MM)
+            rb.line(Position(*above))
+            time.sleep(0.2)
+            rb.line(Position(*tgt))
+    except Exception as e:
+        print '  [WARN] move failed: {}. Skipping.'.format(e)
+        return 'skip'
+    time.sleep(0.5)
+    show_pose()
+
+    if confirm:
+        action = None
+        while action is None:
+            ans = raw_input("  Capture? ('c'+Enter=촬영 / s=skip / q=quit): ").strip().lower()
+            if ans in ('c', ''):
+                action = 'capture'
+            elif ans == 's':
+                action = 'skip'
+            elif ans == 'q':
+                action = 'quit'
+            else:
+                print "  (c=촬영 / s=skip / q=quit 중 입력)"
+        if action == 'skip':
+            print '  -> skipped by user'
+            return 'skip'
+        if action == 'quit':
+            print '  -> quit by user'
+            return 'quit'
+
+    cap_kwargs = {
+        "set_cube_center": set_cc,
+        "set_index": sidx,
+        "set_joints": place_j,
+        "set_tcp": None,
+        "place_joints": place_j,
+        "cube_gripped": cube_gripped,
+        "capture_block": capture_block,
+        "grasp_id": grasp_id,
+    }
+    status, _, _ = do_capture(conn, pose_idx, **cap_kwargs)
+    if status is None:
+        print '[Auto] disconnected, stopping.'
+        return 'disconnect'
+    if status == 'success':
+        print '  [Auto] -> OK'
+        return 'success'
+    print '  [Auto] -> not detected; entering manual recovery'
+    rec = manual_recover(rb, conn, pose_idx, cap_kwargs)
+    if rec is None:
+        return 'disconnect'
+    if rec == 'success':
+        return 'success'
+    if rec == 'quit':
+        return 'quit'
+    return 'skip'
+
+
 def _run_auto_multiset(rb, conn, data, speed, confirm=True,
                         z_clearance_mm=100.0,
                         z_transit_lift_mm=30.0):
     """Multi-set joint-based auto capture (start-command flow).
 
-    Per set in capture_waypoints.json (waypoints[].set_index grouping):
-      1. Approach: move via place_joints + z_transit_lift_mm (line down) so the
-         cube lowers gently to the floor instead of arriving via direct joint
-         interpolation (avoids floor contact during transit).
-      2. Open gripper -> cube released on the floor.
-      3. Move up by z_clearance_mm in +Z direction (line motion in TCP frame).
-      4. For each waypoint in this set: move to capture_joints, capture.
-         set_cube_center는 해당 set의 waypoint에 저장된 set_cube_center_6dof를
-         사용한다 (set마다 큐브 위치가 다르므로 set별 큐브 중점이 meta에 올바르게
-         기록됨). 없으면 파일 최상위 set_cube_center로 폴백한다.
-      5. If a next set exists: return to place_joints, close gripper, line-lift
-         +z_transit_lift_mm before the next set's joint transit (cube clears
-         the floor every time it is moved between sets).
+    각 set(waypoints[].set_index 그룹)마다, capture_block 태그로 두 촬영 방법을 한 번에:
+      Phase B (B_eyetohand): 큐브를 그립한 채 각 grip-sweep pose로 이동하며 촬영
+                             (cube_gripped=True). 고정 카메라가 움직이는 큐브를 관측
+                             = eye-to-hand (method b). 이 set의 그립 하나 = grasp_id.
+      -- place_joints 로 이동해 큐브를 바닥에 내려놓고(하강) tool4로 큐브중점 실측 ->
+         그리퍼 오픈(큐브 릴리즈) -> +Z clearance --
+      Phase A (A_placement): 큐브가 바닥에 놓인 상태로 각 뷰포인트에서 촬영
+                             (cube_gripped=False) = placement (method a).
+                             set_cube_center 는 위에서 실측한 값을 사용.
+      -- 다음 set이 있으면 큐브 재-그립 후 +Z transit lift 하고 이동 --
+
+    waypoint 의 capture_block == 'B_eyetohand' 이면 Phase B, 그 외/없음이면 Phase A.
+    (capture_block 없는 구버전 파일은 전부 A_placement 로 동작 = 기존과 동일.)
     """
     waypoints = data.get('waypoints', [])
     if not waypoints:
@@ -483,8 +597,8 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
             print '[ERROR] waypoint capture_index={} missing set_index'.format(wp.get('capture_index', wp.get('pose_index')))
             send_json(conn, {"command": "quit"})
             return
-        if 'place_joints' not in wp or 'capture_joints' not in wp:
-            print '[ERROR] waypoint capture_index={} missing place_joints/capture_joints'.format(wp.get('capture_index', wp.get('pose_index')))
+        if 'place_joints' not in wp or ('capture_joints' not in wp and 'capture_tcp' not in wp):
+            print '[ERROR] waypoint capture_index={} missing place_joints or capture_joints/capture_tcp'.format(wp.get('capture_index', wp.get('pose_index')))
             send_json(conn, {"command": "quit"})
             return
         if sidx not in by_set:
@@ -505,7 +619,7 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
     print '=========================================='
     print ''
     print 'PRECONDITION: cube must be gripped before starting.'
-    print 'Robot will move to set {}\'s place_joints first, then release the cube.'.format(sets_order[0])
+    print 'Per set: Phase B grip-sweep (cube held) -> place & release -> Phase A placement.'
     raw_input('Press ENTER to confirm cube is gripped and start...')
 
     rb.override(speed)
@@ -528,26 +642,53 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
         place_j = wps[0]['place_joints']
         # set별 큐브 중점: waypoint에 저장된 값 우선, 없으면 파일 최상위로 폴백.
         set_cc = wps[0].get('set_cube_center_6dof') or data.get('set_cube_center')
+        # 이 set 의 그립(Phase B 스윕) 하나 = 하나의 grasp. 재-그립 시 gripper->cube
+        # 변환이 조금 달라지므로 set 마다 grasp_id 를 달리해 Step3 가 구분하게 한다.
+        grasp_id = si
+
+        # capture_block 으로 두 방법을 분리: B(그립 스윕) 먼저, A(placement) 나중.
+        block_b = [wp for wp in wps if wp.get('capture_block') == 'B_eyetohand']
+        block_a = [wp for wp in wps if wp.get('capture_block') != 'B_eyetohand']
 
         print ''
-        print '======== SET {}/{} (set_index={}, {} captures) ========'.format(
-            si + 1, n_sets, sidx, len(wps))
+        print '======== SET {}/{} (set_index={}: B={} grip-sweep, A={} placement) ========'.format(
+            si + 1, n_sets, sidx, len(block_b), len(block_a))
 
-        # Step 1: move to place_joints (cube placement position). Robot is
-        # already lifted +z_transit_lift_mm from the previous set transit (or
-        # is at the start position holding the cube), so the joint motion to
-        # place_joints brings the cube down to the floor naturally.
-        print '[Auto] -> set {} place_joints'.format(sidx)
+        # ---- 안전 전이: B 는 TCP line 이라 먼 거리/특이점에서 실패할 수 있으므로,
+        #      B 시작 전에 관절 이동으로 이 set 영역(place_joints)까지 안전하게 이동한다.
+        #      이후 각 B line 은 이 set 위에서의 국소(주로 수직) 이동이 된다.
+        #      (큐브는 그립된 상태로 잠시 바닥 근처로 내려갔다가 B 접근에서 다시 올라간다.) ----
+        if block_b:
+            print '[Auto] -> set {} region via joints (safe transit before B line moves)'.format(sidx)
+            rb.move(Joint(*place_j[:6]))
+            time.sleep(0.3)
+
+        # ---- Phase B: eye-to-hand. 큐브를 그립한 채(최초 그립 또는 이전 set 재-그립)
+        #      각 sweep pose 로 이동하며 촬영. 고정 카메라가 움직이는 큐브를 관측. ----
+        if block_b:
+            print '[Auto] --- Phase B: {} grip-sweep captures (cube gripped, grasp_id={}) ---'.format(
+                len(block_b), grasp_id)
+        for wi, wp in enumerate(block_b):
+            r = _capture_at_pose(
+                rb, conn, wp, sidx, place_j, set_cc,
+                cube_gripped=True, capture_block='B_eyetohand', grasp_id=grasp_id,
+                confirm=confirm, label='B {}/{}'.format(wi + 1, len(block_b)))
+            if r == 'success':
+                success += 1
+            elif r == 'skip':
+                skipped += 1
+            elif r == 'quit':
+                send_json(conn, {"command": "quit"})
+                return
+            elif r == 'disconnect':
+                return
+
+        # ---- 큐브 내려놓기: place_joints 로 이동(하강) -> tool4 로 큐브중점 실측 ->
+        #      그리퍼 오픈(릴리즈) -> +Z clearance ----
+        print '[Auto] -> set {} place_joints (lower cube to floor)'.format(sidx)
         rb.move(Joint(*place_j[:6]))
         time.sleep(0.5)
-        # 재-그립 시 +Z 위에서 line 접근하기 위한 기준 TCP를 기록.
-        place_tcp = get_tcp()
-
-        # Record the TRUE cube-center pose at placement using tool 4 (the cube-center
-        # TCP), while the gripper still holds the cube. This captures the actual
-        # per-set yaw. The nominal set_cube_center had a reliable translation but its
-        # rotation did not match the physical cube (off by a ~constant frame-convention
-        # offset plus per-set error), which broke the with-prior calibration.
+        place_tcp = get_tcp()  # 재-그립 시 +Z 위에서 line 접근하기 위한 기준 TCP
         try:
             measured_cc = get_cube_center()
             print '[Auto] measured cube center (tool4): ' + fmt6(measured_cc)
@@ -555,12 +696,10 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
         except Exception as e:
             print '[WARN] get_cube_center() failed ({}); keeping nominal set_cube_center'.format(e)
 
-        # Step 2: open gripper -> cube released.
         print '[Auto] gripper OPEN (release cube on floor)'
         gripper_open()
         time.sleep(0.3)
 
-        # Step 3: clearance up in +Z (capture clearance — bigger than transit).
         print '[Auto] -> +Z {:.0f}mm clearance'.format(z_clearance_mm)
         try:
             cur = Position(*rb.getpos().pos2list()[:6])
@@ -569,83 +708,25 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
             print '[WARN] +Z clearance failed: {} (continuing)'.format(e)
         time.sleep(0.5)
 
-        # Step 4: 각 capture pose로 이동 -> 좌표 표시 -> 사람이 'c'로 확인하면 촬영.
-        for wi, wp in enumerate(wps):
-            cap_j = wp['capture_joints']
-            pose_idx = wp.get('capture_index', wp.get('pose_index', wi))
-            print ''
-            print '  -- capture {}/{} (set={}, capture_index={}) --'.format(
-                wi + 1, len(wps), sidx, pose_idx)
-            try:
-                rb.move(Joint(*cap_j[:6]))
-            except Exception as e:
-                print '  [WARN] move failed: {}. Skipping.'.format(e)
-                skipped += 1
-                continue
-            time.sleep(0.5)
-            # 이동된 좌표값(joints + tcp) 표시.
-            show_pose()
-
-            # 사람 확인 대기: 'c'(+Enter)=촬영, s=skip, q=quit.
-            if confirm:
-                action = None
-                while action is None:
-                    ans = raw_input("  Capture? ('c'+Enter=촬영 / s=skip / q=quit): ").strip().lower()
-                    if ans in ('c', ''):
-                        action = 'capture'
-                    elif ans == 's':
-                        action = 'skip'
-                    elif ans == 'q':
-                        action = 'quit'
-                    else:
-                        print "  (c=촬영 / s=skip / q=quit 중 입력)"
-                if action == 'skip':
-                    print '  -> skipped by user'
-                    skipped += 1
-                    continue
-                if action == 'quit':
-                    print '  -> quit by user'
-                    send_json(conn, {"command": "quit"})
-                    return
-
-            # Single capture, NO auto jitter. On detection failure go straight to
-            # manual recovery so the operator jogs until the cube is visible.
-            status, _, _ = do_capture(
-                conn, pose_idx,
-                set_cube_center=set_cc,
-                set_index=sidx,
-                set_joints=place_j,
-                set_tcp=None,
-                place_joints=place_j,
-            )
-            if status is None:
-                print '[Auto] disconnected, stopping.'
-                return
-            if status == 'success':
+        # ---- Phase A: placement. 큐브는 바닥, 그리퍼 카메라가 각 뷰포인트에서 촬영. ----
+        if block_a:
+            print '[Auto] --- Phase A: {} placement captures (cube on floor) ---'.format(len(block_a))
+        for wi, wp in enumerate(block_a):
+            r = _capture_at_pose(
+                rb, conn, wp, sidx, place_j, set_cc,
+                cube_gripped=False, capture_block='A_placement', grasp_id=grasp_id,
+                confirm=confirm, label='A {}/{}'.format(wi + 1, len(block_a)))
+            if r == 'success':
                 success += 1
-                print '  [Auto] -> OK'
-            else:
-                # Marker not detected. Hand control to the operator to jog the robot
-                # until visible, then re-capture.
-                print '  [Auto] -> not detected; entering manual recovery'
-                rec = manual_recover(
-                    rb, conn, pose_idx,
-                    {"set_cube_center": set_cc, "set_index": sidx,
-                     "set_joints": place_j, "set_tcp": None, "place_joints": place_j})
-                if rec is None:
-                    print '[Auto] disconnected, stopping.'
-                    return
-                if rec == 'success':
-                    success += 1
-                elif rec == 'quit':
-                    print '  -> quit by user'
-                    send_json(conn, {"command": "quit"})
-                    return
-                else:
-                    skipped += 1
-                    print '  [Auto] -> SKIPPED by user'
+            elif r == 'skip':
+                skipped += 1
+            elif r == 'quit':
+                send_json(conn, {"command": "quit"})
+                return
+            elif r == 'disconnect':
+                return
 
-        # Step 5: if more sets remain, re-grip the cube and lift before transit.
+        # ---- 다음 set 이 있으면: 큐브 재-그립 후 +Z transit lift 하고 이동 ----
         if si < n_sets - 1:
             print '[Auto] re-grip cube (+Z {:.0f}mm approach above)'.format(
                 GRIP_APPROACH_Z_MM)
@@ -738,6 +819,12 @@ def main():
         capture_block = "A_placement"
         grasp_id = 0
         cube_gripped = False
+        capture_poses = []           # recpose 로 기록하는 뷰포인트 풀 (웨이포인트 생성용)
+        poses_path = 'capture_poses.json'
+        capture_sets = []            # recset 으로 기록하는 큐브 set 배치 (웨이포인트 생성용)
+        sets_path = 'capture_sets.json'
+        grip_poses = []              # recgrip 으로 기록하는 그립-스윕(block B) 포즈 풀
+        grip_poses_path = 'grip_poses.json'
 
         print ''
         print '=========================================='
@@ -751,6 +838,10 @@ def main():
         print '    (b)eye-to-hand: gc(grip cube) -> block b -> jog widely(z>=150mm,'
         print '     tilt>=30deg) -> c at each pose (cube must stay visible to fixed cams)'
         print '  undo [N|all|<axes>|set]  q: quit'
+        print '  recpose | rp          -> A 촬영 뷰포인트 기록 (-> capture_poses.json)'
+        print '  recgrip | rg          -> B 그립-스윕 포즈 기록 (-> grip_poses.json)'
+        print '  recset  | rs          -> 큐브 set 배치 기록 (-> capture_sets.json)'
+        print '    ( ...undo | ...list 지원 )'
         print '  start                 -> auto capture (PC sends waypoints)'
         print '  start <path> [speed]  -> auto capture (local file)'
         print '    (cube must be gripped before start)'
@@ -974,6 +1065,115 @@ def main():
                     show_pose()
                 except Exception as e:
                     print 'Error: {}. Usage: j <axis>,<value>'.format(e)
+
+            # Record capture viewpoint pose (teach pool for waypoint generation)
+            #   recpose | rp          -> 현재 포즈를 풀에 기록 + capture_poses.json 저장
+            #   recpose undo | rp undo-> 마지막 기록 취소
+            #   recpose list | rp list-> 기록된 포즈 목록
+            elif cl == 'recpose' or cl == 'rp' or cl.startswith('recpose ') or cl.startswith('rp '):
+                parts = cl.split()
+                sub = parts[1] if len(parts) >= 2 else None
+                if sub == 'undo':
+                    if capture_poses:
+                        capture_poses.pop()
+                        # pose_index 재부여(0..N-1 유지)
+                        for i, p in enumerate(capture_poses):
+                            p['pose_index'] = i
+                        save_capture_poses(poses_path, capture_poses)
+                        print '[recpose] undo -> {} poses ({})'.format(len(capture_poses), poses_path)
+                    else:
+                        print '[recpose] nothing to undo'
+                elif sub == 'list':
+                    print '[recpose] {} poses recorded:'.format(len(capture_poses))
+                    for p in capture_poses:
+                        print '  #{} joints={}'.format(p['pose_index'], fmt6(p['capture_joints']))
+                else:
+                    pose = {
+                        "pose_index": len(capture_poses),
+                        "capture_joints": get_joints(),
+                        "capture_tcp": get_tcp(),
+                        "cube_center_6dof": get_cube_center(),
+                    }
+                    capture_poses.append(pose)
+                    save_capture_poses(poses_path, capture_poses)
+                    print ''
+                    print '[recpose] #{} saved'.format(pose['pose_index'])
+                    print '  joints: {}'.format(fmt6(pose['capture_joints']))
+                    print '  tcp:    {}'.format(fmt6(pose['capture_tcp']))
+                    print '  cube:   {}'.format(fmt6(pose['cube_center_6dof']))
+                    print '  -> {} ({} poses total)'.format(poses_path, len(capture_poses))
+
+            # Record grip-sweep (eye-to-hand, block B) pose for waypoint gen.
+            #   recgrip | rg           -> 현재(큐브 그립 상태) 스윕 포즈 기록
+            #   recgrip undo | rg undo -> 마지막 취소
+            #   recgrip list | rg list -> 목록
+            elif cl == 'recgrip' or cl == 'rg' or cl.startswith('recgrip ') or cl.startswith('rg '):
+                parts = cl.split()
+                sub = parts[1] if len(parts) >= 2 else None
+                if sub == 'undo':
+                    if grip_poses:
+                        grip_poses.pop()
+                        for i, p in enumerate(grip_poses):
+                            p['pose_index'] = i
+                        save_grip_poses(grip_poses_path, grip_poses)
+                        print '[recgrip] undo -> {} poses ({})'.format(len(grip_poses), grip_poses_path)
+                    else:
+                        print '[recgrip] nothing to undo'
+                elif sub == 'list':
+                    print '[recgrip] {} grip-sweep poses recorded:'.format(len(grip_poses))
+                    for p in grip_poses:
+                        print '  #{} joints={}'.format(p['pose_index'], fmt6(p['capture_joints']))
+                else:
+                    pose = {
+                        "pose_index": len(grip_poses),
+                        "capture_joints": get_joints(),
+                        "capture_tcp": get_tcp(),
+                        "cube_center_6dof": get_cube_center(),
+                    }
+                    grip_poses.append(pose)
+                    save_grip_poses(grip_poses_path, grip_poses)
+                    print ''
+                    print '[recgrip] #{} saved (grip-sweep, block B)'.format(pose['pose_index'])
+                    print '  joints: {}'.format(fmt6(pose['capture_joints']))
+                    print '  tcp:    {}'.format(fmt6(pose['capture_tcp']))
+                    print '  cube:   {}'.format(fmt6(pose['cube_center_6dof']))
+                    print '  -> {} ({} poses total)'.format(grip_poses_path, len(grip_poses))
+
+            # Record cube set placement (place_joints + cube center) for waypoint gen.
+            #   recset | rs           -> 현재(큐브 그립+바닥에 놓은 상태) 기록
+            #   recset undo | rs undo -> 마지막 취소
+            #   recset list | rs list -> 목록
+            elif cl == 'recset' or cl == 'rs' or cl.startswith('recset ') or cl.startswith('rs '):
+                parts = cl.split()
+                sub = parts[1] if len(parts) >= 2 else None
+                if sub == 'undo':
+                    if capture_sets:
+                        capture_sets.pop()
+                        for i, sset in enumerate(capture_sets):
+                            sset['set_index'] = i
+                        save_capture_sets(sets_path, capture_sets)
+                        print '[recset] undo -> {} sets ({})'.format(len(capture_sets), sets_path)
+                    else:
+                        print '[recset] nothing to undo'
+                elif sub == 'list':
+                    print '[recset] {} sets recorded:'.format(len(capture_sets))
+                    for sset in capture_sets:
+                        print '  set#{} cube={}'.format(sset['set_index'], fmt6(sset['set_cube_center_6dof']))
+                else:
+                    sset = {
+                        "set_index": len(capture_sets),
+                        "place_joints": get_joints(),
+                        "place_tcp": get_tcp(),
+                        "set_cube_center_6dof": get_cube_center(),
+                    }
+                    capture_sets.append(sset)
+                    save_capture_sets(sets_path, capture_sets)
+                    print ''
+                    print '[recset] set#{} saved'.format(sset['set_index'])
+                    print '  place_joints: {}'.format(fmt6(sset['place_joints']))
+                    print '  place_tcp:    {}'.format(fmt6(sset['place_tcp']))
+                    print '  cube_center:  {}'.format(fmt6(sset['set_cube_center_6dof']))
+                    print '  -> {} ({} sets total)'.format(sets_path, len(capture_sets))
 
             else:
                 print 'Unknown: {}'.format(cmd)

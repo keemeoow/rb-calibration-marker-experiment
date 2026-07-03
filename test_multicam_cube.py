@@ -36,8 +36,8 @@
   # 카메라 없이 큐브 정의 정합성만 검사 (하드웨어/ pyrealsense2 불필요)
   python test_multicam_cube.py --config-only
 
-    python test_multicam_cube.py
-    # s=저장, SPACE=콘솔 리포트, q=종료
+  python test_multicam_cube.py
+  # s=저장, SPACE=콘솔 리포트, q=종료
 
   python test_multicam_cube.py \
     --intrinsics_dir ../rb-ArucoCube_Robot_multi_calibration/intrinsics \
@@ -486,6 +486,12 @@ def main() -> int:
         print(f"[ERROR] 카메라 모듈 로드 실패 (pyrealsense2?): {e}")
         return 1
 
+    # 이전 실행이 비정상 종료(세그폴트 등)되면 디바이스가 busy 상태로 남아
+    # list_devices()가 "Device or resource busy"로 크래시한다. 열거 전에
+    # 하드웨어 리셋으로 정리한다 (Step1b/Step2와 동일한 순서).
+    if not args.no_reset:
+        RealSenseCamera.reset_all_devices()
+
     devices = RealSenseCamera.list_devices()
     if not devices:
         print("[ERROR] 연결된 RealSense 장치가 없습니다.")
@@ -521,9 +527,6 @@ def main() -> int:
               f"'카메라별 큐브 검출 확인' 모드 (그리드+면별 재투영오차, base 병합/탑뷰 생략)")
 
     cube = AprilTagCubeTarget(cfg)
-
-    if not args.no_reset:
-        RealSenseCamera.reset_all_devices()
 
     cams: Dict[int, RealSenseCamera] = {}
     for ci, serial in idx_serial:

@@ -1071,6 +1071,7 @@ def main():
         place_pose_6dof: Optional[List[float]] = None,
         capture_index: Optional[int] = None,
         capture_robot_joints_6dof: Optional[List[float]] = None,
+        capture_cube_center_6dof: Optional[List[float]] = None,
         set_cube_center_6dof: Optional[List[float]] = None,
         set_index: Optional[int] = None,
         cube_gripped: Optional[bool] = None,
@@ -1156,6 +1157,11 @@ def main():
 
         if capture_robot_joints_6dof is not None:
             cap_rec["capture_robot_joints_6dof"] = [float(x) for x in capture_robot_joints_6dof]
+
+        # 촬영 순간의 실제(live) 큐브 중점 = tool4 포즈(position). B(그립 스윕)에서는
+        # set마다 큐브가 그리퍼에 붙어 움직이므로 pose별 이 값이 핵심 데이터가 된다.
+        if capture_cube_center_6dof is not None:
+            cap_rec["capture_cube_center_6dof"] = [float(x) for x in capture_cube_center_6dof]
 
         if set_cube_center_6dof is not None:
             cap_rec["set_cube_center_6dof"] = [float(x) for x in set_cube_center_6dof]
@@ -1376,6 +1382,7 @@ def main():
                             capture_tcp = msg.get("capture_gripper_pose_6dof")
                             pose_idx = msg.get("capture_index", event_id)
                             r_joints = msg.get("capture_robot_joints_6dof")
+                            live_cube = msg.get("capture_cube_center_6dof")
                             s_cube = msg.get("set_cube_center_6dof")
                             s_idx = msg.get("set_index")
                             m_set_joints = msg.get("set_joints")
@@ -1395,6 +1402,7 @@ def main():
                                 capture_gripper_pose_6dof=capture_tcp,
                                 capture_index=pose_idx,
                                 capture_robot_joints_6dof=r_joints,
+                                capture_cube_center_6dof=live_cube,
                                 set_cube_center_6dof=s_cube,
                                 set_index=s_idx,
                                 cube_gripped=m_gripped,
