@@ -1543,7 +1543,9 @@ def main():
                     pass
                 net_thread.join(timeout=2.0)
 
-                # Save capture_waypoints.json (mirror of robot server's file)
+                # 이번 세션에 실제 촬영된 waypoint 기록(미러)을 저장한다.
+                # 주의: 입력 파일 capture_waypoints.json (생성기 산출물, request_waypoints 가
+                # 읽는 파일)을 덮어쓰면 안 되므로 별도 파일 capture_waypoints_recorded.json 에 쓴다.
                 if wp_list:
                     wp_save = {
                         "set_joints": wp_set_joints,
@@ -1551,10 +1553,10 @@ def main():
                         "set_cube_center": wp_set_cube_center,
                         "waypoints": wp_list,
                     }
-                    wp_path = os.path.join(root, "capture_waypoints.json")
+                    wp_path = os.path.join(root, "capture_waypoints_recorded.json")
                     with open(wp_path, "w") as f:
                         json.dump(wp_save, f, indent=2)
-                    print(f"[INFO] Waypoints saved: {wp_path} ({len(wp_list)} poses)")
+                    print(f"[INFO] Recorded waypoints saved: {wp_path} ({len(wp_list)} poses)")
 
             print(f"\n[DONE] Manual robot capture complete. {event_id} captures saved.")
 
