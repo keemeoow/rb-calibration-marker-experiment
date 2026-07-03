@@ -187,7 +187,8 @@ def gripper_close():
 
 def do_capture(conn, capture_index, set_cube_center=None, set_index=None,
                set_joints=None, set_tcp=None, place_joints=None,
-               cube_gripped=False, capture_block="A_placement", grasp_id=0):
+               cube_gripped=False, capture_block="A_placement", grasp_id=0,
+               force_save=False):
     """Returns (status, tcp, cube_tcp) or (None, None, None) on disconnect.
 
     capture_block / cube_gripped / grasp_id tag each frame so Step3 can separate:
@@ -212,6 +213,7 @@ def do_capture(conn, capture_index, set_cube_center=None, set_index=None,
         "cube_gripped": bool(cube_gripped),
         "capture_block": capture_block,
         "grasp_id": int(grasp_id),
+        "force_save": bool(force_save),
     }
     if set_cube_center is not None:
         msg["set_cube_center_6dof"] = set_cube_center
@@ -467,23 +469,15 @@ def _capture_at_pose(rb, conn, wp, sidx, place_j, set_cc,
         "cube_gripped": cube_gripped,
         "capture_block": capture_block,
         "grasp_id": grasp_id,
+        "force_save": True,   # c+Enter 확인 시 마커 검출 여부와 무관하게 무조건 저장
     }
     status, _, _ = do_capture(conn, pose_idx, **cap_kwargs)
     if status is None:
         print '[Auto] disconnected, stopping.'
         return 'disconnect'
-    if status == 'success':
-        print '  [Auto] -> OK'
-        return 'success'
-    print '  [Auto] -> not detected; entering manual recovery'
-    rec = manual_recover(rb, conn, pose_idx, cap_kwargs)
-    if rec is None:
-        return 'disconnect'
-    if rec == 'success':
-        return 'success'
-    if rec == 'quit':
-        return 'quit'
-    return 'skip'
+    # 마커 검출 실패해도 skip/recovery 하지 않고 무조건 촬영된 것으로 간주하고 진행.
+    print '  [Auto] -> captured (status={})'.format(status)
+    return 'success'
 
 
 def _run_auto_multiset(rb, conn, data, speed, confirm=True,

@@ -1056,6 +1056,7 @@ def main():
         cube_gripped: Optional[bool] = None,
         capture_block: Optional[str] = None,
         grasp_id: Optional[int] = None,
+        force_save: bool = False,
     ) -> Tuple[bool, dict]:
         """모든 카메라에서 마커별 포즈 추정과 함께 촬영."""
         nonlocal event_id
@@ -1106,8 +1107,13 @@ def main():
         )
         capture_span_ms = float(gate["capture_span_ms"])
         if not gate["pass"]:
-            print(f"[SKIP] {gate['reason']}")
-            return False, gate
+            if force_save:
+                # c+Enter 확인 시: 마커/게이트 실패여도 프레임을 무조건 저장한다.
+                # (gate 결과는 meta 에 그대로 남아 나중에 필터 가능; Step3는 이미지에서 재검출)
+                print(f"[FORCE-SAVE] gate 실패({gate['reason']}) 이지만 강제 저장")
+            else:
+                print(f"[SKIP] {gate['reason']}")
+                return False, gate
 
         # ─── 저장 ───
         fid = int(event_id)
@@ -1415,6 +1421,7 @@ def main():
                             m_gripped = msg.get("cube_gripped")
                             m_block = msg.get("capture_block")
                             m_grasp = msg.get("grasp_id")
+                            m_force = msg.get("force_save")
 
                             print(f"\n[ManualRobot] Capture signal received (capture_index={pose_idx}, set_index={s_idx})")
                             if capture_tcp:
@@ -1432,6 +1439,7 @@ def main():
                                 cube_gripped=m_gripped,
                                 capture_block=m_block,
                                 grasp_id=m_grasp,
+                                force_save=bool(m_force),
                             )
 
                             status = "success" if saved else "skipped"
