@@ -20,10 +20,25 @@
   라이브 검사에서는 공통 프레임 병합에서 제외한다(자체 검출만 표시).
 
 필요 입력:
-  - intrinsics_dir : cam{i}.npz (교정 K,D) + device_map.json (serial->idx, gripper_cam_idx)
-  - calib_dir      : Step3 산출물 T_base_C{i}.npy (고정 카메라), (선택) T_base_O.npy
+  - intrinsics_dir : device_map.json + cam{i}.npz. 없으면 시리얼 정렬순 인덱스 +
+                     장치 factory intrinsics 로 자동 대체 (그냥 카메라만 켜도 동작).
+  - calib_dir      : (선택) Step3 산출물 T_base_C{i}.npy. 없으면 base 병합/탑뷰를 생략하고
+                     '카메라별 큐브 검출 확인' 모드로 동작 → 캘리브 전에도 큐브 정의 검증 가능.
+
+2가지 모드:
+  A) 캘리브 없음(기본, 데이터 없을 때): 4대 그리드 + 카메라별 검출 마커/면(face)/재투영오차 +
+     전 카메라 합집합 커버리지(기대 6개 마커 중 어디서든 보인 수 / 아무도 못 본 marker /
+     정의에 없는 unknown ID). 한 카메라가 여러 면을 동시에 보면서 재투영오차가 낮으면
+     = 큐브 정의(면 간 상대기하)가 맞음.
+  B) 캘리브 있음: 위 + base 좌표계 병합/탑뷰로 '4대가 하나의 큐브로 합쳐지는지'까지.
 
 실행 예:
+  # 카메라 없이 큐브 정의 정합성만 검사 (하드웨어/ pyrealsense2 불필요)
+  python test_multicam_cube.py --config-only
+
+    python test_multicam_cube.py
+    # s=저장, SPACE=콘솔 리포트, q=종료
+
   python test_multicam_cube.py \
     --intrinsics_dir ../rb-ArucoCube_Robot_multi_calibration/intrinsics \
     --calib_dir      ../rb-ArucoCube_Robot_multi_calibration/data/session/calib_out
@@ -83,6 +98,19 @@ def load_intrinsics(intr_dir: str, cam_idx: int) -> Tuple[np.ndarray, np.ndarray
     return d["color_K"].astype(np.float64), d["color_D"].astype(np.float64)
 
 
+def color_intrinsics_from_camera(cam) -> Tuple[np.ndarray, np.ndarray]:
+    """RealSense color 스트림 factory intrinsics에서 K, D 추출 (교정 파일 없을 때 대체)."""
+    import pyrealsense2 as rs
+    profile = cam.pipeline.get_active_profile()
+    vsp = profile.get_stream(rs.stream.color).as_video_stream_profile()
+    intr = vsp.get_intrinsics()
+    K = np.array([[intr.fx, 0.0, intr.ppx],
+                  [0.0, intr.fy, intr.ppy],
+                  [0.0, 0.0, 1.0]], dtype=np.float64)
+    D = np.asarray(intr.coeffs, dtype=np.float64).reshape(-1, 1)
+    return K, D
+
+
 def load_base_extrinsics(calib_dir: str, cam_ids: List[int]) -> Dict[int, np.ndarray]:
     """고정 카메라별 T_base_C{i}.npy 로드 (있는 것만)."""
     out = {}
@@ -139,6 +167,10 @@ def analyze_cam(cube: AprilTagCubeTarget, img: np.ndarray, K: np.ndarray, D: np.
     out = img.copy()
     corners_list, ids = cube.detect(img)
     detected_ids = sorted(set(int(x) for x in ids)) if ids is not None else []
+    expected_ids = sorted(int(x) for x in cube.cfg.marker_ids)
+    unknown_ids = [m for m in detected_ids if m not in expected_ids]
+    faces = sorted(set(cube.model.marker_face_name(m) for m in detected_ids
+                       if cube.model.has_marker(m)))
     ok, rvec, tvec, used, reproj = cube.solve_pnp_cube(
         img, K, D, use_ransac=True, min_markers=max(int(min_markers), 1),
         reproj_thr_mean_px=float(max_err), return_reproj=True, min_aspect=float(min_aspect))
@@ -154,6 +186,9 @@ def analyze_cam(cube: AprilTagCubeTarget, img: np.ndarray, K: np.ndarray, D: np.
     return {
         "overlay": out,
         "detected_ids": detected_ids,
+        "expected_ids": expected_ids,
+        "unknown_ids": unknown_ids,
+        "faces": faces,
         "used_ids": sorted(int(x) for x in used) if used else [],
         "pnp_ok": bool(ok),
         "T_C_O": T_C_O,
@@ -202,6 +237,20 @@ def compute_merge(cam_results: Dict[int, dict],
 
 
 # ---------------------------------------------------------------------------
+# Coverage across cameras (정의 대비 검출 커버리지)
+# ---------------------------------------------------------------------------
+def aggregate_coverage(cam_results: Dict[int, dict]) -> dict:
+    """전 카메라 합집합 기준: 기대 마커 중 몇 개가 어디서든 보였는지,
+    아무도 못 본 마커(missing), 정의에 없는 ID(unknown)를 집계."""
+    vals = list(cam_results.values())
+    expected = sorted(set().union(*[set(r.get("expected_ids", [])) for r in vals])) if vals else []
+    detected = sorted(set().union(*[set(r.get("detected_ids", [])) for r in vals])) if vals else []
+    missing = [m for m in expected if m not in detected]
+    unknown = sorted(set(m for r in vals for m in r.get("unknown_ids", [])))
+    return {"expected": expected, "detected": detected, "missing": missing, "unknown": unknown}
+
+
+# ---------------------------------------------------------------------------
 # Rendering
 # ---------------------------------------------------------------------------
 def label_bar(w: int, text: str, color, h: int = 26) -> np.ndarray:
@@ -227,6 +276,10 @@ def make_grid(cam_results: Dict[int, dict], order: List[int], gripper_idx: Optio
         parts = [f"cam{ci} [{role}]"]
         if r is not None:
             parts.append(f"ids={r.get('detected_ids', [])}")
+            fc = r.get("faces", [])
+            parts.append(f"{len(fc)}face")
+            if r.get("unknown_ids"):
+                parts.append(f"UNKNOWN={r['unknown_ids']}")
             if r.get("pnp_ok"):
                 err = r.get("reproj_err_mean_px")
                 parts.append(f"reproj={err:.2f}px" if err is not None else "reproj=?")
@@ -241,7 +294,19 @@ def make_grid(cam_results: Dict[int, dict], order: List[int], gripper_idx: Optio
         cells.append(np.zeros((ch + 26, cw, 3), np.uint8))
     top = cv2.hconcat([cells[0], cells[1]])
     bot = cv2.hconcat([cells[2], cells[3]])
-    return cv2.vconcat([top, bot])
+    grid = cv2.vconcat([top, bot])
+
+    # 하단 커버리지 배너: 전 카메라 합집합으로 기대 마커가 다 보이는지 / 이상 ID 있는지
+    cov = aggregate_coverage(cam_results)
+    line = f"coverage(union) {len(cov['detected'])}/{len(cov['expected'])} ids: {cov['detected']}"
+    ccol = (0, 200, 0)
+    if cov["missing"]:
+        line += f"  MISSING={cov['missing']}"
+        ccol = (0, 200, 255)
+    if cov["unknown"]:
+        line += f"  UNKNOWN={cov['unknown']}"
+        ccol = (0, 0, 255)
+    return cv2.vconcat([grid, label_bar(grid.shape[1], line, ccol, h=30)])
 
 
 def render_topview(merge: dict, T_base_O_ref: Optional[np.ndarray],
@@ -323,7 +388,9 @@ def print_report(merge: dict, cam_results: Dict[int, dict], gripper_idx: Optiona
     for ci in sorted(cam_results.keys()):
         r = cam_results[ci]
         role = "GRIPPER" if ci == gripper_idx else "FIXED"
-        s = f"  cam{ci} [{role}] ids={r['detected_ids']}"
+        s = f"  cam{ci} [{role}] ids={r['detected_ids']} faces={r.get('faces', [])}"
+        if r.get("unknown_ids"):
+            s += f" UNKNOWN={r['unknown_ids']}"
         if r["pnp_ok"]:
             s += f" reproj={r['reproj_err_mean_px']:.2f}px"
             if ci in merge.get("per_cam", {}):
@@ -332,6 +399,15 @@ def print_report(merge: dict, cam_results: Dict[int, dict], gripper_idx: Optiona
         else:
             s += " (no cube)"
         print(s)
+
+    # 전 카메라 합집합 커버리지 (정의 대비)
+    cov = aggregate_coverage(cam_results)
+    print(f"  [커버리지] 합집합 검출 {len(cov['detected'])}/{len(cov['expected'])}: {cov['detected']}")
+    if cov["missing"]:
+        print(f"    [주의] 어느 카메라도 못 본 마커: {cov['missing']} (부착/프린트/정의 확인)")
+    if cov["unknown"]:
+        print(f"    [경고] 정의(config.py)에 없는 ID 검출: {cov['unknown']} (엉뚱한 마커/ID 오정의)")
+
     if merge.get("ok") is not None:
         print(f"  --> fixed cams in base frame: {merge['n']}")
         print(f"      trans spread mean/max: {merge['trans_spread_mean_mm']:.2f} / {merge['trans_spread_max_mm']:.2f} mm")
@@ -351,6 +427,8 @@ def main() -> int:
                     help="cam{i}.npz + device_map.json 폴더")
     ap.add_argument("--calib_dir", default=DEFAULT_CALIB,
                     help="Step3 산출물 T_base_C{i}.npy 폴더")
+    ap.add_argument("--config-only", action="store_true",
+                    help="카메라 없이 config.py 큐브 정의 정합성만 검사하고 종료")
     ap.add_argument("--width", type=int, default=640)
     ap.add_argument("--height", type=int, default=480)
     ap.add_argument("--fps", type=int, default=15)
@@ -367,8 +445,25 @@ def main() -> int:
     cfg_ok, problems = validate_cube_config(cfg)
     print_cube_sanity_check(cfg)
     if not cfg_ok:
-        print("[ERROR] 큐브 정의 자기모순:", problems)
-        return 1
+        # 큐브와 Charuco 보드가 서로 다른 ArUco 딕셔너리면 ID 충돌은 무해
+        # (검출 시 딕셔너리로 구분됨). 이 경우 [collision]은 경고로만 처리.
+        try:
+            from config import CharucoBoardConfig
+            diff_dict = str(cfg.dictionary_name) != str(CharucoBoardConfig().dictionary_name)
+        except Exception:
+            diff_dict = False
+        fatal = [p for p in problems if not (diff_dict and p.strip().startswith("[collision]"))]
+        for p in problems:
+            benign = diff_dict and p.strip().startswith("[collision]")
+            print(f"  [{'경고(무해)' if benign else '오류'}] {p}")
+        if fatal:
+            print("[ERROR] 큐브 정의에 실제 기하 오류가 있습니다. config.py를 고치세요.")
+            return 1
+        print("[주의] 위 ID 충돌은 큐브/보드 딕셔너리가 달라 무해 → 계속 진행합니다.")
+
+    if args.config_only:
+        print("\n--config-only: 큐브 정의 검사 통과(무해 경고 제외). 카메라 단계 생략.")
+        return 0
 
     intr_dir = os.path.abspath(args.intrinsics_dir)
     calib_dir = os.path.abspath(args.calib_dir)
@@ -377,17 +472,13 @@ def main() -> int:
         print(f"[ERROR] intrinsics_dir 없음: {intr_dir}")
         return 1
 
-    serial_to_idx, gripper_idx = load_device_map(intr_dir)
+    # device_map: 있으면 정확한 cam idx/그리퍼 구분, 없으면 아래에서 시리얼 정렬순으로 대체
+    try:
+        serial_to_idx, gripper_idx = load_device_map(intr_dir)
+    except FileNotFoundError:
+        serial_to_idx, gripper_idx = {}, None
+        print("[주의] device_map.json 없음 → 연결 시리얼 정렬순으로 cam 인덱스 부여(그리퍼 구분 없음)")
     print(f"serial->idx: {serial_to_idx}  gripper_cam_idx: {gripper_idx}")
-
-    fixed_ids = sorted(i for i in serial_to_idx.values() if i != gripper_idx)
-    T_base_Ci = load_base_extrinsics(calib_dir, fixed_ids)
-    T_base_O_ref = load_optional_T(calib_dir, "T_base_O.npy")
-    print(f"고정 카메라: {fixed_ids}  |  T_base_C 로드됨: {sorted(T_base_Ci.keys())}"
-          f"  |  T_base_O ref: {'있음' if T_base_O_ref is not None else '없음'}")
-    if not T_base_Ci:
-        print(f"[ERROR] {calib_dir} 에 T_base_C*.npy 가 없습니다. Step3 캘리브레이션을 먼저 수행하세요.")
-        return 1
 
     try:
         from camera import RealSenseCamera
@@ -396,23 +487,40 @@ def main() -> int:
         return 1
 
     devices = RealSenseCamera.list_devices()
-    print("\n연결된 장치:")
-    for s, name in devices.items():
-        idx = serial_to_idx.get(s, "?")
-        print(f"  cam{idx}: {s} ({name})")
-
-    # 매핑에 있는 & 실제 연결된 카메라만
-    idx_serial = sorted(((serial_to_idx[s], s) for s in devices if s in serial_to_idx),
-                        key=lambda x: x[0])
-    if not idx_serial:
-        print("[ERROR] device_map 과 일치하는 연결 장치가 없습니다.")
+    if not devices:
+        print("[ERROR] 연결된 RealSense 장치가 없습니다.")
         return 1
 
-    # intrinsics + 큐브
+    # cam idx 매핑: device_map 있으면 그걸로, 없으면 시리얼 정렬순 0,1,2,...
+    if serial_to_idx:
+        idx_serial = sorted(((serial_to_idx[s], s) for s in devices if s in serial_to_idx),
+                            key=lambda x: x[0])
+        if not idx_serial:
+            print("[ERROR] device_map 과 일치하는 연결 장치가 없습니다.")
+            return 1
+    else:
+        idx_serial = [(i, s) for i, s in enumerate(sorted(devices.keys()))]
+
+    idx_by_serial = {s: i for i, s in idx_serial}
+    print("\n연결된 장치:")
+    for s, name in devices.items():
+        print(f"  cam{idx_by_serial.get(s, '?')}: {s} ({name})")
+
+    fixed_ids = sorted(ci for ci, _ in idx_serial if ci != gripper_idx)
+
+    # 캘리브 외부파라미터(선택): 있으면 base 병합/탑뷰까지, 없으면 검출 확인만
+    T_base_Ci = load_base_extrinsics(calib_dir, fixed_ids)
+    T_base_O_ref = load_optional_T(calib_dir, "T_base_O.npy")
+    has_calib = bool(T_base_Ci)
+    if has_calib:
+        print(f"[캘리브 사용] T_base_C: {sorted(T_base_Ci.keys())}"
+              f"  T_base_O ref: {'있음' if T_base_O_ref is not None else '없음'}"
+              f"  → base 병합/탑뷰로 '하나로 합쳐지는지'까지 확인")
+    else:
+        print(f"[캘리브 없음] {calib_dir} 에 T_base_C*.npy 없음 → "
+              f"'카메라별 큐브 검출 확인' 모드 (그리드+면별 재투영오차, base 병합/탑뷰 생략)")
+
     cube = AprilTagCubeTarget(cfg)
-    K_map, D_map = {}, {}
-    for ci, _ in idx_serial:
-        K_map[ci], D_map[ci] = load_intrinsics(intr_dir, ci)
 
     if not args.no_reset:
         RealSenseCamera.reset_all_devices()
@@ -423,7 +531,17 @@ def main() -> int:
                               fps=args.fps, use_color=True, use_depth=False, warmup_frames=10)
         cam.start()
         cams[ci] = cam
-    print(f"\n{len(cams)}대 카메라 시작 완료. 큐브를 고정 카메라들이 함께 보이는 위치에 두세요.")
+
+    # intrinsics: 파일(cam{idx}.npz) 우선, 없으면 장치 factory 값으로 대체
+    K_map, D_map = {}, {}
+    for ci, _ in idx_serial:
+        try:
+            K_map[ci], D_map[ci] = load_intrinsics(intr_dir, ci)
+        except FileNotFoundError:
+            K_map[ci], D_map[ci] = color_intrinsics_from_camera(cams[ci])
+            print(f"  cam{ci}: intrinsics 파일 없음 → factory 값 사용")
+
+    print(f"\n{len(cams)}대 카메라 시작 완료. 큐브를 카메라들이 보이는 위치에 두세요.")
 
     os.makedirs(args.out, exist_ok=True)
     stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -447,8 +565,9 @@ def main() -> int:
         for ci in order:
             img = frames.get(ci)
             if img is None:
-                cam_results[ci] = {"overlay": None, "detected_ids": [], "used_ids": [],
-                                   "pnp_ok": False, "T_C_O": None, "reproj_err_mean_px": None}
+                cam_results[ci] = {"overlay": None, "detected_ids": [], "faces": [],
+                                   "used_ids": [], "pnp_ok": False, "T_C_O": None,
+                                   "reproj_err_mean_px": None}
                 continue
             cam_results[ci] = analyze_cam(cube, img, K_map[ci], D_map[ci],
                                           args.max_err, args.min_aspect, args.min_markers,
@@ -459,9 +578,9 @@ def main() -> int:
     def save(cam_results, merge):
         base = os.path.join(args.out, f"multicam_{stamp}")
         grid = make_grid(cam_results, order, gripper_idx, merge)
-        top = render_topview(merge, T_base_O_ref)
         cv2.imwrite(base + "_grid.png", grid)
-        cv2.imwrite(base + "_topview.png", top)
+        if has_calib:
+            cv2.imwrite(base + "_topview.png", render_topview(merge, T_base_O_ref))
         report = {
             "n_fixed_in_base": merge.get("n", 0),
             "trans_spread_mean_mm": merge.get("trans_spread_mean_mm"),
@@ -490,9 +609,9 @@ def main() -> int:
         while True:
             cam_results, merge = measure()
             grid = make_grid(cam_results, order, gripper_idx, merge)
-            top = render_topview(merge, T_base_O_ref)
             cv2.imshow("cameras (2x2)", grid)
-            cv2.imshow("base frame top view", top)
+            if has_calib:
+                cv2.imshow("base frame top view", render_topview(merge, T_base_O_ref))
             key = cv2.waitKey(30) & 0xFF
             if key in (ord('q'), 27):
                 break

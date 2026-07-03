@@ -15,8 +15,6 @@ depth 관련 필드(depth_K, depth_scale, R_depth_to_color 등)와 해상도/시
     (depth 필드 포함)를 만들어 두어야 한다.
   - config.py 의 CharucoBoardConfig 가 실제 인쇄된 보드와 일치해야 한다
     (기본: 11x7, square 25mm, marker 18mm, DICT_4X4_250, marker_id_start=5).
-    * intrinsics(K, D)는 보드의 물리 치수와 무관하지만, 보드 레이아웃(칸 수,
-      dictionary, 마커 ID)은 검출을 위해 반드시 일치해야 한다.
 
 동작:
   1) device_map.json 로드 (serial -> cam_idx, gripper_cam_idx)
@@ -29,13 +27,12 @@ depth 관련 필드(depth_K, depth_scale, R_depth_to_color 등)와 해상도/시
 키 조작 (카메라별 수집 중):
   SPACE : 현재 프레임 그랩
   u     : 마지막 그랩 취소(undo)
-  c/Enter: 이 카메라 수집 종료 -> 보정 실행
+  c/Enter: 이 카메라 수집 종료 -> 다음 카메라 촬영
   s     : 이 카메라 건너뛰기 (factory 값 유지)
   q     : 전체 중단 (아무것도 쓰지 않음)
 
 명령어 예시:
   python Step1b_charuco_intrinsics.py --intr_dir ./intrinsics
-  python Step1b_charuco_intrinsics.py --rational           # 8-계수 rational 모델
 """
 
 import os
@@ -49,7 +46,6 @@ import cv2
 from camera import RealSenseCamera
 from charuco_utils import CharucoTarget
 from config import CharucoBoardConfig
-
 
 # ---------------------------------------------------------------------------
 # 보정 헬퍼
