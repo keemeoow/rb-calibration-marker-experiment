@@ -30,6 +30,8 @@ TOOL_CUBE_CENTER_Z = TOOL_GRIPPER_Z - CUBE_CENTER_OFFSET_Z
 GRIP_APPROACH_Z_MM = 50.0
 # B(grip-sweep) TCP pose 로 line 이동 시: 목표 +Z 위로 먼저 간 뒤 하강 (급격한 직행 방지)
 TCP_APPROACH_Z_MM = 40.0
+# 큐브 내려놓기: 항상 place 자세 +Z 위(정자세)로 올렸다가 그대로 수직 하강하여 놓는다.
+PLACE_APPROACH_Z_MM = 50.0
 # save gate 실패 시: 자동 지터 없이 곧바로 사람이 jog하는 manual_recover로 진입한다.
 
 TCP_AXIS_MAP = {'x': 'dx', 'y': 'dy', 'z': 'dz', 'rz': 'drz', 'ry': 'dry', 'rx': 'drx'}
@@ -600,12 +602,26 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
             elif r == 'disconnect':
                 return
 
-        # ---- 큐브 내려놓기: place_joints 로 이동(하강) -> tool4 로 큐브중점 실측 ->
-        #      그리퍼 오픈(릴리즈) -> +Z clearance ----
-        print '[Auto] -> set {} place_joints (lower cube to floor)'.format(sidx)
+        # ---- 큐브 내려놓기: 항상 place 위 +Z{PLACE_APPROACH_Z_MM}mm 정자세에서 수직으로
+        #      그대로 하강해 내려놓는다 -> tool4 로 큐브중점 실측 -> 릴리즈 -> +Z clearance.
+        #      place_joints 는 관절값이라 FK 없이 상공 TCP 를 알 수 없으므로: 관절이동으로
+        #      정자세 place 에 도달해 기준 TCP 를 읽고 -> +Z 로 올렸다가 -> 같은 자세로 수직
+        #      하강한다(마지막 접근을 항상 순수 수직/정자세로 보장). ----
+        print '[Auto] -> set {} place: joint move to upright place pose'.format(sidx)
         rb.move(Joint(*place_j[:6]))
+        time.sleep(0.3)
+        place_tcp = get_tcp()  # 정자세 place 기준 TCP (재-그립/재접근 기준으로도 사용)
+        above = list(place_tcp[:6])
+        above[2] += PLACE_APPROACH_Z_MM
+        try:
+            print '[Auto] +Z {:.0f}mm upright, then straight down to place'.format(
+                PLACE_APPROACH_Z_MM)
+            rb.line(Position(*above))
+            time.sleep(0.2)
+            rb.line(Position(*place_tcp[:6]))
+        except Exception as e:
+            print '[WARN] upright place approach failed: {} (staying at place pose)'.format(e)
         time.sleep(0.5)
-        place_tcp = get_tcp()  # 재-그립 시 +Z 위에서 line 접근하기 위한 기준 TCP
         try:
             measured_cc = get_cube_center()
             print '[Auto] measured cube center (tool4): ' + fmt6(measured_cc)
