@@ -1,0 +1,4866 @@
+[
+  {
+    "event_id": 0,
+    "set_index": 0,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00000.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1273858269119324
+  },
+  {
+    "event_id": 0,
+    "set_index": 0,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00000.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1528782653262957
+  },
+  {
+    "event_id": 1,
+    "set_index": 0,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00001.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1806012374605675
+  },
+  {
+    "event_id": 1,
+    "set_index": 0,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00001.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.8115024780428766
+  },
+  {
+    "event_id": 2,
+    "set_index": 0,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00002.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.10755241245488871
+  },
+  {
+    "event_id": 2,
+    "set_index": 0,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00002.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.102827749251168
+  },
+  {
+    "event_id": 3,
+    "set_index": 0,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00003.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.14508693410892082
+  },
+  {
+    "event_id": 3,
+    "set_index": 0,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00003.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 1.1073265351768826
+  },
+  {
+    "event_id": 4,
+    "set_index": 0,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00004.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.02689789160831485
+  },
+  {
+    "event_id": 4,
+    "set_index": 0,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00004.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.4513661431079231
+  },
+  {
+    "event_id": 5,
+    "set_index": 0,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00005.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16731713663895695
+  },
+  {
+    "event_id": 5,
+    "set_index": 0,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00005.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2354902302764234
+  },
+  {
+    "event_id": 6,
+    "set_index": 0,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00006.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.24541382740382967
+  },
+  {
+    "event_id": 6,
+    "set_index": 0,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00006.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2270437870664688
+  },
+  {
+    "event_id": 7,
+    "set_index": 0,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00007.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.05960018152018996
+  },
+  {
+    "event_id": 7,
+    "set_index": 0,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00007.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.20409436691772304
+  },
+  {
+    "event_id": 8,
+    "set_index": 0,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00008.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.19351429806229925
+  },
+  {
+    "event_id": 8,
+    "set_index": 0,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00008.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.20409436691772304
+  },
+  {
+    "event_id": 9,
+    "set_index": 0,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00009.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.05960018152018996
+  },
+  {
+    "event_id": 9,
+    "set_index": 0,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00009.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.20409436691772304
+  },
+  {
+    "event_id": 10,
+    "set_index": 0,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00010.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.012446393983560946
+  },
+  {
+    "event_id": 10,
+    "set_index": 0,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00010.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.10981487708114811
+  },
+  {
+    "event_id": 11,
+    "set_index": 0,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00011.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.20409436691772304
+  },
+  {
+    "event_id": 11,
+    "set_index": 0,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00011.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.061410843294240215
+  },
+  {
+    "event_id": 12,
+    "set_index": 0,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00012.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.05960018152018996
+  },
+  {
+    "event_id": 12,
+    "set_index": 0,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00012.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.20409436691772304
+  },
+  {
+    "event_id": 13,
+    "set_index": 0,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00013.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.20409436691772304
+  },
+  {
+    "event_id": 13,
+    "set_index": 0,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00013.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.061410843294240215
+  },
+  {
+    "event_id": 14,
+    "set_index": 0,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00014.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.20409436691772304
+  },
+  {
+    "event_id": 14,
+    "set_index": 0,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00014.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.061410843294240215
+  },
+  {
+    "event_id": 15,
+    "set_index": 0,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00015.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1731146288040723
+  },
+  {
+    "event_id": 15,
+    "set_index": 0,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00015.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06373316992608596
+  },
+  {
+    "event_id": 16,
+    "set_index": 0,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00016.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2200043090935076
+  },
+  {
+    "event_id": 16,
+    "set_index": 0,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00016.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.022499030598497886
+  },
+  {
+    "event_id": 17,
+    "set_index": 0,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00017.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.22291158234274813
+  },
+  {
+    "event_id": 17,
+    "set_index": 0,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00017.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2601533639420519
+  },
+  {
+    "event_id": 18,
+    "set_index": 1,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00018.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1495127280424964
+  },
+  {
+    "event_id": 18,
+    "set_index": 1,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00018.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.9807853703534836
+  },
+  {
+    "event_id": 19,
+    "set_index": 1,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00019.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.23045547949742914
+  },
+  {
+    "event_id": 19,
+    "set_index": 1,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00019.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16443130074468398
+  },
+  {
+    "event_id": 20,
+    "set_index": 1,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00020.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1592925055670486
+  },
+  {
+    "event_id": 20,
+    "set_index": 1,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00020.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.17604894338846017
+  },
+  {
+    "event_id": 21,
+    "set_index": 1,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00021.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.12256466675598306
+  },
+  {
+    "event_id": 21,
+    "set_index": 1,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00021.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.3630458667117131
+  },
+  {
+    "event_id": 22,
+    "set_index": 1,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00022.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.047605906042808545
+  },
+  {
+    "event_id": 22,
+    "set_index": 1,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00022.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.08023471027082275
+  },
+  {
+    "event_id": 23,
+    "set_index": 1,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00023.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.12485137947956472
+  },
+  {
+    "event_id": 23,
+    "set_index": 1,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00023.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2185544239921466
+  },
+  {
+    "event_id": 24,
+    "set_index": 1,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00024.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.04831788434946761
+  },
+  {
+    "event_id": 24,
+    "set_index": 1,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00024.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2557651558933226
+  },
+  {
+    "event_id": 25,
+    "set_index": 1,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00025.jpg",
+    "used_ids": [
+      5,
+      0
+    ],
+    "source": "multi",
+    "err_mean_px": 0.4716917900388265
+  },
+  {
+    "event_id": 25,
+    "set_index": 1,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00025.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.12279829716690338
+  },
+  {
+    "event_id": 26,
+    "set_index": 1,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00026.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.04831788434946761
+  },
+  {
+    "event_id": 26,
+    "set_index": 1,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00026.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.08820228563956048
+  },
+  {
+    "event_id": 27,
+    "set_index": 1,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00027.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.04831788434946761
+  },
+  {
+    "event_id": 27,
+    "set_index": 1,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00027.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.15334917694969336
+  },
+  {
+    "event_id": 28,
+    "set_index": 1,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00028.jpg",
+    "used_ids": [
+      5,
+      0
+    ],
+    "source": "multi",
+    "err_mean_px": 0.4716917900388265
+  },
+  {
+    "event_id": 28,
+    "set_index": 1,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00028.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.12279829716690338
+  },
+  {
+    "event_id": 29,
+    "set_index": 1,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00029.jpg",
+    "used_ids": [
+      5,
+      0
+    ],
+    "source": "multi",
+    "err_mean_px": 0.4716917900388265
+  },
+  {
+    "event_id": 29,
+    "set_index": 1,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00029.jpg",
+    "used_ids": [
+      0,
+      1
+    ],
+    "source": "multi",
+    "err_mean_px": 0.35834253978172725
+  },
+  {
+    "event_id": 30,
+    "set_index": 1,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00030.jpg",
+    "used_ids": [
+      5,
+      0,
+      1
+    ],
+    "source": "multi",
+    "err_mean_px": 0.5243896271850639
+  },
+  {
+    "event_id": 30,
+    "set_index": 1,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00030.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.12279829716690338
+  },
+  {
+    "event_id": 31,
+    "set_index": 1,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00031.jpg",
+    "used_ids": [
+      5,
+      0,
+      1
+    ],
+    "source": "multi",
+    "err_mean_px": 0.564367260651114
+  },
+  {
+    "event_id": 31,
+    "set_index": 1,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00031.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.12279829716690338
+  },
+  {
+    "event_id": 32,
+    "set_index": 1,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00032.jpg",
+    "used_ids": [
+      5,
+      0,
+      1
+    ],
+    "source": "multi",
+    "err_mean_px": 0.5243896271850639
+  },
+  {
+    "event_id": 32,
+    "set_index": 1,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00032.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.12279829716690338
+  },
+  {
+    "event_id": 33,
+    "set_index": 1,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00033.jpg",
+    "used_ids": [
+      5,
+      0
+    ],
+    "source": "multi",
+    "err_mean_px": 0.4716917900388265
+  },
+  {
+    "event_id": 33,
+    "set_index": 1,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00033.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11220620680398248
+  },
+  {
+    "event_id": 34,
+    "set_index": 1,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00034.jpg",
+    "used_ids": [
+      5,
+      0
+    ],
+    "source": "multi",
+    "err_mean_px": 0.4716917900388265
+  },
+  {
+    "event_id": 34,
+    "set_index": 1,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00034.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.12279829716690338
+  },
+  {
+    "event_id": 35,
+    "set_index": 2,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00035.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1123419248214366
+  },
+  {
+    "event_id": 35,
+    "set_index": 2,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00035.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.04231762482351476
+  },
+  {
+    "event_id": 36,
+    "set_index": 2,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00036.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1440384788846005
+  },
+  {
+    "event_id": 36,
+    "set_index": 2,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00036.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11788793799091209
+  },
+  {
+    "event_id": 37,
+    "set_index": 2,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00037.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1182204971003365
+  },
+  {
+    "event_id": 37,
+    "set_index": 2,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00037.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.10239428170894826
+  },
+  {
+    "event_id": 38,
+    "set_index": 2,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00038.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.18377539467598158
+  },
+  {
+    "event_id": 38,
+    "set_index": 2,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00038.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.09937513925383268
+  },
+  {
+    "event_id": 39,
+    "set_index": 2,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00039.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.19374238789217135
+  },
+  {
+    "event_id": 39,
+    "set_index": 2,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00039.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.10881344788754214
+  },
+  {
+    "event_id": 40,
+    "set_index": 2,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00040.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.19206389388479223
+  },
+  {
+    "event_id": 40,
+    "set_index": 2,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00040.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1291417304817781
+  },
+  {
+    "event_id": 41,
+    "set_index": 2,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00041.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.08553490437093296
+  },
+  {
+    "event_id": 41,
+    "set_index": 2,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00041.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1291417304817781
+  },
+  {
+    "event_id": 42,
+    "set_index": 2,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00042.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.08553490437093296
+  },
+  {
+    "event_id": 42,
+    "set_index": 2,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00042.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1291417304817781
+  },
+  {
+    "event_id": 43,
+    "set_index": 2,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00043.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.08553490437093296
+  },
+  {
+    "event_id": 43,
+    "set_index": 2,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00043.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1291417304817781
+  },
+  {
+    "event_id": 44,
+    "set_index": 2,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00044.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.08553490437093296
+  },
+  {
+    "event_id": 44,
+    "set_index": 2,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00044.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1291417304817781
+  },
+  {
+    "event_id": 45,
+    "set_index": 2,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00045.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.12134838078681312
+  },
+  {
+    "event_id": 45,
+    "set_index": 2,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00045.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.304770379919123
+  },
+  {
+    "event_id": 46,
+    "set_index": 2,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00046.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.10730279959326115
+  },
+  {
+    "event_id": 46,
+    "set_index": 2,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00046.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1418789176109171
+  },
+  {
+    "event_id": 47,
+    "set_index": 2,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00047.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1291417304817781
+  },
+  {
+    "event_id": 47,
+    "set_index": 2,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00047.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.02582594033058165
+  },
+  {
+    "event_id": 48,
+    "set_index": 2,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00048.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.08553490437093296
+  },
+  {
+    "event_id": 48,
+    "set_index": 2,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00048.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1291417304817781
+  },
+  {
+    "event_id": 49,
+    "set_index": 2,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00049.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.08553490437093296
+  },
+  {
+    "event_id": 49,
+    "set_index": 2,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00049.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1291417304817781
+  },
+  {
+    "event_id": 50,
+    "set_index": 2,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00050.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.14136153645319904
+  },
+  {
+    "event_id": 50,
+    "set_index": 2,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00050.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06189053310370198
+  },
+  {
+    "event_id": 51,
+    "set_index": 3,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00051.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2481170155148142
+  },
+  {
+    "event_id": 51,
+    "set_index": 3,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00051.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1764717772902332
+  },
+  {
+    "event_id": 52,
+    "set_index": 3,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00052.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.13020946842548117
+  },
+  {
+    "event_id": 52,
+    "set_index": 3,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00052.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.024861588182073867
+  },
+  {
+    "event_id": 53,
+    "set_index": 3,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00053.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.02700150874662791
+  },
+  {
+    "event_id": 53,
+    "set_index": 3,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00053.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.053485190413147685
+  },
+  {
+    "event_id": 54,
+    "set_index": 3,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00054.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07939549913523945
+  },
+  {
+    "event_id": 54,
+    "set_index": 3,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00054.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.15920645924187946
+  },
+  {
+    "event_id": 55,
+    "set_index": 3,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00055.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.3185090919427018
+  },
+  {
+    "event_id": 55,
+    "set_index": 3,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00055.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.17175269365849616
+  },
+  {
+    "event_id": 56,
+    "set_index": 3,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00056.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.12162444477351526
+  },
+  {
+    "event_id": 56,
+    "set_index": 3,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00056.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.119541913581109
+  },
+  {
+    "event_id": 57,
+    "set_index": 3,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00057.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.0856681993352161
+  },
+  {
+    "event_id": 57,
+    "set_index": 3,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00057.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.10158936414115616
+  },
+  {
+    "event_id": 58,
+    "set_index": 3,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00058.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2737464059218674
+  },
+  {
+    "event_id": 58,
+    "set_index": 3,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00058.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.10866680713110154
+  },
+  {
+    "event_id": 59,
+    "set_index": 3,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00059.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.21747718702688523
+  },
+  {
+    "event_id": 59,
+    "set_index": 3,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00059.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06138061296644595
+  },
+  {
+    "event_id": 60,
+    "set_index": 3,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00060.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1786048697602133
+  },
+  {
+    "event_id": 60,
+    "set_index": 3,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00060.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.03633711987142536
+  },
+  {
+    "event_id": 61,
+    "set_index": 3,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00061.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.08988552330013629
+  },
+  {
+    "event_id": 61,
+    "set_index": 3,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00061.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.03633711987142536
+  },
+  {
+    "event_id": 62,
+    "set_index": 3,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00062.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.7105512148601593
+  },
+  {
+    "event_id": 62,
+    "set_index": 3,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00062.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.03633711987142536
+  },
+  {
+    "event_id": 63,
+    "set_index": 3,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00063.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2737464059218674
+  },
+  {
+    "event_id": 63,
+    "set_index": 3,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00063.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.03633711987142536
+  },
+  {
+    "event_id": 64,
+    "set_index": 3,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00064.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16956591531461548
+  },
+  {
+    "event_id": 64,
+    "set_index": 3,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00064.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06034251497870074
+  },
+  {
+    "event_id": 65,
+    "set_index": 3,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00065.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.08988552330013629
+  },
+  {
+    "event_id": 65,
+    "set_index": 3,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00065.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.03633711987142536
+  },
+  {
+    "event_id": 66,
+    "set_index": 3,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00066.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2737464059218674
+  },
+  {
+    "event_id": 66,
+    "set_index": 3,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00066.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.10866680713110154
+  },
+  {
+    "event_id": 67,
+    "set_index": 3,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00067.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1786048697602133
+  },
+  {
+    "event_id": 67,
+    "set_index": 3,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00067.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.21747718702688523
+  },
+  {
+    "event_id": 68,
+    "set_index": 3,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00068.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16956591531461548
+  },
+  {
+    "event_id": 68,
+    "set_index": 3,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00068.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.10866680713110154
+  },
+  {
+    "event_id": 69,
+    "set_index": 4,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00069.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.08448421658953353
+  },
+  {
+    "event_id": 69,
+    "set_index": 4,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00069.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2583777149946427
+  },
+  {
+    "event_id": 70,
+    "set_index": 4,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00070.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.17911519796456002
+  },
+  {
+    "event_id": 70,
+    "set_index": 4,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00070.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.22352622588242993
+  },
+  {
+    "event_id": 71,
+    "set_index": 4,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00071.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1354632434548873
+  },
+  {
+    "event_id": 71,
+    "set_index": 4,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00071.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1020730112579247
+  },
+  {
+    "event_id": 72,
+    "set_index": 4,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00072.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.05201458415244231
+  },
+  {
+    "event_id": 72,
+    "set_index": 4,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00072.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.13560910867032766
+  },
+  {
+    "event_id": 73,
+    "set_index": 4,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00073.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.21711380107337858
+  },
+  {
+    "event_id": 73,
+    "set_index": 4,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00073.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.9443699703428661
+  },
+  {
+    "event_id": 74,
+    "set_index": 4,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00074.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.10478977247021984
+  },
+  {
+    "event_id": 74,
+    "set_index": 4,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00074.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.014196541512724705
+  },
+  {
+    "event_id": 75,
+    "set_index": 4,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00075.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06766125674013516
+  },
+  {
+    "event_id": 75,
+    "set_index": 4,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00075.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.5581579352402252
+  },
+  {
+    "event_id": 76,
+    "set_index": 4,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00076.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.09385690887874258
+  },
+  {
+    "event_id": 76,
+    "set_index": 4,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00076.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.240423945313394
+  },
+  {
+    "event_id": 77,
+    "set_index": 4,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00077.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.09385690887874258
+  },
+  {
+    "event_id": 77,
+    "set_index": 4,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00077.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.240423945313394
+  },
+  {
+    "event_id": 78,
+    "set_index": 4,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00078.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.09385690887874258
+  },
+  {
+    "event_id": 78,
+    "set_index": 4,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00078.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.240423945313394
+  },
+  {
+    "event_id": 79,
+    "set_index": 4,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00079.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.09385690887874258
+  },
+  {
+    "event_id": 79,
+    "set_index": 4,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00079.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07820171586318447
+  },
+  {
+    "event_id": 80,
+    "set_index": 4,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00080.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.09385690887874258
+  },
+  {
+    "event_id": 80,
+    "set_index": 4,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00080.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.240423945313394
+  },
+  {
+    "event_id": 81,
+    "set_index": 4,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00081.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.09385690887874258
+  },
+  {
+    "event_id": 81,
+    "set_index": 4,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00081.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07820171586318447
+  },
+  {
+    "event_id": 82,
+    "set_index": 4,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00082.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.09385690887874258
+  },
+  {
+    "event_id": 82,
+    "set_index": 4,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00082.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07820171586318447
+  },
+  {
+    "event_id": 83,
+    "set_index": 4,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00083.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.09385690887874258
+  },
+  {
+    "event_id": 83,
+    "set_index": 4,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00083.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.240423945313394
+  },
+  {
+    "event_id": 84,
+    "set_index": 4,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00084.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.09385690887874258
+  },
+  {
+    "event_id": 84,
+    "set_index": 4,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00084.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.240423945313394
+  },
+  {
+    "event_id": 85,
+    "set_index": 4,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00085.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.09385690887874258
+  },
+  {
+    "event_id": 85,
+    "set_index": 4,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00085.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07820171586318447
+  },
+  {
+    "event_id": 86,
+    "set_index": 4,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00086.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.09385690887874258
+  },
+  {
+    "event_id": 86,
+    "set_index": 4,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00086.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.240423945313394
+  },
+  {
+    "event_id": 87,
+    "set_index": 5,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00087.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.25079262807571
+  },
+  {
+    "event_id": 87,
+    "set_index": 5,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00087.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.138158232944835
+  },
+  {
+    "event_id": 88,
+    "set_index": 5,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00088.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.219929717041824
+  },
+  {
+    "event_id": 88,
+    "set_index": 5,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00088.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2695604045022751
+  },
+  {
+    "event_id": 89,
+    "set_index": 5,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00089.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1835562010702225
+  },
+  {
+    "event_id": 89,
+    "set_index": 5,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00089.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07887917382758919
+  },
+  {
+    "event_id": 90,
+    "set_index": 5,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00090.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.12527824219430764
+  },
+  {
+    "event_id": 90,
+    "set_index": 5,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00090.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 1.5136492441583793
+  },
+  {
+    "event_id": 91,
+    "set_index": 5,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00091.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.0731003964159946
+  },
+  {
+    "event_id": 91,
+    "set_index": 5,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00091.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.23044219338805663
+  },
+  {
+    "event_id": 92,
+    "set_index": 5,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00092.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1402515398353709
+  },
+  {
+    "event_id": 92,
+    "set_index": 5,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00092.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11850704260964448
+  },
+  {
+    "event_id": 93,
+    "set_index": 5,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00093.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1402515398353709
+  },
+  {
+    "event_id": 93,
+    "set_index": 5,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00093.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11850704260964448
+  },
+  {
+    "event_id": 94,
+    "set_index": 5,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00094.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16053647883042937
+  },
+  {
+    "event_id": 94,
+    "set_index": 5,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00094.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07285435355844068
+  },
+  {
+    "event_id": 95,
+    "set_index": 5,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00095.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1402515398353709
+  },
+  {
+    "event_id": 95,
+    "set_index": 5,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00095.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16053647883042937
+  },
+  {
+    "event_id": 96,
+    "set_index": 5,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00096.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1402515398353709
+  },
+  {
+    "event_id": 96,
+    "set_index": 5,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00096.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16053647883042937
+  },
+  {
+    "event_id": 97,
+    "set_index": 5,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00097.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1402515398353709
+  },
+  {
+    "event_id": 97,
+    "set_index": 5,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00097.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16053647883042937
+  },
+  {
+    "event_id": 98,
+    "set_index": 5,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00098.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1402515398353709
+  },
+  {
+    "event_id": 98,
+    "set_index": 5,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00098.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.008690620228744356
+  },
+  {
+    "event_id": 99,
+    "set_index": 5,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00099.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1402515398353709
+  },
+  {
+    "event_id": 99,
+    "set_index": 5,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00099.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16053647883042937
+  },
+  {
+    "event_id": 100,
+    "set_index": 5,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00100.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.09936126916703933
+  },
+  {
+    "event_id": 100,
+    "set_index": 5,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00100.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16053647883042937
+  },
+  {
+    "event_id": 101,
+    "set_index": 5,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00101.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1402515398353709
+  },
+  {
+    "event_id": 101,
+    "set_index": 5,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00101.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11850704260964448
+  },
+  {
+    "event_id": 102,
+    "set_index": 5,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00102.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11850704260964448
+  },
+  {
+    "event_id": 102,
+    "set_index": 5,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00102.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.04237801190897296
+  },
+  {
+    "event_id": 103,
+    "set_index": 6,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00103.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.14259258488318072
+  },
+  {
+    "event_id": 104,
+    "set_index": 6,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00104.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06571410754456425
+  },
+  {
+    "event_id": 105,
+    "set_index": 6,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00105.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11384247506669197
+  },
+  {
+    "event_id": 105,
+    "set_index": 6,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00105.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.46878808518159837
+  },
+  {
+    "event_id": 106,
+    "set_index": 6,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00106.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.10028516337547753
+  },
+  {
+    "event_id": 106,
+    "set_index": 6,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00106.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.18994408449488825
+  },
+  {
+    "event_id": 107,
+    "set_index": 6,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00107.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1264774741737421
+  },
+  {
+    "event_id": 107,
+    "set_index": 6,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00107.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.05014936069568766
+  },
+  {
+    "event_id": 108,
+    "set_index": 6,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00108.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.15140326537838036
+  },
+  {
+    "event_id": 108,
+    "set_index": 6,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00108.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.22177444768672533
+  },
+  {
+    "event_id": 109,
+    "set_index": 6,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00109.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.15140326537838036
+  },
+  {
+    "event_id": 109,
+    "set_index": 6,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00109.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1264774741737421
+  },
+  {
+    "event_id": 110,
+    "set_index": 6,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00110.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.15140326537838036
+  },
+  {
+    "event_id": 110,
+    "set_index": 6,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00110.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1264774741737421
+  },
+  {
+    "event_id": 111,
+    "set_index": 6,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00111.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.15140326537838036
+  },
+  {
+    "event_id": 111,
+    "set_index": 6,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00111.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1264774741737421
+  },
+  {
+    "event_id": 112,
+    "set_index": 6,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00112.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.15140326537838036
+  },
+  {
+    "event_id": 112,
+    "set_index": 6,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00112.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.05830522542339608
+  },
+  {
+    "event_id": 113,
+    "set_index": 6,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00113.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.10028516337547753
+  },
+  {
+    "event_id": 113,
+    "set_index": 6,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00113.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16019556597490728
+  },
+  {
+    "event_id": 114,
+    "set_index": 6,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00114.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.15140326537838036
+  },
+  {
+    "event_id": 114,
+    "set_index": 6,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00114.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1264774741737421
+  },
+  {
+    "event_id": 115,
+    "set_index": 6,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00115.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.15140326537838036
+  },
+  {
+    "event_id": 115,
+    "set_index": 6,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00115.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1264774741737421
+  },
+  {
+    "event_id": 116,
+    "set_index": 7,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00116.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.19111727217402658
+  },
+  {
+    "event_id": 117,
+    "set_index": 7,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00117.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07474779113640433
+  },
+  {
+    "event_id": 118,
+    "set_index": 7,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00118.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06005340210823121
+  },
+  {
+    "event_id": 119,
+    "set_index": 7,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00119.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1277910434441225
+  },
+  {
+    "event_id": 119,
+    "set_index": 7,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00119.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.6021817682747954
+  },
+  {
+    "event_id": 120,
+    "set_index": 7,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00120.jpg",
+    "used_ids": [
+      5,
+      0
+    ],
+    "source": "multi",
+    "err_mean_px": 0.46688663912545936
+  },
+  {
+    "event_id": 121,
+    "set_index": 7,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00121.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.19431554043511592
+  },
+  {
+    "event_id": 121,
+    "set_index": 7,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00121.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.08749305679243975
+  },
+  {
+    "event_id": 122,
+    "set_index": 7,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00122.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07396437807758335
+  },
+  {
+    "event_id": 123,
+    "set_index": 7,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00123.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.17934211538287054
+  },
+  {
+    "event_id": 123,
+    "set_index": 7,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00123.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.14768286013225423
+  },
+  {
+    "event_id": 124,
+    "set_index": 7,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00124.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1716301772856443
+  },
+  {
+    "event_id": 124,
+    "set_index": 7,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00124.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1084904949111329
+  },
+  {
+    "event_id": 125,
+    "set_index": 7,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00125.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16729236241735446
+  },
+  {
+    "event_id": 125,
+    "set_index": 7,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00125.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.09959692493532947
+  },
+  {
+    "event_id": 126,
+    "set_index": 7,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00126.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.29537440282412514
+  },
+  {
+    "event_id": 126,
+    "set_index": 7,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00126.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.05882349677006522
+  },
+  {
+    "event_id": 127,
+    "set_index": 7,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00127.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16729236241735446
+  },
+  {
+    "event_id": 127,
+    "set_index": 7,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00127.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.0869311129102854
+  },
+  {
+    "event_id": 128,
+    "set_index": 7,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00128.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16063180249095813
+  },
+  {
+    "event_id": 128,
+    "set_index": 7,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00128.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.05882349677006522
+  },
+  {
+    "event_id": 129,
+    "set_index": 7,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00129.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.29537440282412514
+  },
+  {
+    "event_id": 129,
+    "set_index": 7,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00129.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16729236241735446
+  },
+  {
+    "event_id": 130,
+    "set_index": 7,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00130.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16729236241735446
+  },
+  {
+    "event_id": 130,
+    "set_index": 7,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00130.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.04872559545165326
+  },
+  {
+    "event_id": 131,
+    "set_index": 7,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00131.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16729236241735446
+  },
+  {
+    "event_id": 131,
+    "set_index": 7,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00131.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.0880168203601056
+  },
+  {
+    "event_id": 132,
+    "set_index": 7,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00132.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16729236241735446
+  },
+  {
+    "event_id": 132,
+    "set_index": 7,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00132.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06482678252190453
+  },
+  {
+    "event_id": 133,
+    "set_index": 7,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00133.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.29537440282412514
+  },
+  {
+    "event_id": 133,
+    "set_index": 7,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00133.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.05882349677006522
+  },
+  {
+    "event_id": 134,
+    "set_index": 7,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00134.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16063180249095813
+  },
+  {
+    "event_id": 134,
+    "set_index": 7,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00134.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16729236241735446
+  },
+  {
+    "event_id": 135,
+    "set_index": 8,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00135.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11783303328480037
+  },
+  {
+    "event_id": 136,
+    "set_index": 8,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00136.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.03653039211382528
+  },
+  {
+    "event_id": 136,
+    "set_index": 8,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00136.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.21040309818928488
+  },
+  {
+    "event_id": 137,
+    "set_index": 8,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00137.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1182528034062856
+  },
+  {
+    "event_id": 137,
+    "set_index": 8,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00137.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 1.5315888997164828
+  },
+  {
+    "event_id": 138,
+    "set_index": 8,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00138.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.08889077735900722
+  },
+  {
+    "event_id": 139,
+    "set_index": 8,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00139.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.09145197537930089
+  },
+  {
+    "event_id": 140,
+    "set_index": 8,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00140.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.0930340685083602
+  },
+  {
+    "event_id": 141,
+    "set_index": 8,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00141.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.08992187139771696
+  },
+  {
+    "event_id": 142,
+    "set_index": 8,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00142.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.0833053095075067
+  },
+  {
+    "event_id": 142,
+    "set_index": 8,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00142.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.27400271790308334
+  },
+  {
+    "event_id": 143,
+    "set_index": 8,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00143.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.10507046896835906
+  },
+  {
+    "event_id": 144,
+    "set_index": 8,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00144.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.23215573202582754
+  },
+  {
+    "event_id": 144,
+    "set_index": 8,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00144.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.014401615179233513
+  },
+  {
+    "event_id": 145,
+    "set_index": 8,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00145.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.04168624605019794
+  },
+  {
+    "event_id": 145,
+    "set_index": 8,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00145.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.014401615179233513
+  },
+  {
+    "event_id": 146,
+    "set_index": 8,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00146.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1583658436867336
+  },
+  {
+    "event_id": 146,
+    "set_index": 8,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00146.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.014401615179233513
+  },
+  {
+    "event_id": 147,
+    "set_index": 8,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00147.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11019697645154755
+  },
+  {
+    "event_id": 147,
+    "set_index": 8,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00147.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.014401615179233513
+  },
+  {
+    "event_id": 148,
+    "set_index": 8,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00148.jpg",
+    "used_ids": [
+      5,
+      0
+    ],
+    "source": "multi",
+    "err_mean_px": 0.6468937506520791
+  },
+  {
+    "event_id": 148,
+    "set_index": 8,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00148.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.014401615179233513
+  },
+  {
+    "event_id": 149,
+    "set_index": 8,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00149.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1074417313899567
+  },
+  {
+    "event_id": 149,
+    "set_index": 8,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00149.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11701425986709814
+  },
+  {
+    "event_id": 150,
+    "set_index": 8,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00150.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.20923549133456926
+  },
+  {
+    "event_id": 150,
+    "set_index": 8,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00150.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.014401615179233513
+  },
+  {
+    "event_id": 151,
+    "set_index": 8,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00151.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07929641777884962
+  },
+  {
+    "event_id": 151,
+    "set_index": 8,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00151.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.014401615179233513
+  },
+  {
+    "event_id": 152,
+    "set_index": 8,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00152.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.3295094218273197
+  },
+  {
+    "event_id": 152,
+    "set_index": 8,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00152.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.014401615179233513
+  },
+  {
+    "event_id": 153,
+    "set_index": 8,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00153.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1074417313899567
+  },
+  {
+    "event_id": 153,
+    "set_index": 8,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00153.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.014401615179233513
+  },
+  {
+    "event_id": 154,
+    "set_index": 8,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00154.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.21910967118232497
+  },
+  {
+    "event_id": 154,
+    "set_index": 8,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00154.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.014401615179233513
+  },
+  {
+    "event_id": 155,
+    "set_index": 9,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00155.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.0873557322566911
+  },
+  {
+    "event_id": 156,
+    "set_index": 9,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00156.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1261857381050425
+  },
+  {
+    "event_id": 157,
+    "set_index": 9,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00157.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.20722135038405426
+  },
+  {
+    "event_id": 158,
+    "set_index": 9,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00158.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.13201172731754904
+  },
+  {
+    "event_id": 159,
+    "set_index": 9,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00159.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.13401054073453136
+  },
+  {
+    "event_id": 160,
+    "set_index": 9,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00160.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.17968042096495657
+  },
+  {
+    "event_id": 161,
+    "set_index": 9,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00161.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1947188482329685
+  },
+  {
+    "event_id": 162,
+    "set_index": 9,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00162.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.029304018720533134
+  },
+  {
+    "event_id": 163,
+    "set_index": 9,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00163.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.21129868973334287
+  },
+  {
+    "event_id": 163,
+    "set_index": 9,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00163.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1145701789374362
+  },
+  {
+    "event_id": 164,
+    "set_index": 9,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00164.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07557087427794706
+  },
+  {
+    "event_id": 164,
+    "set_index": 9,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00164.jpg",
+    "used_ids": [
+      0,
+      1
+    ],
+    "source": "multi",
+    "err_mean_px": 0.23380146254560447
+  },
+  {
+    "event_id": 165,
+    "set_index": 9,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00165.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.3573426319082247
+  },
+  {
+    "event_id": 165,
+    "set_index": 9,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00165.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07557087427794706
+  },
+  {
+    "event_id": 166,
+    "set_index": 9,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00166.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.26360527927651956
+  },
+  {
+    "event_id": 166,
+    "set_index": 9,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00166.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07557087427794706
+  },
+  {
+    "event_id": 167,
+    "set_index": 9,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00167.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.26360527927651956
+  },
+  {
+    "event_id": 167,
+    "set_index": 9,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00167.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07557087427794706
+  },
+  {
+    "event_id": 168,
+    "set_index": 9,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00168.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2531926729334852
+  },
+  {
+    "event_id": 168,
+    "set_index": 9,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00168.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07557087427794706
+  },
+  {
+    "event_id": 169,
+    "set_index": 9,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00169.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2617497634679282
+  },
+  {
+    "event_id": 169,
+    "set_index": 9,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00169.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07557087427794706
+  },
+  {
+    "event_id": 170,
+    "set_index": 9,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00170.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07557087427794706
+  },
+  {
+    "event_id": 170,
+    "set_index": 9,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00170.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.054366365690595726
+  },
+  {
+    "event_id": 171,
+    "set_index": 9,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00171.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07557087427794706
+  },
+  {
+    "event_id": 171,
+    "set_index": 9,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00171.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06424726326313086
+  },
+  {
+    "event_id": 172,
+    "set_index": 9,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00172.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.26360527927651956
+  },
+  {
+    "event_id": 172,
+    "set_index": 9,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00172.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07557087427794706
+  },
+  {
+    "event_id": 173,
+    "set_index": 9,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00173.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07557087427794706
+  },
+  {
+    "event_id": 173,
+    "set_index": 9,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00173.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.042152065644895126
+  },
+  {
+    "event_id": 174,
+    "set_index": 10,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00174.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1458016067866147
+  },
+  {
+    "event_id": 175,
+    "set_index": 10,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00175.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.018727329047702496
+  },
+  {
+    "event_id": 176,
+    "set_index": 10,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00176.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.10837974708734754
+  },
+  {
+    "event_id": 176,
+    "set_index": 10,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00176.jpg",
+    "used_ids": [
+      5,
+      0
+    ],
+    "source": "multi",
+    "err_mean_px": 0.9330874181201938
+  },
+  {
+    "event_id": 177,
+    "set_index": 10,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00177.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.05820412182527861
+  },
+  {
+    "event_id": 177,
+    "set_index": 10,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00177.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.03188249155313123
+  },
+  {
+    "event_id": 178,
+    "set_index": 10,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00178.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.22664238092589328
+  },
+  {
+    "event_id": 178,
+    "set_index": 10,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00178.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 1.3994474710362086
+  },
+  {
+    "event_id": 179,
+    "set_index": 10,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00179.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.15383382420013347
+  },
+  {
+    "event_id": 179,
+    "set_index": 10,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00179.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.4227128235626079
+  },
+  {
+    "event_id": 180,
+    "set_index": 10,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00180.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.18967275532511266
+  },
+  {
+    "event_id": 180,
+    "set_index": 10,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00180.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.339331893326837
+  },
+  {
+    "event_id": 181,
+    "set_index": 10,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00181.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.004509382822223211
+  },
+  {
+    "event_id": 181,
+    "set_index": 10,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00181.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.09375473614129616
+  },
+  {
+    "event_id": 182,
+    "set_index": 10,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00182.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 182,
+    "set_index": 10,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00182.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06571028207581829
+  },
+  {
+    "event_id": 183,
+    "set_index": 10,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00183.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 183,
+    "set_index": 10,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00183.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06571028207581829
+  },
+  {
+    "event_id": 184,
+    "set_index": 10,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00184.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 184,
+    "set_index": 10,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00184.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2955264741795928
+  },
+  {
+    "event_id": 185,
+    "set_index": 10,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00185.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 185,
+    "set_index": 10,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00185.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06571028207581829
+  },
+  {
+    "event_id": 186,
+    "set_index": 10,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00186.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 186,
+    "set_index": 10,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00186.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06571028207581829
+  },
+  {
+    "event_id": 187,
+    "set_index": 10,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00187.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 187,
+    "set_index": 10,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00187.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06571028207581829
+  },
+  {
+    "event_id": 188,
+    "set_index": 10,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00188.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06930876744879849
+  },
+  {
+    "event_id": 188,
+    "set_index": 10,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00188.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.20896892948111673
+  },
+  {
+    "event_id": 189,
+    "set_index": 10,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00189.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 189,
+    "set_index": 10,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00189.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06571028207581829
+  },
+  {
+    "event_id": 190,
+    "set_index": 10,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00190.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 190,
+    "set_index": 10,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00190.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06571028207581829
+  },
+  {
+    "event_id": 191,
+    "set_index": 10,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00191.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06930876744879849
+  },
+  {
+    "event_id": 191,
+    "set_index": 10,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00191.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.18393496765008582
+  },
+  {
+    "event_id": 192,
+    "set_index": 10,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00192.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.06930876744879849
+  },
+  {
+    "event_id": 192,
+    "set_index": 10,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00192.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.08266878259313266
+  },
+  {
+    "event_id": 193,
+    "set_index": 11,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00193.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 193,
+    "set_index": 11,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00193.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.14939265951848546
+  },
+  {
+    "event_id": 194,
+    "set_index": 11,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00194.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 194,
+    "set_index": 11,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00194.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.3917145834560775
+  },
+  {
+    "event_id": 195,
+    "set_index": 11,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00195.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 195,
+    "set_index": 11,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00195.jpg",
+    "used_ids": [
+      5,
+      0
+    ],
+    "source": "multi",
+    "err_mean_px": 0.71559466292824
+  },
+  {
+    "event_id": 196,
+    "set_index": 11,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00196.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 196,
+    "set_index": 11,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00196.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16969460099243378
+  },
+  {
+    "event_id": 197,
+    "set_index": 11,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00197.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 197,
+    "set_index": 11,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00197.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2528283603366855
+  },
+  {
+    "event_id": 198,
+    "set_index": 11,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00198.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 198,
+    "set_index": 11,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00198.jpg",
+    "used_ids": [
+      5,
+      0,
+      1
+    ],
+    "source": "multi",
+    "err_mean_px": 0.7400350357887794
+  },
+  {
+    "event_id": 199,
+    "set_index": 11,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00199.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 200,
+    "set_index": 11,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00200.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1539785601639517
+  },
+  {
+    "event_id": 200,
+    "set_index": 11,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00200.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1852389688330015
+  },
+  {
+    "event_id": 201,
+    "set_index": 11,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00201.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.15178695238456646
+  },
+  {
+    "event_id": 201,
+    "set_index": 11,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00201.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1040700572384683
+  },
+  {
+    "event_id": 202,
+    "set_index": 11,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00202.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.27570563904206186
+  },
+  {
+    "event_id": 202,
+    "set_index": 11,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00202.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.08293534705987501
+  },
+  {
+    "event_id": 203,
+    "set_index": 11,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00203.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1814937144753266
+  },
+  {
+    "event_id": 203,
+    "set_index": 11,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00203.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07430077131839215
+  },
+  {
+    "event_id": 204,
+    "set_index": 11,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00204.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 204,
+    "set_index": 11,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00204.jpg",
+    "used_ids": [
+      5,
+      0,
+      1
+    ],
+    "source": "multi",
+    "err_mean_px": 0.4571413111481977
+  },
+  {
+    "event_id": 205,
+    "set_index": 11,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00205.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 205,
+    "set_index": 11,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00205.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.25702400000507863
+  },
+  {
+    "event_id": 206,
+    "set_index": 11,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00206.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.19981539041572344
+  },
+  {
+    "event_id": 206,
+    "set_index": 11,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00206.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.049172968297354416
+  },
+  {
+    "event_id": 207,
+    "set_index": 11,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00207.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.15178695238456646
+  },
+  {
+    "event_id": 207,
+    "set_index": 11,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00207.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.01958749579787549
+  },
+  {
+    "event_id": 208,
+    "set_index": 11,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00208.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 208,
+    "set_index": 11,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00208.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.19981539041572344
+  },
+  {
+    "event_id": 209,
+    "set_index": 11,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00209.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.15178695238456646
+  },
+  {
+    "event_id": 209,
+    "set_index": 11,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00209.jpg",
+    "used_ids": [
+      0
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.08770838794785082
+  },
+  {
+    "event_id": 210,
+    "set_index": 11,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00210.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 210,
+    "set_index": 11,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00210.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.27570563904206186
+  },
+  {
+    "event_id": 211,
+    "set_index": 11,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00211.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.27570563904206186
+  },
+  {
+    "event_id": 211,
+    "set_index": 11,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00211.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1076191703281049
+  },
+  {
+    "event_id": 212,
+    "set_index": 12,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00212.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 212,
+    "set_index": 12,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00212.jpg",
+    "used_ids": [
+      3
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.052637203776071596
+  },
+  {
+    "event_id": 213,
+    "set_index": 12,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00213.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.12785061962698208
+  },
+  {
+    "event_id": 213,
+    "set_index": 12,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00213.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.023696054037738917
+  },
+  {
+    "event_id": 214,
+    "set_index": 12,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00214.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 214,
+    "set_index": 12,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00214.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.21220219638673007
+  },
+  {
+    "event_id": 215,
+    "set_index": 12,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00215.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 215,
+    "set_index": 12,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00215.jpg",
+    "used_ids": [
+      5,
+      0
+    ],
+    "source": "multi",
+    "err_mean_px": 0.8070221721113339
+  },
+  {
+    "event_id": 216,
+    "set_index": 12,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00216.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 216,
+    "set_index": 12,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00216.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.1061297828488436
+  },
+  {
+    "event_id": 217,
+    "set_index": 12,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00217.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 217,
+    "set_index": 12,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00217.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.02083899600496365
+  },
+  {
+    "event_id": 218,
+    "set_index": 12,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00218.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 218,
+    "set_index": 12,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00218.jpg",
+    "used_ids": [
+      4
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.3347151867637707
+  },
+  {
+    "event_id": 219,
+    "set_index": 12,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00219.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 219,
+    "set_index": 12,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00219.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2434605333655973
+  },
+  {
+    "event_id": 220,
+    "set_index": 12,
+    "cam_idx": 0,
+    "rgb_path": "cam0/rgb_00220.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.11056352881765569
+  },
+  {
+    "event_id": 220,
+    "set_index": 12,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00220.jpg",
+    "used_ids": [
+      1
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.2546202473253449
+  },
+  {
+    "event_id": 221,
+    "set_index": 12,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00221.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16251120922957496
+  },
+  {
+    "event_id": 221,
+    "set_index": 12,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00221.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07478547389213071
+  },
+  {
+    "event_id": 222,
+    "set_index": 12,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00222.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.014052072502438524
+  },
+  {
+    "event_id": 222,
+    "set_index": 12,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00222.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07478547389213071
+  },
+  {
+    "event_id": 223,
+    "set_index": 12,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00223.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.36421807261912137
+  },
+  {
+    "event_id": 223,
+    "set_index": 12,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00223.jpg",
+    "used_ids": [
+      5
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.02596528615299493
+  },
+  {
+    "event_id": 224,
+    "set_index": 12,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00224.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16251120922957496
+  },
+  {
+    "event_id": 224,
+    "set_index": 12,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00224.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07478547389213071
+  },
+  {
+    "event_id": 225,
+    "set_index": 12,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00225.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16251120922957496
+  },
+  {
+    "event_id": 225,
+    "set_index": 12,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00225.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07478547389213071
+  },
+  {
+    "event_id": 226,
+    "set_index": 12,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00226.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16251120922957496
+  },
+  {
+    "event_id": 226,
+    "set_index": 12,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00226.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07478547389213071
+  },
+  {
+    "event_id": 227,
+    "set_index": 12,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00227.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.36192425973360004
+  },
+  {
+    "event_id": 227,
+    "set_index": 12,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00227.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07478547389213071
+  },
+  {
+    "event_id": 228,
+    "set_index": 12,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00228.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16251120922957496
+  },
+  {
+    "event_id": 228,
+    "set_index": 12,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00228.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07478547389213071
+  },
+  {
+    "event_id": 229,
+    "set_index": 12,
+    "cam_idx": 2,
+    "rgb_path": "cam2/rgb_00229.jpg",
+    "used_ids": [
+      5,
+      0,
+      1
+    ],
+    "source": "multi",
+    "err_mean_px": 0.5756823326021056
+  },
+  {
+    "event_id": 229,
+    "set_index": 12,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00229.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07478547389213071
+  },
+  {
+    "event_id": 230,
+    "set_index": 12,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00230.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16251120922957496
+  },
+  {
+    "event_id": 230,
+    "set_index": 12,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00230.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07478547389213071
+  },
+  {
+    "event_id": 231,
+    "set_index": 12,
+    "cam_idx": 1,
+    "rgb_path": "cam1/rgb_00231.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.16251120922957496
+  },
+  {
+    "event_id": 231,
+    "set_index": 12,
+    "cam_idx": 3,
+    "rgb_path": "cam3/rgb_00231.jpg",
+    "used_ids": [
+      2
+    ],
+    "source": "ippe0",
+    "err_mean_px": 0.07478547389213071
+  }
+]

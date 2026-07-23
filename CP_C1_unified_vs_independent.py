@@ -21,8 +21,15 @@ C1: Eye-in-Hand & Eye-to-Hand 를 하나로 통합(joint) 실행  vs  독립(따
   joint_fk_fixed: cube 를 FK 값으로 *고정*하고 {T_base_Ci, gTc} 만 동시 최적화
                   (C3 의 "큐브중점 known" 과 C1 의 "동시" 를 겹쳐 본 참고용).
 
+평가(시뮬 unified_vs_independent.eval_model 과 정렬):
+  - consistency / cube_vs_fk : train set 에서 서브시스템 정합·FK 대비 큐브오차.
+  - 다운스트림 큐브예측(held-out): 카메라를 train set 으로만 맞춘 뒤 test set 큐브를
+    base 에서 예측해 FK(정답 프록시) 대비 RMSE. `+fk` = train 잔차를 [1,x,y] 에
+    Ridge 회귀해 뺀 보정판(시뮬의 C 잔차보정). --test_sets / --holdout_frac 로 활성.
+
 시뮬레이션 짝: Simul_test/joint_calib.py (calib_independent_aligned / calib_joint /
-calib_joint_fk_fixed). 이 스크립트는 그 구조를 실데이터 관측으로 포팅한 것이다.
+calib_joint_fk_fixed) + unified_vs_independent.eval_model (downstream + `+fk`).
+이 스크립트는 그 구조를 실데이터 관측으로 포팅한 것이다.
 
 주의: base gauge 를 FK 로 잡으므로 유효한 결과에는 set >= 2~3 개가 필요하다(파일럿 1-set
 데이터에서는 실행은 되지만 수치는 의미가 약하다).
@@ -230,6 +237,94 @@ def _se3_average(Ts: List[np.ndarray]) -> np.ndarray:
     return out
 
 
+# ── Held-out (train/test) split + downstream cube prediction + FK residual ─────
+# 시뮬 짝: unified_vs_independent.eval_model 의 (4) 다운스트림 큐브예측 + `+fk`(잔차
+# Ridge 보정 C). 실데이터에는 GT 가 없으므로 로봇 FK 큐브를 정답 프록시로 쓴다:
+# 카메라는 train set 으로만 맞추고, held-out test set 큐브 위치를 base 에서 예측해
+# FK 와 비교한다. `+fk` 는 train 잔차 (예측 vs FK) 를 [1,x,y] 특징에 Ridge 회귀해 뺀다.
+def _resid_feature(t: np.ndarray) -> np.ndarray:
+    """큐브 base 위치 (x,y) 의 선형 특징 [1, x, y] (시뮬 abc_calib._resid_feature 와 동일)."""
+    t = np.asarray(t, float).reshape(3)
+    return np.array([1.0, t[0], t[1]], dtype=float)
+
+
+def subset_scene(sc: Scene, keep_sets) -> Scene:
+    """keep_sets 에 속한 관측만 남긴 train 전용 Scene (카메라 fit 용)."""
+    keep = {int(s) for s in keep_sets}
+    obs_f = [o for o in sc.obs_fixed if int(o[2]) in keep]
+    obs_g = [o for o in sc.obs_grip if int(o[1]) in keep]
+    events = {int(e) for (_, e, _, _) in obs_f} | {int(e) for (e, _, _) in obs_g}
+    return Scene(
+        fixed_cam_ids=list(sc.fixed_cam_ids),
+        gripper_cam_idx=int(sc.gripper_cam_idx),
+        obs_fixed=obs_f, obs_grip=obs_g,
+        bTg={e: T for e, T in sc.bTg.items() if int(e) in events},
+        fk_cube={s: T for s, T in sc.fk_cube.items() if int(s) in keep},
+        sets=sorted(keep & set(sc.sets)),
+    )
+
+
+def predict_cube_base_pos(model: dict, sc: Scene, s: int) -> Optional[np.ndarray]:
+    """고정 카메라 + 그리퍼(gTc 경유) 관측을 base 로 올려 set s 큐브 위치(3,) 예측."""
+    cams = model.get("cams", {})
+    gTc = model.get("gTc")
+    Ts = [cams[ci] @ T_co for (ci, e, ss, T_co) in sc.obs_fixed
+          if int(ss) == int(s) and ci in cams]
+    if gTc is not None:
+        Ts += [sc.bTg[e] @ gTc @ T_go for (e, ss, T_go) in sc.obs_grip
+               if int(ss) == int(s) and int(e) in sc.bTg]
+    return _se3_average(Ts)[:3, 3] if Ts else None
+
+
+def learn_fk_ridge(model: dict, sc_train: Scene, train_sets: List[int],
+                   lam: float = 1e-3) -> Optional[np.ndarray]:
+    """train 에서 (예측 큐브위치 vs FK) 잔차를 [1,x,y] 에 Ridge 회귀 → 계수 W (3x3)."""
+    X, Y = [], []
+    for s in train_sets:
+        p = predict_cube_base_pos(model, sc_train, s)
+        if p is None or int(s) not in sc_train.fk_cube:
+            continue
+        X.append(_resid_feature(p))
+        Y.append(sc_train.fk_cube[int(s)][:3, 3] - p)
+    if len(X) < 3:
+        return None
+    X = np.asarray(X, float)
+    Y = np.asarray(Y, float)
+    reg = float(lam) * np.eye(X.shape[1])
+    reg[0, 0] = 0.0                       # 절편은 정규화하지 않음
+    return np.linalg.solve(X.T @ X + reg, X.T @ Y)
+
+
+def downstream_rmse(model: dict, sc_eval: Scene, eval_sets: List[int],
+                    W: Optional[np.ndarray]) -> Optional[float]:
+    """eval_sets 큐브 위치를 예측(+선택적 W 보정)해 FK 대비 RMSE(mm)."""
+    errs = []
+    for s in eval_sets:
+        p = predict_cube_base_pos(model, sc_eval, s)
+        if p is None or int(s) not in sc_eval.fk_cube:
+            continue
+        t = p + (_resid_feature(p) @ W if W is not None else 0.0)
+        errs.append(np.linalg.norm(t - sc_eval.fk_cube[int(s)][:3, 3]) * 1000.0)
+    return float(np.sqrt(np.mean(np.square(errs)))) if errs else None
+
+
+def resolve_test_sets(available_sets: List[int], test_sets_arg: str,
+                      holdout_frac: float, split_seed: int) -> List[int]:
+    """--test_sets(명시) 또는 --holdout_frac(무작위)로 held-out set 목록을 정한다."""
+    avail = sorted(int(s) for s in available_sets)
+    if str(test_sets_arg).strip():
+        want = {int(t) for t in str(test_sets_arg).replace(";", ",").split(",") if t.strip()}
+        return sorted(want & set(avail))
+    if float(holdout_frac) > 0.0 and len(avail) >= 2:
+        import random as _random
+        n_test = max(1, int(round(len(avail) * float(holdout_frac))))
+        n_test = min(n_test, len(avail) - 1)     # keep >=1 train set
+        shuffled = list(avail)
+        _random.Random(int(split_seed)).shuffle(shuffled)
+        return sorted(shuffled[len(shuffled) - n_test:])
+    return []
+
+
 # ── Evaluation (base frame) ───────────────────────────────────────────────────
 @dataclass
 class JointResult:
@@ -242,6 +337,12 @@ class JointResult:
     grip_align_trans_rmse_mm: Optional[float]   # gripper-only prediction vs cube (base)
     cube_pos_err_vs_fk_mm: Optional[float]
     optimizer_cost: Optional[float]
+    # --- held-out downstream cube prediction (FK as GT proxy). None if no split. ---
+    train_sets: Optional[str] = None
+    test_sets: Optional[str] = None
+    n_test_sets: Optional[int] = None
+    downstream_trans_rmse_mm: Optional[float] = None      # no-fk (raw prediction)
+    downstream_fk_trans_rmse_mm: Optional[float] = None    # +fk (Ridge residual corrected)
     note: str = ""
 
 
@@ -315,6 +416,17 @@ def main() -> None:
     ap.add_argument("--anchor_weight", type=float, default=5.0,
                     help="unified_joint 에서 cube[set] 를 FK 로 당기는 gauge-anchor 가중치.")
     ap.add_argument("--max_nfev", type=int, default=200)
+    # --- held-out (train/test) 다운스트림 큐브예측 (시뮬 eval_model 의 downstream_mm 짝) ---
+    # 카메라는 train set 으로만 맞추고, held-out test set 큐브를 예측해 FK 대비 오차를 잰다.
+    # 공정 비교의 핵심: unified 가 학습에 쓴 FK 로 그대로 평가되어 유리해지지 않도록.
+    ap.add_argument("--test_sets", type=str, default="",
+                    help="held-out 으로 뺄 set_index 목록(콤마 구분). 지정 시 --holdout_frac 무시.")
+    ap.add_argument("--holdout_frac", type=float, default=0.0,
+                    help="test 로 뺄 set 비율(0~1). 0(기본)이면 split 없이 전체 fit(다운스트림 NA).")
+    ap.add_argument("--split_seed", type=int, default=0,
+                    help="--holdout_frac 무작위 분할 시드(재현성).")
+    ap.add_argument("--ridge_lambda", type=float, default=1e-3,
+                    help="`+fk` 잔차보정 Ridge 정규화 세기 (시뮬 lam 기본 1e-3).")
     args = ap.parse_args()
 
     root = args.root_folder
@@ -385,13 +497,45 @@ def main() -> None:
         print(f"[WARN] only {len(sc.sets)} set(s) with FK cube — base gauge is weakly "
               f"constrained; treat numbers as smoke-test only (need >=3 sets).")
 
-    indep = solve_independent(sc, max_nfev=args.max_nfev)
-    joint = solve_unified_joint(sc, indep, anchor_weight=float(args.anchor_weight),
+    # ── held-out split: 카메라는 train set 으로만 fit, test set 은 다운스트림 평가에만 ──
+    test_set_ids = resolve_test_sets(sc.sets, args.test_sets, args.holdout_frac,
+                                     args.split_seed)
+    if str(args.test_sets).strip():
+        missing = sorted({int(t) for t in str(args.test_sets).replace(";", ",").split(",")
+                          if t.strip()} - set(sc.sets))
+        if missing:
+            print(f"[WARN] --test_sets {missing} not in available sets {sc.sets}; ignored")
+    train_set_ids = [s for s in sc.sets if s not in set(test_set_ids)]
+    sc_fit = sc
+    if test_set_ids:
+        if not train_set_ids:
+            raise RuntimeError(f"train set empty after removing test_sets={test_set_ids}")
+        sc_fit = subset_scene(sc, train_set_ids)
+        print(f"[C1] train/test split: train={train_set_ids} test={test_set_ids} "
+              f"(fit obs: fixed={len(sc_fit.obs_fixed)} grip={len(sc_fit.obs_grip)})")
+    else:
+        print("[C1] no train/test split (fit on all sets; downstream metrics NA). "
+              "Use --test_sets or --holdout_frac for the held-out cube-prediction comparison.")
+
+    indep = solve_independent(sc_fit, max_nfev=args.max_nfev)
+    joint = solve_unified_joint(sc_fit, indep, anchor_weight=float(args.anchor_weight),
                                 max_nfev=args.max_nfev)
-    joint_fk = solve_joint_fk_fixed(sc, indep, max_nfev=args.max_nfev)
+    joint_fk = solve_joint_fk_fixed(sc_fit, indep, max_nfev=args.max_nfev)
 
     models = [indep, joint, joint_fk]
-    results = [evaluate(sc, m) for m in models]
+    results = [evaluate(sc_fit, m) for m in models]
+
+    # 다운스트림 큐브예측 (held-out): raw 예측과 `+fk`(Ridge 잔차보정) 둘 다 기록.
+    #   캘리브는 방식당 한 번, no-fk/+fk 는 예측단계에서만 다름 (시뮬과 동일 구조).
+    if test_set_ids:
+        for m, r in zip(models, results):
+            W = learn_fk_ridge(m, sc_fit, train_set_ids, lam=float(args.ridge_lambda))
+            r.train_sets = ",".join(str(s) for s in train_set_ids)
+            r.test_sets = ",".join(str(s) for s in test_set_ids)
+            r.n_test_sets = len(test_set_ids)
+            r.downstream_trans_rmse_mm = downstream_rmse(m, sc, test_set_ids, None)
+            r.downstream_fk_trans_rmse_mm = downstream_rmse(m, sc, test_set_ids, W)
+
     for m in models:
         save_model(out_dir, m)
 
@@ -403,22 +547,32 @@ def main() -> None:
         w.writeheader()
         w.writerows(rows)
 
-    print("\n" + "=" * 96)
-    print("C1 JOINT-vs-INDEPENDENT SUMMARY  (lower = better)")
-    print("=" * 96)
+    has_test = any(r.n_test_sets for r in results)
+    print("\n" + "=" * 112)
+    print("C1 JOINT-vs-INDEPENDENT SUMMARY  (lower = better)"
+          + ("  (+ held-out downstream cube prediction)" if has_test else ""))
+    print("=" * 112)
     hdr = (f"{'method':16s} {'nFix':>5s} {'nGrp':>5s} {'sets':>4s} "
            f"{'cons_t_mm':>10s} {'cons_r_deg':>11s} {'grip_t_mm':>10s} "
            f"{'cube_vs_fk_mm':>13s} {'cost':>10s}")
+    if has_test:
+        hdr += f" {'|down_mm':>9s} {'down+fk_mm':>10s}"
     print(hdr)
     print("-" * len(hdr))
 
     def f(x, nd=3):
         return "NA" if x is None else f"{x:.{nd}f}"
     for r in results:
-        print(f"{r.method:16s} {r.n_fixed_obs:5d} {r.n_grip_obs:5d} {r.n_sets:4d} "
-              f"{f(r.consistency_trans_rmse_mm,2):>10s} {f(r.consistency_rot_rmse_deg,3):>11s} "
-              f"{f(r.grip_align_trans_rmse_mm,2):>10s} {f(r.cube_pos_err_vs_fk_mm,2):>13s} "
-              f"{f(r.optimizer_cost,4):>10s}")
+        line = (f"{r.method:16s} {r.n_fixed_obs:5d} {r.n_grip_obs:5d} {r.n_sets:4d} "
+                f"{f(r.consistency_trans_rmse_mm,2):>10s} {f(r.consistency_rot_rmse_deg,3):>11s} "
+                f"{f(r.grip_align_trans_rmse_mm,2):>10s} {f(r.cube_pos_err_vs_fk_mm,2):>13s} "
+                f"{f(r.optimizer_cost,4):>10s}")
+        if has_test:
+            line += f" {f(r.downstream_trans_rmse_mm,2):>9s} {f(r.downstream_fk_trans_rmse_mm,2):>10s}"
+        print(line)
+    if has_test:
+        print("\n[C1] down_mm = held-out 큐브예측 RMSE(mm, FK 프록시 대비), down+fk_mm = 잔차 Ridge "
+              "보정(+fk) 후. independent vs unified_joint 를 down_mm 로, 보정효과를 down+fk_mm 로 비교.")
     print(f"\n[DONE] summary: {os.path.join(out_dir, 'joint_ablation_summary.csv')}")
 
 

@@ -32,6 +32,15 @@ python CP_C3_prior_vs_noprior.py \
 2) with robot-known cube prior, when set_cube_center_6dof exists in meta.json
 ------------------------------------------------------------------------------------
 
+<<시뮬 Exp3 (Camera-based / FK-based / Camera+FK후보정) 3방식 정렬>>
+시뮬 exp3_gtc_estimation 의 세 방식을 실데이터 held-out(FK 프록시)로 그대로 잰다:
+  - without-prior              == ① Camera-based   (큐브를 미지수로 vision 만으로 추정)
+  - with-prior                 == ② FK-based       (로봇 FK 큐브중점을 solve 에 강제)
+  - 05_camera_fk_correction    == ③ Camera+FK후보정 (①의 예측을 train 잔차 Ridge 로 후보정)
+핵심 지표 test_prior_trans_rmse_mm(held-out FK 위치오차) 로 세 방식을 비교한다.
+(--test_sets 또는 --holdout_frac 로 held-out split 을 켜야 05 및 test_* 지표가 나온다.)
+------------------------------------------------------------------------------------
+
 <<결과물>>
 <out_dir>/ablation_summary.csv
 <out_dir>/ablation_summary.json
@@ -48,7 +57,7 @@ import json
 import math
 import os
 from collections import defaultdict
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, replace
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import cv2
@@ -536,6 +545,60 @@ def write_corrected_set_cube_center(
     return payload
 
 
+# ── Camera+FK-correction (시뮬 Exp3 ③: camera-based estimation + FK 후보정) ──────
+# without-prior(=Camera-based) 카메라로 train 큐브위치를 추정해 FK(정답 프록시) 대비 잔차를
+# [1,x,y] 특징에 Ridge 회귀(W)로 배우고, held-out test 큐브예측에 그 보정을 적용한다.
+# gTc/카메라는 바꾸지 않고 최종 예측만 후보정하므로 held-out 에서만 효과가 난다.
+def _resid_feature(t: np.ndarray) -> np.ndarray:
+    t = np.asarray(t, dtype=np.float64).reshape(3)
+    return np.array([1.0, t[0], t[1]], dtype=np.float64)
+
+
+def fk_corrected_heldout(
+    T_cam: Dict[int, np.ndarray],
+    fixed_cam_ids: List[int],
+    train_pose_obs: List[PoseObs],
+    event_to_set: Dict[int, Optional[int]],
+    train_priors: Dict[int, np.ndarray],
+    test_bundle: Dict[str, Any],
+    lam: float = 1e-3,
+) -> Optional[Dict[str, Any]]:
+    """Return {'test_prior_trans_rmse_mm', 'n'} after applying the FK-learned
+    residual correction to held-out cube predictions, or None if unlearnable."""
+    T_obj_tr = estimate_object_poses_from_cams(train_pose_obs, T_cam, fixed_cam_ids)
+    X, Y = [], []
+    for eid, T in T_obj_tr.items():
+        s = event_to_set.get(eid)
+        if s is None or s not in train_priors:
+            continue
+        t = T[:3, 3]
+        X.append(_resid_feature(t))
+        Y.append(train_priors[s][:3, 3] - t)
+    if len(X) < 3:
+        return None
+    X = np.asarray(X, dtype=np.float64)
+    Y = np.asarray(Y, dtype=np.float64)
+    reg = float(lam) * np.eye(X.shape[1])
+    reg[0, 0] = 0.0
+    W = np.linalg.solve(X.T @ X + reg, X.T @ Y)
+
+    tp_obs = test_bundle.get("pose_obs", [])
+    te2s = test_bundle.get("event_to_set", {})
+    tpriors = test_bundle.get("set_priors", {})
+    T_obj_te = estimate_object_poses_from_cams(tp_obs, T_cam, fixed_cam_ids)
+    errs = []
+    for eid, T in T_obj_te.items():
+        s = te2s.get(eid)
+        if s is None or s not in tpriors:
+            continue
+        t = T[:3, 3] + _resid_feature(T[:3, 3]) @ W
+        errs.append(float(np.linalg.norm(t - tpriors[s][:3, 3]) * 1000.0))
+    if not errs:
+        return None
+    return {"test_prior_trans_rmse_mm": float(np.sqrt(np.mean(np.square(errs)))),
+            "n": len(errs)}
+
+
 def run_method_suite(
     pose_obs: List[PoseObs],
     corner_obs: List[CornerObs],
@@ -671,7 +734,8 @@ def run_method_suite(
             prior_weight_trans=0.0, prior_weight_rot=0.0,
         )
         T_cam_pose, T_obj_pose = to_base(T_cam_pose_r, T_obj_pose_r)
-        results.append(ev("03_pose_consistency_opt", T_cam_pose, T_obj_pose, diag_pose))
+        res_pose = ev("03_pose_consistency_opt", T_cam_pose, T_obj_pose, diag_pose)
+        results.append(res_pose)
         T_cam_repr_r, T_obj_repr_r, diag_repr = optimize_reprojection(
             corner_obs=corner_obs, pose_obs=pose_obs, fixed_cam_ids=fixed_cam_ids,
             init_T_cam=T_cam_pose_r, init_T_obj=T_obj_pose_r, ref_cam=ref_cam,
@@ -681,6 +745,19 @@ def run_method_suite(
         )
         T_cam_repr, T_obj_repr = to_base(T_cam_repr_r, T_obj_repr_r)
         results.append(ev("04_direct_reprojection_opt", T_cam_repr, T_obj_repr, diag_repr))
+
+        # ③ Camera+FK-correction (시뮬 Exp3): camera-based(=without-prior) 예측에
+        #   FK 로 학습한 위치의존 잔차(Ridge)를 held-out 예측에만 후보정. gTc/카메라는
+        #   그대로이므로 재투영/pose 지표는 03 과 동일하고 test_prior_t 만 개선된다.
+        if test_bundle:
+            corr = fk_corrected_heldout(
+                T_cam_pose, fixed_cam_ids, pose_obs, event_to_set, set_priors,
+                test_bundle, lam=float(getattr(args, "ridge_lambda", 1e-3)))
+            if corr is not None:
+                results.append(replace(
+                    res_pose, method="05_camera_fk_correction",
+                    test_prior_trans_rmse_mm=corr["test_prior_trans_rmse_mm"],
+                    test_prior_rot_rmse_deg=None, test_n_events=corr["n"]))
 
     # Stamp the prior weights actually used (for the C3 sweep curve) and tag
     # method names with the suffix so sweep rows remain distinct in the summary.
@@ -773,6 +850,8 @@ def print_summary(results: List[MethodResult]) -> None:
     if has_test:
         print("\n[C3] test_prior_t = FK position RMSE (mm) on HELD-OUT sets — the fair "
               "with-prior vs without-prior metric. test_reproj = reprojection RMSE (px) on held-out sets.")
+        print("[C3] 시뮬 Exp3 3방식 짝: without-prior=Camera-based, with-prior=FK-based, "
+              "05_camera_fk_correction=Camera+FK후보정(Ridge). test_prior_t 로 세 방식을 비교.")
 
 
 def main() -> None:
@@ -828,6 +907,8 @@ def main() -> None:
                              "--test_sets 가 있으면 무시.")
     parser.add_argument("--split_seed", type=int, default=0,
                         help="--holdout_frac 무작위 분할 시드(재현성). 정렬된 set 을 이 시드로 섞어 뒤쪽을 test 로.")
+    parser.add_argument("--ridge_lambda", type=float, default=1e-3,
+                        help="Camera+FK-correction(05) 잔차보정 Ridge 정규화 세기 (시뮬 lam 기본 1e-3).")
     args = parser.parse_args()
 
     def _parse_sweep(s):

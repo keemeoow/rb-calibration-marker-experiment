@@ -91,12 +91,18 @@ class CubeConfig:
     })
 
     # In-plane rotation around each face normal, degrees. Validate physically.
+    # Per-face in-plane roll (deg, about the face normal) of the printed marker vs
+    # the nominal face axes. Calibrated from data/session multi-face co-observations
+    # (self-calibration over roll in {0,90,180,270}): the physical cube's side tags
+    # are mounted rotated by 90-degree steps. Applying these brought the inter-face
+    # cube-pose rotation disagreement from median ~91deg down to ~1.9deg.
+    # If the cube is reprinted/re-stickered, re-run the face-roll self-calibration.
     face_roll_deg: Dict[int, float] = field(default_factory=lambda: {
         TOP_MARKER_NEG_Y_ID: 0.0,
         TOP_MARKER_POS_Y_ID: 0.0,
-        SIDE_MARKER_POS_X_ID: 0.0,
-        SIDE_MARKER_POS_Y_ID: 0.0,
-        SIDE_MARKER_NEG_X_ID: 0.0,
+        SIDE_MARKER_POS_X_ID: 90.0,
+        SIDE_MARKER_POS_Y_ID: 180.0,
+        SIDE_MARKER_NEG_X_ID: 270.0,
         SIDE_MARKER_NEG_Y_ID: 0.0,
     })
 
