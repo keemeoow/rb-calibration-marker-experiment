@@ -10,12 +10,18 @@ Step 2: 멀티카메라 캘리브레이션용 캡처 수집.
   5. `set_index`, robot pose, set_cube_center_6dof, capture gate 결과를 함께 저장한다.
 
 명령어:
-python Step2_capture.py --root_folder ./data/session \
+python Step2_capture.py --root_folder ./data/spython Step2_capture.py --root_folder ./data/session \
+    --intrinsics_dir ./intrinsics --use_robot --manual_robot \
+    --robot_ip 192.168.0.23 --robot_port 12348 --show --save_depth
+ession \
     --intrinsics_dir ./intrinsics --use_robot --manual_robot \
     --robot_ip 192.168.0.23 --robot_port 12348 --show --save_depth
 """
 
 """
+python Step2_capture.py --root_folder ./data/session \
+    --intrinsics_dir ./intrinsics --use_robot --manual_robot \
+    --robot_ip 192.168.0.23 --robot_port 12348 --show --save_depth
 
 저장 파일:
   - meta.json               : 캡처별 상세 (robot pose, set_index, set_cube_center_6dof, cube/board quality)
