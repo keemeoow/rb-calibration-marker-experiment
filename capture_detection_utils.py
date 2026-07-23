@@ -65,12 +65,16 @@ def detect_cube_markers_in_frame(bgr: np.ndarray,
     board_mask_applied = False
 
     cube_img = bgr
-    if is_gripper and charuco is not None:
+    if charuco is not None:
+        # ChArUco 검출은 카메라 종류와 무관하게 수행 (보드-전용 비교실험을 위해
+        # 고정카메라도 보드를 인식/저장). 단, 보드 마커 영역 마스킹은 그리퍼에서만:
+        # 고정카메라의 큐브 검출 입력을 기존 큐브-전용 파이프라인과 동일하게 유지해
+        # 대조군을 보존하기 위함 (보드 검출은 순수 '추가' 동작).
         try:
             ch_corners, ch_ids, charuco_detect_n, board_mkr_corners, board_mkr_ids = charuco.detect(bgr)
         except Exception:
             ch_corners, ch_ids, charuco_detect_n, board_mkr_corners, board_mkr_ids = None, None, 0, None, None
-        if board_mkr_corners is not None and len(board_mkr_corners) > 0:
+        if is_gripper and board_mkr_corners is not None and len(board_mkr_corners) > 0:
             cube_img = mask_board_marker_regions(bgr, board_mkr_corners, pad_px=board_mask_pad_px)
             board_mask_applied = True
 

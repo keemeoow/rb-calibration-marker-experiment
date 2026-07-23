@@ -8,14 +8,6 @@ Step 2: 멀티카메라 캘리브레이션용 캡처 수집.
   3. 각 이벤트에서 모든 카메라(그리퍼 + 고정)가 동시에 color/depth를 저장한다.
   4. AprilTag cube / gripper ChArUco를 즉시 검출하고 pose 후보와 품질 지표를 meta.json에 기록한다.
   5. `set_index`, robot pose, set_cube_center_6dof, capture gate 결과를 함께 저장한다.
-
-명령어:
-python Step2_capture.py --root_folder ./data/spython Step2_capture.py --root_folder ./data/session \
-    --intrinsics_dir ./intrinsics --use_robot --manual_robot \
-    --robot_ip 192.168.0.23 --robot_port 12348 --show --save_depth
-ession \
-    --intrinsics_dir ./intrinsics --use_robot --manual_robot \
-    --robot_ip 192.168.0.23 --robot_port 12348 --show --save_depth
 """
 
 """
@@ -71,18 +63,18 @@ def annotate_image(bgr, cube, cam_idx, is_gripper, n_markers, ids, corners,
     """마커 오버레이 및 정보 텍스트를 이미지에 그림."""
     out = bgr.copy()
 
-    # Gripper camera: draw board ArUco markers (DICT_4X4_250)
+    # Board ArUco markers (DICT_4X4_250) — 모든 카메라에서 표시 (고정캠도 보드 인식)
     n_board = 0
-    if is_gripper and board_mkr_corners is not None and board_mkr_ids is not None:
+    if board_mkr_corners is not None and board_mkr_ids is not None:
         n_board = len(board_mkr_ids)
         try:
             cv2.aruco.drawDetectedMarkers(out, board_mkr_corners, board_mkr_ids)
         except Exception:
             pass
 
-    # Gripper camera: draw ChArUco interpolated corners
+    # ChArUco interpolated corners — 모든 카메라에서 표시
     n_charuco = 0
-    if is_gripper and ch_corners is not None and ch_ids is not None:
+    if ch_corners is not None and ch_ids is not None:
         n_charuco = len(ch_ids)
         try:
             cv2.aruco.drawDetectedCornersCharuco(out, ch_corners, ch_ids)
@@ -100,7 +92,7 @@ def annotate_image(bgr, cube, cam_idx, is_gripper, n_markers, ids, corners,
     role = "GRIPPER" if is_gripper else "FIXED"
     ids_txt = ",".join(str(int(x)) for x in ids) if ids is not None and len(ids) > 0 else "-"
     board_txt = ""
-    if is_gripper:
+    if n_board > 0 or n_charuco > 0:
         board_txt = f" board={n_board}mkr ch={n_charuco}cor"
     lines = [
         f"cam{cam_idx} [{role}]",
@@ -666,9 +658,15 @@ def main():
                         help="Optional cube config JSON override. Leave unset to use the project's canonical cube definition.")
 
     # 스트림 설정
+    # 해상도 기본값 640x480 — 기존 인트린식(color_w/color_h)이 이 해상도로 캘리브됨.
+    # 더 높은 해상도로 촬영하려면 먼저 Step1/Step1b 로 그 해상도에서 재캘리브해야 하며,
+    # 아래 정합성 검사가 --intrinsics_dir 의 color_w/color_h 와 불일치를 잡아 중단시킨다.
     parser.add_argument("--fps", type=int, default=15)
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=480)
+    parser.add_argument("--allow_intrinsics_res_mismatch", action="store_true",
+                        help="캡처 해상도가 인트린식(color_w/h)과 달라도 강행. "
+                             "PnP/ChArUco pose 가 부정확해지므로 디버깅용에만 사용.")
 
     # 검출 설정
     parser.add_argument("--min_markers", type=int, default=1,
@@ -809,6 +807,36 @@ def main():
         except FileNotFoundError:
             print(f"[WARN] No intrinsics for cam{ci}. Per-marker PnP will be skipped.")
 
+    # ─── 인트린식 해상도 정합성 검사 ───
+    # 인트린식(K,D)은 캘리브된 해상도에서만 유효하다. 캡처 해상도가 다르면 cx,cy,fx,fy
+    # 가 어긋나 PnP/ChArUco pose 가 조용히 부정확해진다(종횡비까지 다르면 화각도 다름).
+    # color_w/color_h 를 읽어 (args.width,args.height)와 비교, 불일치 시 중단.
+    res_mismatch = []
+    for ci, _ in idx_serial_pairs:
+        p = os.path.join(intr_dir, f"cam{ci}.npz")
+        if not os.path.exists(p):
+            continue
+        d = np.load(p, allow_pickle=True)
+        if "color_w" in d and "color_h" in d:
+            iw, ih = int(d["color_w"]), int(d["color_h"])
+            if (iw, ih) != (int(args.width), int(args.height)):
+                res_mismatch.append((ci, iw, ih))
+    if res_mismatch:
+        print("[ERROR] 캡처 해상도 {}x{} 가 인트린식 캘리브 해상도와 다릅니다:"
+              .format(args.width, args.height))
+        for ci, iw, ih in res_mismatch:
+            print(f"          cam{ci}: intrinsics {iw}x{ih}")
+        print("        -> {}x{} 해상도로 인트린식을 다시 캘리브하세요:".format(args.width, args.height))
+        print("           1) python Step1_dump_all_intrinsics.py --out_dir {} "
+              "--color_w {} --color_h {} --fps {}".format(intr_dir, args.width, args.height, args.fps))
+        print("           2) python Step1b_charuco_intrinsics.py --intr_dir {}  "
+              "(npz 의 {}x{} 를 읽어 리파인)".format(intr_dir, args.width, args.height))
+        if not args.allow_intrinsics_res_mismatch:
+            raise RuntimeError(
+                "인트린식 해상도 불일치로 중단. 재캘리브하거나 "
+                "--allow_intrinsics_res_mismatch 로 강행(부정확).")
+        print("[WARN] --allow_intrinsics_res_mismatch: 불일치 상태로 강행합니다(pose 부정확).")
+
     # ─── 카메라 시작 ───
     # 이전 실행이 비정상 종료(세그폴트 등)된 경우 디바이스가 비정상 상태로
     # 남을 수 있어 D435가 첫 pipeline.start()에서 "Frame didn't arrive"로
@@ -843,7 +871,7 @@ def main():
     print(f"[INFO] Cube config source: {cube_cfg_source}")
     print(f"[INFO] Cube id_to_face: {cfg.id_to_face}")
 
-    # ChArUco board target — gripper camera only
+    # ChArUco board target — 그리퍼캠 + 고정캠 모두 검출 (보드-전용 비교실험)
     charuco_cfg = CharucoBoardConfig()
     charuco = CharucoTarget(charuco_cfg)
     print(f"[INFO] ChArUco board: {charuco_cfg.squares_x}x{charuco_cfg.squares_y}, "
@@ -933,7 +961,7 @@ def main():
             color,
             cube,
             cube_ids=cfg.marker_ids,
-            charuco=charuco if ci == gripper_cam_idx else None,
+            charuco=charuco,  # 전 카메라에서 ChArUco 검출 (고정캠 보드-전용 비교실험)
             is_gripper=(ci == gripper_cam_idx),
             board_mask_pad_px=float(args.board_mask_pad_px),
         )
@@ -956,12 +984,12 @@ def main():
             "cube_detect_filtered_ids": detect_info["filtered_ids"],
             "board_mask_applied": bool(detect_info["board_mask_applied"]),
         }
-        if ci == gripper_cam_idx:
-            fr["board_mkr_corners"] = detect_info["board_mkr_corners"]
-            fr["board_mkr_ids"] = detect_info["board_mkr_ids"]
-            fr["ch_corners"] = detect_info["ch_corners"]
-            fr["ch_ids"] = detect_info["ch_ids"]
-            fr["charuco_detect_n"] = int(detect_info["charuco_detect_n"])
+        # ChArUco 검출 결과는 모든 카메라에 저장 (고정캠도 보드 인식 -> 보드-전용 비교실험).
+        fr["board_mkr_corners"] = detect_info["board_mkr_corners"]
+        fr["board_mkr_ids"] = detect_info["board_mkr_ids"]
+        fr["ch_corners"] = detect_info["ch_corners"]
+        fr["ch_ids"] = detect_info["ch_ids"]
+        fr["charuco_detect_n"] = int(detect_info["charuco_detect_n"])
 
         intr = cam_intrinsics.get(ci)
         if intr is not None and ids is not None and len(ids) > 0:
@@ -1006,31 +1034,31 @@ def main():
                     **depth_metrics_to_fields((reproj or {}).get("depth_metrics")),
                 }
 
-        if ci == gripper_cam_idx:
-            if include_charuco_pose and intr is not None:
-                K, D, _ = intr
-                try:
-                    ch_ok, ch_rvec, ch_tvec, ch_n, ch_reproj = charuco.estimate_pose(color, K, D)
-                except Exception as e:
-                    ch_ok = False
-                    ch_n = int(fr.get("charuco_detect_n", 0))
-                    ch_reproj = None
-                    if log_pose_status:
-                        print(f"  [ChArUco] pose ERROR: {e}")
-                if ch_ok and ch_rvec is not None:
-                    T_cam_board = rodrigues_to_Rt(ch_rvec, ch_tvec)
-                    fr["charuco"] = {
-                        "ok": True,
-                        "n_corners": int(ch_n),
-                        "reproj_error_px": float(ch_reproj) if ch_reproj is not None else None,
-                        "rvec": ch_rvec.flatten().tolist(),
-                        "tvec": ch_tvec.flatten().tolist(),
-                        "T_cam_board_4x4": T_cam_board.tolist(),
-                    }
-                    if log_pose_status:
-                        print(f"  [ChArUco] OK: {ch_n} corners, reproj={ch_reproj:.3f}px")
-                elif log_pose_status:
-                    print(f"  [ChArUco] FAILED (corners={int(fr.get('charuco_detect_n', 0))})")
+        # ChArUco 보드 pose 추정도 모든 카메라에서 (고정캠 보드 기반 외부파라미터 비교용).
+        if include_charuco_pose and intr is not None:
+            K, D, _ = intr
+            try:
+                ch_ok, ch_rvec, ch_tvec, ch_n, ch_reproj = charuco.estimate_pose(color, K, D)
+            except Exception as e:
+                ch_ok = False
+                ch_n = int(fr.get("charuco_detect_n", 0))
+                ch_reproj = None
+                if log_pose_status:
+                    print(f"  [ChArUco] pose ERROR: {e}")
+            if ch_ok and ch_rvec is not None:
+                T_cam_board = rodrigues_to_Rt(ch_rvec, ch_tvec)
+                fr["charuco"] = {
+                    "ok": True,
+                    "n_corners": int(ch_n),
+                    "reproj_error_px": float(ch_reproj) if ch_reproj is not None else None,
+                    "rvec": ch_rvec.flatten().tolist(),
+                    "tvec": ch_tvec.flatten().tolist(),
+                    "T_cam_board_4x4": T_cam_board.tolist(),
+                }
+                if log_pose_status:
+                    print(f"  [ChArUco] OK: {ch_n} corners, reproj={ch_reproj:.3f}px")
+            elif log_pose_status:
+                print(f"  [ChArUco] FAILED (corners={int(fr.get('charuco_detect_n', 0))})")
 
         return fr
 
@@ -1202,13 +1230,13 @@ def main():
                 "cube_detect_filtered_ids": fr.get("cube_detect_filtered_ids", []),
                 "board_mask_applied": bool(fr.get("board_mask_applied", False)),
             }
-            if ci == gripper_cam_idx:
-                cam_rec["charuco_detect_n"] = int(fr.get("charuco_detect_n", 0))
+            # ChArUco 검출/pose 는 모든 카메라에 기록 (고정캠 보드-전용 비교실험).
+            cam_rec["charuco_detect_n"] = int(fr.get("charuco_detect_n", 0))
 
             if fr["cube_pnp"] is not None:
                 cam_rec["cube_pnp"] = fr["cube_pnp"]
 
-            if ci == gripper_cam_idx and fr.get("charuco") is not None:
+            if fr.get("charuco") is not None:
                 cam_rec["charuco"] = fr["charuco"]
 
             cap_rec["cams"][str(ci)] = cam_rec
@@ -1231,11 +1259,16 @@ def main():
             tag = "G" if ci == gripper_cam_idx else "F"
             n = fr["n_markers"]
             cam_summary.append(f"cam{ci}({tag}):{n}mkr")
-        charuco_txt = ""
-        gi_rec = cap_rec["cams"].get(str(gripper_cam_idx), {})
-        if "charuco" in gi_rec:
-            ch = gi_rec["charuco"]
-            charuco_txt = f" charuco={ch['n_corners']}cor"
+        # ChArUco 검출/pose 요약을 카메라별로 출력 (고정캠 보드 인식 확인용).
+        ch_summary = []
+        for ci in sorted(frames.keys()):
+            rec = cap_rec["cams"].get(str(ci), {})
+            ndet = int(rec.get("charuco_detect_n", 0))
+            if ndet > 0 or "charuco" in rec:
+                tag = "G" if ci == gripper_cam_idx else "F"
+                npose = rec.get("charuco", {}).get("n_corners") if "charuco" in rec else None
+                ch_summary.append(f"cam{ci}({tag}):{ndet}cor" + (f"/pose{npose}" if npose else ""))
+        charuco_txt = (" charuco[" + " ".join(ch_summary) + "]") if ch_summary else ""
         print(f"[SAVE] event={fid} | {' '.join(cam_summary)} span={capture_span_ms:.1f}ms{charuco_txt}")
         event_id += 1
         return True, gate
