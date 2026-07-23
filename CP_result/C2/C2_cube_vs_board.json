@@ -1,0 +1,189 @@
+{
+  "experiment": "C2_cube_vs_board",
+  "calib_dir": "/private/tmp/claude-501/-Users-woo-Documents-GitHub-Robot-Lab-rb-calibration-marker-experiment/be131aba-41ec-498b-80bf-13799ab5a1fe/scratchpad/c2_out",
+  "cube_config_source": "config_py:CubeConfig",
+  "modes": [
+    "cube_only",
+    "hybrid"
+  ],
+  "rows": [
+    {
+      "mode": "cube_only",
+      "num_base_cameras": "3",
+      "base_cameras": "cam0, cam1, cam3",
+      "cross_camera_mean_mm": "22.57",
+      "cube_reproj_mean_px": "19.972",
+      "board_reproj_mean_px": "0.209",
+      "mesh_rmse_mm": "3.27",
+      "dimension_err_mm": "1.50",
+      "pose_repeat_mm": "22.57",
+      "pose_repeat_deg": "25.553",
+      "handeye_pass": "FAIL"
+    },
+    {
+      "mode": "hybrid",
+      "num_base_cameras": "3",
+      "base_cameras": "cam0, cam1, cam3",
+      "cross_camera_mean_mm": "34.31",
+      "cube_reproj_mean_px": "19.972",
+      "board_reproj_mean_px": "0.209",
+      "mesh_rmse_mm": "3.25",
+      "dimension_err_mm": "1.82",
+      "pose_repeat_mm": "34.31",
+      "pose_repeat_deg": "36.958",
+      "handeye_pass": "FAIL"
+    }
+  ],
+  "verification": {
+    "cube_only": {
+      "cross_camera": {
+        "events_with_2plus_cams": 14,
+        "num_errors": 28,
+        "mean_mm": 22.56661345148885,
+        "median_mm": 26.636013914423437,
+        "max_mm": 48.640863694647905,
+        "std_mm": 13.372538346405307,
+        "pass": false
+      },
+      "reprojection": {
+        "total_observations": 47,
+        "mean_px": 19.971705341288317,
+        "median_px": 21.010073602398986,
+        "max_px": 45.78290808314601,
+        "lt_1px_count": 9,
+        "pass": false
+      },
+      "handeye": {
+        "frames": 6,
+        "board_position_std_mm": 0.8805189453557803,
+        "board_position_max_mm": 5.321821552995645,
+        "board_rotation_mean_deg": 1.0054045541768162,
+        "board_rotation_max_deg": 1.825028588813358,
+        "pass": false
+      },
+      "board_reprojection": {
+        "total_frames": 6,
+        "mean_px": 0.20913676420847574,
+        "median_px": 0.1970490887761116,
+        "max_px": 0.26933515071868896,
+        "pass": true,
+        "per_camera": {
+          "cam0": {
+            "frames": 0,
+            "mean_px": null
+          },
+          "cam1": {
+            "frames": 0,
+            "mean_px": null
+          },
+          "cam2": {
+            "frames": 6,
+            "mean_px": 0.20913676420847574
+          },
+          "cam3": {
+            "frames": 0,
+            "mean_px": null
+          }
+        }
+      },
+      "pose_repeatability": {
+        "num_events": 14,
+        "mean_dt_mm": 22.56661345148885,
+        "mean_dr_deg": 25.552922499481195,
+        "max_dt_mm": 80.31486958434834,
+        "max_dr_deg": 79.79775807391806,
+        "pass": false
+      },
+      "mesh_alignment": {
+        "usable_clouds": 27,
+        "usable_events": 14,
+        "mean_rmse_mm": 3.2688097536741783,
+        "median_rmse_mm": 3.2984127787773305,
+        "max_rmse_mm": 4.818176002751154,
+        "pass": true
+      },
+      "dimension_accuracy": {
+        "usable_events": 12,
+        "mean_abs_err_mm": 1.5021660307290505,
+        "median_abs_err_mm": 1.5668900728587758,
+        "max_abs_err_mm": 2.958496261766026,
+        "pass": true
+      }
+    },
+    "hybrid": {
+      "cross_camera": {
+        "events_with_2plus_cams": 14,
+        "num_errors": 28,
+        "mean_mm": 34.31406995242214,
+        "median_mm": 29.547936290113093,
+        "max_mm": 116.14334635484565,
+        "std_mm": 23.489764452151032,
+        "pass": false
+      },
+      "reprojection": {
+        "total_observations": 47,
+        "mean_px": 19.971705341288317,
+        "median_px": 21.010073602398986,
+        "max_px": 45.78290808314601,
+        "lt_1px_count": 9,
+        "pass": false
+      },
+      "handeye": {
+        "frames": 6,
+        "board_position_std_mm": 0.8805189453557803,
+        "board_position_max_mm": 5.321821552995645,
+        "board_rotation_mean_deg": 1.0054045541768162,
+        "board_rotation_max_deg": 1.825028588813358,
+        "pass": false
+      },
+      "board_reprojection": {
+        "total_frames": 6,
+        "mean_px": 0.20913676420847574,
+        "median_px": 0.1970490887761116,
+        "max_px": 0.26933515071868896,
+        "pass": true,
+        "per_camera": {
+          "cam0": {
+            "frames": 0,
+            "mean_px": null
+          },
+          "cam1": {
+            "frames": 0,
+            "mean_px": null
+          },
+          "cam2": {
+            "frames": 6,
+            "mean_px": 0.20913676420847574
+          },
+          "cam3": {
+            "frames": 0,
+            "mean_px": null
+          }
+        }
+      },
+      "pose_repeatability": {
+        "num_events": 14,
+        "mean_dt_mm": 34.31406995242214,
+        "mean_dr_deg": 36.95751526426796,
+        "max_dt_mm": 117.12480732006543,
+        "max_dr_deg": 83.37338497350692,
+        "pass": false
+      },
+      "mesh_alignment": {
+        "usable_clouds": 28,
+        "usable_events": 14,
+        "mean_rmse_mm": 3.2465653674857893,
+        "median_rmse_mm": 3.4096459592682646,
+        "max_rmse_mm": 4.900086449310156,
+        "pass": true
+      },
+      "dimension_accuracy": {
+        "usable_events": 14,
+        "mean_abs_err_mm": 1.8205551448534885,
+        "median_abs_err_mm": 1.5300906158159482,
+        "max_abs_err_mm": 4.213651743826957,
+        "pass": true
+      }
+    }
+  }
+}

@@ -30,7 +30,7 @@ import cv2
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
-import CP_Step3_compare_calibrartion as S
+import CP_C3_prior_vs_noprior as S
 from apriltag_cube import AprilTagCubeTarget
 from config import get_default_cube_config
 from calibration_runtime_utils import (

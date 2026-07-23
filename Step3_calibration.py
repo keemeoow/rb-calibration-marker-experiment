@@ -1423,6 +1423,22 @@ def main():
     parser.add_argument("--fixed_board_refine_alpha", type=float, default=0.35)
     parser.add_argument("--cube_config_json", type=str, default=None,
                         help="Optional cube config JSON override. Leave unset to use the project's canonical cube definition.")
+    # ─── C2 ablation: graspable cube 유/무 비교 ───
+    # summary["transform_sets"] 에 board_only / cube_only / hybrid 세 벌의 fixed-cam
+    # base transform 을 기록해 Step5 의 calibration_mode_comparison 리포트를 살린다.
+    #   board_only : ChArUco 보드만으로 추정한 raw T_base_C* (큐브 미사용 baseline)
+    #   cube_only  : graspable cube 만으로 추정한 raw T_base_C*
+    #   hybrid     : 두 소스를 융합 + set/depth refinement 까지 거친 최종(production) 결과
+    # board_only/cube_only 는 refinement 이전 단일-소스 추정치이고, hybrid 는 큐브가 있어야
+    # 가능한 refinement 을 포함한 전체 파이프라인 결과다("큐브 기여도"를 그대로 반영).
+    parser.add_argument("--target", type=str, default="both",
+                        choices=["board", "cube", "both"],
+                        help="C2 ablation: transform_sets 에 기록할 대상. "
+                             "both=board_only+cube_only+hybrid(기본), "
+                             "board=board_only 만, cube=cube_only 만.")
+    parser.add_argument("--emit_transform_sets", type=lambda s: str(s).lower() not in ("0", "false", "no"),
+                        default=True,
+                        help="summary['transform_sets'] 기록 여부(Step5 mode-comparison 리포트용). 기본 True.")
     args = parser.parse_args()
 
     root = args.root_folder
@@ -2067,6 +2083,12 @@ def main():
         mode=str(args.common_object_mode),
         board_refine_alpha=float(args.fixed_board_refine_alpha),
     )
+    # C2 ablation snapshots: raw single-source estimates captured BEFORE any
+    # set/depth refinement so board_only vs cube_only differ only in object source.
+    c2_board_only_T_base = {int(ci): np.asarray(T, dtype=np.float64)
+                            for ci, T in board_T_base_Ci.items()}
+    c2_cube_only_T_base = {int(ci): np.asarray(T, dtype=np.float64)
+                           for ci, T in cube_T_base_Ci.items()}
     for ci in fixed_cam_ids:
         key = f"T_base_C{ci}"
         T = T_base_Ci.get(ci)
@@ -2506,6 +2528,33 @@ def main():
     summary["transforms"]["T_base_O"] = T_B_O_avg.reshape(-1).tolist()
     for ci, T in T_base_Ci.items():
         summary["transforms"][f"T_base_C{ci}"] = T.reshape(-1).tolist()
+
+    # ─── C2 ablation: transform_sets (board_only / cube_only / hybrid) ───
+    # Step5.build_mode_comparison_rows 가 이 키를 읽어 mode-comparison 리포트를 만든다.
+    # 각 set 은 공유 transform(T_C{ref}_C*, T_gripper_cam, T_base_O)에 소스별 T_base_C* 를 얹는다.
+    if bool(getattr(args, "emit_transform_sets", True)):
+        _shared_tf = {}
+        for ci, T in T_Cref_Ci.items():
+            _shared_tf[f"T_C{ref_fixed}_C{ci}"] = T.reshape(-1).tolist()
+        _shared_tf["T_gripper_cam"] = T_gTc.reshape(-1).tolist()
+        _shared_tf["T_base_O"] = T_B_O_avg.reshape(-1).tolist()
+
+        def _make_transform_set(base_by_cam):
+            d = dict(_shared_tf)
+            for ci, T in base_by_cam.items():
+                d[f"T_base_C{int(ci)}"] = np.asarray(T, dtype=np.float64).reshape(-1).tolist()
+            return d
+
+        _tgt = str(getattr(args, "target", "both"))
+        summary["transform_sets"] = {}
+        if _tgt in ("both", "board") and c2_board_only_T_base:
+            summary["transform_sets"]["board_only"] = _make_transform_set(c2_board_only_T_base)
+        if _tgt in ("both", "cube") and c2_cube_only_T_base:
+            summary["transform_sets"]["cube_only"] = _make_transform_set(c2_cube_only_T_base)
+        if _tgt == "both":
+            summary["transform_sets"]["hybrid"] = _make_transform_set(T_base_Ci)
+        print(f"[C2] transform_sets recorded: {sorted(summary['transform_sets'].keys())} "
+              f"(target={_tgt})")
 
     final_transforms = {
         "generated_by": "Step3_calibration.py",

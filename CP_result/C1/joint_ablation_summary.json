@@ -1,0 +1,38 @@
+[
+  {
+    "method": "independent",
+    "n_fixed_obs": 42,
+    "n_grip_obs": 5,
+    "n_sets": 1,
+    "consistency_trans_rmse_mm": 405.1844911530032,
+    "consistency_rot_rmse_deg": 78.32668463776562,
+    "grip_align_trans_rmse_mm": 161.3467363756248,
+    "cube_pos_err_vs_fk_mm": 0.0,
+    "optimizer_cost": null,
+    "note": ""
+  },
+  {
+    "method": "unified_joint",
+    "n_fixed_obs": 42,
+    "n_grip_obs": 5,
+    "n_sets": 1,
+    "consistency_trans_rmse_mm": 62.257199532962545,
+    "consistency_rot_rmse_deg": 77.45462025814994,
+    "grip_align_trans_rmse_mm": 158.12484300291564,
+    "cube_pos_err_vs_fk_mm": 8.925051257047041,
+    "optimizer_cost": 43.08126652182838,
+    "note": ""
+  },
+  {
+    "method": "joint_fk_fixed",
+    "n_fixed_obs": 42,
+    "n_grip_obs": 5,
+    "n_sets": 1,
+    "consistency_trans_rmse_mm": 63.1304219130675,
+    "consistency_rot_rmse_deg": 77.53420800205988,
+    "grip_align_trans_rmse_mm": 161.34647185700624,
+    "cube_pos_err_vs_fk_mm": 0.0,
+    "optimizer_cost": 43.127419466252235,
+    "note": ""
+  }
+]

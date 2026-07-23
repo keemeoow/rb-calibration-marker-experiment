@@ -1,0 +1,3 @@
+mode,num_base_cameras,base_cameras,cross_camera_mean_mm,cube_reproj_mean_px,board_reproj_mean_px,mesh_rmse_mm,dimension_err_mm,pose_repeat_mm,pose_repeat_deg,handeye_pass
+cube_only,3,"cam0, cam1, cam3",22.57,19.972,0.209,3.27,1.50,22.57,25.553,FAIL
+hybrid,3,"cam0, cam1, cam3",34.31,19.972,0.209,3.25,1.82,34.31,36.958,FAIL

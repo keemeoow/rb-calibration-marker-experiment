@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
 """
-Step3_compare_calibrartion.py
+CP_C3_prior_vs_noprior.py  —  기여도 C3 독립 실험
+
+C3: solve 에서 로봇 큐브중점을 정답(known)으로 강한 soft 제약(FK 사용)하느냐
+    vs 미지수로 두고 vision 만으로 풀고 마지막에 base 등록만 하느냐(FK 미사용).
+
+한 번 촬영한 세션(--root_folder)의 관측을 읽어, with-prior / without-prior 를
+같은 데이터로 풀어 비교한다. 결과는 기본적으로 CP_result/C3 에 저장된다.
+이 파일은 C1/C2 와 독립적으로 단독 실행된다(공유 로더는 CP_common 이 재노출).
 
 <<명령어>>
-python Step3_compare_calibrartion.py \
+python CP_C3_prior_vs_noprior.py \
   --root_folder ./data/session \
-  --intrinsics_dir ./intrinsics \
-  --out_dir ./data/session/calib_ablation
+  --intrinsics_dir ./intrinsics
+  # 결과 -> CP_result/C3 (기본).  --out_dir 로 변경 가능.
 
-  (optional) 
-  --prior_weight_rot
-  --prior_weight_trans (기본 30mm)
+  (optional)
+  --prior_weight_trans (기본 30) / --prior_weight_rot (기본 0)
+  --prior_weight_sweep "0,1,10,30,100" [--sweep_axis trans|rot|both]
+  --test_sets "3,7"  또는  --holdout_frac 0.3 --split_seed 0  (held-out 공정 비교)
 ------------------------------------------------------------------------------------
 
 <<4가지 방법 비교>>
@@ -68,126 +76,43 @@ from robot_comm import euler_deg_to_matrix
 # Basic SE(3) utilities
 # -----------------------------
 
-def ensure_dir(path: str) -> str:
-    os.makedirs(path, exist_ok=True)
-    return path
 
-
-def make_T(rotvec: np.ndarray, t: np.ndarray) -> np.ndarray:
-    T = np.eye(4, dtype=np.float64)
-    T[:3, :3] = R.from_rotvec(np.asarray(rotvec, dtype=np.float64)).as_matrix()
-    T[:3, 3] = np.asarray(t, dtype=np.float64).reshape(3)
-    return T
-
-
-def T_to_vec(T: np.ndarray) -> np.ndarray:
-    v = np.zeros(6, dtype=np.float64)
-    v[:3] = np.asarray(T[:3, 3], dtype=np.float64)
-    v[3:] = R.from_matrix(T[:3, :3]).as_rotvec()
-    return v
-
-
-def vec_to_T(v: np.ndarray) -> np.ndarray:
-    v = np.asarray(v, dtype=np.float64).reshape(6)
-    return make_T(v[3:], v[:3])
-
-
-def se3_log_residual(T_err: np.ndarray, rot_scale_m_per_rad: float = 0.05) -> np.ndarray:
-    """Return residual in meters: [dx,dy,dz, scaled_rotvec]."""
-    r = np.zeros(6, dtype=np.float64)
-    r[:3] = T_err[:3, 3]
-    r[3:] = R.from_matrix(T_err[:3, :3]).as_rotvec() * float(rot_scale_m_per_rad)
-    return r
-
-
-def weighted_se3_average(T_list: List[np.ndarray], weights: Optional[List[float]] = None) -> np.ndarray:
-    if not T_list:
-        raise ValueError("weighted_se3_average got an empty T_list")
-    if weights is None:
-        w = np.ones(len(T_list), dtype=np.float64)
-    else:
-        w = np.maximum(np.asarray(weights, dtype=np.float64), 1e-12)
-    w = w / (w.sum() + 1e-12)
-
-    t = np.sum(np.stack([T[:3, 3] for T in T_list], axis=0) * w[:, None], axis=0)
-    M = np.sum(np.stack([T[:3, :3] for T in T_list], axis=0) * w[:, None, None], axis=0)
-    U, _, Vt = np.linalg.svd(M)
-    Rm = U @ Vt
-    if np.linalg.det(Rm) < 0:
-        U[:, -1] *= -1.0
-        Rm = U @ Vt
-    T = np.eye(4, dtype=np.float64)
-    T[:3, :3] = Rm
-    T[:3, 3] = t
-    return T
-
-
-def robust_se3_average(
-    T_list: List[np.ndarray],
-    weights: Optional[List[float]] = None,
-    max_iters: int = 5,
-    k_mad: float = 2.5,
-) -> Tuple[np.ndarray, Dict[str, float]]:
-    if not T_list:
-        raise ValueError("robust_se3_average got an empty T_list")
-    if weights is None:
-        weights = [1.0] * len(T_list)
-    inliers = np.arange(len(T_list), dtype=int)
-    T_avg = weighted_se3_average(T_list, weights)
-
-    for _ in range(max_iters):
-        errs = []
-        for idx in inliers:
-            e = se3_log_residual(inv_T(T_avg) @ T_list[idx])
-            errs.append(float(np.linalg.norm(e[:3]) * 1000.0 + np.linalg.norm(e[3:]) * 1000.0))
-        errs = np.asarray(errs, dtype=np.float64)
-        med = float(np.median(errs))
-        mad = float(np.median(np.abs(errs - med)) + 1e-12)
-        thr = med + k_mad * 1.4826 * mad
-        keep_local = errs <= thr
-        if keep_local.sum() < max(3, int(0.4 * len(inliers))):
-            break
-        new_inliers = inliers[keep_local]
-        if len(new_inliers) == len(inliers):
-            break
-        inliers = new_inliers
-        T_avg = weighted_se3_average([T_list[i] for i in inliers], [weights[i] for i in inliers])
-
-    T_avg = weighted_se3_average([T_list[i] for i in inliers], [weights[i] for i in inliers])
-    trans = [float(np.linalg.norm(T[:3, 3] - T_avg[:3, 3]) * 1000.0) for T in [T_list[i] for i in inliers]]
-    rot = [rotation_error_deg(T[:3, :3], T_avg[:3, :3]) for T in [T_list[i] for i in inliers]]
-    return T_avg, {
-        "num_total": int(len(T_list)),
-        "num_inliers": int(len(inliers)),
-        "inlier_ratio": float(len(inliers) / max(1, len(T_list))),
-        "translation_std_mm": float(np.std(trans)) if trans else 0.0,
-        "rotation_std_deg": float(np.std(rot)) if rot else 0.0,
-    }
-
-
-# -----------------------------
-# Data containers
-# -----------------------------
-
-@dataclass
-class PoseObs:
-    cam: int
-    event: int
-    set_idx: Optional[int]
-    T_C_O: np.ndarray
-    err_px: float
-    n_points: int
-    source: str
-
-
-@dataclass
-class CornerObs:
-    cam: int
-    event: int
-    set_idx: Optional[int]
-    object_points: np.ndarray  # Nx3, cube/object frame
-    image_points: np.ndarray   # Nx2
-    err_hint_px: float
+# 공유 로더/기하/지표는 CP_common 으로 물리 분리됨. 되받아 네임스페이스 유지
+# (보조 스크립트의 S.<name> 및 내부 참조 호환).
+from CP_common import *  # noqa: F401,F403
+from CP_common import (  # 명시 재노출(정적 분석/가독성)
+    CornerObs,
+    PoseObs,
+    T_to_pose6_mm,
+    T_to_vec,
+    build_ref_relative_from_pairwise,
+    detect_corner_observations,
+    ensure_dir,
+    estimate_image_cube_pose,
+    estimate_object_poses_from_cams,
+    get_marker_object_corners,
+    initialize_base_translation_anchored,
+    initialize_ref_object_poses,
+    kabsch_rigid,
+    load_nominal_set_cube_pose6,
+    load_nominal_set_cube_transforms,
+    load_pose_observations,
+    load_robot_poses_from_meta,
+    make_T,
+    marker_aspect_ratio,
+    observations_by_cam_event,
+    pose6_to_T_base_gripper,
+    pose_consistency_metrics,
+    prior_metrics,
+    reprojection_errors,
+    robust_kabsch_rigid,
+    robust_se3_average,
+    se3_log_residual,
+    stored_cube_pose_candidates,
+    try_parse_pose6,
+    vec_to_T,
+    weighted_se3_average,
+)
 
 
 @dataclass
@@ -220,621 +145,18 @@ class MethodResult:
     prior_warning: Optional[str] = None
     # --- direct reprojection corner loading (problem 2) ---
     corner_obs_reason_if_zero: Optional[str] = None
-
-
-# -----------------------------
-# Meta and detection adapters
-# -----------------------------
-
-def try_parse_pose6(obj: Any) -> Optional[List[float]]:
-    if obj is None:
-        return None
-    if isinstance(obj, list) and len(obj) == 6:
-        try:
-            return [float(x) for x in obj]
-        except Exception:
-            return None
-    if isinstance(obj, dict):
-        if all(k in obj for k in ["x", "y", "z", "rz", "ry", "rx"]):
-            return [float(obj["x"]), float(obj["y"]), float(obj["z"]), float(obj["rz"]), float(obj["ry"]), float(obj["rx"])]
-        for key in ["robot_pose_6dof", "tcp_pose_6dof", "pose_6dof", "pose"]:
-            out = try_parse_pose6(obj.get(key))
-            if out is not None:
-                return out
-    return None
-
-
-def pose6_to_T_base_gripper(pose6: List[float]) -> np.ndarray:
-    # Project convention: robot 6-DoF pose is [x,y,z (mm), rz,ry,rx (deg)] and
-    # euler_deg_to_matrix returns the full 4x4 with translation in meters.
-    return euler_deg_to_matrix(*[float(v) for v in pose6])
-
-
-def T_to_pose6_mm(T: np.ndarray) -> List[float]:
-    """Inverse of pose6_to_T_base_gripper: 4x4 (m) -> [x,y,z mm, rz,ry,rx deg].
-
-    Matches euler_deg_to_matrix's R = Rz@Ry@Rx (intrinsic ZYX) convention so the
-    written value round-trips through the existing capture/calibration code.
-    """
-    rz, ry, rx = R.from_matrix(np.asarray(T[:3, :3], dtype=np.float64)).as_euler("ZYX", degrees=True)
-    t = np.asarray(T[:3, 3], dtype=np.float64) * 1000.0
-    return [float(t[0]), float(t[1]), float(t[2]), float(rz), float(ry), float(rx)]
-
-
-def load_nominal_set_cube_transforms(meta: Dict[str, Any]) -> Dict[int, np.ndarray]:
-    priors: Dict[int, np.ndarray] = {}
-    for cap in meta.get("captures", []):
-        sidx = get_capture_set_index(cap)
-        if sidx is None or sidx in priors:
-            continue
-        raw = get_capture_set_cube_center_transform_raw(cap)
-        pose = try_parse_pose6(raw)
-        if pose is None:
-            pose = try_parse_pose6(cap.get("set_cube_center_6dof"))
-        if pose is not None:
-            priors[int(sidx)] = pose6_to_T_base_gripper(pose)
-    return priors
-
-
-def load_robot_poses_from_meta(meta: Dict[str, Any]) -> Dict[int, np.ndarray]:
-    robot_T: Dict[int, np.ndarray] = {}
-    for cap in meta.get("captures", []):
-        eid = int(cap.get("event_id", -1))
-        if eid < 0:
-            continue
-        pose = None
-        for key in ["robot_pose_6dof", "tcp_pose_6dof", "pose_6dof", "robot_pose"]:
-            pose = try_parse_pose6(cap.get(key))
-            if pose is not None:
-                break
-        if pose is not None:
-            robot_T[eid] = pose6_to_T_base_gripper(pose)
-    return robot_T
-
-
-def marker_aspect_ratio(img_pts: np.ndarray) -> float:
-    pts = np.asarray(img_pts, dtype=np.float64).reshape(4, 2)
-    lens = [np.linalg.norm(pts[(i + 1) % 4] - pts[i]) for i in range(4)]
-    return float(min(lens) / max(max(lens), 1e-12))
-
-
-def stored_cube_pose_candidates(
-    cinfo: Dict[str, Any],
-    cam_idx: int,
-    gripper_cam_idx: Optional[int],
-    max_err: float,
-    min_markers: int,
-    min_aspect: float,
-) -> List[Dict[str, Any]]:
-    candidates: List[Dict[str, Any]] = []
-    aspect_by_marker: Dict[int, float] = {}
-
-    for item in cinfo.get("markers", []):
-        mid = int(item.get("marker_id", -1))
-        corners = np.asarray(item.get("corners_2d", []), dtype=np.float64)
-        aspect = None
-        if corners.shape == (4, 2):
-            aspect = marker_aspect_ratio(corners)
-            aspect_by_marker[mid] = aspect
-
-        for cand in item.get("pose_candidates") or []:
-            err = float(cand.get("reproj_error_mean_px", 99.0))
-            T44 = cand.get("T_cam_cube_4x4")
-            if T44 is None or err > max_err:
-                continue
-            if aspect is not None and aspect < min_aspect:
-                continue
-            candidates.append({
-                "T_C_O": np.asarray(T44, dtype=np.float64),
-                "err_mean": err,
-                "n_points": 4,
-                "used_ids": [mid],
-                "source": "stored_ippe",
-                **copy_depth_fields(cand),
-            })
-
-    cpnp = cinfo.get("cube_pnp")
-    if cpnp and cpnp.get("ok"):
-        err = float(cpnp.get("reproj_mean_px", 99.0))
-        used_ids = [int(x) for x in cpnp.get("used_ids", [])]
-        T44 = cpnp.get("T_cam_cube_4x4")
-        if T44 is not None and err <= max_err and len(set(used_ids)) >= max(1, int(min_markers)):
-            aspects = [aspect_by_marker[mid] for mid in used_ids if mid in aspect_by_marker]
-            if not aspects or min(aspects) >= min_aspect:
-                candidates.append({
-                    "T_C_O": np.asarray(T44, dtype=np.float64),
-                    "err_mean": err,
-                    "n_points": int(cpnp.get("n_points", 4 * max(1, len(set(used_ids))))),
-                    "used_ids": used_ids,
-                    "source": "stored_cube_pnp",
-                    **copy_depth_fields(cpnp),
-                })
-    return candidates
-
-
-def get_marker_object_corners(cube: AprilTagCubeTarget, marker_id: int) -> Optional[np.ndarray]:
-    """Adapter for project-specific cube model APIs.
-
-    Expected output order must match cube.model.reorder_image_corners(marker_id, corners).
-    Add one branch here if your model exposes a different method/field name.
-    """
-    model = cube.model
-    mid = int(marker_id)
-
-    method_names = [
-        "marker_corners_in_rig",  # this project's AprilTagCubeModel accessor (paired with reorder_image_corners)
-        "get_marker_object_corners",
-        "marker_object_corners",
-        "get_marker_corners_3d",
-        "marker_corners_3d",
-        "object_corners",
-        "corners_3d",
-    ]
-    for name in method_names:
-        fn = getattr(model, name, None)
-        if callable(fn):
-            try:
-                pts = np.asarray(fn(mid), dtype=np.float64)
-                if pts.shape == (4, 3):
-                    return pts
-            except TypeError:
-                pass
-            except Exception:
-                pass
-
-    field_names = [
-        "marker_corners_obj",
-        "marker_corners_3d",
-        "object_points_by_id",
-        "corners_by_marker",
-        "markers",
-    ]
-    for name in field_names:
-        data = getattr(model, name, None)
-        if isinstance(data, dict) and mid in data:
-            val = data[mid]
-            if isinstance(val, dict):
-                for key in ["corners_3d", "object_points", "obj_pts", "points"]:
-                    if key in val:
-                        pts = np.asarray(val[key], dtype=np.float64)
-                        if pts.shape == (4, 3):
-                            return pts
-            else:
-                pts = np.asarray(val, dtype=np.float64)
-                if pts.shape == (4, 3):
-                    return pts
-    return None
-
-
-def detect_corner_observations(
-    root: str,
-    meta: Dict[str, Any],
-    cube: AprilTagCubeTarget,
-    K_map: Dict[int, np.ndarray],
-    D_map: Dict[int, np.ndarray],
-    all_cam_ids: List[int],
-    gripper_cam_idx: int,
-    max_err_fixed: float,
-    max_err_gripper: float,
-    min_aspect_fixed: float,
-    min_aspect_gripper: float,
-) -> Tuple[List[CornerObs], str]:
-    """Return (corner observations, reason-string-if-empty).
-
-    The reason string makes problem 2 debuggable: it distinguishes "no images/
-    detections were loaded" from "cube model 3D marker corners are unavailable".
-    """
-    obs: List[CornerObs] = []
-    # counters for an actionable zero-observations reason
-    n_imgs_read = n_imgs_missing = 0
-    n_detections = n_obj_corner_fail = n_aspect_reject = 0
-    for cap in meta.get("captures", []):
-        eid = int(cap.get("event_id", -1))
-        if eid < 0:
-            continue
-        sidx = get_capture_set_index(cap)
-        for ci_str, cinfo in cap.get("cams", {}).items():
-            ci = int(ci_str)
-            if ci not in all_cam_ids or not cinfo.get("saved"):
-                continue
-            rgb_rel = cinfo.get("rgb_path", "")
-            if not rgb_rel:
-                n_imgs_missing += 1
-                continue
-            img = cv2.imread(os.path.join(root, rgb_rel))
-            if img is None:
-                n_imgs_missing += 1
-                continue
-            n_imgs_read += 1
-            try:
-                corners_list, ids = cube.detect(img)
-            except Exception:
-                continue
-            if ids is None:
-                continue
-            obj_all, img_all = [], []
-            min_aspect = min_aspect_gripper if ci == gripper_cam_idx else min_aspect_fixed
-            for corners, mid_raw in zip(corners_list, ids):
-                mid = int(np.asarray(mid_raw).reshape(-1)[0])
-                if not cube.model.has_marker(mid):
-                    continue
-                n_detections += 1
-                img_pts_raw = np.asarray(corners, dtype=np.float64).reshape(4, 2)
-                try:
-                    img_pts = np.asarray(cube.model.reorder_image_corners(mid, img_pts_raw), dtype=np.float64).reshape(4, 2)
-                except Exception:
-                    img_pts = img_pts_raw
-                if marker_aspect_ratio(img_pts) < min_aspect:
-                    n_aspect_reject += 1
-                    continue
-                obj_pts = get_marker_object_corners(cube, mid)
-                if obj_pts is None:
-                    n_obj_corner_fail += 1
-                    continue
-                obj_all.append(obj_pts)
-                img_all.append(img_pts)
-            if obj_all:
-                obs.append(CornerObs(
-                    cam=ci,
-                    event=eid,
-                    set_idx=int(sidx) if sidx is not None else None,
-                    object_points=np.concatenate(obj_all, axis=0),
-                    image_points=np.concatenate(img_all, axis=0),
-                    err_hint_px=max_err_gripper if ci == gripper_cam_idx else max_err_fixed,
-                ))
-
-    reason = ""
-    if not obs:
-        if n_imgs_read == 0:
-            reason = (f"0 corner observations because no images could be read "
-                      f"({n_imgs_missing} missing/unreadable rgb paths)")
-        elif n_detections == 0:
-            reason = "0 corner observations because no AprilTag markers were detected in any image"
-        elif n_obj_corner_fail >= max(1, n_detections - n_aspect_reject):
-            reason = ("0 corner observations because cube model 3D marker corners were unavailable "
-                      "(adapt get_marker_object_corners() to your AprilTagCubeTarget model)")
-        else:
-            reason = (f"0 corner observations after filtering: {n_aspect_reject} aspect-rejected, "
-                      f"{n_obj_corner_fail}/{n_detections} missing object corners")
-    return obs, reason
-
-
-def estimate_image_cube_pose(
-    cube: AprilTagCubeTarget,
-    img: np.ndarray,
-    K: np.ndarray,
-    D: np.ndarray,
-    max_err: float,
-    min_markers: int,
-    min_aspect: float,
-) -> List[Dict[str, Any]]:
-    candidates: List[Dict[str, Any]] = []
-    try:
-        ok, rvec, tvec, used, reproj = cube.solve_pnp_cube(
-            img, K, D,
-            use_ransac=True,
-            min_markers=max(1, int(min_markers)),
-            reproj_thr_mean_px=float(max_err),
-            return_reproj=True,
-            min_aspect=float(min_aspect),
-        )
-        if ok and reproj and float(reproj.get("err_mean", 99.0)) <= max_err:
-            candidates.append({
-                "T_C_O": rodrigues_to_Rt(rvec, tvec),
-                "err_mean": float(reproj["err_mean"]),
-                "n_points": int(reproj.get("n_points", 4)),
-                "used_ids": [int(x) for x in used],
-                "source": "redetect_cube_pnp",
-            })
-    except Exception:
-        pass
-    return candidates
-
-
-def load_pose_observations(
-    root: str,
-    meta: Dict[str, Any],
-    cube: AprilTagCubeTarget,
-    K_map: Dict[int, np.ndarray],
-    D_map: Dict[int, np.ndarray],
-    all_cam_ids: List[int],
-    gripper_cam_idx: int,
-    reuse_stored_cube_candidates: bool,
-    max_err_fixed: float,
-    max_err_gripper: float,
-    min_aspect_fixed: float,
-    min_aspect_gripper: float,
-    gripper_min_markers: int,
-) -> List[PoseObs]:
-    obs: List[PoseObs] = []
-    for cap in meta.get("captures", []):
-        eid = int(cap.get("event_id", -1))
-        if eid < 0:
-            continue
-        sidx = get_capture_set_index(cap)
-        for ci_str, cinfo in cap.get("cams", {}).items():
-            ci = int(ci_str)
-            if ci not in all_cam_ids or not cinfo.get("saved"):
-                continue
-            max_err = max_err_gripper if ci == gripper_cam_idx else max_err_fixed
-            min_aspect = min_aspect_gripper if ci == gripper_cam_idx else min_aspect_fixed
-            min_markers = gripper_min_markers if ci == gripper_cam_idx else 1
-
-            candidates = []
-            if reuse_stored_cube_candidates:
-                candidates.extend(stored_cube_pose_candidates(
-                    cinfo, ci, gripper_cam_idx, max_err, min_markers, min_aspect
-                ))
-            rgb_rel = cinfo.get("rgb_path", "")
-            if rgb_rel:
-                img = cv2.imread(os.path.join(root, rgb_rel))
-                if img is not None:
-                    candidates = estimate_image_cube_pose(
-                        cube, img, K_map[ci], D_map[ci], max_err, min_markers, min_aspect
-                    ) + candidates
-            candidates = filter_candidates_for_camera_role(candidates, ci, gripper_cam_idx)
-            best = select_primary_cube_candidate(candidates) if candidates else None
-            if best is None:
-                continue
-            obs.append(PoseObs(
-                cam=ci,
-                event=eid,
-                set_idx=int(sidx) if sidx is not None else None,
-                T_C_O=np.asarray(best["T_C_O"], dtype=np.float64),
-                err_px=float(best.get("err_mean", 99.0)),
-                n_points=int(best.get("n_points", 4)),
-                source=str(best.get("source", "unknown")),
-            ))
-    return obs
-
-
-# -----------------------------
-# Calibration initialization
-# -----------------------------
-
-def observations_by_cam_event(pose_obs: List[PoseObs]) -> Dict[int, Dict[int, PoseObs]]:
-    out: Dict[int, Dict[int, PoseObs]] = defaultdict(dict)
-    for o in pose_obs:
-        out[o.cam][o.event] = o
-    return out
-
-
-def build_ref_relative_from_pairwise(
-    pose_obs: List[PoseObs],
-    fixed_cam_ids: List[int],
-    ref_cam: int,
-    robust: bool,
-) -> Tuple[Dict[int, np.ndarray], Dict[str, Any]]:
-    by = observations_by_cam_event(pose_obs)
-    T_ref_C: Dict[int, np.ndarray] = {ref_cam: np.eye(4, dtype=np.float64)}
-    diag: Dict[str, Any] = {}
-    for ci in fixed_cam_ids:
-        if ci == ref_cam:
-            continue
-        common = sorted(set(by.get(ref_cam, {}).keys()) & set(by.get(ci, {}).keys()))
-        Ts, ws = [], []
-        for eid in common:
-            T_ref_O = by[ref_cam][eid].T_C_O
-            T_ci_O = by[ci][eid].T_C_O
-            Ts.append(T_ref_O @ inv_T(T_ci_O))
-            ws.append(1.0 / max(by[ref_cam][eid].err_px * by[ci][eid].err_px, 1e-9))
-        if not Ts:
-            continue
-        if robust:
-            T, st = robust_se3_average(Ts, ws)
-        else:
-            T = weighted_se3_average(Ts, None)
-            st = {"num_total": len(Ts), "num_inliers": len(Ts), "inlier_ratio": 1.0}
-        T_ref_C[ci] = T
-        diag[f"T_ref_C{ci}"] = st
-    return T_ref_C, diag
-
-
-def initialize_ref_object_poses(
-    pose_obs: List[PoseObs],
-    T_ref_C: Dict[int, np.ndarray],
-    fixed_cam_ids: List[int],
-    ref_cam: int,
-) -> Dict[int, np.ndarray]:
-    by_event: Dict[int, List[Tuple[np.ndarray, float]]] = defaultdict(list)
-    for o in pose_obs:
-        if o.cam not in fixed_cam_ids or o.cam not in T_ref_C:
-            continue
-        # T_ref_O = T_ref_Ci * T_Ci_O
-        by_event[o.event].append((T_ref_C[o.cam] @ o.T_C_O, 1.0 / max(o.err_px, 1e-9)))
-    out: Dict[int, np.ndarray] = {}
-    for eid, pairs in by_event.items():
-        out[eid] = weighted_se3_average([p[0] for p in pairs], [p[1] for p in pairs])
-    return out
-
-
-def load_nominal_set_cube_pose6(meta: Dict[str, Any]) -> Dict[int, List[float]]:
-    """Raw set_cube_center_6dof per capture set (for diagnostics/CSV)."""
-    out: Dict[int, List[float]] = {}
-    for cap in meta.get("captures", []):
-        sidx = get_capture_set_index(cap)
-        if sidx is None or int(sidx) in out:
-            continue
-        raw = get_capture_set_cube_center_transform_raw(cap)
-        pose = try_parse_pose6(raw)
-        if pose is None:
-            pose = try_parse_pose6(cap.get("set_cube_center_6dof"))
-        if pose is not None:
-            out[int(sidx)] = [float(x) for x in pose]
-    return out
-
-
-def kabsch_rigid(src: np.ndarray, dst: np.ndarray) -> np.ndarray:
-    """Proper rigid SE(3) mapping src points -> dst points (no reflection, no scale)."""
-    src = np.asarray(src, dtype=np.float64).reshape(-1, 3)
-    dst = np.asarray(dst, dtype=np.float64).reshape(-1, 3)
-    cs, cd = src.mean(0), dst.mean(0)
-    H = (src - cs).T @ (dst - cd)
-    U, _, Vt = np.linalg.svd(H)
-    d = float(np.sign(np.linalg.det(Vt.T @ U.T)))
-    Rm = Vt.T @ np.diag([1.0, 1.0, d]) @ U.T
-    T = np.eye(4, dtype=np.float64)
-    T[:3, :3] = Rm
-    T[:3, 3] = cd - Rm @ cs
-    return T
-
-
-def robust_kabsch_rigid(
-    src: np.ndarray, dst: np.ndarray, max_resid_mm: float, min_keep: int = 3, iters: int = 5
-) -> Tuple[np.ndarray, np.ndarray]:
-    """Kabsch with iterative outlier rejection on per-point residual (mm).
-
-    Returns (T, keep_mask). Used to anchor the cam-ref frame into robot base
-    using only the (reliable) cube-center positions.
-    """
-    src = np.asarray(src, dtype=np.float64).reshape(-1, 3)
-    dst = np.asarray(dst, dtype=np.float64).reshape(-1, 3)
-    keep = np.ones(len(src), dtype=bool)
-    T = kabsch_rigid(src, dst)
-    for _ in range(iters):
-        pred = (T[:3, :3] @ src.T).T + T[:3, 3]
-        resid_mm = np.linalg.norm(pred - dst, axis=1) * 1000.0
-        new_keep = resid_mm <= float(max_resid_mm)
-        if new_keep.sum() < max(min_keep, 3):
-            # keep the best `min_keep` instead of collapsing
-            order = np.argsort(resid_mm)
-            new_keep = np.zeros_like(keep)
-            new_keep[order[:max(min_keep, 3)]] = True
-        if np.array_equal(new_keep, keep) and T is not None:
-            keep = new_keep
-            break
-        keep = new_keep
-        T = kabsch_rigid(src[keep], dst[keep])
-    return T, keep
-
-
-def initialize_base_translation_anchored(
-    pose_obs: List[PoseObs],
-    fixed_cam_ids: List[int],
-    ref_cam: int,
-    set_priors: Dict[int, np.ndarray],
-    set_pose6: Dict[int, List[float]],
-    event_to_set: Dict[int, Optional[int]],
-    max_trans_error_mm: float,
-    max_rot_error_deg: float,
-    disable_if_inconsistent: bool,
-) -> Tuple[np.ndarray, Dict[int, np.ndarray], Dict[int, np.ndarray], Dict[str, Any], List[Dict[str, Any]], Dict[str, Any]]:
-    """Robot-base calibration anchored by the RELIABLE part of the prior only.
-
-    Root-cause: set_cube_center_6dof has a correct cube-CENTER position but an
-    UNRELIABLE orientation. So we:
-      1) build the vision calibration in the cam-ref frame (excellent),
-      2) estimate T_base_ref by rigid-aligning per-set cube-center POSITIONS
-         (prior_base vs vision_ref) with outlier rejection,
-      3) express cameras/objects in base frame: T_base_X = T_base_ref @ T_ref_X.
-    The prior rotation is intentionally NOT used (it is diagnosed + reported).
-
-    Returns (T_base_C, T_base_O_event, diag, prior_rows, prior_stats).
-    """
-    # 1) vision-only calibration in cam-ref frame
-    T_ref_C, vdiag = build_ref_relative_from_pairwise(pose_obs, fixed_cam_ids, ref_cam, robust=True)
-    T_ref_O = initialize_ref_object_poses(pose_obs, T_ref_C, fixed_cam_ids, ref_cam)
-
-    # per-set mean vision object pose (cube is static within a set)
-    by_set: Dict[int, List[np.ndarray]] = defaultdict(list)
-    for eid, T in T_ref_O.items():
-        s = event_to_set.get(eid)
-        if s is not None and s in set_priors:
-            by_set[int(s)].append(T)
-    set_vis: Dict[int, np.ndarray] = {
-        s: weighted_se3_average(lst) for s, lst in by_set.items() if lst
-    }
-    common_sets = sorted(set_vis.keys())
-
-    diag: Dict[str, Any] = {"anchor": "translation_only_kabsch", "vision_pairwise": vdiag}
-    if len(common_sets) < 3:
-        # not enough sets to anchor; fall back to vision frame (ref = base)
-        diag["anchor_status"] = f"insufficient_prior_sets ({len(common_sets)})"
-        T_base_O_event = dict(T_ref_O)
-        stats = {
-            "num_prior_total": len(common_sets), "num_prior_used": 0,
-            "num_prior_rejected": len(common_sets),
-            "median_prior_trans_error_mm": None, "median_prior_rot_error_deg": None,
-            "reason": "too few prior sets to anchor base frame; reporting cam-ref frame",
-        }
-        return np.eye(4), T_ref_C, T_base_O_event, diag, [], stats
-
-    src = np.array([set_vis[s][:3, 3] for s in common_sets])          # cam-ref positions
-    dst = np.array([set_priors[s][:3, 3] for s in common_sets])       # base positions
-    T_base_ref, keep = robust_kabsch_rigid(src, dst, max_resid_mm=max_trans_error_mm)
-    used_sets = [common_sets[i] for i in range(len(common_sets)) if keep[i]]
-    rejected_sets = [s for s in common_sets if s not in used_sets]
-    pred = (T_base_ref[:3, :3] @ src.T).T + T_base_ref[:3, 3]
-    anchor_resid_mm = float(np.sqrt(np.mean(np.sum((pred - dst) ** 2, axis=1))) * 1000.0)
-    diag["anchor_rms_mm"] = anchor_resid_mm
-    diag["anchor_used_sets"] = used_sets
-    diag["anchor_rejected_sets"] = rejected_sets
-
-    # 2) express everything in base frame
-    T_base_C = {ci: T_base_ref @ T_ref_C[ci] for ci in T_ref_C}
-    T_base_O_event = {eid: T_base_ref @ T for eid, T in T_ref_O.items()}
-
-    # 3) per-event prior diagnostics: prior pose vs vision-estimated pose (base frame)
-    prior_rows: List[Dict[str, Any]] = []
-    tr_errs: List[float] = []
-    ro_errs: List[float] = []
-    for eid in sorted(T_base_O_event.keys()):
-        s = event_to_set.get(eid)
-        if s is None or s not in set_priors:
-            continue
-        P = set_priors[s]
-        est = T_base_O_event[eid]
-        delta = inv_T(P) @ est
-        dt = float(np.linalg.norm(delta[:3, 3]) * 1000.0)
-        dr = float(np.degrees(np.linalg.norm(R.from_matrix(delta[:3, :3]).as_rotvec())))
-        tr_errs.append(dt)
-        ro_errs.append(dr)
-        raw6 = set_pose6.get(s)
-        max_t = max(abs(P[0, 3]), abs(P[1, 3]), abs(P[2, 3]))
-        unit_warn = "translation>5m: possible unit (mm/m) error" if max_t > 5.0 else ""
-        rot_warn = f"rotation prior off by {dr:.0f}deg (>{max_rot_error_deg:.0f})" if dr > max_rot_error_deg else ""
-        prior_rows.append({
-            "event_id": eid,
-            "set_index": int(s),
-            "raw_set_cube_center_6dof": raw6,
-            "prior_translation_m": [float(x) for x in P[:3, 3]],
-            "prior_rotation_rotvec": [float(x) for x in R.from_matrix(P[:3, :3]).as_rotvec()],
-            "estimated_cube_translation_m": [float(x) for x in est[:3, 3]],
-            "estimated_cube_rotation_rotvec": [float(x) for x in R.from_matrix(est[:3, :3]).as_rotvec()],
-            "delta_trans_mm": dt,
-            "delta_rot_deg": dr,
-            "possible_unit_warning": unit_warn,
-            "possible_rotation_warning": rot_warn,
-            "set_used_for_anchor": bool(s in used_sets),
-        })
-
-    med_t = float(np.median(tr_errs)) if tr_errs else None
-    med_r = float(np.median(ro_errs)) if ro_errs else None
-    n_total = len(prior_rows)
-    n_used = sum(1 for r in prior_rows if r["set_used_for_anchor"])
-    rot_inconsistent = med_r is not None and med_r > max_rot_error_deg
-
-    reason_bits = [f"translation-only anchor, rms={anchor_resid_mm:.1f}mm over {len(used_sets)} sets"]
-    if rot_inconsistent:
-        reason_bits.append(
-            f"rotation prior REJECTED (median {med_r:.1f}deg > {max_rot_error_deg:.0f}deg): "
-            "orientation in set_cube_center_6dof does not match the observed cube"
-        )
-    if rejected_sets and disable_if_inconsistent:
-        reason_bits.append(f"position-outlier sets excluded from anchor: {rejected_sets}")
-    stats = {
-        "num_prior_total": n_total,
-        "num_prior_used": n_used,
-        "num_prior_rejected": n_total - n_used,
-        "median_prior_trans_error_mm": med_t,
-        "median_prior_rot_error_deg": med_r,
-        "rotation_prior_used": (not rot_inconsistent),
-        "translation_prior_used": True,
-        "anchor_rms_mm": anchor_resid_mm,
-        "reason": "; ".join(reason_bits),
-    }
-    diag["prior_stats"] = stats
-    return T_base_ref, T_base_C, T_base_O_event, diag, prior_rows, stats
+    # --- C3 prior-weight sweep: weights actually used for this row ---
+    prior_weight_trans_used: Optional[float] = None
+    prior_weight_rot_used: Optional[float] = None
+    # --- C3 held-out (train/test) evaluation: cameras fit on train sets, metrics
+    #     measured on unseen test sets. None when no split is requested. ---
+    train_sets: Optional[str] = None
+    test_sets: Optional[str] = None
+    test_prior_trans_rmse_mm: Optional[float] = None
+    test_prior_rot_rmse_deg: Optional[float] = None
+    test_reproj_rmse_px: Optional[float] = None
+    test_reproj_median_px: Optional[float] = None
+    test_n_events: Optional[int] = None
 
 
 def build_param_layout(cam_ids: List[int], event_ids: List[int], ref_cam: Optional[int]) -> Dict[str, Any]:
@@ -875,72 +197,6 @@ def unpack_params(x: np.ndarray, layout: Dict[str, Any], ref_cam: Optional[int])
     T_obj = {eid: vec_to_T(x[sl]) for eid, sl in layout["event_slice"].items()}
     return T_cam, T_obj
 
-
-# -----------------------------
-# Metrics
-# -----------------------------
-
-def pose_consistency_metrics(
-    pose_obs: List[PoseObs],
-    T_cam: Dict[int, np.ndarray],
-    T_obj_event: Dict[int, np.ndarray],
-    fixed_cam_ids: List[int],
-) -> Tuple[Optional[float], Optional[float]]:
-    trans_mm, rot_deg = [], []
-    for o in pose_obs:
-        if o.cam not in fixed_cam_ids or o.cam not in T_cam or o.event not in T_obj_event:
-            continue
-        pred = inv_T(T_cam[o.cam]) @ T_obj_event[o.event]
-        Terr = inv_T(o.T_C_O) @ pred
-        trans_mm.append(float(np.linalg.norm(Terr[:3, 3]) * 1000.0))
-        rot_deg.append(float(np.degrees(np.linalg.norm(R.from_matrix(Terr[:3, :3]).as_rotvec()))))
-    if not trans_mm:
-        return None, None
-    return float(np.sqrt(np.mean(np.square(trans_mm)))), float(np.sqrt(np.mean(np.square(rot_deg))))
-
-
-def prior_metrics(
-    T_obj_event: Dict[int, np.ndarray],
-    event_to_set: Dict[int, Optional[int]],
-    set_priors: Dict[int, np.ndarray],
-) -> Tuple[Optional[float], Optional[float]]:
-    trans_mm, rot_deg = [], []
-    for eid, T in T_obj_event.items():
-        sidx = event_to_set.get(eid)
-        if sidx is None or sidx not in set_priors:
-            continue
-        Terr = inv_T(set_priors[sidx]) @ T
-        trans_mm.append(float(np.linalg.norm(Terr[:3, 3]) * 1000.0))
-        rot_deg.append(float(np.degrees(np.linalg.norm(R.from_matrix(Terr[:3, :3]).as_rotvec()))))
-    if not trans_mm:
-        return None, None
-    return float(np.sqrt(np.mean(np.square(trans_mm)))), float(np.sqrt(np.mean(np.square(rot_deg))))
-
-
-def reprojection_errors(
-    corner_obs: List[CornerObs],
-    T_cam: Dict[int, np.ndarray],
-    T_obj_event: Dict[int, np.ndarray],
-    K_map: Dict[int, np.ndarray],
-    D_map: Dict[int, np.ndarray],
-    fixed_cam_ids: List[int],
-) -> np.ndarray:
-    errs: List[float] = []
-    for o in corner_obs:
-        if o.cam not in fixed_cam_ids or o.cam not in T_cam or o.event not in T_obj_event:
-            continue
-        T_C_O = inv_T(T_cam[o.cam]) @ T_obj_event[o.event]
-        rvec = R.from_matrix(T_C_O[:3, :3]).as_rotvec().reshape(3, 1)
-        tvec = T_C_O[:3, 3].reshape(3, 1)
-        proj, _ = cv2.projectPoints(o.object_points.astype(np.float64), rvec, tvec, K_map[o.cam], D_map[o.cam])
-        diff = proj.reshape(-1, 2) - o.image_points.reshape(-1, 2)
-        errs.extend(np.linalg.norm(diff, axis=1).tolist())
-    return np.asarray(errs, dtype=np.float64)
-
-
-# -----------------------------
-# Optimization methods
-# -----------------------------
 
 def prior_residual_terms(
     T_obj: Dict[int, np.ndarray],
@@ -1096,10 +352,6 @@ def optimize_reprojection(
     return _finalize_opt(init_T_cam, init_T_obj, T_cam, T_obj, residual, x0, opt)
 
 
-# -----------------------------
-# Evaluation runner
-# -----------------------------
-
 def save_transforms(out_dir: str, T_cam: Dict[int, np.ndarray], prior_mode: str, ref_cam: Optional[int]) -> None:
     # Both modes now output in robot BASE frame; the difference is whether the
     # robot cube-center constrains the SOLVE (with) or is used only for the final
@@ -1132,6 +384,7 @@ def evaluate_and_save(
     ref_cam: Optional[int],
     corner_obs_reason: str = "",
     prior_stats: Optional[Dict[str, Any]] = None,
+    test_bundle: Optional[Dict[str, Any]] = None,
 ) -> MethodResult:
     out_dir = ensure_dir(os.path.join(base_out, f"{method}__{prior_mode}"))
     save_transforms(out_dir, T_cam, prior_mode, ref_cam)
@@ -1141,6 +394,28 @@ def evaluate_and_save(
     reproj_med = float(np.median(e)) if e.size else None
     pose_t, pose_r = pose_consistency_metrics(pose_obs, T_cam, T_obj, fixed_cam_ids)
     prior_t, prior_r = prior_metrics(T_obj, event_to_set, set_priors)
+
+    # ── Held-out (train/test) evaluation ──────────────────────────────────────
+    # T_cam here is already in base frame (mapped via to_base). Re-estimate the cube
+    # pose on each TEST-set event from these cameras (test FK NOT used in the fit),
+    # then score FK position error + reprojection on the unseen sets. This is the
+    # fair C3 comparison: with-prior can't win just by fitting the same FK it's scored on.
+    test_prior_t = test_prior_r = test_reproj_rmse = test_reproj_med = None
+    test_n_events = None
+    train_sets_str = test_sets_str = None
+    if test_bundle:
+        tp_obs = test_bundle.get("pose_obs", [])
+        tc_obs = test_bundle.get("corner_obs", [])
+        te2s = test_bundle.get("event_to_set", {})
+        tpriors = test_bundle.get("set_priors", {})
+        train_sets_str = test_bundle.get("train_sets_str")
+        test_sets_str = test_bundle.get("test_sets_str")
+        T_obj_test = estimate_object_poses_from_cams(tp_obs, T_cam, fixed_cam_ids)
+        test_n_events = len(T_obj_test)
+        test_prior_t, test_prior_r = prior_metrics(T_obj_test, te2s, tpriors)
+        te = reprojection_errors(tc_obs, T_cam, T_obj_test, K_map, D_map, fixed_cam_ids)
+        test_reproj_rmse = float(np.sqrt(np.mean(te ** 2))) if te.size else None
+        test_reproj_med = float(np.median(te)) if te.size else None
 
     # optimizer accept/reject info (present only for methods 3/4)
     opt_success = diag.get("optimizer_success")
@@ -1194,6 +469,13 @@ def evaluate_and_save(
         prior_median_rot_error_deg=ps.get("median_prior_rot_error_deg"),
         prior_warning=ps.get("reason"),
         corner_obs_reason_if_zero=corner_obs_reason if len(corner_obs) == 0 else None,
+        train_sets=train_sets_str,
+        test_sets=test_sets_str,
+        test_prior_trans_rmse_mm=test_prior_t,
+        test_prior_rot_rmse_deg=test_prior_r,
+        test_reproj_rmse_px=test_reproj_rmse,
+        test_reproj_median_px=test_reproj_med,
+        test_n_events=test_n_events,
     )
 
 
@@ -1268,7 +550,21 @@ def run_method_suite(
     with_prior: bool,
     corner_obs_reason: str,
     args: argparse.Namespace,
+    weight_trans_override: Optional[float] = None,
+    weight_rot_override: Optional[float] = None,
+    emit_closed_form: bool = True,
+    method_suffix: str = "",
+    test_bundle: Optional[Dict[str, Any]] = None,
 ) -> List[MethodResult]:
+    """Run the method suite for one prior mode.
+
+    weight_trans_override / weight_rot_override: if given, use these instead of
+      args.prior_weight_{trans,rot} (used by the C3 prior-weight sweep).
+    emit_closed_form: emit rows 01/02 (closed-form vision baselines). They are
+      independent of the prior, so the caller emits them only ONCE (in the
+      without-prior pass) to avoid the duplicate rows that inflated the summary.
+    method_suffix: appended to method names so sweep rows stay distinct.
+    """
     prior_mode = "with_robot_cube_prior" if with_prior else "without_robot_cube_prior"
     results: List[MethodResult] = []
     if with_prior and not set_priors:
@@ -1316,6 +612,7 @@ def run_method_suite(
             method, prior_mode, out_dir, pose_obs, corner_obs, T_cam, T_obj,
             fixed_cam_ids, K_map, D_map, event_to_set, set_priors, diag, None,
             corner_obs_reason=corner_obs_reason, prior_stats=ev_prior_stats,
+            test_bundle=test_bundle,
         )
 
     # Vision calibration in cam-ref frame (mean and robust), then mapped to base.
@@ -1327,14 +624,18 @@ def run_method_suite(
     T_cam_rob, T_obj_rob = to_base(Tc_rob_ref, To_rob_ref)
 
     # 1) simple mean, 2) robust average — closed-form vision baselines (no solve to
-    #    constrain), so identical for with/without prior; shown in base frame.
-    results.append(ev("01_pnp_mean", T_cam_mean, T_obj_mean,
-                      {**diag_anchor, "init": "vision_mean_base"}))
-    results.append(ev("02_pnp_robust_se3", T_cam_rob, T_obj_rob,
-                      {**diag_anchor, "init": "vision_robust_base"}))
+    #    constrain), so identical for with/without prior. Emitted only once (caller
+    #    passes emit_closed_form=False on the with-prior pass) to avoid duplicate rows.
+    if emit_closed_form:
+        results.append(ev("01_pnp_mean", T_cam_mean, T_obj_mean,
+                          {**diag_anchor, "init": "vision_mean_base"}))
+        results.append(ev("02_pnp_robust_se3", T_cam_rob, T_obj_rob,
+                          {**diag_anchor, "init": "vision_robust_base"}))
 
-    pw_trans = float(args.prior_weight_trans) if with_prior else 0.0
-    pw_rot = float(args.prior_weight_rot) if with_prior else 0.0
+    _base_pw_trans = args.prior_weight_trans if weight_trans_override is None else weight_trans_override
+    _base_pw_rot = args.prior_weight_rot if weight_rot_override is None else weight_rot_override
+    pw_trans = float(_base_pw_trans) if with_prior else 0.0
+    pw_rot = float(_base_pw_rot) if with_prior else 0.0
 
     if with_prior:
         # Solve in cam-ref frame (ref cam fixed = clean gauge), but with the robot
@@ -1381,6 +682,13 @@ def run_method_suite(
         T_cam_repr, T_obj_repr = to_base(T_cam_repr_r, T_obj_repr_r)
         results.append(ev("04_direct_reprojection_opt", T_cam_repr, T_obj_repr, diag_repr))
 
+    # Stamp the prior weights actually used (for the C3 sweep curve) and tag
+    # method names with the suffix so sweep rows remain distinct in the summary.
+    for r in results:
+        r.prior_weight_trans_used = pw_trans
+        r.prior_weight_rot_used = pw_rot
+        if method_suffix:
+            r.method = f"{r.method}{method_suffix}"
     return results
 
 
@@ -1396,6 +704,44 @@ def write_summary(out_dir: str, results: List[MethodResult]) -> None:
         writer.writerows(rows)
 
 
+def write_sweep_curve(out_dir: str, results: List[MethodResult]) -> None:
+    """Emit prior_weight_sweep.csv: one row per (method, weight) for plotting the
+    C3 weight-vs-error curve. Only with-prior rows carry a swept weight."""
+    ensure_dir(out_dir)
+    rows = []
+    for r in results:
+        if r.prior_mode != "with_robot_cube_prior":
+            continue
+        # base method name without the __w... suffix, for grouping in a plot
+        base_method = r.method.split("__w")[0]
+        rows.append({
+            "base_method": base_method,
+            "method": r.method,
+            "prior_weight_trans": r.prior_weight_trans_used,
+            "prior_weight_rot": r.prior_weight_rot_used,
+            "reproj_rmse_px": r.reproj_rmse_px,
+            "reproj_median_px": r.reproj_median_px,
+            "pose_trans_rmse_mm": r.pose_trans_rmse_mm,
+            "pose_rot_rmse_deg": r.pose_rot_rmse_deg,
+            "prior_trans_rmse_mm": r.prior_trans_rmse_mm,
+            "prior_rot_rmse_deg": r.prior_rot_rmse_deg,
+            "test_prior_trans_rmse_mm": r.test_prior_trans_rmse_mm,
+            "test_prior_rot_rmse_deg": r.test_prior_rot_rmse_deg,
+            "test_reproj_rmse_px": r.test_reproj_rmse_px,
+            "train_sets": r.train_sets,
+            "test_sets": r.test_sets,
+            "optimizer_accepted": r.optimizer_accepted,
+        })
+    if not rows:
+        return
+    path = os.path.join(out_dir, "prior_weight_sweep.csv")
+    with open(path, "w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+    print(f"[C3] wrote prior-weight sweep curve: {path} ({len(rows)} rows)")
+
+
 def print_summary(results: List[MethodResult]) -> None:
     def fmt(v: Optional[float], nd: int = 3) -> str:
         return "NA" if v is None else f"{v:.{nd}f}"
@@ -1405,18 +751,28 @@ def print_summary(results: List[MethodResult]) -> None:
             return "-"
         return "yes" if r.optimizer_accepted else "NO(fb)"
 
+    has_test = any(r.test_prior_trans_rmse_mm is not None or r.test_n_events for r in results)
+
     print("\n" + "=" * 108)
-    print("ABLATION SUMMARY")
+    print("ABLATION SUMMARY" + ("  (+ held-out test columns)" if has_test else ""))
     print("=" * 108)
     header = (f"{'method':28s} {'prior':14s} {'reprj_rmse':>10s} {'reprj_med':>9s} "
               f"{'pose_t':>8s} {'pose_r':>7s} {'prior_t':>8s} {'opt_acc':>7s}")
+    if has_test:
+        header += f" {'|test_prior_t':>13s} {'test_reproj':>11s}"
     print(header)
     print("-" * len(header))
     for r in results:
         pm = "WITH" if r.prior_mode == "with_robot_cube_prior" else "no"
-        print(f"{r.method:28s} {pm:14s} {fmt(r.reproj_rmse_px,3):>10s} {fmt(r.reproj_median_px,3):>9s} "
-              f"{fmt(r.pose_trans_rmse_mm,2):>8s} {fmt(r.pose_rot_rmse_deg,2):>7s} "
-              f"{fmt(r.prior_trans_rmse_mm,2):>8s} {acc(r):>7s}")
+        line = (f"{r.method:28s} {pm:14s} {fmt(r.reproj_rmse_px,3):>10s} {fmt(r.reproj_median_px,3):>9s} "
+                f"{fmt(r.pose_trans_rmse_mm,2):>8s} {fmt(r.pose_rot_rmse_deg,2):>7s} "
+                f"{fmt(r.prior_trans_rmse_mm,2):>8s} {acc(r):>7s}")
+        if has_test:
+            line += f" {fmt(r.test_prior_trans_rmse_mm,2):>13s} {fmt(r.test_reproj_rmse_px,3):>11s}"
+        print(line)
+    if has_test:
+        print("\n[C3] test_prior_t = FK position RMSE (mm) on HELD-OUT sets — the fair "
+              "with-prior vs without-prior metric. test_reproj = reprojection RMSE (px) on held-out sets.")
 
 
 def main() -> None:
@@ -1451,10 +807,43 @@ def main() -> None:
     parser.add_argument("--write_corrected_priors", type=lambda s: str(s).lower() not in ("0", "false", "no"),
                         default=True,
                         help="Back-write a corrected set_cube_center_6dof (vision yaw, base frame) for next-run priors.")
+    # --- C3 prior-weight sweep ---
+    # 큐브중점 prior 의 soft-constraint 세기를 여러 값으로 쓸어 weight-vs-error 곡선을 만든다.
+    # 예) --prior_weight_sweep 0,1,10,30,100  (0 은 without-prior 와 동치)
+    parser.add_argument("--prior_weight_sweep", type=str, default="",
+                        help="C3 sweep: 콤마로 구분한 prior weight 목록. 지정 시 with-prior suite 를 "
+                             "각 weight 로 반복 실행하고 prior_weight_sweep.csv 를 추가로 남긴다. "
+                             "비우면(기본) 기존처럼 --prior_weight_trans 단일 실행.")
+    parser.add_argument("--sweep_axis", type=str, default="trans",
+                        choices=["trans", "rot", "both"],
+                        help="sweep 값이 구동할 prior weight 축: trans(기본)/rot/both. "
+                             "rot 은 서버 yaw 가 신뢰될 때의 회전 prior 기여도를 본다.")
+    # --- C3 held-out (train/test) split ---
+    # prior 를 쓴 쪽은 학습에 쓴 FK 로 평가하면 자명히 유리하므로, 카메라는 train set 으로만
+    # 맞추고 test set(학습에 안 쓴 배치)에서 FK 위치오차/재투영을 잰다. 공정 비교의 핵심.
+    parser.add_argument("--test_sets", type=str, default="",
+                        help="held-out 으로 뺄 set_index 목록(콤마 구분). 지정 시 --holdout_frac 무시.")
+    parser.add_argument("--holdout_frac", type=float, default=0.0,
+                        help="test 로 뺄 set 비율(0~1). 0(기본)이면 split 없이 전체로 fit·평가(기존 동작). "
+                             "--test_sets 가 있으면 무시.")
+    parser.add_argument("--split_seed", type=int, default=0,
+                        help="--holdout_frac 무작위 분할 시드(재현성). 정렬된 set 을 이 시드로 섞어 뒤쪽을 test 로.")
     args = parser.parse_args()
 
+    def _parse_sweep(s):
+        vals = []
+        for tok in str(s or "").replace(";", ",").split(","):
+            tok = tok.strip()
+            if not tok:
+                continue
+            try:
+                vals.append(float(tok))
+            except ValueError:
+                raise SystemExit(f"[ERROR] invalid --prior_weight_sweep value: {tok!r}")
+        return vals
+
     root = args.root_folder
-    out_dir = ensure_dir(args.out_dir or os.path.join(root, "calib_ablation"))
+    out_dir = ensure_dir(args.out_dir or os.path.join("CP_result", "C3"))
     with open(os.path.join(root, "meta.json"), "r") as f:
         meta = json.load(f)
 
@@ -1551,19 +940,98 @@ def main() -> None:
     else:
         print("[INFO] Direct reprojection optimization (04) will run on real marker corners.")
 
+    # ── C3 held-out (train/test) split ────────────────────────────────────────
+    def _obs_set(o):
+        return o.set_idx if getattr(o, "set_idx", None) is not None else event_to_set.get(int(o.event))
+
+    available_sets = sorted(int(s) for s in set_priors.keys())
+    test_set_ids: List[int] = []
+    if str(args.test_sets).strip():
+        want = {int(t) for t in str(args.test_sets).replace(";", ",").split(",") if t.strip() != ""}
+        test_set_ids = sorted(want & set(available_sets))
+        missing = sorted(want - set(available_sets))
+        if missing:
+            print(f"[WARN] --test_sets {missing} not in available sets {available_sets}; ignored")
+    elif float(args.holdout_frac) > 0.0:
+        import random as _random
+        n_test = max(1, int(round(len(available_sets) * float(args.holdout_frac))))
+        n_test = min(n_test, max(0, len(available_sets) - 1))  # keep >=1 train set
+        shuffled = list(available_sets)
+        _random.Random(int(args.split_seed)).shuffle(shuffled)
+        test_set_ids = sorted(shuffled[len(shuffled) - n_test:]) if n_test > 0 else []
+
+    fit_pose_obs, fit_corner_obs, fit_priors = fixed_pose_obs, corner_obs, set_priors
+    test_bundle = None
+    if test_set_ids:
+        test_set = set(test_set_ids)
+        train_set_ids = [s for s in available_sets if s not in test_set]
+        if not train_set_ids:
+            raise RuntimeError(f"train set empty after removing test_sets={test_set_ids}; "
+                               f"available={available_sets}")
+        fit_pose_obs = [o for o in fixed_pose_obs if _obs_set(o) not in test_set]
+        fit_corner_obs = [o for o in corner_obs if _obs_set(o) not in test_set]
+        fit_priors = {s: T for s, T in set_priors.items() if int(s) not in test_set}
+        test_pose_obs = [o for o in fixed_pose_obs if _obs_set(o) in test_set]
+        test_corner_obs = [o for o in corner_obs if _obs_set(o) in test_set]
+        test_priors = {s: T for s, T in set_priors.items() if int(s) in test_set}
+        test_bundle = {
+            "pose_obs": test_pose_obs,
+            "corner_obs": test_corner_obs,
+            "event_to_set": event_to_set,
+            "set_priors": test_priors,
+            "train_sets_str": ",".join(str(s) for s in train_set_ids),
+            "test_sets_str": ",".join(str(s) for s in test_set_ids),
+        }
+        print(f"[C3] train/test split: train={train_set_ids} test={test_set_ids} "
+              f"(fit pose_obs {len(fit_pose_obs)}/{len(fixed_pose_obs)}, "
+              f"test pose_obs {len(test_pose_obs)})")
+    else:
+        print("[C3] no train/test split (fit and evaluate on all sets; "
+              "test metrics will be NA). Use --test_sets or --holdout_frac for a fair C3 comparison.")
+
+    # NOTE (C3 scope): this ablation measures the cube-center prior contribution for
+    # the FIXED (eye-to-hand) cameras only — the moving gripper (eye-in-hand) camera
+    # is intentionally excluded because its base extrinsic is not constant and cannot
+    # enter this static ref-relative solve. The analogous hand-eye/FK-prior ablation
+    # for the gripper camera lives in the joint solver (CP_Step3_joint_unified.py).
+    sweep_weights = _parse_sweep(args.prior_weight_sweep)
+
     results: List[MethodResult] = []
+    # without-prior pass: emits the closed-form baselines (01/02) exactly once.
+    # Cameras are fit on TRAIN sets only (fit_*); held-out metrics use test_bundle.
     results.extend(run_method_suite(
-        fixed_pose_obs, corner_obs, fixed_cam_ids, ref_cam, K_map, D_map,
-        event_to_set, set_priors, set_pose6, out_dir, with_prior=False,
-        corner_obs_reason=corner_reason, args=args,
-    ))
-    results.extend(run_method_suite(
-        fixed_pose_obs, corner_obs, fixed_cam_ids, ref_cam, K_map, D_map,
-        event_to_set, set_priors, set_pose6, out_dir, with_prior=True,
-        corner_obs_reason=corner_reason, args=args,
+        fit_pose_obs, fit_corner_obs, fixed_cam_ids, ref_cam, K_map, D_map,
+        event_to_set, fit_priors, set_pose6, out_dir, with_prior=False,
+        corner_obs_reason=corner_reason, args=args, emit_closed_form=True,
+        test_bundle=test_bundle,
     ))
 
+    if sweep_weights:
+        print(f"[C3] prior-weight sweep on axis '{args.sweep_axis}': {sweep_weights}")
+        for w in sweep_weights:
+            wt = w if args.sweep_axis in ("trans", "both") else float(args.prior_weight_trans)
+            wr = w if args.sweep_axis in ("rot", "both") else float(args.prior_weight_rot)
+            suffix = f"__w{args.sweep_axis}{w:g}"
+            results.extend(run_method_suite(
+                fit_pose_obs, fit_corner_obs, fixed_cam_ids, ref_cam, K_map, D_map,
+                event_to_set, fit_priors, set_pose6, out_dir, with_prior=True,
+                corner_obs_reason=corner_reason, args=args,
+                weight_trans_override=wt, weight_rot_override=wr,
+                emit_closed_form=False, method_suffix=suffix,
+                test_bundle=test_bundle,
+            ))
+    else:
+        # single with-prior pass (legacy behavior); no duplicate closed-form rows.
+        results.extend(run_method_suite(
+            fit_pose_obs, fit_corner_obs, fixed_cam_ids, ref_cam, K_map, D_map,
+            event_to_set, fit_priors, set_pose6, out_dir, with_prior=True,
+            corner_obs_reason=corner_reason, args=args, emit_closed_form=False,
+            test_bundle=test_bundle,
+        ))
+
     write_summary(out_dir, results)
+    if sweep_weights:
+        write_sweep_curve(out_dir, results)
     print_summary(results)
     # surface optimizer fallbacks for problem 3
     for r in results:
