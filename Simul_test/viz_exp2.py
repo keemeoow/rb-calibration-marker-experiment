@@ -12,6 +12,13 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+from figure_style import CATEGORY_COLORS, apply_paper_style, clean_axis, save_figure
+
+apply_paper_style()
+
 FIG_DIR = os.path.join(os.path.dirname(__file__), "figures")
 JSON_DEFAULT = os.path.join(FIG_DIR, "exp2_board_vs_cube_data.json")
 
@@ -25,7 +32,7 @@ PANELS = [
 ]
 MODE_ORDER = ["board", "board+cube"]
 MODE_LABEL = {"board": "Board only", "board+cube": "Board + Cube"}
-MODE_COLOR = {"board": "#c44e52", "board+cube": "#4c72b0"}
+MODE_COLOR = {"board": CATEGORY_COLORS[2], "board+cube": CATEGORY_COLORS[1]}
 
 
 def make_figure(blob, out="fig_exp2_board_vs_cube.png", show=False):
@@ -42,7 +49,7 @@ def make_figure(blob, out="fig_exp2_board_vs_cube.png", show=False):
         xs = np.arange(len(MODE_ORDER))
         ax.bar(xs, means, yerr=stds, capsize=5,
                color=[MODE_COLOR[m] for m in MODE_ORDER],
-               edgecolor="black", linewidth=0.7, alpha=0.9, width=0.6)
+               edgecolor="white", linewidth=0.7, width=0.6, zorder=3)
         for x, m, s in zip(xs, means, stds):
             ax.text(x, m + s + max(means) * 0.02 + 1e-6, f"{m:.1f}",
                     ha="center", va="bottom", fontsize=9, fontweight="bold")
@@ -55,9 +62,8 @@ def make_figure(blob, out="fig_exp2_board_vs_cube.png", show=False):
         # 앞 2개 = 관측성(회색), 뒤 2개 = 캘리브 결과(초록) — 제목 배경색으로 구분
         is_calib = i >= 2
         bg = "#e3f2e8" if is_calib else "#eeeeee"
-        ax.set_title(f"{title}\n({arrow})", fontsize=10, fontweight="bold",
-                     bbox=dict(boxstyle="round,pad=0.4", fc=bg, ec="none"))
-        ax.grid(axis="y", alpha=0.3)
+        ax.set_title(f"{title}\n({arrow})", fontsize=10, fontweight="semibold")
+        clean_axis(ax)
 
     fig.suptitle(
         "Experiment 2 — Planar Board only  vs  Board + Marker Cube   (FK not used, camera-only)\n"
@@ -68,7 +74,7 @@ def make_figure(blob, out="fig_exp2_board_vs_cube.png", show=False):
     fig.tight_layout(rect=[0, 0, 1, 0.9])
     os.makedirs(FIG_DIR, exist_ok=True)
     path = os.path.join(FIG_DIR, out)
-    fig.savefig(path, dpi=130, bbox_inches="tight")
+    save_figure(fig, path, close=False)
     print(f"[저장] {path}")
     if show:
         plt.show()

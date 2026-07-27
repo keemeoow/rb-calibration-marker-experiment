@@ -14,6 +14,13 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+from figure_style import CATEGORY_COLORS, apply_paper_style, clean_axis, save_figure
+
+apply_paper_style()
+
 FIG_DIR = os.path.join(os.path.dirname(__file__), "figures")
 JSON_DEFAULT = os.path.join(FIG_DIR, "unified_vs_indep_data.json")
 
@@ -25,8 +32,8 @@ KEY_LABELS = {
     "downstream_mm":  "Downstream cube\nprediction (mm)",
 }
 METHOD_ORDER = ["Indep", "Indep+fk", "Joint", "Joint+fk"]
-METHOD_COLORS = {"Indep": "#c44e52", "Indep+fk": "#e17c7f",
-                 "Joint": "#4c72b0", "Joint+fk": "#7a9bcc"}
+METHOD_COLORS = {"Indep": CATEGORY_COLORS[2], "Indep+fk": "#E5A05A",
+                 "Joint": CATEGORY_COLORS[1], "Joint+fk": "#76A9CE"}
 
 
 def _load(path):
@@ -55,14 +62,14 @@ def make_figure(blob, out="fig_unified_vs_indep.png", show=False):
             xs = np.arange(len(METHOD_ORDER))
             bars = ax.bar(xs, means, yerr=stds, capsize=4,
                           color=[METHOD_COLORS[m] for m in METHOD_ORDER],
-                          edgecolor="black", linewidth=0.6, alpha=0.9)
+                          edgecolor="white", linewidth=0.7, zorder=3)
             for x, m, s in zip(xs, means, stds):
                 ax.text(x, m + s + max(means) * 0.02, f"{m:.2f}",
                         ha="center", va="bottom", fontsize=8)
             ax.set_xticks(xs)
             ax.set_xticklabels(METHOD_ORDER, rotation=20, ha="right", fontsize=8)
             ax.set_ylim(0, max(m + s for m, s in zip(means, stds)) * 1.28)
-            ax.grid(axis="y", alpha=0.3)
+            clean_axis(ax)
             if ri == 0:
                 ax.set_title(KEY_LABELS[key], fontsize=10, fontweight="bold")
             if ci == 0:
@@ -82,7 +89,7 @@ def make_figure(blob, out="fig_unified_vs_indep.png", show=False):
 
     os.makedirs(FIG_DIR, exist_ok=True)
     path = os.path.join(FIG_DIR, out)
-    fig.savefig(path, dpi=130, bbox_inches="tight")
+    save_figure(fig, path, close=False)
     print(f"[저장] {path}")
     if show:
         plt.show()
@@ -124,7 +131,7 @@ def make_tilt_sweep(tilts=(15, 25, 35, 50, 70, 90), seeds=15, noise_mm=6.0,
         ax.set_xlabel("gripper EE tilt range  ±deg  (pose diversity →)")
         ax.set_ylabel(f"gTc error ({unit})")
         ax.set_title(ttl, fontsize=11, fontweight="bold")
-        ax.grid(alpha=0.3); ax.legend(fontsize=9)
+        clean_axis(ax); ax.legend(fontsize=9)
         ax.axvline(35, color="gray", ls="--", alpha=0.6)
         ax.text(35, ax.get_ylim()[1]*0.92, " realistic\n (±35°)", fontsize=8, color="gray")
     fig.suptitle(
@@ -134,7 +141,7 @@ def make_tilt_sweep(tilts=(15, 25, 35, 50, 70, 90), seeds=15, noise_mm=6.0,
     fig.tight_layout(rect=[0, 0, 1, 0.93])
     os.makedirs(FIG_DIR, exist_ok=True)
     path = os.path.join(FIG_DIR, out)
-    fig.savefig(path, dpi=130, bbox_inches="tight")
+    save_figure(fig, path, close=False)
     print(f"[저장] {path}")
     if show:
         plt.show()

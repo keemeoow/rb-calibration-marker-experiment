@@ -29,12 +29,18 @@ import os
 import csv
 import json
 import argparse
+import shutil
 
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
+from figure_style import (
+    CATEGORY_COLORS, INK, MUTED, apply_paper_style, clean_axis, save_figure,
+)
+
+apply_paper_style()
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 SIM_FIG_DIR = os.path.join(ROOT, "Simul_test", "figures")
@@ -42,8 +48,8 @@ CP_DIR = os.path.join(ROOT, "CP_result")
 OUT_DIR = os.path.join(CP_DIR, "figures")
 
 # Simul_test/viz_*.py 와 동일한 팔레트 — 두 행이 한 시스템으로 읽혀야 하므로 유지.
-RED, BLUE, GREEN = "#c44e52", "#4c72b0", "#55a868"
-RED_L, BLUE_L, GREEN_L = "#e17c7f", "#7a9bcc", "#8ecf9f"
+RED, BLUE, GREEN = CATEGORY_COLORS[2], CATEGORY_COLORS[1], CATEGORY_COLORS[3]
+RED_L, BLUE_L, GREEN_L = "#E5A05A", "#76A9CE", "#79B39F"
 NA_GRAY = "#d9d9d9"
 # +fk / 후보정 변형은 색만이 아니라 hatch 로도 구분(CVD·흑백 인쇄 대비 이중 인코딩)
 FK_HATCH = "//"
@@ -76,28 +82,25 @@ def _bars(ax, labels, values, colors, hatches=None, fmt="{:.2f}", ylabel=None,
     xs = np.arange(len(labels))
     hatches = hatches or [""] * len(labels)
     for x, v, c, h in zip(xs, values, colors, hatches):
-        ax.bar(x, v, color=c, hatch=h, edgecolor="black", linewidth=0.6,
-               alpha=0.9, width=0.62)
+        ax.bar(x, v, color=c, hatch=h, edgecolor="white", linewidth=0.7,
+               width=0.62, zorder=3)
     finite = [v for v in values if np.isfinite(v)]
     top = max(finite) if finite else 1.0
     for x, v in zip(xs, values):
         if np.isfinite(v):
             ax.text(x, v + top * 0.02, fmt.format(v), ha="center", va="bottom",
-                    fontsize=8, fontweight="bold", color="#333333")
+                    fontsize=8, fontweight="semibold", color=INK)
     ax.set_xticks(xs)
     ax.set_xticklabels(labels, rotation=18, ha="right", fontsize=8)
     ax.set_ylim(0, top * 1.25 if top > 0 else 1)
-    ax.grid(axis="y", alpha=0.25)
-    ax.set_axisbelow(True)
+    clean_axis(ax)
     if ylabel:
         ax.set_ylabel(ylabel, fontsize=9)
     if title:
-        ax.set_title(title, fontsize=9.5, fontweight="bold",
-                     bbox=dict(boxstyle="round,pad=0.35",
-                               fc=title_bg or "#eeeeee", ec="none"))
+        ax.set_title(title, fontsize=9.5, fontweight="semibold")
     if note:
         ax.text(0.5, 0.94, note, transform=ax.transAxes, ha="center", va="top",
-                fontsize=7.5, color="#555555")
+                fontsize=7.5, color=MUTED)
 
 
 def _na_panel(ax, title, msg):
@@ -112,8 +115,7 @@ def _na_panel(ax, title, msg):
             fontsize=20, fontweight="bold", color="#8a8a8a")
     ax.text(0.5, 0.36, msg, transform=ax.transAxes, ha="center", va="center",
             fontsize=8, color="#666666", wrap=True)
-    ax.set_title(title, fontsize=9.5, fontweight="bold",
-                 bbox=dict(boxstyle="round,pad=0.35", fc="#eeeeee", ec="none"))
+    ax.set_title(title, fontsize=9.5, fontweight="semibold")
 
 
 def _row_tag(ax, text, color):
@@ -125,8 +127,15 @@ def _row_tag(ax, text, color):
 def _save(fig, name):
     os.makedirs(OUT_DIR, exist_ok=True)
     path = os.path.join(OUT_DIR, name)
-    fig.savefig(path, dpi=130, bbox_inches="tight")
-    plt.close(fig)
+    for ax in fig.axes:
+        clean_axis(ax)
+    save_figure(fig, path)
+    legacy_aliases = {
+        "fig_CP_C2_board_vs_cube.png": "fig_C2_board_vs_cube.png",
+        "fig_CP_C3_gtc_estimation.png": "fig_C3_fk_prior.png",
+    }
+    if name in legacy_aliases:
+        shutil.copyfile(path, os.path.join(OUT_DIR, legacy_aliases[name]))
     print(f"[저장] {path}")
     return path
 
@@ -189,7 +198,7 @@ def _c1_cp_row(axr, cp):
     for m in m3:
         down6.append(_f(cp[m], "downstream_trans_rmse_mm"))
         down6.append(_f(cp[m], "downstream_fk_trans_rmse_mm"))
-    _bars(axr[3], ["Indep", "Indep+fk", "Joint", "Joint+fk", "JointFK", "JointFK+fk"],
+    _bars(axr[3], ["Indep raw", "Indep+Ridge", "Joint raw", "Joint+Ridge", "JointFK raw", "JointFK+Ridge"],
           down6, [RED, RED_L, BLUE, BLUE_L, GREEN, GREEN_L],
           hatches=["", FK_HATCH, "", FK_HATCH, "", FK_HATCH], fmt="{:.1f}",
           ylabel="RMSE vs FK (mm)",
@@ -392,8 +401,7 @@ def _c3_rel_panel(a, vals, lbls, colors, hatches):
     a.set_axisbelow(True)
     a.set_ylabel("change vs baseline (%)", fontsize=9)
     a.set_title("Relative to Camera-based baseline\n(negative = better)",
-                fontsize=9.5, fontweight="bold",
-                bbox=dict(boxstyle="round,pad=0.35", fc="#e3f2e8", ec="none"))
+                fontsize=9.5, fontweight="semibold")
 
 
 def _c3_data(sim, cp):
@@ -427,8 +435,7 @@ def _c3_sim_row(axr, sim, names, colors, hatches, sim_held, xs):
     a.set_axisbelow(True)
     a.legend(fontsize=8)
     a.set_title("Noise-robustness sweep\n(simulation only)", fontsize=9.5,
-                fontweight="bold",
-                bbox=dict(boxstyle="round,pad=0.35", fc="#eeeeee", ec="none"))
+                fontweight="semibold")
 
 
 def _c3_cp_row(axr, colors, hatches, lbl, test, train):
@@ -439,11 +446,11 @@ def _c3_cp_row(axr, colors, hatches, lbl, test, train):
     a = axr[2]
     w = 0.36
     xsr = np.arange(len(lbl))
-    a.bar(xsr - w / 2, train, width=w, color="#bbbbbb", edgecolor="black",
-          linewidth=0.6, label="train (fit to FK)")
+    a.bar(xsr - w / 2, train, width=w, color="#AEB8C2", edgecolor="white",
+          linewidth=0.7, label="train (fit to FK)", zorder=3)
     for x, v, c, h in zip(xsr + w / 2, test, colors, hatches):
-        a.bar(x, v, width=w, color=c, hatch=h, edgecolor="black", linewidth=0.6,
-              alpha=0.9)
+        a.bar(x, v, width=w, color=c, hatch=h, edgecolor="white", linewidth=0.7,
+              zorder=3)
     top = max(test + train)
     for x, v in zip(xsr - w / 2, train):
         a.text(x, v + top * 0.02, f"{v:.2f}", ha="center", va="bottom", fontsize=7.5)
@@ -460,8 +467,7 @@ def _c3_cp_row(axr, colors, hatches, lbl, test, train):
                       Patch(fc="white", ec="black", lw=0.6, label="held-out test")],
              fontsize=8, loc="upper left")
     a.set_title("Train vs held-out gap\n(FK overfit, real data only)", fontsize=9.5,
-                fontweight="bold",
-                bbox=dict(boxstyle="round,pad=0.35", fc="#eeeeee", ec="none"))
+                fontweight="semibold")
 
 
 def fig_c3(which="both"):

@@ -1,152 +1,375 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""C1 held-out 큐브예측 오차 — FK 정보를 얼마나 쓰느냐에 따른 비교 피규어.
+"""Generate the real-data C1/C3 paper figures from recorded result files.
 
-`CP_result/C1/joint_ablation_summary.csv` 를 읽어 세 보정 단계를 나란히 그린다
-(재계산 없음 — CP_C1 을 --holdout_frac 로 한 번 돌린 뒤 실행):
+No metric is recomputed from images and no uncertainty is synthesized.  C1 values
+come from ``CP_result/C1/joint_ablation_summary.csv`` and C3 values come from
+``CP_result/C3/ablation_summary.json``.
 
-    down_mm      : FK 미사용. 카메라 관측만으로 held-out set 큐브 위치를 예측.
-    down+se3_mm  : train 잔차를 강체 SE(3)(회전+평행이동, 자유도 6)로 정렬.
-    down+fk_mm   : train 잔차를 Ridge [1,x,y](자유도 9 — 회전·스케일·전단)로 보정.
+The C1 implementation fits the two post-corrections independently to the same raw
+training predictions (``learn_fk_rigid`` and ``learn_fk_ridge`` are sibling calls in
+``CP_C1_unified_vs_independent.py``).  Consequently Figure 1 presents a parallel
+Raw -> SE(3) / Raw -> Ridge comparison, never an SE(3) -> Ridge sequence.
 
-핵심은 **강체 SE(3) 만으로 목표 5mm 안에 들어온다**는 것이다. 남은 오차가 임의의
-곡선맞춤이 아니라 base 프레임 정렬 잔차(≈3°, ≈26mm)라는 뜻이고, 그건 앵커/촬영 개선으로
-실제로 없앨 수 있는 종류의 오차다.
-
-실행:  PYTHONPATH= python CP_viz_c1_fk_correction.py
+Run:
+    PYTHONPATH= python CP_viz_c1_fk_correction.py
 """
+from __future__ import annotations
+
 import csv
-import os
+import json
+import shutil
+from pathlib import Path
+from typing import Iterable
 
 import matplotlib
+
 matplotlib.use("Agg")
-import matplotlib.patheffects as pe
 import matplotlib.pyplot as plt
-from matplotlib.patches import Patch
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
-CSV = os.path.join(ROOT, "CP_result", "C1", "joint_ablation_summary.csv")
-OUT = os.path.join(ROOT, "CP_result", "figures", "fig_CP_C1_fk_correction.png")
+from figure_style import (
+    INK, METHOD_COLORS as SHARED_METHOD_COLORS, MUTED, PAPER, SERIES_COLORS,
+    apply_paper_style, clean_axis, save_figure,
+)
 
-# 순서형(ordinal) 파랑 램프 — "FK 정보를 더 쓸수록 진하게". 값은 dataviz 기준 팔레트의
-# sequential blue 에서 step 250 / 450 / 650 (light 표면용 ordinal 하한 250 을 지킴).
-RAMP = ["#86b6ef", "#2a78d6", "#104281"]
-INK, INK2, MUTED = "#0b0b0b", "#52514e", "#8a8a86"
+ROOT = Path(__file__).resolve().parent
+C1_CSV = ROOT / "CP_result" / "C1" / "joint_ablation_summary.csv"
+C3_JSON = ROOT / "CP_result" / "C3" / "ablation_summary.json"
+FIG_DIR = ROOT / "CP_result" / "figures"
+
+OUT_C1 = FIG_DIR / "fig_CP_C1_fk_correction.png"
+OUT_C1_LEGACY = FIG_DIR / "fig_C1_unified_vs_independent.png"
+OUT_INTERNAL = FIG_DIR / "fig_CP_C1_internal_metrics.png"
+OUT_LINK = FIG_DIR / "fig_CP_C1_C3_interpretation.png"
+OUT_PROVENANCE = FIG_DIR / "fig_CP_C1_real_data_provenance.json"
+
+METHODS = ["independent", "unified_joint", "joint_fk_fixed"]
+METHOD_COLORS = SHARED_METHOD_COLORS
+SERIES = [
+    ("downstream_trans_rmse_mm", "Raw calibration prediction\n(no additional FK post-correction)\n캘리브레이션 원출력 · 추가 FK 후보정 없음", SERIES_COLORS["raw"]),
+    ("downstream_se3_trans_rmse_mm", "+ FK-supervised SE(3) alignment", SERIES_COLORS["se3"]),
+    ("downstream_fk_trans_rmse_mm", "+ FK-supervised Ridge correction [1,x,y]", SERIES_COLORS["ridge"]),
+]
 TARGET_MM = 5.0
 
-SERIES = [
-    ("downstream_trans_rmse_mm", "FK 미사용\n(카메라 관측만)"),
-    ("downstream_se3_trans_rmse_mm", "+ 강체 SE(3)\n(train, 자유도 6)"),
-    ("downstream_fk_trans_rmse_mm", "+ Ridge [1,x,y]\n(train, 자유도 9)"),
-]
-METHOD_LABEL = {
-    "independent": "independent",
-    "unified_joint": "unified_joint",
-    "joint_fk_fixed": "joint_fk_fixed",
-}
+
+def _setup_style() -> None:
+    apply_paper_style()
 
 
-def load_rows():
-    with open(CSV, newline="") as f:
+def _clean_axis(ax, grid: bool = True) -> None:
+    clean_axis(ax, grid_axis="y" if grid else None)
+
+
+def _load_c1() -> list[dict[str, str]]:
+    with C1_CSV.open(newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
-    if not rows or not rows[0].get("downstream_se3_trans_rmse_mm"):
+    by_method = {r["method"]: r for r in rows}
+    missing_methods = [m for m in METHODS if m not in by_method]
+    required = {
+        "consistency_trans_rmse_mm", "consistency_rot_rmse_deg",
+        "grip_align_trans_rmse_mm", "downstream_trans_rmse_mm",
+        "downstream_se3_trans_rmse_mm", "downstream_fk_trans_rmse_mm",
+        "train_sets", "test_sets",
+    }
+    missing_columns = sorted(required - set(rows[0]) if rows else required)
+    if missing_methods or missing_columns:
         raise SystemExit(
-            "down+se3 열이 없다. 먼저 held-out split 으로 C1 을 돌려라:\n"
-            "  PYTHONPATH= python CP_C1_unified_vs_independent.py "
-            "--root_folder data/session --intrinsics_dir intrinsics --holdout_frac 0.3")
-    return rows
+            f"C1 source is incomplete; missing methods={missing_methods}, columns={missing_columns}"
+        )
+    return [by_method[m] for m in METHODS]
 
 
-def main():
-    rows = load_rows()
-    methods = [r["method"] for r in rows]
-    fnum = lambda v: float(v) if v not in ("", None) else float("nan")
+def _load_c3() -> dict[str, dict]:
+    with C3_JSON.open(encoding="utf-8") as f:
+        rows = json.load(f)
 
-    # AppleGothic 은 대괄호·도(°) 기호를 CJK 글리프로 대체해 버린다 — SD Gothic Neo 사용.
-    plt.rcParams.update({
-        "font.family": ["Apple SD Gothic Neo", "NanumGothic", "AppleGothic"],
-        "axes.unicode_minus": False,
-        "figure.facecolor": "#fcfcfb",
-        "axes.facecolor": "#fcfcfb",
-    })
-    fig, ax = plt.subplots(figsize=(9.8, 5.6))
+    def select(method: str, prior: str) -> dict:
+        matches = [r for r in rows if r.get("method") == method and r.get("prior_mode") == prior]
+        if len(matches) != 1 or matches[0].get("test_prior_trans_rmse_mm") is None:
+            raise SystemExit(f"C3 source row unavailable or ambiguous: {method} / {prior}")
+        return matches[0]
 
-    n = len(SERIES)
-    group_w, gap = 0.78, 0.02          # 인접 막대 사이 표면 간격
-    bar_w = (group_w - gap * (n - 1)) / n
-    baseline = {}
-    for j, (col, label) in enumerate(SERIES):
-        xs, vals = [], []
-        for i, r in enumerate(rows):
-            xs.append(i - group_w / 2 + bar_w / 2 + j * (bar_w + gap))
-            vals.append(fnum(r[col]))
-        bars = ax.bar(xs, vals, width=bar_w, color=RAMP[j], linewidth=0,
-                      zorder=3, label=label)
-        for i, (b, v) in enumerate(zip(bars, vals)):
-            if j == 0:
-                baseline[i] = v
-            # 값 라벨은 목표선과 겹칠 수 있어 표면색 halo 를 둘러 항상 읽히게 한다.
-            ax.annotate(f"{v:.2f}", (b.get_x() + b.get_width() / 2, v),
-                        xytext=(0, 4), textcoords="offset points",
-                        ha="center", va="bottom", fontsize=9.5, zorder=5,
-                        color=INK if v > TARGET_MM else "#1c5cab",
-                        fontweight="bold" if v <= TARGET_MM else "normal",
-                        path_effects=[pe.withStroke(linewidth=3.2, foreground="#fcfcfb")])
-            if j > 0:      # 기준(FK 미사용) 대비 감소율 — 막대 안쪽에 조용히
-                ax.annotate(f"-{(1 - v / baseline[i]) * 100:.0f}%",
-                            (b.get_x() + b.get_width() / 2, v),
-                            xytext=(0, -13), textcoords="offset points",
-                            ha="center", va="top", fontsize=8.5, zorder=5,
-                            color="#ffffff")
+    return {
+        "vision_only": select("03_pose_consistency_opt", "without_robot_cube_prior"),
+        "fk_prior": select("03_pose_consistency_opt", "with_robot_cube_prior"),
+        "post_correction": select("05_fk_prior_correction", "with_robot_cube_prior"),
+    }
 
-    ax.axhline(TARGET_MM, color=MUTED, lw=1.2, ls=(0, (4, 3)), zorder=2)
-    ax.annotate(f"목표 {TARGET_MM:.0f} mm", (len(rows) - 0.52, TARGET_MM),
-                xytext=(-2, 5), textcoords="offset points",
-                ha="right", va="bottom", fontsize=9, color=INK2, zorder=5,
-                path_effects=[pe.withStroke(linewidth=3.2, foreground="#fcfcfb")])
 
-    ax.set_xticks(range(len(rows)))
-    ax.set_xticklabels([METHOD_LABEL.get(m, m) for m in methods], fontsize=10.5, color=INK)
-    # 세로 회전한 한글은 읽기 나쁘다 — 축 단위를 축 위에 가로로 둔다.
-    ax.set_ylim(0, max(fnum(r[SERIES[0][0]]) for r in rows) * 1.22)
-    ax.annotate("held-out 큐브 위치 예측 RMSE (mm)", (0, 1), xycoords="axes fraction",
-                xytext=(-42, 12), textcoords="offset points",
-                ha="left", va="bottom", fontsize=9.5, color=INK2)
-    ax.tick_params(axis="y", labelsize=9, colors=INK2, length=0)
-    ax.tick_params(axis="x", length=0)
-    ax.grid(axis="y", color="#e6e5e1", lw=0.8, zorder=0)
-    ax.set_axisbelow(True)
-    for side in ("top", "right", "left"):
-        ax.spines[side].set_visible(False)
-    ax.spines["bottom"].set_color("#d8d7d3")
+def _f(row: dict, key: str) -> float:
+    value = row.get(key)
+    if value in (None, ""):
+        raise SystemExit(f"Required measured value is absent: {key}")
+    return float(value)
 
-    ax.legend(handles=[Patch(facecolor=RAMP[j], label=SERIES[j][1]) for j in range(n)],
-              loc="upper right", frameon=False, fontsize=9, labelcolor=INK2,
-              handlelength=1.1, handleheight=1.1, borderpad=0.2, labelspacing=0.7)
 
-    test_sets = rows[0].get("test_sets", "")
-    train_sets = rows[0].get("train_sets", "")
-    ax.set_title("held-out 큐브 위치 예측 오차 — FK 정보를 어디까지 쓰는가",
-                 fontsize=13.5, color=INK, pad=34, loc="left")
+def _pct_drop(before: float, after: float) -> float:
+    return (1.0 - after / before) * 100.0
 
-    rigid = "   ".join(
-        f"{r['method']} {float(r['fk_rigid_angle_deg']):.1f}°/{float(r['fk_rigid_trans_mm']):.0f}mm"
-        for r in rows if r.get("fk_rigid_angle_deg"))
-    fig.text(0.008, -0.015,
-             f"data/session · train set [{train_sets}] / test set [{test_sets}] · 낮을수록 좋음\n"
-             f"보정은 모두 train set 에서만 학습해 held-out test 예측에 적용 — test FK 는 비교 대상으로만 쓴다.\n"
-             f"추정된 강체보정 크기(회전/평행이동): {rigid}  →  남은 오차의 대부분은 base 프레임 정렬 잔차다.",
-             fontsize=8.5, color=INK2, va="top", linespacing=1.6)
 
-    os.makedirs(os.path.dirname(OUT), exist_ok=True)
-    fig.savefig(OUT, dpi=160, bbox_inches="tight", facecolor=fig.get_facecolor())
-    print(f"[DONE] {OUT}")
+def _save(fig, path: Path) -> None:
+    save_figure(fig, path)
+    print(f"[DONE] {path}")
+    if path == OUT_C1:
+        shutil.copyfile(path, OUT_C1_LEGACY)
+        print(f"[DONE] {OUT_C1_LEGACY} (current-data compatibility alias)")
 
-    print("\n" + "-" * 78)
-    print(f"{'method':16s} {'down':>8s} {'down+se3':>10s} {'down+fk':>9s}   (mm)")
-    for r in rows:
-        print(f"{r['method']:16s} {fnum(r[SERIES[0][0]]):8.2f} "
-              f"{fnum(r[SERIES[1][0]]):10.2f} {fnum(r[SERIES[2][0]]):9.2f}")
+
+def figure_1(rows: list[dict[str, str]]) -> None:
+    """C1 held-out agreement: verified parallel raw/SE(3)/Ridge branches."""
+    fig = plt.figure(figsize=(14.4, 8.3), layout="constrained")
+    gs = fig.add_gridspec(2, 2, width_ratios=[1.62, 1.0], height_ratios=[1.0, 0.17])
+    ax = fig.add_subplot(gs[0, 0])
+    info = fig.add_subplot(gs[0, 1])
+    foot = fig.add_subplot(gs[1, :])
+    info.axis("off")
+    foot.axis("off")
+
+    width = 0.24
+    x = list(range(len(rows)))
+    raw = [_f(r, "downstream_trans_rmse_mm") for r in rows]
+    for j, (column, label, color) in enumerate(SERIES):
+        values = [_f(r, column) for r in rows]
+        bars = ax.bar([v + (j - 1) * width for v in x], values, width=width,
+                      color=color, edgecolor="white", linewidth=0.7, zorder=3, label=label)
+        for i, (bar, value) in enumerate(zip(bars, values)):
+            ax.text(bar.get_x() + bar.get_width() / 2, value + 0.27, f"{value:.2f}",
+                    ha="center", va="bottom", fontsize=9.6, fontweight="semibold",
+                    bbox=dict(facecolor=PAPER, edgecolor="none", pad=0.5))
+            if j > 0:
+                ax.text(bar.get_x() + bar.get_width() / 2, max(0.35, value - 0.48),
+                        f"−{_pct_drop(raw[i], value):.1f}%",
+                        ha="center", va="top", fontsize=7.8, color="white", fontweight="semibold")
+
+    ax.axhline(TARGET_MM, color="#8A4F2D", lw=1.25, ls=(0, (5, 3)), zorder=2)
+    ax.text(2.43, TARGET_MM + 0.15, "5 mm FK-proxy agreement target",
+            ha="right", va="bottom", fontsize=9, color="#8A4F2D")
+    ax.set_xticks(x, METHODS)
+    ax.set_ylabel("Held-out RMSE vs FK proxy (mm)")
+    ax.set_ylim(0, max(raw) * 1.23)
+    ax.set_title("C1 — Held-out Cube Position Agreement with FK Proxy", loc="left",
+                 fontsize=16, fontweight="semibold", pad=30)
+    ax.text(0, 1.025, "캘리브레이션 구조 및 FK-supervised 후보정에 따른 held-out 위치 RMSE",
+            transform=ax.transAxes, ha="left", va="bottom", fontsize=11, color=MUTED)
+    _clean_axis(ax)
+    ax.legend(loc="upper right", frameon=False, fontsize=9.1, labelspacing=0.8)
+
+    info.text(0.0, 0.98, "Calibration structures", fontsize=12.5, fontweight="semibold", va="top")
+    method_text = (
+        "independent\n"
+        "Fixed cameras solved independently using FK cube references;\n"
+        "gripper-camera hand–eye estimated separately; no joint exchange.\n\n"
+        "unified_joint\n"
+        "Jointly optimizes fixed-camera extrinsics, gripper-camera hand–eye,\n"
+        "and free per-set cube poses; FK is a soft anchor.\n\n"
+        "joint_fk_fixed\n"
+        "Jointly optimizes fixed-camera extrinsics and gripper-camera hand–eye;\n"
+        "per-set cube poses are fixed to FK values."
+    )
+    info.text(0.0, 0.91, method_text, fontsize=9.4, va="top", linespacing=1.33)
+    info.text(0.0, 0.49, "C1 compares calibration structures, not FK versus no-FK systems.",
+              fontsize=10.3, fontweight="semibold", va="top", wrap=True)
+    info.text(0.0, 0.43, "C1은 FK 사용 여부가 아니라 FK를 포함한 캘리브레이션 구조의 차이를 비교한다.",
+              fontsize=9.5, color=MUTED, va="top", wrap=True)
+    info.text(0.0, 0.32, "Verified correction topology", fontsize=11.2,
+              fontweight="semibold", va="top")
+    info.text(0.0, 0.265,
+              "Raw → FK-supervised SE(3)\nRaw → FK-supervised Ridge [1,x,y]\n\n"
+              "Both corrections are independently learned from the raw train-set\n"
+              "predictions. Percentages therefore use Raw as the only baseline.",
+              fontsize=9.2, va="top", linespacing=1.38)
+
+    conclusion = (
+        "FK-supervised Ridge post-correction reduced held-out disagreement with the FK proxy "
+        "from 11.5–13.4 mm to 2.5–2.8 mm on this split.\n"
+        "해당 split에서 FK-supervised Ridge 후보정은 FK proxy 대비 held-out 불일치를 "
+        "11.5–13.4 mm에서 2.5–2.8 mm로 감소시켰다."
+    )
+    foot.text(0.0, 0.78, conclusion, fontsize=10.2, va="top", linespacing=1.35,
+              bbox=dict(boxstyle="round,pad=0.55", facecolor="#F3F6F8", edgecolor="#CCD5DC"))
+    foot.text(0.0, 0.02,
+              "Real-data evaluation uses the robot FK cube center as a proxy, not an independent physical ground truth.  "
+              "Reported improvements quantify FK-proxy agreement, not absolute physical accuracy.",
+              fontsize=8.8, color=MUTED, va="bottom")
+    _save(fig, OUT_C1)
+
+
+def figure_2(rows: list[dict[str, str]]) -> None:
+    """C1 internal metrics, kept separate from held-out evaluation."""
+    metrics = [
+        ("consistency_trans_rmse_mm", "Translation consistency", "mm"),
+        ("consistency_rot_rmse_deg", "Rotation consistency", "deg"),
+        ("grip_align_trans_rmse_mm", "Gripper alignment", "mm"),
+    ]
+    fig, axes = plt.subplots(1, 3, figsize=(14.2, 5.8), layout="constrained")
+    fig.suptitle("Internal subsystem consistency after calibration", fontsize=16,
+                 fontweight="semibold")
+    for ax, (key, title, unit) in zip(axes, metrics):
+        values = [_f(r, key) for r in rows]
+        bars = ax.bar(range(3), values, color=[METHOD_COLORS[m] for m in METHODS],
+                      width=0.65, zorder=3)
+        for bar, value in zip(bars, values):
+            ax.text(bar.get_x() + bar.get_width() / 2, value + max(values) * 0.025,
+                    f"{value:.2f}", ha="center", va="bottom", fontsize=10,
+                    fontweight="semibold")
+        ax.set_xticks(range(3), METHODS, rotation=18, ha="right")
+        ax.set_title(f"{title} ({unit})", fontsize=12)
+        ax.set_ylim(0, max(values) * 1.18)
+        _clean_axis(ax)
+
+    fig.text(0.5, -0.03,
+             "unified_joint provides the best internal alignment, but the margin is modest.  "
+             "Better train/internal consistency does not automatically imply better held-out position prediction.\n"
+             "Raw held-out RMSE differs by only 0.14 mm between unified_joint (11.67 mm) and "
+             "joint_fk_fixed (11.53 mm); this split does not establish clearly superior held-out generalization.",
+             ha="center", va="top", fontsize=9.4, color=MUTED, linespacing=1.4)
+    _save(fig, OUT_INTERNAL)
+
+
+def _bar_panel(ax, labels: Iterable[str], values: Iterable[float], colors: Iterable[str],
+               title: str, ylabel: str) -> None:
+    labels, values, colors = list(labels), list(values), list(colors)
+    bars = ax.bar(range(len(values)), values, color=colors, width=0.62, zorder=3)
+    for bar, value in zip(bars, values):
+        ax.text(bar.get_x() + bar.get_width() / 2, value + max(values) * 0.025,
+                f"{value:.2f}", ha="center", va="bottom", fontsize=10,
+                fontweight="semibold")
+    ax.set_xticks(range(len(labels)), labels)
+    ax.set_ylim(0, max(values) * 1.2)
+    ax.set_ylabel(ylabel)
+    ax.set_title(title, loc="left", fontsize=12.5, fontweight="semibold")
+    _clean_axis(ax)
+
+
+def figure_3(rows: list[dict[str, str]], c3: dict[str, dict]) -> None:
+    """Directionally connect C1 and C3 while preserving their metric definitions."""
+    fig = plt.figure(figsize=(14.5, 9.2), layout="constrained")
+    gs = fig.add_gridspec(2, 2, height_ratios=[1.0, 0.92])
+    ax1 = fig.add_subplot(gs[0, 0])
+    ax2 = fig.add_subplot(gs[0, 1])
+    limits = fig.add_subplot(gs[1, :])
+    limits.axis("off")
+    fig.suptitle("C1–C3 interpretation — solve-time FK prior vs post-correction",
+                 fontsize=16, fontweight="semibold")
+
+    # Separate C1 and C3 axes: their units share 'mm' but their samples and estimands differ.
+    c1_raw = [_f(r, "downstream_trans_rmse_mm") for r in rows]
+    c1_ridge = [_f(r, "downstream_fk_trans_rmse_mm") for r in rows]
+    width = 0.34
+    x = range(3)
+    for offset, values, label, color in [
+        (-width / 2, c1_raw, "Raw calibration prediction\n(no additional FK post-correction)", "#AEB8C2"),
+        (width / 2, c1_ridge, "+ FK-supervised Ridge", "#1F5A94"),
+    ]:
+        bars = ax1.bar([i + offset for i in x], values, width=width, color=color,
+                       label=label, zorder=3)
+        for bar, value in zip(bars, values):
+            ax1.text(bar.get_x() + bar.get_width() / 2, value + 0.23, f"{value:.2f}",
+                     ha="center", va="bottom", fontsize=9.3)
+    ax1.set_xticks(list(x), METHODS, rotation=12, ha="right")
+    ax1.set_ylim(0, max(c1_raw) * 1.2)
+    ax1.set_ylabel("Held-out RMSE vs FK proxy (mm)")
+    ax1.set_title("C1 · set-level · fixed + gripper cameras", loc="left",
+                  fontsize=12.5, fontweight="semibold")
+    ax1.legend(frameon=False, fontsize=9)
+    _clean_axis(ax1)
+
+    c3_values = [_f(c3[k], "test_prior_trans_rmse_mm")
+                 for k in ("vision_only", "fk_prior", "post_correction")]
+    _bar_panel(
+        ax2,
+        ["no-fk-prior\nvision-only", "fk-prior", "fk-prior\n+ post-correction"],
+        c3_values,
+        ["#6D7D8B", "#C46A4A", "#2F7D67"],
+        "C3 · event-level · fixed cameras only",
+        "Held-out prior translation RMSE (mm)",
+    )
+    ax2.text(0.03, 0.93,
+             f"solve-time prior: {c3_values[0]:.2f} → {c3_values[1]:.2f} mm (worse)\n"
+             f"post-correction: {c3_values[1]:.2f} → {c3_values[2]:.2f} mm\n"
+             f"{_pct_drop(c3_values[0], c3_values[2]):.1f}% below vision-only on this split",
+             transform=ax2.transAxes, va="top", fontsize=9.1,
+             bbox=dict(boxstyle="round,pad=0.4", facecolor="#F5F7F8", edgecolor="#D2D9DE"))
+
+    limits.text(0.0, 0.98,
+                "Forcing the FK proxy into the solve did not improve held-out performance, whereas using it as "
+                "post-correction supervision was beneficial on this split.",
+                fontsize=11.2, fontweight="semibold", va="top")
+    limits.text(0.0, 0.86,
+                "C1 and C3 are shown on separate axes because their metric definitions and aggregation units differ; "
+                "only the direction of the post-correction result is linked.",
+                fontsize=9.5, color=MUTED, va="top")
+
+    limitations = (
+        "Evaluation protocol and limitations\n"
+        "• Real-data evaluation uses the robot FK cube center as a proxy, not an independent physical ground truth.\n"
+        "• Single split: 9 training sets / 4 held-out sets.\n"
+        "• FK rotation convention was corrected from the observed 179.8° mismatch; robust averaging was enabled.\n"
+        "• Reported improvements measure agreement with the FK proxy and do not, by themselves, establish absolute physical accuracy.\n"
+        "• Ridge captures position-dependent residuals relative to the FK proxy. The observed dependence may combine camera calibration, "
+        "robot FK, and grasp-repeatability effects."
+    )
+    follow_up = (
+        "Required follow-up validation\n"
+        "• repeated hold-out or leave-one-set-out validation\n"
+        "• mean ± standard deviation\n"
+        "• cross-validated R² for Ridge residual prediction\n"
+        "• permutation test\n"
+        "• evaluation against independent external GT\n"
+        "• coefficient stability across splits"
+    )
+    limits.text(0.0, 0.70, limitations, fontsize=9.2, va="top", linespacing=1.45,
+                bbox=dict(boxstyle="round,pad=0.6", facecolor="#F5F7F8", edgecolor="#CCD5DC"))
+    limits.text(0.70, 0.70, follow_up, fontsize=9.2, va="top", linespacing=1.45,
+                bbox=dict(boxstyle="round,pad=0.6", facecolor="#FFF9ED", edgecolor="#DFCDAA"))
+    limits.text(0.0, 0.04,
+                "No error bars, p-values, residual distributions, or external-ground-truth claims are shown because "
+                "those measurements are absent from the source result files.",
+                fontsize=8.8, color=MUTED, va="bottom")
+    _save(fig, OUT_LINK)
+
+
+def write_provenance(rows: list[dict[str, str]], c3: dict[str, dict]) -> None:
+    payload = {
+        "figure_1_source": str(C1_CSV.relative_to(ROOT)),
+        "figure_2_source": str(C1_CSV.relative_to(ROOT)),
+        "figure_3_sources": [str(C1_CSV.relative_to(ROOT)), str(C3_JSON.relative_to(ROOT))],
+        "c1_source_columns": {
+            "raw": "downstream_trans_rmse_mm",
+            "se3": "downstream_se3_trans_rmse_mm",
+            "ridge": "downstream_fk_trans_rmse_mm",
+            "internal_translation": "consistency_trans_rmse_mm",
+            "internal_rotation": "consistency_rot_rmse_deg",
+            "gripper_alignment": "grip_align_trans_rmse_mm",
+        },
+        "se3_ridge_topology": "parallel: raw->SE(3), raw->Ridge",
+        "topology_evidence": {
+            "file": "CP_C1_unified_vs_independent.py",
+            "description": "learn_fk_ridge and learn_fk_rigid are sibling fits; downstream_rmse receives W or T_rigid independently",
+        },
+        "train_sets": rows[0]["train_sets"],
+        "test_sets": rows[0]["test_sets"],
+        "c3_selected_rows": {
+            key: {"method": value["method"], "prior_mode": value["prior_mode"],
+                  "source_column": "test_prior_trans_rmse_mm"}
+            for key, value in c3.items()
+        },
+        "residual_plot": "omitted: source summaries contain no per-set x/y/z residual records",
+        "uncertainty": "not shown: unavailable in source files",
+    }
+    OUT_PROVENANCE.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print(f"[DONE] {OUT_PROVENANCE}")
+
+
+def main() -> None:
+    _setup_style()
+    c1 = _load_c1()
+    c3 = _load_c3()
+    figure_1(c1)
+    figure_2(c1)
+    figure_3(c1, c3)
+    write_provenance(c1, c3)
 
 
 if __name__ == "__main__":

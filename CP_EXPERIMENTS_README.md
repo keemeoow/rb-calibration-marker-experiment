@@ -171,10 +171,16 @@ set 11·12 에 몰려 있는 PnP flip 이며, `--robust_average`(기본 True)의
 | unified_joint | **15.25** | **7.47** | **13.67** | 4.86 | 11.67 | **2.51** |
 | joint_fk_fixed | 16.77 | 8.47 | 15.06 | 0.00 | **11.53** | 2.58 |
 
-→ unified_joint 가 서브시스템 정합에서 여전히 가장 좋지만(회전 8.98→7.47°, grip 15.06→13.67mm),
-FK prior 회전 보정 후에는 세 방법의 격차가 크게 줄었다 — 옛 수치의 427 vs 144mm 라는 극적인
-차이는 대부분 뒤집힌 앵커가 independent 쪽을 더 심하게 망가뜨린 결과였다. `+fk` Ridge 보정은
-held-out 예측을 11~13mm → **2.5~2.8mm** 로 낮춘다.
+→ unified_joint 가 내부 서브시스템 정합에서 가장 낮은 값을 보이지만(회전 8.98→7.47°,
+grip 15.06→13.67mm), 차이는 크지 않다. raw held-out 은 unified_joint 11.67mm와
+joint_fk_fixed 11.53mm로 0.14mm 차이이므로 held-out 일반화 우위를 주장할 수 없다.
+`+fk` Ridge 보정은 이 split에서 **FK proxy 대비 held-out RMSE**를 11.5~13.4mm에서
+**2.5~2.8mm**로 낮췄다. 이는 독립 물리 GT 대비 절대 위치 정확도가 아니다.
+
+`downstream_se3_trans_rmse_mm`와 `downstream_fk_trans_rmse_mm`의 코드 경로는 순차가 아니라
+병렬이다. 동일 raw train 예측으로부터 `learn_fk_rigid`와 `learn_fk_ridge`를 각각 학습하고,
+held-out raw 예측에 서로 독립 적용한다. 따라서 SE(3)→Ridge 추가 개선으로 해석하지 않고 두
+개선율 모두 Raw 대비로 계산한다.
 
 ### C2 (`CP_result/C2`)
 | mode | 등록 카메라 | cross-camera (mm) | pose_repeat (mm) |
@@ -253,13 +259,25 @@ SE(3) 폴백)을 쓴다. 재투영 기반은 **04** 뿐이고, 픽셀 재투영�
    16.0(independent) vs 15.3mm(unified) 로 거의 붙는다. 차이가 남는 곳은 회전(8.98→7.47°)과
    그리퍼 정합(15.06→13.67mm). 옛 문서의 "427→144mm(−66%)" 는 **뒤집힌 앵커가 independent 를
    더 심하게 망가뜨린 결과**였고, 통합의 진짜 이점을 과장한 수치다.
-2. **`+fk` 보정은 여전히 유효** — 11~13mm → 2.5~2.8mm. 단순 `[1,x,y]` 선형 보정이 크게 먹힌다는
-   건 남은 오차가 랜덤이 아니라 **위치에 선형적인 체계 편향**이라는 뜻이며, 이 편향의 상당
-   부분은 FK 큐브중점 prior 자체의 위치오차(median 6.6mm)로 보인다.
-3. **절대값이 실용 수준으로 내려왔다** — consistency 15~17mm, grip_align 13.7~15.1mm.
-   카메라간 큐브중점 일치도만 보면 held-out median **2.45mm** 로 5mm 목표를 만족한다
-   (RMS 를 끌어올리는 5.3% 의 PnP flip 꼬리는 `--robust_average` 로 처리).
-   (`cube_pos_err_vs_fk=0.0` 은 FK 를 그대로 쓴 정의상 결과라 정보 없음.)
+2. **`+fk` 보정은 이 split의 FK proxy 정합에서 유효** — 11.5~13.4mm → 2.5~2.8mm.
+   Ridge는 FK proxy 대비 위치 의존 residual을 포착한다. 이것만으로 물리 camera error가
+   선형임을 입증하지는 않는다. 관측된 의존성은 camera calibration, robot FK, grasp
+   repeatability가 결합된 결과일 수 있다.
+3. **절대 물리 정확도는 측정하지 않았다** — 외부 ground truth가 없으므로 consistency
+   15~17mm, grip_align 13.7~15.1mm와 held-out 결과는 모두 내부 정합 또는 FK proxy 대비
+   지표로만 해석한다. (`cube_pos_err_vs_fk=0.0` 은 FK 를 그대로 쓴 정의상 결과라 정보 없음.)
+
+논문용 실데이터 Figure는 `CP_viz_c1_fk_correction.py`가 세 장으로 생성한다:
+`fig_CP_C1_fk_correction.png`, `fig_CP_C1_internal_metrics.png`,
+`fig_CP_C1_C3_interpretation.png`. set별 x/y/z residual 원자료가 summary CSV/JSON에 없으므로
+residual 수치 그래프, error bar, p-value, 분포는 생성하지 않는다.
+
+### Figure 디자인 규약
+
+모든 논문·검증 Figure는 `figure_style.py`의 `apply_paper_style()`, `clean_axis()`,
+`save_figure()`를 사용한다. 기준 디자인은 위 C1 실데이터 3장으로, 흰 배경·산세리프 글꼴·
+절제된 semantic palette·수평 grid·열린 상단/우측 spine·220 dpi를 공통 적용한다.
+새 Figure도 `AGENTS.md`의 저장소 규약에 따라 같은 스타일을 사용해야 한다.
 
 ### C2 (board vs cube)
 1. **큐브 기여가 정량 입증** — board 만으로는 **cam3 을 아예 등록 못 함**(2대만). 큐브를 넣으면
