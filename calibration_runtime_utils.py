@@ -26,8 +26,98 @@ def rotation_error_deg(Ra: np.ndarray, Rb: np.ndarray) -> float:
     return float(np.degrees(np.arccos(c)))
 
 
+def validate_cube_model_against_captures(meta: dict,
+                                         K_map: Dict[int, np.ndarray],
+                                         D_map: Dict[int, np.ndarray],
+                                         cube: "AprilTagCubeTarget",
+                                         warn_deg: float = 15.0,
+                                         fail_deg: float = 45.0,
+                                         max_frames: int = 800) -> Dict[str, Any]:
+    """Data-driven guard that the cube geometry model matches the physical cube.
+
+    The static validate_cube_config() cannot catch a wrong ``face_roll_deg`` /
+    ``id_to_face`` because an internally-consistent-but-wrong model still passes — that
+    is exactly how the original 90/180deg face-roll bug produced a silently corrupted
+    calibration. Here we re-solve each marker's cube pose from its stored image corners
+    with the CURRENT model; on the real cube, every face seen in one frame must yield
+    the SAME cube pose. A large median inter-face rotation disagreement means the model
+    disagrees with the hardware, so callers surface it loudly instead of proceeding.
+
+    Returns {median_deg, n_pairs, n_frames, status in {ok,warn,fail,skip}}.
+    """
+    model = cube.model
+    gaps: List[float] = []
+    frames_used = 0
+    for cap in meta.get("captures", []):
+        for ci_str, cinfo in cap.get("cams", {}).items():
+            ci = int(ci_str)
+            if ci not in K_map or not cinfo.get("saved"):
+                continue
+            mks = [mk for mk in (cinfo.get("markers") or [])
+                   if mk.get("corners_2d") is not None
+                   and model.has_marker(int(mk.get("marker_id", -1)))]
+            faces = {model.marker_face_name(int(mk["marker_id"])) for mk in mks}
+            if len(mks) < 2 or len(faces) < 2:
+                continue  # need >=2 distinct faces for a cross-face check
+            K, D = K_map[ci], D_map[ci]
+            poses = []
+            for mk in mks:
+                mid = int(mk["marker_id"])
+                obj = model.marker_corners_in_rig(mid).reshape(-1, 1, 3).astype(np.float64)
+                img = model.reorder_image_corners(
+                    mid, np.asarray(mk["corners_2d"], dtype=np.float64).reshape(4, 2)
+                ).reshape(-1, 1, 2).astype(np.float64)
+                ok, rvec, tvec = cv2.solvePnP(obj, img, K, D, flags=cv2.SOLVEPNP_IPPE)
+                if ok:
+                    poses.append(rodrigues_to_Rt(rvec, tvec))
+            for a in range(len(poses)):
+                for b in range(a + 1, len(poses)):
+                    gaps.append(rotation_error_deg(poses[a][:3, :3], poses[b][:3, :3]))
+            frames_used += 1
+            if frames_used >= int(max_frames):
+                break
+        if frames_used >= int(max_frames):
+            break
+    if not gaps:
+        return {"median_deg": None, "n_pairs": 0, "n_frames": frames_used, "status": "skip"}
+    med = float(np.median(gaps))
+    status = "ok" if med <= float(warn_deg) else ("warn" if med <= float(fail_deg) else "fail")
+    return {"median_deg": med, "n_pairs": len(gaps), "n_frames": frames_used, "status": status}
+
+
+_ID_TO_FACE_CACHE: Optional[Dict[int, str]] = None
+
+
+def _default_id_to_face() -> Dict[int, str]:
+    global _ID_TO_FACE_CACHE
+    if _ID_TO_FACE_CACHE is None:
+        try:
+            _ID_TO_FACE_CACHE = {int(k): str(v)
+                                 for k, v in get_default_cube_config().id_to_face.items()}
+        except Exception:
+            _ID_TO_FACE_CACHE = {}
+    return _ID_TO_FACE_CACHE
+
+
 def candidate_face_count(cand: dict) -> int:
+    """Number of DISTINCT CUBE FACES the candidate's markers lie on.
+
+    NOT the marker count. The cube's +Z top carries TWO markers, so counting marker
+    ids reports a pair of coplanar top tags as a well-constrained "2-face" view when
+    it is really a degenerate single-plane one. That misread disabled every
+    single-face safeguard (candidate_face_weight / single_face_penalty /
+    observation_weight's n^2 support) exactly on the views that keep the planar flip
+    ambiguity alive — measured on data/session: coplanar gripper views were 58% wrong
+    (median 50 deg off) while genuine 2-face views were 0% wrong (median 1.0 deg).
+    Counting faces makes those safeguards fire where they were always meant to.
+    """
     used_ids = cand.get("used_ids", [])
+    faces = cand.get("used_faces")
+    if faces:
+        return max(len(set(str(f) for f in faces)), 1)
+    i2f = _default_id_to_face()
+    if i2f:
+        return max(len(set(i2f.get(int(x), f"id{int(x)}") for x in used_ids)), 1)
     return max(len(set(int(x) for x in used_ids)), 1)
 
 
@@ -62,7 +152,8 @@ def filter_candidates_for_camera_role(candidates: List[dict],
                                       cam_idx: int,
                                       gripper_cam_idx: Optional[int],
                                       min_fixed_faces: int = 1,
-                                      max_fixed_err: float = 2.75) -> List[dict]:
+                                      max_fixed_err: float = 2.75,
+                                      min_gripper_faces: int = 2) -> List[dict]:
     """Per-camera candidate filter.
 
     Policy: a fixed cam with even 1 visible marker contributes to calibration
@@ -78,6 +169,15 @@ def filter_candidates_for_camera_role(candidates: List[dict],
         face_count = candidate_face_count(cand)
         err_mean = float(cand.get("err_mean", 99.0))
         if max_face_count >= 2 and face_count < max_face_count:
+            continue
+        if is_gripper and face_count < int(min_gripper_faces):
+            # Coplanar-only view (single cube face, e.g. just the +Z top pair): the
+            # planar PnP flip stays unresolved and the wrong solution often wins.
+            # Measured on data/session: coplanar gripper cube poses were 58% wrong
+            # (median 50 deg off the session-consistent orientation) vs 0% wrong for
+            # genuine 2-face views. Requiring two DISTINCT faces (not two markers —
+            # the top face carries two coplanar tags) is what actually breaks the
+            # ambiguity, so drop coplanar-only gripper observations.
             continue
         if not is_gripper:
             if face_count < int(min_fixed_faces):

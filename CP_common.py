@@ -355,11 +355,13 @@ def detect_corner_observations(
     max_err_gripper: float,
     min_aspect_fixed: float,
     min_aspect_gripper: float,
+    exclude_gripped: bool = False,
 ) -> Tuple[List[CornerObs], str]:
     """Return (corner observations, reason-string-if-empty).
 
     The reason string makes problem 2 debuggable: it distinguishes "no images/
     detections were loaded" from "cube model 3D marker corners are unavailable".
+    exclude_gripped: see load_pose_observations().
     """
     obs: List[CornerObs] = []
     # counters for an actionable zero-observations reason
@@ -368,6 +370,8 @@ def detect_corner_observations(
     for cap in meta.get("captures", []):
         eid = int(cap.get("event_id", -1))
         if eid < 0:
+            continue
+        if exclude_gripped and cap.get("cube_gripped"):
             continue
         sidx = get_capture_set_index(cap)
         for ci_str, cinfo in cap.get("cams", {}).items():
@@ -482,20 +486,39 @@ def load_pose_observations(
     min_aspect_fixed: float,
     min_aspect_gripper: float,
     gripper_min_markers: int,
+    exclude_gripped: bool = False,
+    fixed_min_markers: int = 1,
 ) -> List[PoseObs]:
+    """exclude_gripped: skip captures taken while the robot HOLDS the cube.
+
+    Those captures are unusable for calibration: the per-set `set_cube_center_6dof`
+    no longer describes where the cube is (it moved with the gripper), and for the
+    eye-in-hand camera the target moves *with* the camera, so there is no relative
+    motion to solve hand-eye from. Mixing them in corrupts the per-set vision mean
+    and hence the Kabsch robot-base anchor.
+
+    fixed_min_markers: minimum distinct cube markers a FIXED-camera pose must use.
+    A single-marker cube pose is planar-PnP flip-ambiguous (the estimated cube can
+    be ~180deg rotated with its center placed ~a cube-width off), which is the
+    dominant source of the ~150deg / ~140mm cross-camera outliers and the
+    pose-repeatability / hand-eye verify failures. Requiring >=2 markers removes it.
+    """
     obs: List[PoseObs] = []
     for cap in meta.get("captures", []):
         eid = int(cap.get("event_id", -1))
         if eid < 0:
+            continue
+        if exclude_gripped and cap.get("cube_gripped"):
             continue
         sidx = get_capture_set_index(cap)
         for ci_str, cinfo in cap.get("cams", {}).items():
             ci = int(ci_str)
             if ci not in all_cam_ids or not cinfo.get("saved"):
                 continue
-            max_err = max_err_gripper if ci == gripper_cam_idx else max_err_fixed
-            min_aspect = min_aspect_gripper if ci == gripper_cam_idx else min_aspect_fixed
-            min_markers = gripper_min_markers if ci == gripper_cam_idx else 1
+            is_grip = ci == gripper_cam_idx
+            max_err = max_err_gripper if is_grip else max_err_fixed
+            min_aspect = min_aspect_gripper if is_grip else min_aspect_fixed
+            min_markers = gripper_min_markers if is_grip else max(1, int(fixed_min_markers))
 
             candidates = []
             if reuse_stored_cube_candidates:
@@ -510,6 +533,11 @@ def load_pose_observations(
                         cube, img, K_map[ci], D_map[ci], max_err, min_markers, min_aspect
                     ) + candidates
             candidates = filter_candidates_for_camera_role(candidates, ci, gripper_cam_idx)
+            # Enforce the fixed-camera marker-count floor: a selected candidate that
+            # used fewer than `min_markers` distinct markers is flip-ambiguous.
+            if not is_grip and int(fixed_min_markers) > 1:
+                candidates = [c for c in candidates
+                              if len(set(c.get("used_ids", []))) >= int(fixed_min_markers)]
             best = select_primary_cube_candidate(candidates) if candidates else None
             if best is None:
                 continue
@@ -849,3 +877,234 @@ def reprojection_errors(
         diff = proj.reshape(-1, 2) - o.image_points.reshape(-1, 2)
         errs.extend(np.linalg.norm(diff, axis=1).tolist())
     return np.asarray(errs, dtype=np.float64)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# 공유 고정-카메라 solver — 03(pose-consistency) / 04(direct reprojection)
+# ------------------------------------------------------------------------------
+# 예전에는 이 두 최적화기가 CP_C3 안에만 있었고, Step3 의 고정-카메라 등록은
+# closed-form robust SE(3) 평균(= C3 의 02_pnp_robust_se3)에서 멈췄다. 실측 비교
+# (data/session)에서 04(재투영오차 직접 최소화)가 재투영 RMSE 를 9.31→5.51px(-41%),
+# median 1.48→0.79px(-47%) 로 낮춰 픽셀 정합이 가장 좋았다. 그래서 세 스크립트
+# (Step3 / CP_C1 / CP_C3)가 모두 같은 solver 를 쓰도록 여기로 끌어올린다.
+#
+# 기본 정책: solve_fixed_cameras(prefer="reproj") = 04 를 먼저 시도하고, 마커 코너
+# 관측이 없거나(코너 검출 불가) 최적화가 개선에 실패하면 자동으로 03 으로 폴백한다.
+# 두 최적화기 모두 게이지(ref_cam)를 항등으로 고정한 cam-ref 프레임에서 풀고, 초기값은
+# pairwise robust SE(3)(build_ref_relative_from_pairwise) 로 준다.
+
+def build_param_layout(cam_ids: List[int], event_ids: List[int],
+                       ref_cam: Optional[int]) -> Dict[str, Any]:
+    """{cam(≠ref), event} 별 6-vec 슬롯 배치. ref_cam 은 항등으로 고정(변수 아님)."""
+    cam_vars = [ci for ci in cam_ids if ref_cam is None or ci != ref_cam]
+    layout = {"cam_vars": cam_vars, "event_vars": event_ids,
+              "cam_slice": {}, "event_slice": {}, "n": 0}
+    k = 0
+    for ci in cam_vars:
+        layout["cam_slice"][ci] = slice(k, k + 6); k += 6
+    for eid in event_ids:
+        layout["event_slice"][eid] = slice(k, k + 6); k += 6
+    layout["n"] = k
+    return layout
+
+
+def pack_params(T_cam: Dict[int, np.ndarray], T_obj: Dict[int, np.ndarray],
+                layout: Dict[str, Any]) -> np.ndarray:
+    x = np.zeros(layout["n"], dtype=np.float64)
+    for ci, sl in layout["cam_slice"].items():
+        x[sl] = T_to_vec(T_cam[ci])
+    for eid, sl in layout["event_slice"].items():
+        x[sl] = T_to_vec(T_obj[eid])
+    return x
+
+
+def unpack_params(x: np.ndarray, layout: Dict[str, Any],
+                  ref_cam: Optional[int]) -> Tuple[Dict[int, np.ndarray], Dict[int, np.ndarray]]:
+    T_cam: Dict[int, np.ndarray] = {}
+    if ref_cam is not None:
+        T_cam[ref_cam] = np.eye(4, dtype=np.float64)
+    for ci, sl in layout["cam_slice"].items():
+        T_cam[ci] = vec_to_T(x[sl])
+    T_obj = {eid: vec_to_T(x[sl]) for eid, sl in layout["event_slice"].items()}
+    return T_cam, T_obj
+
+
+def prior_residual_terms(T_obj: Dict[int, np.ndarray],
+                         event_to_set: Dict[int, Optional[int]],
+                         set_priors: Dict[int, np.ndarray],
+                         w_trans: float, w_rot: float) -> List[float]:
+    """FK 큐브중점 soft prior 잔차 (병진/회전 가중 분리).
+
+    prior 의 회전은 신뢰 불가(뒤집힘)라 w_rot 기본 0 — 병진(큐브중심)만 당긴다."""
+    res: List[float] = []
+    if not set_priors or (w_trans <= 0.0 and w_rot <= 0.0):
+        return res
+    for eid, T in T_obj.items():
+        sidx = event_to_set.get(eid)
+        if sidx is None or sidx not in set_priors:
+            continue
+        Terr = inv_T(set_priors[sidx]) @ T
+        if w_trans > 0.0:
+            res.extend((Terr[:3, 3] * float(w_trans)).tolist())
+        if w_rot > 0.0:
+            res.extend((R.from_matrix(Terr[:3, :3]).as_rotvec() * float(w_rot)).tolist())
+    return res
+
+
+def _finalize_opt(init_T_cam, init_T_obj, opt_T_cam, opt_T_obj, residual, x0, opt
+                  ) -> Tuple[Dict[int, np.ndarray], Dict[int, np.ndarray], Dict[str, Any]]:
+    """비용이 실제로 낮아졌을 때만 최적화 결과를 채택 (아니면 초기값 유지).
+
+    scipy `success` 는 종료조건 도달만 뜻하지 목적함수 개선을 보장하지 않는다."""
+    c0 = float(np.mean(residual(x0) ** 2))
+    c1 = float(np.mean(residual(opt.x) ** 2))
+    accepted = bool(opt.success) and (c1 < c0)
+    info = {"optimized": True, "optimizer_success": bool(opt.success),
+            "accepted": accepted, "cost_initial": c0, "cost_final": c1,
+            "nfev": int(opt.nfev)}
+    if accepted:
+        return opt_T_cam, opt_T_obj, info
+    info["fallback_reason"] = ("final cost was not lower than initial cost"
+                               if bool(opt.success)
+                               else f"optimizer did not converge (status={int(opt.status)})")
+    return init_T_cam, init_T_obj, info
+
+
+def optimize_pose_consistency(
+    pose_obs: List[PoseObs], fixed_cam_ids: List[int],
+    init_T_cam: Dict[int, np.ndarray], init_T_obj: Dict[int, np.ndarray],
+    ref_cam: Optional[int], event_to_set: Dict[int, Optional[int]],
+    set_priors: Optional[Dict[int, np.ndarray]],
+    prior_weight_trans: float = 0.0, prior_weight_rot: float = 0.0,
+) -> Tuple[Dict[int, np.ndarray], Dict[int, np.ndarray], Dict[str, Any]]:
+    """03: 카메라·이벤트 pose 를 SE(3) pose 일관성으로 동시 최적화 (픽셀 불필요)."""
+    event_ids = sorted(init_T_obj.keys())
+    cam_ids = sorted([ci for ci in fixed_cam_ids if ci in init_T_cam])
+    layout = build_param_layout(cam_ids, event_ids, ref_cam=ref_cam)
+    x0 = pack_params(init_T_cam, init_T_obj, layout)
+
+    usable = [o for o in pose_obs if o.cam in cam_ids and o.event in init_T_obj]
+    if len(usable) < 4:
+        return init_T_cam, init_T_obj, {"optimized": False, "accepted": False,
+                                        "reason": "not enough pose observations"}
+
+    def residual(x: np.ndarray) -> np.ndarray:
+        T_cam, T_obj = unpack_params(x, layout, ref_cam=ref_cam)
+        res: List[float] = []
+        for o in usable:
+            pred = inv_T(T_cam[o.cam]) @ T_obj[o.event]
+            e = se3_log_residual(inv_T(o.T_C_O) @ pred)
+            w = math.sqrt(min(50.0, 1.0 / max(o.err_px, 1e-6)))
+            res.extend((e * w).tolist())
+        if set_priors:
+            res.extend(prior_residual_terms(T_obj, event_to_set, set_priors,
+                                            prior_weight_trans, prior_weight_rot))
+        return np.asarray(res, dtype=np.float64)
+
+    opt = least_squares(residual, x0, method="trf", loss="huber", f_scale=0.003,
+                        max_nfev=300, xtol=1e-10, ftol=1e-10, gtol=1e-10)
+    T_cam, T_obj = unpack_params(opt.x, layout, ref_cam=ref_cam)
+    return _finalize_opt(init_T_cam, init_T_obj, T_cam, T_obj, residual, x0, opt)
+
+
+def optimize_reprojection(
+    corner_obs: List[CornerObs], pose_obs: List[PoseObs], fixed_cam_ids: List[int],
+    init_T_cam: Dict[int, np.ndarray], init_T_obj: Dict[int, np.ndarray],
+    ref_cam: Optional[int], K_map: Dict[int, np.ndarray], D_map: Dict[int, np.ndarray],
+    event_to_set: Dict[int, Optional[int]], set_priors: Optional[Dict[int, np.ndarray]],
+    prior_weight_trans: float = 0.0, prior_weight_rot: float = 0.0,
+    pose_regularizer_weight: float = 2.0,
+) -> Tuple[Dict[int, np.ndarray], Dict[int, np.ndarray], Dict[str, Any]]:
+    """04: 마커 코너의 픽셀 재투영오차를 직접 최소화 (pose 항으로 약하게 정규화)."""
+    event_ids = sorted(init_T_obj.keys())
+    cam_ids = sorted([ci for ci in fixed_cam_ids if ci in init_T_cam])
+    layout = build_param_layout(cam_ids, event_ids, ref_cam=ref_cam)
+    x0 = pack_params(init_T_cam, init_T_obj, layout)
+
+    usable_corners = [o for o in corner_obs if o.cam in cam_ids and o.event in init_T_obj]
+    usable_poses = [o for o in pose_obs if o.cam in cam_ids and o.event in init_T_obj]
+    if len(usable_corners) < 4:
+        return init_T_cam, init_T_obj, {"optimized": False, "accepted": False,
+                                        "reason": "not enough corner observations or cube object-corner API unavailable"}
+
+    def residual(x: np.ndarray) -> np.ndarray:
+        T_cam, T_obj = unpack_params(x, layout, ref_cam=ref_cam)
+        res: List[float] = []
+        for o in usable_corners:
+            T_C_O = inv_T(T_cam[o.cam]) @ T_obj[o.event]
+            rvec = R.from_matrix(T_C_O[:3, :3]).as_rotvec().reshape(3, 1)
+            tvec = T_C_O[:3, 3].reshape(3, 1)
+            proj, _ = cv2.projectPoints(o.object_points.astype(np.float64), rvec, tvec,
+                                        K_map[o.cam], D_map[o.cam])
+            res.extend((proj.reshape(-1, 2) - o.image_points.reshape(-1, 2)).reshape(-1).tolist())
+        if pose_regularizer_weight > 0.0:
+            for o in usable_poses:
+                pred = inv_T(T_cam[o.cam]) @ T_obj[o.event]
+                e = se3_log_residual(inv_T(o.T_C_O) @ pred)
+                res.extend((e * float(pose_regularizer_weight)).tolist())
+        if set_priors:
+            res.extend(prior_residual_terms(T_obj, event_to_set, set_priors,
+                                            prior_weight_trans, prior_weight_rot))
+        return np.asarray(res, dtype=np.float64)
+
+    opt = least_squares(residual, x0, method="trf", loss="huber", f_scale=2.0,
+                        max_nfev=500, xtol=1e-10, ftol=1e-10, gtol=1e-10)
+    T_cam, T_obj = unpack_params(opt.x, layout, ref_cam=ref_cam)
+    return _finalize_opt(init_T_cam, init_T_obj, T_cam, T_obj, residual, x0, opt)
+
+
+def solve_fixed_cameras(
+    pose_obs: List[PoseObs], fixed_cam_ids: List[int], ref_cam: int,
+    K_map: Optional[Dict[int, np.ndarray]] = None,
+    D_map: Optional[Dict[int, np.ndarray]] = None,
+    corner_obs: Optional[List[CornerObs]] = None,
+    event_to_set: Optional[Dict[int, Optional[int]]] = None,
+    set_priors: Optional[Dict[int, np.ndarray]] = None,
+    prior_weight_trans: float = 0.0, prior_weight_rot: float = 0.0,
+    pose_regularizer_weight: float = 2.0,
+    prefer: str = "reproj",
+    init_T_cam: Optional[Dict[int, np.ndarray]] = None,
+    init_T_obj: Optional[Dict[int, np.ndarray]] = None,
+) -> Tuple[Dict[int, np.ndarray], Dict[int, np.ndarray], Dict[str, Any]]:
+    """고정 카메라 상대 pose 를 04(재투영)→03(pose-consistency) 폴백으로 푼다.
+
+    반환 (T_cam, T_obj, diag). 모두 cam-ref 프레임(ref_cam=항등). diag["method"] 는
+    실제로 채택된 방법("04_direct_reprojection" | "03_pose_consistency" |
+    "init_robust_se3"). 초기값은 pairwise robust SE(3) 로 자동 생성(명시 init 가능).
+
+    prefer="reproj"(기본): 코너 관측이 충분하고 최적화가 개선하면 04 채택. 코너가
+    없거나 04 가 기각되면 03 을 시도하고, 그것도 기각되면 robust 초기값을 그대로 반환.
+    prefer="pose": 04 를 건너뛰고 03 만.
+    """
+    if init_T_cam is None or init_T_obj is None:
+        init_T_cam, _ = build_ref_relative_from_pairwise(pose_obs, fixed_cam_ids, ref_cam, robust=True)
+        init_T_obj = initialize_ref_object_poses(pose_obs, init_T_cam, fixed_cam_ids, ref_cam)
+    event_to_set = event_to_set or {}
+
+    diag: Dict[str, Any] = {"method": "init_robust_se3", "prefer": prefer}
+
+    can_reproj = (prefer == "reproj" and corner_obs and K_map is not None and D_map is not None)
+    if can_reproj:
+        T_cam, T_obj, info04 = optimize_reprojection(
+            corner_obs=corner_obs, pose_obs=pose_obs, fixed_cam_ids=fixed_cam_ids,
+            init_T_cam=init_T_cam, init_T_obj=init_T_obj, ref_cam=ref_cam,
+            K_map=K_map, D_map=D_map, event_to_set=event_to_set, set_priors=set_priors,
+            prior_weight_trans=prior_weight_trans, prior_weight_rot=prior_weight_rot,
+            pose_regularizer_weight=pose_regularizer_weight)
+        diag["reproj"] = info04
+        if info04.get("accepted"):
+            diag["method"] = "04_direct_reprojection"
+            return T_cam, T_obj, diag
+
+    # 04 를 못 썼거나 기각됨 → 03 으로 폴백
+    T_cam, T_obj, info03 = optimize_pose_consistency(
+        pose_obs=pose_obs, fixed_cam_ids=fixed_cam_ids,
+        init_T_cam=init_T_cam, init_T_obj=init_T_obj, ref_cam=ref_cam,
+        event_to_set=event_to_set, set_priors=set_priors,
+        prior_weight_trans=prior_weight_trans, prior_weight_rot=prior_weight_rot)
+    diag["pose"] = info03
+    if info03.get("accepted"):
+        diag["method"] = "03_pose_consistency"
+        return T_cam, T_obj, diag
+
+    return init_T_cam, init_T_obj, diag

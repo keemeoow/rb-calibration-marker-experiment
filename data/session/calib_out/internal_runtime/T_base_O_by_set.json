@@ -3,22 +3,22 @@
     "transform_key": "T_base_O_set0",
     "transform": [
       [
-        0.1350402057948326,
-        -0.9534541036943301,
-        0.2696097456831477,
-        -0.11285389484731735
+        0.4166650363632657,
+        -0.9090599326341517,
+        0.0005351182957709624,
+        -0.0964742158944625
       ],
       [
-        0.9855218720048544,
-        0.10109307160838525,
-        -0.13611330086669812,
-        0.2407090394867583
+        0.9090509627733049,
+        0.4166634185099395,
+        0.004235889108446119,
+        0.2871233294506876
       ],
       [
-        0.10252210795206923,
-        0.2840870694368617,
-        0.9533015023379748,
-        0.019602157761099224
+        -0.0040736412859929075,
+        -0.0012784970874332585,
+        0.9999908854043973,
+        0.006469754353607729
       ],
       [
         0.0,
@@ -51,48 +51,51 @@
     ],
     "stability": {
       "num_frames": 18,
-      "num_inliers": 18,
-      "inlier_ratio": 1.0,
-      "translation_std_mm": 44.6928586458945,
-      "rotation_std_deg": 54.83290667173328
+      "num_inliers": 11,
+      "inlier_ratio": 0.6111111111111112,
+      "translation_std_mm": 0.3642788633759962,
+      "rotation_std_deg": 0.24461451792957845,
+      "prior_blend_dt_mm": 0.5967668062026605,
+      "prior_blend_dr_deg": 0.30663538986784156,
+      "prior_blend_alpha": 0.25
     },
     "fixed_support": 18,
-    "gripper_support": 10,
+    "gripper_support": 6,
     "fixed_stability": {
       "num_frames": 18,
-      "num_inliers": 12,
-      "inlier_ratio": 0.6666666666666666,
-      "translation_std_mm": 32.05802062013878,
-      "rotation_std_deg": 5.924596395351179
+      "num_inliers": 7,
+      "inlier_ratio": 0.3888888888888889,
+      "translation_std_mm": 0.16370526156817686,
+      "rotation_std_deg": 0.0170991865870848
     },
     "gripper_stability": {
-      "num_frames": 10,
-      "num_inliers": 5,
-      "inlier_ratio": 0.5,
-      "translation_std_mm": 5.588179514448798,
-      "rotation_std_deg": 1.037872178351459
+      "num_frames": 6,
+      "num_inliers": 6,
+      "inlier_ratio": 1.0,
+      "translation_std_mm": 1.8911649606804672,
+      "rotation_std_deg": 0.1398754045695738
     }
   },
   "1": {
     "transform_key": "T_base_O_set1",
     "transform": [
       [
-        -0.2629471385887285,
-        -0.9647974303897909,
-        0.0049719836339079775,
-        -0.0849643255907431
+        -0.2659069857313621,
+        -0.9639986850045155,
+        -0.00010123648904650513,
+        -0.09584329977297229
       ],
       [
-        0.9647567482848701,
-        -0.2628748025750874,
-        0.011885066676808099,
-        0.38520142864786666
+        0.9639986682748439,
+        -0.265906955724764,
+        -0.00024178816279993079,
+        0.41959684123455165
       ],
       [
-        -0.010159672573625739,
-        0.007921899037778068,
-        0.9999170088406497,
-        0.016788773407019706
+        0.00020616398437816797,
+        -0.0001618850021776752,
+        0.9999999656448283,
+        0.006510257691603662
       ],
       [
         0.0,
@@ -124,48 +127,51 @@
     ],
     "stability": {
       "num_frames": 17,
-      "num_inliers": 9,
-      "inlier_ratio": 0.5294117647058824,
-      "translation_std_mm": 3.848475747806029,
-      "rotation_std_deg": 0.4087136433650372
+      "num_inliers": 11,
+      "inlier_ratio": 0.6470588235294118,
+      "translation_std_mm": 0.8167076088024833,
+      "rotation_std_deg": 0.28006122342829587,
+      "prior_blend_dt_mm": 1.0505017641132088,
+      "prior_blend_dr_deg": 0.0538017093755418,
+      "prior_blend_alpha": 0.25
     },
     "fixed_support": 17,
-    "gripper_support": 11,
+    "gripper_support": 9,
     "fixed_stability": {
       "num_frames": 17,
-      "num_inliers": 8,
-      "inlier_ratio": 0.47058823529411764,
-      "translation_std_mm": 0.0,
-      "rotation_std_deg": 0.0
+      "num_inliers": 11,
+      "inlier_ratio": 0.6470588235294118,
+      "translation_std_mm": 0.8167076088024833,
+      "rotation_std_deg": 0.3200046730013231
     },
     "gripper_stability": {
-      "num_frames": 11,
-      "num_inliers": 10,
-      "inlier_ratio": 0.9090909090909091,
-      "translation_std_mm": 3.81068809361505,
-      "rotation_std_deg": 0.5373102628264547
+      "num_frames": 9,
+      "num_inliers": 9,
+      "inlier_ratio": 1.0,
+      "translation_std_mm": 1.9405466116937966,
+      "rotation_std_deg": 0.25035010299252547
     }
   },
   "2": {
     "transform_key": "T_base_O_set2",
     "transform": [
       [
-        0.958309300462692,
-        0.2855107789192797,
-        -0.01126409195683986,
-        -0.06065996724286081
+        0.9615663478197559,
+        0.2745688221471742,
+        -0.0014562435544318215,
+        -0.07562212536603552
       ],
       [
-        -0.28553237117321006,
-        0.9583690105305199,
-        -0.00032352273035877365,
-        0.46740498306964917
+        -0.27457260816581147,
+        0.9615564976486931,
+        -0.004357140645305454,
+        0.5178848798607631
       ],
       [
-        0.010702787436458482,
-        0.0035262977269630014,
-        0.9999365057669569,
-        0.04329370435796123
+        0.00020392547701175473,
+        0.004589524408108767,
+        0.9999894472843738,
+        0.006058469875079951
       ],
       [
         0.0,
@@ -196,48 +202,51 @@
     ],
     "stability": {
       "num_frames": 16,
-      "num_inliers": 7,
-      "inlier_ratio": 0.4375,
-      "translation_std_mm": 11.693332441314578,
-      "rotation_std_deg": 0.5023413888781872
+      "num_inliers": 11,
+      "inlier_ratio": 0.6875,
+      "translation_std_mm": 0.569051236962651,
+      "rotation_std_deg": 0.3387085499631124,
+      "prior_blend_dt_mm": 6.711085789244888,
+      "prior_blend_dr_deg": 0.5683536578371873,
+      "prior_blend_alpha": 0.25
     },
     "fixed_support": 16,
-    "gripper_support": 10,
+    "gripper_support": 9,
     "fixed_stability": {
       "num_frames": 16,
-      "num_inliers": 7,
-      "inlier_ratio": 0.4375,
-      "translation_std_mm": 0.9763147881051386,
-      "rotation_std_deg": 0.052513125378335745
+      "num_inliers": 11,
+      "inlier_ratio": 0.6875,
+      "translation_std_mm": 0.569051236962651,
+      "rotation_std_deg": 0.10154352648694123
     },
     "gripper_stability": {
-      "num_frames": 10,
-      "num_inliers": 5,
-      "inlier_ratio": 0.5,
-      "translation_std_mm": 3.6169658698821685,
-      "rotation_std_deg": 0.4234572053099082
+      "num_frames": 9,
+      "num_inliers": 9,
+      "inlier_ratio": 1.0,
+      "translation_std_mm": 2.063558042706298,
+      "rotation_std_deg": 0.32724202769979066
     }
   },
   "3": {
     "transform_key": "T_base_O_set3",
     "transform": [
       [
-        -0.2523378730529442,
-        -0.9674560014854543,
-        -0.018827719269553997,
-        -0.07462470577838999
+        -0.25658050003125543,
+        -0.9665097416524733,
+        -0.005036496260308169,
+        -0.07582284098369876
       ],
       [
-        0.9676184680298759,
-        -0.25215736941992567,
-        -0.01145257066075101,
-        0.5776606087773835
+        0.9665217892840939,
+        -0.2565689594707562,
+        -0.0028284050570302715,
+        0.57336408947595
       ],
       [
-        0.006332310054992518,
-        -0.021107966197624374,
-        0.9997571483177138,
-        0.006037675759339332
+        0.0014414724360734211,
+        -0.005593596961059294,
+        0.9999833167759616,
+        0.006695581457869718
       ],
       [
         0.0,
@@ -270,48 +279,51 @@
     ],
     "stability": {
       "num_frames": 18,
-      "num_inliers": 6,
-      "inlier_ratio": 0.3333333333333333,
-      "translation_std_mm": 1.7115608230032624,
-      "rotation_std_deg": 0.5412657718753168
+      "num_inliers": 11,
+      "inlier_ratio": 0.6111111111111112,
+      "translation_std_mm": 1.1663992326530501,
+      "rotation_std_deg": 0.37407117384948096,
+      "prior_blend_dt_mm": 6.201276180227817,
+      "prior_blend_dr_deg": 0.769920351329341,
+      "prior_blend_alpha": 0.25
     },
     "fixed_support": 18,
-    "gripper_support": 9,
+    "gripper_support": 7,
     "fixed_stability": {
       "num_frames": 18,
-      "num_inliers": 9,
-      "inlier_ratio": 0.5,
-      "translation_std_mm": 2.1707359808054294,
-      "rotation_std_deg": 0.5953524918617952
+      "num_inliers": 10,
+      "inlier_ratio": 0.5555555555555556,
+      "translation_std_mm": 0.46056996762014335,
+      "rotation_std_deg": 0.06752202244512025
     },
     "gripper_stability": {
-      "num_frames": 9,
-      "num_inliers": 6,
-      "inlier_ratio": 0.6666666666666666,
-      "translation_std_mm": 3.611181748491184,
-      "rotation_std_deg": 0.5412657718753168
+      "num_frames": 7,
+      "num_inliers": 7,
+      "inlier_ratio": 1.0,
+      "translation_std_mm": 2.3243550243394107,
+      "rotation_std_deg": 0.3574098083024357
     }
   },
   "4": {
     "transform_key": "T_base_O_set4",
     "transform": [
       [
-        -0.9768512590011291,
-        0.05006389920931492,
-        -0.20797890225662136,
-        -0.27733141716288784
+        -0.9702935870691266,
+        0.241914461036223,
+        0.0027836009198536765,
+        -0.22882518340231606
       ],
       [
-        -0.18900314684731967,
-        -0.6573641462823405,
-        0.7294862504970883,
-        0.6235217093265623
+        -0.24192872689097566,
+        -0.9702660909799133,
+        -0.007362322966996737,
+        0.641773941712274
       ],
       [
-        -0.10019694740719429,
-        0.7519082292264461,
-        0.6516092284121141,
-        0.027310700299473266
+        0.0009197811908189437,
+        -0.007817047787521403,
+        0.9999690234034496,
+        0.008400026972958045
       ],
       [
         0.0,
@@ -344,48 +356,51 @@
     ],
     "stability": {
       "num_frames": 18,
-      "num_inliers": 18,
-      "inlier_ratio": 1.0,
-      "translation_std_mm": 24.068458408075223,
-      "rotation_std_deg": 41.4348941389366
+      "num_inliers": 10,
+      "inlier_ratio": 0.5555555555555556,
+      "translation_std_mm": 0.1492526044004962,
+      "rotation_std_deg": 0.20557139523255077,
+      "prior_blend_dt_mm": 2.538570454036749,
+      "prior_blend_dr_deg": 0.7817600895839675,
+      "prior_blend_alpha": 0.25
     },
     "fixed_support": 18,
-    "gripper_support": 10,
+    "gripper_support": 7,
     "fixed_stability": {
       "num_frames": 18,
-      "num_inliers": 18,
-      "inlier_ratio": 1.0,
-      "translation_std_mm": 24.068458408075223,
-      "rotation_std_deg": 42.39393407613162
+      "num_inliers": 11,
+      "inlier_ratio": 0.6111111111111112,
+      "translation_std_mm": 0.17345795871508843,
+      "rotation_std_deg": 0.0338932471433411
     },
     "gripper_stability": {
-      "num_frames": 10,
-      "num_inliers": 10,
+      "num_frames": 7,
+      "num_inliers": 7,
       "inlier_ratio": 1.0,
-      "translation_std_mm": 49.945918000099034,
-      "rotation_std_deg": 19.742855117153155
+      "translation_std_mm": 2.2297363596911355,
+      "rotation_std_deg": 0.24849583324134566
     }
   },
   "5": {
     "transform_key": "T_base_O_set5",
     "transform": [
       [
-        0.17064952807509656,
-        0.22887579026454782,
-        -0.9583812452247417,
-        -0.30077511882835467
+        0.07880231552557868,
+        0.9968835179906955,
+        0.0036669641805334645,
+        -0.30054229238801733
       ],
       [
-        -0.98378179437831,
-        0.09411146947799652,
-        -0.1526971262417377,
-        0.6530416476510347
+        -0.9968859263578843,
+        0.07881228870902016,
+        -0.0026595071026128247,
+        0.6428688766114561
       ],
       [
-        0.05524599186854941,
-        0.968895713657291,
-        0.24122391348908434,
-        0.009200475698129719
+        -0.0029402206362557607,
+        -0.0034459696661897077,
+        0.9999897401452027,
+        0.008025030244953012
       ],
       [
         0.0,
@@ -416,48 +431,51 @@
     ],
     "stability": {
       "num_frames": 16,
-      "num_inliers": 8,
-      "inlier_ratio": 0.5,
-      "translation_std_mm": 1.1074910026854259,
-      "rotation_std_deg": 1.0794137884612078
+      "num_inliers": 11,
+      "inlier_ratio": 0.6875,
+      "translation_std_mm": 0.3116357745579512,
+      "rotation_std_deg": 0.29888143924065486,
+      "prior_blend_dt_mm": 6.249548981959837,
+      "prior_blend_dr_deg": 0.3692613643990468,
+      "prior_blend_alpha": 0.25
     },
     "fixed_support": 16,
-    "gripper_support": 11,
+    "gripper_support": 9,
     "fixed_stability": {
       "num_frames": 16,
-      "num_inliers": 6,
-      "inlier_ratio": 0.375,
-      "translation_std_mm": 0.0,
-      "rotation_std_deg": 0.0
+      "num_inliers": 7,
+      "inlier_ratio": 0.4375,
+      "translation_std_mm": 0.262224441735179,
+      "rotation_std_deg": 0.05084550903149288
     },
     "gripper_stability": {
-      "num_frames": 11,
+      "num_frames": 9,
       "num_inliers": 8,
-      "inlier_ratio": 0.7272727272727273,
-      "translation_std_mm": 2.6568902120232636,
-      "rotation_std_deg": 1.0794137884612078
+      "inlier_ratio": 0.8888888888888888,
+      "translation_std_mm": 1.6825423539743136,
+      "rotation_std_deg": 0.19048933242852664
     }
   },
   "6": {
     "transform_key": "T_base_O_set6",
     "transform": [
       [
-        -0.765455556249548,
-        -0.6434781670885373,
-        -0.0036932217738699863,
-        -0.4034851296151614
+        -0.7632913886447986,
+        -0.6460533515520206,
+        -0.0011502039366781485,
+        -0.4001459072729868
       ],
       [
-        0.6430920504071116,
-        -0.7651725511461611,
-        0.030717774588213242,
-        0.607635100292684
+        0.6460536968335973,
+        -0.7632867967733762,
+        -0.0028083231795944168,
+        0.60177114699892
       ],
       [
-        -0.0225921692157231,
-        0.021138009671002655,
-        0.9995212746296481,
-        0.01088209849228347
+        0.0009363911239549383,
+        -0.0028866624049195197,
+        0.9999953951653092,
+        0.007838052089264138
       ],
       [
         0.0,
@@ -483,48 +501,51 @@
     ],
     "stability": {
       "num_frames": 11,
-      "num_inliers": 6,
-      "inlier_ratio": 0.5454545454545454,
-      "translation_std_mm": 2.5849394142282115e-26,
-      "rotation_std_deg": 0.4274919858202101
+      "num_inliers": 9,
+      "inlier_ratio": 0.8181818181818182,
+      "translation_std_mm": 0.15693221754948047,
+      "rotation_std_deg": 0.09887177373726071,
+      "prior_blend_dt_mm": 5.612737876687243,
+      "prior_blend_dr_deg": 0.5387936759118503,
+      "prior_blend_alpha": 0.25
     },
     "fixed_support": 11,
-    "gripper_support": 11,
+    "gripper_support": 8,
     "fixed_stability": {
       "num_frames": 11,
-      "num_inliers": 11,
-      "inlier_ratio": 1.0,
-      "translation_std_mm": 3.564391364535312e-14,
+      "num_inliers": 8,
+      "inlier_ratio": 0.7272727272727273,
+      "translation_std_mm": 0.0,
       "rotation_std_deg": 0.0
     },
     "gripper_stability": {
-      "num_frames": 11,
+      "num_frames": 8,
       "num_inliers": 7,
-      "inlier_ratio": 0.6363636363636364,
-      "translation_std_mm": 4.286653824072959,
-      "rotation_std_deg": 0.7494782897818317
+      "inlier_ratio": 0.875,
+      "translation_std_mm": 2.4896813324593947,
+      "rotation_std_deg": 0.1911016866280406
     }
   },
   "7": {
     "transform_key": "T_base_O_set7",
     "transform": [
       [
-        -0.44407505798272384,
-        0.5786517775219511,
-        0.6840756268486163,
-        -0.3871916885010214
+        -0.6534236550890925,
+        0.7569913080615001,
+        -0.0012986490478830025,
+        -0.40172677782481014
       ],
       [
-        0.549437114341226,
-        -0.42722049850430815,
-        0.7180539694494538,
-        0.47243976034818147
+        -0.7569843564536748,
+        -0.6534236507839103,
+        -0.0034952368506394743,
+        0.5124280688783983
       ],
       [
-        0.7077543360955321,
-        0.69472639652486,
-        -0.12821479520537327,
-        -0.02430646546050571
+        -0.003494431917505073,
+        -0.0013008134245758307,
+        0.9999930483908417,
+        0.008372021762900974
       ],
       [
         0.0,
@@ -553,48 +574,51 @@
     ],
     "stability": {
       "num_frames": 14,
-      "num_inliers": 14,
-      "inlier_ratio": 1.0,
-      "translation_std_mm": 51.34328927308925,
-      "rotation_std_deg": 35.93282839481514
+      "num_inliers": 11,
+      "inlier_ratio": 0.7857142857142857,
+      "translation_std_mm": 0.31823773368342206,
+      "rotation_std_deg": 0.2036153409283775,
+      "prior_blend_dt_mm": 3.5641002911799378,
+      "prior_blend_dr_deg": 0.3645749808780264,
+      "prior_blend_alpha": 0.25
     },
     "fixed_support": 14,
-    "gripper_support": 11,
+    "gripper_support": 8,
     "fixed_stability": {
       "num_frames": 14,
-      "num_inliers": 9,
-      "inlier_ratio": 0.6428571428571429,
-      "translation_std_mm": 1.276096000287595e-13,
+      "num_inliers": 5,
+      "inlier_ratio": 0.35714285714285715,
+      "translation_std_mm": 0.0,
       "rotation_std_deg": 0.0
     },
     "gripper_stability": {
-      "num_frames": 11,
-      "num_inliers": 11,
+      "num_frames": 8,
+      "num_inliers": 8,
       "inlier_ratio": 1.0,
-      "translation_std_mm": 55.69540133888043,
-      "rotation_std_deg": 42.514905571325556
+      "translation_std_mm": 2.8947883139860386,
+      "rotation_std_deg": 0.16675261279065312
     }
   },
   "8": {
     "transform_key": "T_base_O_set8",
     "transform": [
       [
-        -0.62590925995795,
-        -0.7798438979491539,
-        -0.009005172422604898,
-        -0.2804492659194235
+        -0.636920542575406,
+        -0.7709245901246514,
+        0.0027383912409325237,
+        -0.39883414439032117
       ],
       [
-        0.7798916959985234,
-        -0.6259020334641764,
-        -0.003948039761248775,
-        0.3610511015682632
+        0.7709289205302795,
+        -0.6369202612817354,
+        0.0010863971757345747,
+        0.44099991833281404
       ],
       [
-        -0.0025575010143333576,
-        -0.00949417383867246,
-        0.9999516587574035,
-        -0.11812763322788923
+        0.0009066065672506674,
+        0.002803053681983053,
+        0.9999956604678781,
+        0.0073252038219140106
       ],
       [
         0.0,
@@ -623,48 +647,51 @@
     ],
     "stability": {
       "num_frames": 14,
-      "num_inliers": 6,
-      "inlier_ratio": 0.42857142857142855,
-      "translation_std_mm": 0.0,
-      "rotation_std_deg": 0.5051175407426447
+      "num_inliers": 8,
+      "inlier_ratio": 0.5714285714285714,
+      "translation_std_mm": 0.42753379177800827,
+      "rotation_std_deg": 0.1116274416585891,
+      "prior_blend_dt_mm": 4.1048826073856715,
+      "prior_blend_dr_deg": 0.338847659978007,
+      "prior_blend_alpha": 0.25
     },
     "fixed_support": 14,
-    "gripper_support": 11,
+    "gripper_support": 8,
     "fixed_stability": {
       "num_frames": 14,
-      "num_inliers": 10,
-      "inlier_ratio": 0.7142857142857143,
-      "translation_std_mm": 2.9871045956708977e-12,
-      "rotation_std_deg": 0.0
+      "num_inliers": 8,
+      "inlier_ratio": 0.5714285714285714,
+      "translation_std_mm": 0.3744220160926794,
+      "rotation_std_deg": 0.049363277328365866
     },
     "gripper_stability": {
-      "num_frames": 11,
-      "num_inliers": 5,
-      "inlier_ratio": 0.45454545454545453,
-      "translation_std_mm": 1.880283435939242,
-      "rotation_std_deg": 0.2880795757374447
+      "num_frames": 8,
+      "num_inliers": 8,
+      "inlier_ratio": 1.0,
+      "translation_std_mm": 2.909595812996348,
+      "rotation_std_deg": 0.36022884159496815
     }
   },
   "9": {
     "transform_key": "T_base_O_set9",
     "transform": [
       [
-        -0.4640567961835549,
-        0.33914917672593425,
-        -0.8183086983785374,
-        -0.3359656747056134
+        -0.6529894978450217,
+        0.7573573460206373,
+        0.003816560321038451,
+        -0.4304647989237239
       ],
       [
-        -0.820424367989806,
-        -0.5128853128920251,
-        0.25269054637674304,
-        0.31806420092292537
+        -0.757364672294803,
+        -0.652991624659817,
+        -0.0008314348557193163,
+        0.35939809011437734
       ],
       [
-        -0.3339987220400429,
-        0.7886231620652361,
-        0.5162541640799105,
-        -0.11064670797743723
+        0.0018624886289304587,
+        -0.0034334461857628007,
+        0.9999923712626,
+        0.007778039117100972
       ],
       [
         0.0,
@@ -690,48 +717,51 @@
     ],
     "stability": {
       "num_frames": 11,
-      "num_inliers": 10,
-      "inlier_ratio": 0.9090909090909091,
-      "translation_std_mm": 37.54058535986306,
-      "rotation_std_deg": 20.25815400839768
+      "num_inliers": 11,
+      "inlier_ratio": 1.0,
+      "translation_std_mm": 0.6719746954733271,
+      "rotation_std_deg": 0.2810488816688997,
+      "prior_blend_dt_mm": 6.741674983250485,
+      "prior_blend_dr_deg": 0.3580216303326836,
+      "prior_blend_alpha": 0.25
     },
     "fixed_support": 11,
-    "gripper_support": 11,
+    "gripper_support": 8,
     "fixed_stability": {
-      "num_frames": 11,
-      "num_inliers": 5,
-      "inlier_ratio": 0.45454545454545453,
-      "translation_std_mm": 0.0,
-      "rotation_std_deg": 0.0
-    },
-    "gripper_stability": {
       "num_frames": 11,
       "num_inliers": 10,
       "inlier_ratio": 0.9090909090909091,
-      "translation_std_mm": 9.727292058424315,
-      "rotation_std_deg": 20.25815400839768
+      "translation_std_mm": 0.7266812966436224,
+      "rotation_std_deg": 0.0842927402388799
+    },
+    "gripper_stability": {
+      "num_frames": 8,
+      "num_inliers": 8,
+      "inlier_ratio": 1.0,
+      "translation_std_mm": 1.7297141961525275,
+      "rotation_std_deg": 0.1770583069105435
     }
   },
   "10": {
     "transform_key": "T_base_O_set10",
     "transform": [
       [
-        0.9607611386276503,
-        -0.1926067459806676,
-        -0.19960129234461277,
-        -0.4436640563411016
+        0.632955806441201,
+        0.7741578895435532,
+        0.006819761714355116,
+        -0.38783793160637003
       ],
       [
-        -0.068938405631314,
-        0.5312147615455521,
-        -0.8444278378553814,
-        0.27686689687957733
+        -0.7741823249586606,
+        0.6329601803483691,
+        0.0017713878635207748,
+        0.2775201958727199
       ],
       [
-        0.2686736509818435,
-        0.8250536458430086,
-        0.4970924971765778,
-        0.03874434145091883
+        -0.0029453037146648965,
+        -0.006400949213358653,
+        0.999975176209488,
+        0.007933209992925162
       ],
       [
         0.0,
@@ -763,48 +793,51 @@
     ],
     "stability": {
       "num_frames": 17,
-      "num_inliers": 17,
-      "inlier_ratio": 1.0,
-      "translation_std_mm": 30.357771587652763,
-      "rotation_std_deg": 40.42273279283473
+      "num_inliers": 11,
+      "inlier_ratio": 0.6470588235294118,
+      "translation_std_mm": 0.35574561998601,
+      "rotation_std_deg": 0.3508014007605084,
+      "prior_blend_dt_mm": 2.868579272792417,
+      "prior_blend_dr_deg": 0.5396005298173006,
+      "prior_blend_alpha": 0.25
     },
     "fixed_support": 17,
-    "gripper_support": 10,
+    "gripper_support": 7,
     "fixed_stability": {
       "num_frames": 17,
-      "num_inliers": 8,
-      "inlier_ratio": 0.47058823529411764,
-      "translation_std_mm": 4.4133668956228e-14,
+      "num_inliers": 5,
+      "inlier_ratio": 0.29411764705882354,
+      "translation_std_mm": 0.0,
       "rotation_std_deg": 0.0
     },
     "gripper_stability": {
-      "num_frames": 10,
-      "num_inliers": 5,
-      "inlier_ratio": 0.5,
-      "translation_std_mm": 10.146638589064937,
-      "rotation_std_deg": 0.8656040790224778
+      "num_frames": 7,
+      "num_inliers": 7,
+      "inlier_ratio": 1.0,
+      "translation_std_mm": 1.3768090286054175,
+      "rotation_std_deg": 0.23359586976406882
     }
   },
   "11": {
     "transform_key": "T_base_O_set11",
     "transform": [
       [
-        -0.1985950645653745,
-        0.9798278104942678,
-        -0.02230385868597015,
-        -0.3723027736341724
+        -0.1979419961899686,
+        0.9802125066434492,
+        0.001551761610867498,
+        -0.31611844265621364
       ],
       [
-        -0.980075614348543,
-        -0.19862214435750047,
-        0.0010168235609371427,
-        0.2807900759701875
+        -0.9802032179287435,
+        -0.19794695774803042,
+        0.004318967519607107,
+        0.28015224411041084
       ],
       [
-        -0.0034337282362821298,
-        0.022061404144731067,
-        0.9997507209087482,
-        0.008172990870146371
+        0.004540672468527136,
+        -0.0006661366721199603,
+        0.9999894692222852,
+        0.007409994017357346
       ],
       [
         0.0,
@@ -837,48 +870,51 @@
     ],
     "stability": {
       "num_frames": 18,
-      "num_inliers": 8,
-      "inlier_ratio": 0.4444444444444444,
-      "translation_std_mm": 2.1930442405413326,
-      "rotation_std_deg": 0.6886739553763729
+      "num_inliers": 10,
+      "inlier_ratio": 0.5555555555555556,
+      "translation_std_mm": 0.4611078111859535,
+      "rotation_std_deg": 0.15463889424139698,
+      "prior_blend_dt_mm": 1.6539243691175647,
+      "prior_blend_dr_deg": 0.4480227360949942,
+      "prior_blend_alpha": 0.25
     },
     "fixed_support": 18,
-    "gripper_support": 11,
+    "gripper_support": 10,
     "fixed_stability": {
       "num_frames": 18,
-      "num_inliers": 11,
-      "inlier_ratio": 0.6111111111111112,
-      "translation_std_mm": 2.341760491333452,
-      "rotation_std_deg": 1.1232074336896436
+      "num_inliers": 10,
+      "inlier_ratio": 0.5555555555555556,
+      "translation_std_mm": 0.3674556373940554,
+      "rotation_std_deg": 0.052318953361373426
     },
     "gripper_stability": {
-      "num_frames": 11,
-      "num_inliers": 6,
-      "inlier_ratio": 0.5454545454545454,
-      "translation_std_mm": 7.06595500753811,
-      "rotation_std_deg": 0.2440272821977941
+      "num_frames": 10,
+      "num_inliers": 9,
+      "inlier_ratio": 0.9,
+      "translation_std_mm": 1.378781054189903,
+      "rotation_std_deg": 0.15297096180925882
     }
   },
   "12": {
     "transform_key": "T_base_O_set12",
     "transform": [
       [
-        -0.9008200603985654,
-        -0.4166992590628185,
-        0.12200387813517494,
-        -0.31771809984431054
+        -0.9311284252414553,
+        -0.36461500265359786,
+        0.007466963725940163,
+        -0.24299822058134313
       ],
       [
-        0.42295818800776713,
-        -0.9056632885373732,
-        0.029671181184050342,
-        0.24274964912062527
+        0.36462505324176775,
+        -0.931154428801976,
+        -1.6459160288138044e-05,
+        0.2801593814943537
       ],
       [
-        0.09813047427130311,
-        0.07833093445228682,
-        0.9920860218383888,
-        -0.02252456254235505
+        0.00695889759988505,
+        0.0027073164541253844,
+        0.9999721217023061,
+        0.0073943922812081
       ],
       [
         0.0,
@@ -913,26 +949,29 @@
     ],
     "stability": {
       "num_frames": 20,
-      "num_inliers": 20,
-      "inlier_ratio": 1.0,
-      "translation_std_mm": 58.47492018582545,
-      "rotation_std_deg": 64.83247585173154
+      "num_inliers": 11,
+      "inlier_ratio": 0.55,
+      "translation_std_mm": 0.20326665392545326,
+      "rotation_std_deg": 0.41661978623937923,
+      "prior_blend_dt_mm": 2.029357651268929,
+      "prior_blend_dr_deg": 0.6646510488471531,
+      "prior_blend_alpha": 0.25
     },
     "fixed_support": 20,
     "gripper_support": 11,
     "fixed_stability": {
       "num_frames": 20,
-      "num_inliers": 20,
-      "inlier_ratio": 1.0,
-      "translation_std_mm": 58.47492018582545,
-      "rotation_std_deg": 58.49479000526911
+      "num_inliers": 5,
+      "inlier_ratio": 0.25,
+      "translation_std_mm": 0.0,
+      "rotation_std_deg": 0.0
     },
     "gripper_stability": {
       "num_frames": 11,
-      "num_inliers": 8,
-      "inlier_ratio": 0.7272727272727273,
-      "translation_std_mm": 3.147316521575599,
-      "rotation_std_deg": 0.7388908506206978
+      "num_inliers": 11,
+      "inlier_ratio": 1.0,
+      "translation_std_mm": 0.8333637066630994,
+      "rotation_std_deg": 0.41661978623937923
     }
   }
 }
