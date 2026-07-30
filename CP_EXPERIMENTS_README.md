@@ -7,6 +7,12 @@
 
 각 CP 실험은 C1/C2/C3 서로 독립 실행되며, 공유 로더/기하/지표는 `CP_common.py` 에 있다.
 
+> **논문 핵심표의 source of truth는
+> [`CP_result/Calibration_Experiment_table.md`](CP_result/Calibration_Experiment_table.md)다.** 아래의 기존
+> C1/C2/C3는 서로 다른 historical/component 실험이므로, canonical A0–B3의 통제된 인과 비교나
+> 외부-GT accuracy로 재해석하지 않는다. 특히 C1의 FK 후보정과 C2의 marker-source 결과는
+> Main Ablation 행에 섞지 않는다.
+
 ---
 
 ## 시뮬 ↔ 실데이터 대응
@@ -80,6 +86,30 @@ grip_t, cube_vs_fk, cost, **down_mm / down+fk_mm**.
 python Step3_calibration.py --root_folder <sess> --intrinsics_dir <intr> \
     --out_dir <sess>/calib_out --target both
 ```
+
+기본값 `--joint_solve fk_fixed`는 단계식 해를 초기값으로 만든 뒤 STEP-E에서 기존
+pose-SE(3) residual로 `{T_base_Ci, T_gripper_cam, T_base_board}`를 공동 최적화한다.
+cube pose는 object frame에 정렬된 set별 FK pose로 고정된다. 검증 중인 canonical
+per-corner pixel objective는 아래처럼 **명시적으로 opt-in**한다. 동치성·수렴 검증이
+끝날 때까지 production 기본값은 바꾸지 않는다.
+
+```bash
+python3 Step3_calibration.py \
+  --root_folder data/session \
+  --intrinsics_dir intrinsics \
+  --out_dir <isolated-output> \
+  --target both \
+  --joint_solve reprojection_fk_fixed
+```
+
+두 진입점은 [`calibration_reprojection_backend.py`](calibration_reprojection_backend.py)의
+동일 residual, freeze mask, local SE(3) retraction, Jacobian, smooth robust
+`soft_l1(f_scale=2 px)`, SciPy `x_scale='jac'`를
+사용한다. [`calibration_corner_observations.py`](calibration_corner_observations.py)가
+corner 관측 생성도 공유한다. 이전 단계식 동작은 `--joint_solve off`를 사용한다. 실제
+채택 여부, 종료 status, optimality, 관측 수와 전후 direct consistency는
+`calibration_summary.json > diagnostics > joint_optimization`에 기록된다.
+
 **실행**
 ```bash
 PYTHONPATH= python CP_C2_cube_vs_board.py \
@@ -91,6 +121,203 @@ PYTHONPATH= python CP_C2_cube_vs_board.py \
 
 > 실세션 결과가 시뮬 핵심 주장을 재현: **cube 동시관측 2.70대(≥2대 89.7%) vs board 1.03대
 > (2.9%)** — cube 6면이 카메라 간 연결을 강하게 만든다.
+
+### Main ablation pose-source schema
+
+모든 A0–B3 조건은 손목 카메라 뷰를 정합하기 위한 운동학 백본
+`T_base_gripper=FK(q)`를 공통으로 사용한다. 실험 축은 백본 FK 사용 여부가 아니라
+target pose source이며, [`CP_ablation_schema.py`](CP_ablation_schema.py)에 7행 정의와
+검증 규칙을 고정했다. 외부 고정 board에는 robot FK pose가 없으므로
+`FK→board=FK-fixed`인 조건은 실행 전에 오류로 반려된다.
+
+같은 스키마에는 seq 행의 stage별 자유변수/freeze 목록, B1·A3·B2가 공유해야 하는
+단일 **board-free FK artifact**, event-stratified held-out reprojection 평가, noise-free
+`A1=A2`/`B1=A3` sanity gate도 포함된다. Train reprojection은 최적화 진단값으로만
+보고하고 method 순위의 1차 지표로 사용하지 않는다. 상세 계약은
+[`CP_result/Calibration_Experiment_table.md`](CP_result/Calibration_Experiment_table.md)에 있다.
+
+FK-fixed 행의 artifact는 board hand-eye보다 먼저, raw `set_cube_center_6dof`와 train eih
+cube corners만으로 `T_gripper_cam`과 FK-cube→tag-object delta를 공동 추정한다.
+B1/A3/B2는 동일 SHA와 fixed cube matrix를 사용하며 B2의 전처리에도 board가 들어가지 않는다.
+
+```bash
+python3 CP_build_board_free_fk_artifact.py \
+  --root_folder data/session \
+  --intrinsics_dir intrinsics \
+  --out_dir CP_result/fk_cube_artifact
+```
+
+실데이터 canonical artifact는 108 observations/1148 corners, Jacobian 12/12 full rank,
+condition 38.11이며 3개 초기값 모두 수렴했다. 기존 board-derived delta와는
+9.148 mm/0.540° 차이다. canonical 파일과 board-derived 비교 파일은
+[`CP_result/fk_cube_artifact`](CP_result/fk_cube_artifact/)에 분리되어 있고 비교 파일은
+어떤 ablation 행도 소비하지 않는다.
+
+```bash
+python3 CP_ablation_7row.py \
+  --root_folder data/session \
+  --intrinsics_dir intrinsics \
+  --calib_dir data/session/calib_out \
+  --out_dir CP_result/ablation_7row_canonical \
+  --num_inits 3 \
+  --max_nfev 300 \
+  --tol 1e-8
+```
+
+실행 전 noise-free synthetic gate를 강제로 통과한다. Canonical backend의 Table 1 숫자는
+비차원화·종료조건을 train/synthetic 진단으로 먼저 고정했다. board-free artifact를 적용한
+단일-seed 7행은 7/7, B1/A3/B2 3-seed는 9/9
+수렴했다. 이후 모델 독립 path mask를 반영한 canonical 7행×3 seeds도 21/21 수렴했다.
+산출물은 [`CP_result/ablation_7row_canonical`](CP_result/ablation_7row_canonical/)에 있다.
+
+path mask는 held-out measurement만으로 fitting 전에 고정되며 SHA-256
+`8122b1f886a40ab94fb5cb223c12e3926f43148841a3f28f62343eecf49b76a3`다. 모든 cube 행이
+동일한 113 observations, 81 `e_cross` pairs, 29 `e_e2e` units를 평가하며 예측값에 따른
+30 mm/10° 제거는 없다. 보고서는 marker별·카메라별 reprojection도 분리한다. A0/B3의 path
+metric은 cube가 없으므로 N/A다. 현재 3-seed `±`는 initialization 분산이며 데이터
+불확실성이 아니므로, 여러 event split/seed 반복 전에는 fixed-split 결과로 표기한다.
+
+외부 GT가 없는 위치 hold-out 값은 `e_task_pose^{FK-proxy}`로만 부르고 absolute physical
+accuracy로 표현하지 않는다.
+
+반복 split 최종 runner는 다음과 같다.
+
+```bash
+python3 CP_ablation_multisplit.py \
+  --out_dir CP_result/ablation_multisplit \
+  --split_seeds 20260729,20260730,20260731,20260732,20260733 \
+  --num_inits 5 --max_nfev 300 --tol 1e-8
+```
+
+5 splits×7 rows×5 initializations의 175/175 run이 수렴했다. 집계는
+[`multisplit_ablation.md`](CP_result/ablation_multisplit/multisplit_ablation.md)에 있으며,
+split mean의 표준편차와 split 내부 initialization 표준편차를 분리한다. paired contrast 결과는
+A1→A2 overall `−0.1486±0.0216 px`(5/5 개선), B1→A3 `−0.00869±0.00220 px`
+(5/5이나 효과 작음), A2→A3 `+0.1155±0.0253 px`(0/5 개선)다. B2→A3도 공통
+cube reprojection/e_e2e/e_cross에서 모두 0/5 개선이다. 따라서 현재 실데이터는
+estimated-pose Unified 효과만 지지하며 FK-fixed 및 board 추가의 정확도 이득은 지지하지 않는다.
+
+### Canonical custom-GT synthetic sweep
+
+```bash
+python3 CP_synthetic_7row.py \
+  --out_dir CP_result/synthetic_7row \
+  --pixel_sigmas 0,0.5,1.0,2.0 --trials 10 \
+  --fk_noise_specs 0:0,1:0.1,3:0.3,5:0.5 \
+  --fk_sweep_pixel_sigma 1.0
+```
+
+이 결과는 **METRIC이 아니라** A0–B3 전체를 구현할 수 있는 pixel-level custom GT다.
+포함된 METRIC `medium_workcell`은 eye-on-base checkerboard-only라 cube/eih/FK→cube 축을
+만들 수 없다. headline은 모든 행에 공통인 `T_base_Ci`와 `T_gripper_cam`의 GT RMS다.
+
+noise-free에서는 7행 모두 수치 오차 안에서 GT를 복원했다. A2 strict estimated-cube는
+σ=0.5/1/2 px에서 6/10, 3/10, 0/10만 수렴하여 미수렴 조건의 GT 숫자를 표에서 제거했다.
+A3는 모든 σ에서 10/10 수렴했다. B2→A3 board 이득은 pixel noise와 함께 커졌지만 실제
+5-split 데이터에서는 0/5 개선이므로 실제 setup으로 일반화할 수 없다. pixel σ=1 px에서
+FK cube-pose noise를 0→5 mm/0→0.5°로 늘리면 A3 translation GT error가
+4.18→44.11 mm로 증가했다. 상세 표와 raw diagnostics는
+[`CP_result/synthetic_7row`](CP_result/synthetic_7row/)에 있다.
+
+### METRIC board-only external-GT baseline
+
+```bash
+python3 CP_metric_board_only.py \
+  --dataset_dir '[]Multi-Camera-Hand-Eye-Calibration-main/data/medium_workcell' \
+  --out_dir CP_result/metric_board_only
+```
+
+METRIC `medium_workcell`은 4-camera eye-on-base checkerboard 자료이므로 7행 factorial에
+넣지 않는다. 별도 runner는 Tsai-Lenz/Park-Martin/Horaud/Daniilidis와 공유
+`T_gripper_board`를 갖는 joint corner reprojection 호환 재구현을 번들 `T_base_cam` GT로
+평가한다. Joint 결과는 4-camera RMS `0.9474 mm/0.0626°`, train coordinate RMSE
+`0.2407 px`, Jacobian 30/30 full-rank다. 원본 Allegro C++/Ceres 바이너리는 현재 환경에
+`cmake`가 없어 실행하지 않았으므로 이 값을 원본 바이너리 결과로 부르지 않는다. 상세
+per-camera 값과 provenance는 [`CP_result/metric_board_only`](CP_result/metric_board_only/)에 있다.
+
+### Table 4 real-data sensitivity
+
+```bash
+python3 CP_sensitivity_7row.py \
+  --root_folder data/session \
+  --intrinsics_dir intrinsics \
+  --out_dir CP_result/sensitivity_7row
+```
+
+물리 task 실험과 분리된 추가수집 없는 subsampling runner다. 5개 고정 위치
+`[0,2,6,9,12]`에 전체 train event `N=5/10/20/40`을 균등 배분하고, 같은 seed에서 작은
+subset이 큰 subset에 포함되도록 했다. `cams=2/3/4`는 eih 한 대를 포함하며 고정 카메라는
+`[0]⊂[0,1]⊂[0,1,3]`으로 추가한다. 해상도 조건은 저장 영상을 0.5×로 줄여 검출을 다시
+수행한 것과 native 검출의 비교이며 센서 재촬영 결과가 아니다. 검출 corner는 native pixel
+frame으로 되돌리고, 모든 조건을 같은 native held-out event와 `eih+cam0`에서 평가한다.
+
+5개 subset seed에서 A2는 N=5의 1개 seed가 `max_nfev=300`에 도달해 headline 값을
+제거했다. A0는 0.5×에서 고정 카메라 ChArUco 검출이 없어 0/5 모두 등록 불가였다. 핵심
+B2→A3 공통-cube paired Δ(A3−B2)는 N=5에서 `−0.1558±0.1654 px`(4/5 개선)였지만,
+N=10/20/40에서는 각각 `+0.0305/+0.0307/+0.0373 px`로 board 이득이 재현되지 않았다.
+따라서 현재 실데이터로 강한 저N board 이득을 주장하지 않는다. 표와 raw provenance는
+[`CP_result/sensitivity_7row`](CP_result/sensitivity_7row/)에 있다.
+
+### Fixed-camera solver 01–04 controlled comparison
+
+```bash
+python3 CP_solver_01_04.py \
+  --root_folder data/session \
+  --intrinsics_dir intrinsics \
+  --test_sets 0,4,6,12 \
+  --out_dir CP_result/solver_01_04
+```
+
+01 mean, 02 robust SE(3), 03 pose consistency, 04 direct corner reprojection을 같은 train/test
+cube 관측으로 강제 실행한다. 03과 04는 동일한 02 초기값 SHA를 공유하고, 04의 pose
+regularizer는 0이며 production fallback은 비활성화된다. 1차 지표는 held-out 한 카메라의
+PnP pose를 다른 카메라 corner로 전이하는 measurement-only cross-view RMSE다.
+
+01/02/03/04의 held-out transfer는 각각 `37.9321/29.8026/29.8609/29.4867 px`였다.
+04의 train reprojection은 02의 `9.3070`에서 `5.5139 px`로 크게 낮지만 held-out 개선은
+`0.3159 px`에 그쳤고, 03은 02보다 소폭 나빴다. 따라서 train loss만으로 solver 우위를
+주장하지 않는다. 이 실세션에는 외부 GT가 없으므로 수치는 absolute accuracy가 아니라
+multi-view agreement다. 상세 결과는
+[`CP_result/solver_01_04`](CP_result/solver_01_04/)에 있다.
+
+### SOTA protocol audit
+
+SOTA 표는 서로 다른 논문의 mm/°를 `e_task_pose` 하나로 합치지 않는다. strict
+`learning-free`(pretrained model도 없음), `multi-cam`, 고정+손목 카메라가 한 objective에
+들어가는 `joint eye-in+to`를 별도 검증하고, 각 숫자에 GT와 metric 정의를 붙인다.
+
+- Tabb & Yousef는 학습 없는 multi-camera robot-world hand-eye지만 원 논문 확장은 같은 로봇에
+  장착한 multiple-eye이며, mixed eye-in+eye-to joint 방법은 아니다.
+- Allegro et al.은 여러 fixed camera와 robot-mounted board를 푸는 learning-free 방법이다.
+  METRIC synthetic medium 보고값은 `0.75 mm/0.02°`, `13.78 s`다.
+- EasyHeC++의 `1.35 mm/0.045°`는 5-view synthetic eye-to-hand camera-pose GT다. SAM 및
+  pretrained matcher를 사용하므로 strict learning-free는 아니다.
+- Li et al.의 `0.930 mm/0.265°`는 단일 structured-light camera에서 여섯 configuration과
+  세 재장착 group 사이의 평균 표준편차다. external-GT accuracy나 multi-camera 결과가 아니다.
+- 본 A3 real 결과는 외부 transform GT가 없으므로 `4.6230±0.4338 px` held-out corner RMSE만
+  보고하며, 외부 논문의 mm/°와 순위를 만들지 않는다.
+
+원문 링크와 전체 표·runtime/view 정의는
+[`CP_result/Calibration_Experiment_table.md`](CP_result/Calibration_Experiment_table.md)의 Table 6에 있다.
+
+### A2 strict-none vs A3 FK-fixed — historical 진단
+
+```bash
+python3 CP_A2_strict_none.py \
+  --root_folder data/session \
+  --intrinsics_dir intrinsics \
+  --calib_dir data/session/calib_out \
+  --test_sets 0,4,6,12 \
+  --num_inits 5 \
+  --max_nfev 300 \
+  --out_dir CP_result/A2_strict_none
+```
+
+A2는 set별 cube pose를 visual-only 초기값에서 자유변수로 풀며 FK residual과
+post-correction을 전혀 사용하지 않는다. A3는 동일 관측·optimizer에서 cube pose만
+aligned FK에 고정한다. 다만 이 독립 script는 canonical backend 추출 전 historical
+diagnostic이며, 핵심표의 A2/A3는 이제 7행 runner의 공통 backend 결과만 사용한다.
+종료조건 미도달 시 단일 오차값을 핵심표 값으로 채택하지 않는다.
 
 ---
 
@@ -200,14 +427,34 @@ held-out raw 예측에 서로 독립 적용한다. 따라서 SE(3)→Ridge 추�
 | no-fk-prior (03) | 22.68 | 77.42 | vision-only |
 | fk-prior (03) | 24.02 | 86.90 | train prior_t=0.01mm 인데 held-out 은 vision-only 보다 나쁨 |
 
-> **결론이 뒤집혔다.** 예전에는 Ridge 후보정(05)이 fk-prior 의 손해를 일부 회복하는 데
-> 그쳤지만(79.3 > 77.4), `exclude_gripped` + `fixed_min_markers=2` 로 관측 품질이 올라간
-> 지금은 **05 가 vision-only 를 앞선다**(20.98 < 22.68). 즉 FK 큐브중점 prior 는
-> *solve 에 강제로 넣을* 정보로는 여전히 손해(24.02)지만, *예측을 사후 보정하는* 정보로는
-> 이득이다.
+> **단일 split 에서는** `exclude_gripped` + `fixed_min_markers=2` 로 관측 품질이 올라가
+> 05(20.98)가 vision-only(22.68)를 앞섰다. 하지만 이 순위는 **아래 LOSO 반복 검증에서
+> 확인되지 않았다** — 아래 "⚠️ 이 순위는 반복 검증되지 않았다" 참고. 즉 이 표의 순위는
+> **이 하나의 split 에 한정**해서 읽어야 한다.
 >
-> **여전한 사실:** fk-prior 는 train FK 에 거의 완벽히 맞지만(0.01mm) held-out 은 vision-only
-> 보다 나쁘다 — FK 과적합. 다만 격차가 9.5mm → 1.3mm 로 줄었다.
+> **반복 검증에서도 견고한 사실:** fk-prior(FK 를 solve 에 강제)는 train FK 에 거의 완벽히
+> 맞지만(0.01mm) held-out 은 vision-only 보다 나쁘다 — FK 과적합. "FK 를 solve 에 강제하지
+> 마라"는 방향은 유지된다. 논쟁적인 것은 **후보정(05)이 vision-only 를 이기느냐**이다.
+
+#### ⚠️ 이 순위는 반복 검증되지 않았다 (LOSO, `CP_result/validate_loso`)
+
+set 을 하나씩 빼는 leave-one-set-out(13 fold, closed-form) 로 다시 재면, **후보정이
+vision-only 를 유의하게 이기지 못한다**:
+
+| 방법 (closed-form LOSO) | mean ± std | median | range |
+|---|---:|---:|---:|
+| no-fk-prior | 12.8 ± 11.6 | 11.2 | 2.9 – 45.6 |
+| + Ridge 후보정 | 12.8 ± 11.2 | **7.8** | 1.9 – 43.0 |
+
+- median 으로는 개선(11.2→7.8)하지만 **mean 은 동일**(set 12 = 45mm 이상치가 지배).
+- **fold 별로 절반은 개선, 절반은 악화** — train 12개 set 의 `[1,x,y]` 선형 fit 이 일부 held-out
+  위치로 잘못 외삽한다. fold 편차가 매우 크다(2.9~45.6mm).
+- 따라서 위 단일-split 의 "05 < no-fk-prior(20.98 < 22.68)" 는 **일반화 주장이 아니다.**
+
+> 주의: LOSO 는 조인트 solve(fold 당 ~100s, 13× 반복 비현실적)를 뺀 **closed-form 프록시**라
+> 절대값(12.8mm)이 위 단일-split 표(22.68mm)와 다르다 — 추정기가 다르다. LOSO 는 "후보정의
+> 이점이 split 에 따라 뒤집힌다"는 **안정성** 질문에만 답한다. (반면 C1 의 held-out 는 같은
+> LOSO 에서 보정 후 2.5±1mm 로 견고하게 재현된다 — C1 절 참고.)
 > **주의:** 04(재투영 최적화)에서는 with/without prior 가 23.02 / 23.01mm 로 사실상 동일하게
 > 수렴해 prior 차이가 사라진다 — 재투영 항이 prior 영향을 씻어낸다.
 >
@@ -259,7 +506,11 @@ SE(3) 폴백)을 쓴다. 재투영 기반은 **04** 뿐이고, 픽셀 재투영�
    16.0(independent) vs 15.3mm(unified) 로 거의 붙는다. 차이가 남는 곳은 회전(8.98→7.47°)과
    그리퍼 정합(15.06→13.67mm). 옛 문서의 "427→144mm(−66%)" 는 **뒤집힌 앵커가 independent 를
    더 심하게 망가뜨린 결과**였고, 통합의 진짜 이점을 과장한 수치다.
-2. **`+fk` 보정은 이 split의 FK proxy 정합에서 유효** — 11.5~13.4mm → 2.5~2.8mm.
+2. **`+fk`/`+se3` 보정은 LOSO 반복 검증에서도 견고** — 단일 split 11.5~13.4mm → 2.5~2.8mm 를
+   넘어, leave-one-set-out(13 fold, C1 실제 3솔버)에서 **+SE(3) 4.5±2mm, +Ridge 2.5±1mm 로
+   전 fold 재현**된다(`CP_result/validate_loso/fig_CP_C1_loso.png`). raw 는 fold 간 ±5~7mm 로
+   흔들리지만 보정 후에는 안정적이다 — 즉 이 값은 우연한 split 이 아니다. (반면 C3 의 후보정
+   이점은 같은 LOSO 에서 재현되지 않는다 — C3 절 참고.)
    Ridge는 FK proxy 대비 위치 의존 residual을 포착한다. 이것만으로 물리 camera error가
    선형임을 입증하지는 않는다. 관측된 의존성은 camera calibration, robot FK, grasp
    repeatability가 결합된 결과일 수 있다.
@@ -291,16 +542,19 @@ residual 수치 그래프, error bar, p-value, 분포는 생성하지 않는다.
 > 큐브는 "정확도를 조금 높이는" 게 아니라 **캘리브 가능 여부 자체를 결정**한다.
 
 ### C3 (fk-prior / no-fk-prior / fk-prior+후보정)
-1. **fk-prior 는 명백한 과적합** — train 에서 FK 에 0.02mm 로 완벽히 맞지만 대가로 카메라가
-   망가진다(재투영 17.5→72.6px, pose 일관성 15.7→80.5mm). held-out 은 오히려 악화(77.4→86.9).
-   64mm 틀린 목표에 억지로 맞춘 결과.
-2. **후보정은 실제로 작동** — 86.9→79.34mm(**−8.7%**). 다만 이 데이터셋에선 vision-only(77.4)를
-   넘지 못했다.
-3. **시뮬과 결론이 갈리는 이유** — 시뮬 Exp3 는 "FK 가 완벽하다"고 가정한다. 실제 FK 는 위
-   규약 오프셋 탓에 틀려 있어 "FK 를 solve 에 강제"하는 이점이 사라지고 손해만 남는다.
+1. **fk-prior 는 명백한 과적합 (반복 검증에서도 견고)** — train FK 에 거의 완벽히 맞지만
+   (0.01mm) held-out 은 vision-only 보다 나쁘다(단일 split 24.02 vs 22.68mm). "FK 를 solve 에
+   강제하지 마라"는 방향은 확실하다.
+2. **후보정의 이점은 반복 검증되지 않았다** — 단일 split 에서는 05 가 vision-only 를 앞섰지만
+   (20.98 < 22.68), LOSO(13 fold, closed-form)에서는 median 만 개선(11.2→7.8)하고 mean 은
+   동일하며 **fold 별로 절반은 악화**한다. 즉 "후보정이 vision-only 를 이긴다"는 **일반화
+   주장으로 쓸 수 없다.** (위 C3 결과 절의 LOSO 표 참고.)
+3. **시뮬과 결론이 갈리는 이유** — 시뮬 Exp3 는 "FK 가 완벽하다"고 가정한다. 실제 FK 큐브중점은
+   위치오차(median 6.6mm)가 있어 "FK 를 solve 에 강제"하는 이점이 사라지고 손해만 남는다.
    **시뮬 결론이 틀린 게 아니라 전제가 실데이터에서 깨진 것.**
-4. **04(재투영)에서는 차이가 소멸** — with/without 모두 77.53mm 로 수렴. 강한 픽셀 항이 prior
-   영향을 씻어낸다 → 재투영 항이 충분하면 prior 선택은 무의미해진다.
+4. **04(재투영)에서는 prior 차이가 소멸** — with/without 모두 23.0mm 로 수렴하고, 픽셀 재투영은
+   04 가 압도적(5.51px)이지만 held-out FK 지표는 방법과 무관하다(22.68/23.01). FK 대비 지표는
+   FK prior 자체 오차·파지 반복성이 지배하므로 픽셀 정밀도로는 못 넘는다.
 
 ---
 
@@ -308,9 +562,10 @@ residual 수치 그래프, error bar, p-value, 분포는 생성하지 않는다.
 
 | 기여 | 입증 여부 | 근거 |
 |---|---|---|
-| **C2 큐브** | ✅ **강하게 입증** | 카메라 3대 등록 가능, cross-camera −82% |
-| **C1 통합** | ✅ 방향성 입증 | consistency −66% |
-| **C1/C3 `+fk` 보정** | ✅ 효과 확인 | C1 −91%, C3 −8.7% |
+| **C2 큐브** | ✅ **강하게 입증** | 카메라 3대 등록 가능, cross-camera −82% (FK 무관) |
+| **C1 통합** | 🔸 방향성만 | 보정 후 구조 간 차이 작음(15~17mm), std 안에 묻힘 |
+| **C1 `+fk`/`+se3` 보정** | ✅ **LOSO 재현** | held-out +SE(3) 4.5±2mm, +Ridge 2.5±1mm (13 fold) |
+| **C3 후보정 이점** | ⚠️ **미확인** | 단일 split 만 우세, LOSO 에서 fold 절반 악화 |
 | **C3 FK prior 강제** | ❌ **역효과** | held-out +12% 악화 |
 
 ### 권고 (우선순위)

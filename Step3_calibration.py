@@ -8,7 +8,11 @@ Step2_capture.py의 meta.json을 입력으로 받아:
   C) Hand-eye는 gripper ChArUco 보드로 계산하되 cube 일관성까지 함께 평가한다
   D) 고정 카메라는 cube-primary, board-refine 방식으로 base 좌표계에 정렬한다
   E) set_cube_center_6dof가 있으면 cube object frame과의 상수 delta를 학습해 set prior로 재정렬한다
-  F) 기본 경로에서는 depth pose를 직접 최적화 변수로 쓰지 않고, depth 품질과 set prior를
+  F) cube+board의 eye-to-hand/eye-in-hand 관측으로 {T_base_Ci, T_gripper_cam,
+     T_base_board}를 한 목적함수에서 최종 공동 최적화하고 cube pose는 정렬된 FK에 고정한다.
+     production 기본값은 기존 pose-SE(3) residual이며, 검증 중인 canonical per-corner
+     reprojection backend는 --joint_solve=reprojection_fk_fixed로만 opt-in한다
+  G) 기본 경로에서는 depth pose를 직접 최적화 변수로 쓰지 않고, depth 품질과 set prior를
      candidate selection / refinement에만 반영한다.
 
 출력:
@@ -24,7 +28,9 @@ Step2_capture.py의 meta.json을 입력으로 받아:
     --intrinsics_dir ./intrinsics
 
 기본 정책:
-  - 새 데이터도 기본 `calib_out` 경로에서 현재 안정형 파이프라인을 그대로 사용한다.
+  - 단계식 해를 초기값으로 만든 뒤, 기본 `--joint_solve=fk_fixed`에서 기존 A3 pose solve를 실행한다.
+  - canonical corner backend는 동치성·수렴 검증 전까지 opt-in이며 기본 경로를 바꾸지 않는다.
+  - 명백한 planar-pose/cross-path 이상치는 초기해 기반 gate로 제외하고 제외 수를 summary에 남긴다.
 """
 
 import os
@@ -54,6 +60,15 @@ from calibration_runtime_utils import (
 )
 import CP_common as cp
 from config import CubeConfig, get_default_cube_config
+from calibration_corner_observations import load_cube_board_pixel_observations
+from calibration_reprojection_backend import (
+    PoseState as CornerPoseState,
+    SE3Scaling as CornerSE3Scaling,
+    SolverOptions as CornerSolverOptions,
+    pose_delta as corner_pose_delta,
+    solve_corner_reprojection,
+    variable_keys as corner_variable_keys,
+)
 from cube_config_utils import (
     cube_config_to_dict,
     cube_configs_equivalent,
@@ -244,7 +259,12 @@ def load_robot_poses_from_meta(meta):
             if p6 is not None:
                 T = euler_deg_to_matrix(*p6)
         if T is not None:
-            out[eid] = T.astype(np.float64)
+            T = T.astype(np.float64)
+            s = cp.robot_pos_scale()   # correct robot Cartesian scale (translation only)
+            if s != 1.0:
+                T = T.copy()
+                T[:3, 3] *= s
+            out[eid] = T
     return out
 
 
@@ -1291,7 +1311,12 @@ def load_nominal_set_cube_transforms(meta: dict) -> Dict[int, np.ndarray]:
             continue
         T_nominal = get_capture_set_cube_center_transform_raw(cap)
         if T_nominal is not None:
-            priors[int(set_index)] = np.asarray(T_nominal, dtype=np.float64)
+            T_nominal = np.asarray(T_nominal, dtype=np.float64)
+            s = cp.robot_pos_scale()   # correct robot Cartesian scale (translation only)
+            if s != 1.0:
+                T_nominal = T_nominal.copy()
+                T_nominal[:3, 3] *= s
+            priors[int(set_index)] = T_nominal
     return priors
 
 
@@ -1519,6 +1544,486 @@ def build_hybrid_setwise_cube_anchors(meta: dict,
     return transforms_by_set, diag
 
 
+def refine_joint_cube_board_fk(meta: dict,
+                               robot_T: Dict[int, np.ndarray],
+                               pnp_obs: Dict[int, Dict[int, dict]],
+                               board_obs_by_cam: Dict[int, Dict[int, dict]],
+                               fixed_cam_ids: List[int],
+                               gripper_cam_idx: int,
+                               T_base_Ci: Dict[int, np.ndarray],
+                               T_gTc: np.ndarray,
+                               fk_cube_by_set: Dict[int, np.ndarray],
+                               max_nfev: int = 300,
+                               translation_sigma_mm: float = 5.0,
+                               rotation_sigma_deg: float = 1.0,
+                               cube_weight: float = 1.0,
+                               board_weight: float = 1.0,
+                               cross_path_weight: float = 1.0,
+                               max_delta_trans_mm: float = 50.0,
+                               max_delta_rot_deg: float = 15.0):
+    """Jointly refine fixed cameras and hand-eye from cube+board observations.
+
+    Variables are ``{T_base_Ci, T_gripper_cam, T_base_board}``.  Per-set cube
+    poses are fixed to the aligned FK priors, so this is the production A3
+    objective (cube+board, unified e2h/eih, FK fixed).  Four observation groups
+    (fixed/eih × cube/board) are normalized independently to keep a large group
+    from dominating merely because it contains more frames.
+    """
+    try:
+        from scipy.optimize import least_squares
+        from scipy.spatial.transform import Rotation
+    except ImportError as exc:
+        return dict(T_base_Ci), np.asarray(T_gTc, dtype=np.float64), {
+            "enabled": True,
+            "adopted": False,
+            "reason": f"scipy unavailable: {exc}",
+        }
+
+    cam_ids = [int(ci) for ci in fixed_cam_ids if int(ci) in T_base_Ci]
+    event_to_set = {}
+    cube_gripped_by_event = {}
+    for cap in meta.get("captures", []):
+        eid = int(cap.get("event_id", -1))
+        sidx = get_capture_set_index(cap)
+        if eid >= 0 and sidx is not None:
+            event_to_set[eid] = int(sidx)
+            cube_gripped_by_event[eid] = bool(cap.get("cube_gripped", False))
+
+    cube_fixed = []
+    cube_grip = []
+    for ci in cam_ids:
+        for eid, obs in pnp_obs.get(ci, {}).items():
+            sidx = event_to_set.get(int(eid))
+            # A held cube moves with the robot; its per-set placement prior is
+            # no longer the event cube pose.  Single-marker fixed-camera PnP is
+            # also planar-flip ambiguous, so it is excluded from the FK solve.
+            if (sidx in fk_cube_by_set
+                    and not cube_gripped_by_event.get(int(eid), False)
+                    and len(obs.get("used_ids", [])) >= 2):
+                cube_fixed.append((ci, int(eid), sidx, np.asarray(obs["T_C_O"], dtype=np.float64)))
+    for eid, obs in pnp_obs.get(int(gripper_cam_idx), {}).items():
+        sidx = event_to_set.get(int(eid))
+        if (int(eid) in robot_T and sidx in fk_cube_by_set
+                and not cube_gripped_by_event.get(int(eid), False)):
+            cube_grip.append((int(eid), sidx, np.asarray(obs["T_C_O"], dtype=np.float64)))
+
+    board_fixed = []
+    for ci in cam_ids:
+        for eid, obs in board_obs_by_cam.get(ci, {}).items():
+            board_fixed.append((ci, int(eid), np.asarray(obs["T_cam_board"], dtype=np.float64)))
+    board_grip = []
+    for eid, obs in board_obs_by_cam.get(int(gripper_cam_idx), {}).items():
+        if int(eid) in robot_T:
+            board_grip.append((int(eid), np.asarray(obs["T_cam_board"], dtype=np.float64)))
+
+    # Direct same-event path constraints.  Unlike the FK-fixed residuals above,
+    # these remain valid while the cube is held and moving: every camera still
+    # observes the same instantaneous cube pose.  They are also the geometric
+    # quantity required for the paper's e_e2e definition.
+    cross_sources_by_event = defaultdict(list)
+    for ci in cam_ids:
+        for eid, obs in pnp_obs.get(ci, {}).items():
+            if len(obs.get("used_ids", [])) >= 2:
+                cross_sources_by_event[int(eid)].append(
+                    ("fixed", ci, np.asarray(obs["T_C_O"], dtype=np.float64)))
+    for eid, obs in pnp_obs.get(int(gripper_cam_idx), {}).items():
+        if int(eid) in robot_T:
+            cross_sources_by_event[int(eid)].append(
+                ("gripper", int(gripper_cam_idx),
+                 np.asarray(obs["T_C_O"], dtype=np.float64)))
+    cube_cross_specs = []
+    for eid, sources in sorted(cross_sources_by_event.items()):
+        if len(sources) < 2:
+            continue
+        ref = sources[0]
+        for other in sources[1:]:
+            kind = ("e2e" if {ref[0], other[0]} == {"fixed", "gripper"}
+                    else "fixed_cross")
+            cube_cross_specs.append((kind, int(eid), ref, other))
+
+    raw_counts = {
+        "cube_fixed": len(cube_fixed),
+        "cube_gripper": len(cube_grip),
+        "board_fixed": len(board_fixed),
+        "board_gripper": len(board_grip),
+        "cube_fixed_cross_pairs": sum(1 for x in cube_cross_specs if x[0] == "fixed_cross"),
+        "cube_e2e_pairs": sum(1 for x in cube_cross_specs if x[0] == "e2e"),
+    }
+    if not cam_ids or not fk_cube_by_set or not (cube_fixed or cube_grip):
+        return dict(T_base_Ci), np.asarray(T_gTc, dtype=np.float64), {
+            "enabled": True,
+            "adopted": False,
+            "reason": "insufficient registered cameras, FK cube priors, or cube observations",
+            "observation_counts": raw_counts,
+        }
+    if not (board_fixed or board_grip):
+        return dict(T_base_Ci), np.asarray(T_gTc, dtype=np.float64), {
+            "enabled": True,
+            "adopted": False,
+            "reason": "no ChArUco observations; cube+board A3 objective cannot be formed",
+            "observation_counts": raw_counts,
+        }
+
+    def T_to_vec(T):
+        T = np.asarray(T, dtype=np.float64)
+        return np.concatenate([Rotation.from_matrix(T[:3, :3]).as_rotvec(), T[:3, 3]])
+
+    def vec_to_T(v):
+        T = np.eye(4, dtype=np.float64)
+        T[:3, :3] = Rotation.from_rotvec(np.asarray(v[:3], dtype=np.float64)).as_matrix()
+        T[:3, 3] = np.asarray(v[3:6], dtype=np.float64)
+        return T
+
+    def pose_error(A, B):
+        E = inv_T(np.asarray(A, dtype=np.float64)) @ np.asarray(B, dtype=np.float64)
+        return (
+            Rotation.from_matrix(E[:3, :3]).as_rotvec(),
+            np.asarray(E[:3, 3], dtype=np.float64),
+        )
+
+    # The gripper sequence provides the robust board anchor.  Fixed-camera
+    # ChArUco detections are sparse and can contain planar pose flips; gate them
+    # against that anchor before adding them to the joint objective.
+    board_init_candidates = []
+    for eid, T_cb in board_grip:
+        board_init_candidates.append(
+            np.asarray(robot_T[eid], dtype=np.float64) @ np.asarray(T_gTc, dtype=np.float64) @ T_cb)
+    if not board_init_candidates:
+        for ci, _, T_cb in board_fixed:
+            board_init_candidates.append(np.asarray(T_base_Ci[ci], dtype=np.float64) @ T_cb)
+    if not board_init_candidates:
+        return dict(T_base_Ci), np.asarray(T_gTc, dtype=np.float64), {
+            "enabled": True, "adopted": False, "reason": "board pose initialization failed",
+            "observation_counts": raw_counts,
+        }
+    T_base_board0 = robust_weighted_se3_average(board_init_candidates)
+
+    board_fixed_raw_n = len(board_fixed)
+    board_fixed = [
+        (ci, eid, T_cb) for ci, eid, T_cb in board_fixed
+        if (np.linalg.norm((np.asarray(T_base_Ci[ci], dtype=np.float64) @ T_cb)[:3, 3]
+                           - T_base_board0[:3, 3]) * 1000.0 <= 25.0
+            and rotation_error_deg(
+                (np.asarray(T_base_Ci[ci], dtype=np.float64) @ T_cb)[:3, :3],
+                T_base_board0[:3, :3]) <= 5.0)
+    ]
+    counts = {
+        "cube_fixed": len(cube_fixed),
+        "cube_gripper": len(cube_grip),
+        "board_fixed": len(board_fixed),
+        "board_gripper": len(board_grip),
+        "cube_fixed_cross_pairs": sum(1 for x in cube_cross_specs if x[0] == "fixed_cross"),
+        "cube_e2e_pairs": sum(1 for x in cube_cross_specs if x[0] == "e2e"),
+    }
+    rejected_counts = {
+        "board_fixed_pose_gate": int(board_fixed_raw_n - len(board_fixed)),
+        "cube_cross_path_pose_gate": 0,
+    }
+
+    p0 = np.concatenate(
+        [T_to_vec(T_base_Ci[ci]) for ci in cam_ids]
+        + [T_to_vec(T_gTc), T_to_vec(T_base_board0)]
+    )
+    off_gtc = len(cam_ids) * 6
+    off_board = off_gtc + 6
+
+    def unpack(p):
+        cams = {ci: vec_to_T(p[i * 6:(i + 1) * 6]) for i, ci in enumerate(cam_ids)}
+        return cams, vec_to_T(p[off_gtc:off_gtc + 6]), vec_to_T(p[off_board:off_board + 6])
+
+    sigma_t = max(float(translation_sigma_mm), 1e-6) / 1000.0
+    sigma_r = np.deg2rad(max(float(rotation_sigma_deg), 1e-6))
+
+    def append_group(res, pairs, marker_weight):
+        if not pairs:
+            return
+        scale = float(marker_weight) / np.sqrt(float(len(pairs)))
+        for pred, target in pairs:
+            rv, tv = pose_error(pred, target)
+            res.extend((scale * rv / sigma_r).tolist())
+            res.extend((scale * tv / sigma_t).tolist())
+
+    def cross_pairs(cams, gTc, requested_kind=None):
+        pairs = []
+        for kind, eid, a, b in cube_cross_specs:
+            if requested_kind is not None and kind != requested_kind:
+                continue
+            def predict(source):
+                role, ci, T_co = source
+                if role == "fixed":
+                    return cams[ci] @ T_co
+                return np.asarray(robot_T[eid], dtype=np.float64) @ gTc @ T_co
+            pairs.append((predict(a), predict(b)))
+        return pairs
+
+    def residuals(p):
+        cams, gTc, base_board = unpack(p)
+        res = []
+        append_group(
+            res,
+            [(cams[ci] @ T_co, fk_cube_by_set[sidx])
+             for ci, _, sidx, T_co in cube_fixed],
+            cube_weight,
+        )
+        append_group(
+            res,
+            [(np.asarray(robot_T[eid], dtype=np.float64) @ gTc @ T_co,
+              fk_cube_by_set[sidx]) for eid, sidx, T_co in cube_grip],
+            cube_weight,
+        )
+        append_group(
+            res,
+            [(cams[ci] @ T_cb, base_board) for ci, _, T_cb in board_fixed],
+            board_weight,
+        )
+        append_group(
+            res,
+            [(np.asarray(robot_T[eid], dtype=np.float64) @ gTc @ T_cb, base_board)
+             for eid, T_cb in board_grip],
+            board_weight,
+        )
+        append_group(res, cross_pairs(cams, gTc, "fixed_cross"), cross_path_weight)
+        append_group(res, cross_pairs(cams, gTc, "e2e"), cross_path_weight)
+        return np.asarray(res if res else [0.0], dtype=np.float64)
+
+    def physical_metrics(cams, gTc, base_board):
+        groups = {
+            "cube_fixed": [(cams[ci] @ T_co, fk_cube_by_set[sidx])
+                           for ci, _, sidx, T_co in cube_fixed],
+            "cube_gripper": [(np.asarray(robot_T[eid], dtype=np.float64) @ gTc @ T_co,
+                              fk_cube_by_set[sidx]) for eid, sidx, T_co in cube_grip],
+            "board_fixed": [(cams[ci] @ T_cb, base_board) for ci, _, T_cb in board_fixed],
+            "board_gripper": [(np.asarray(robot_T[eid], dtype=np.float64) @ gTc @ T_cb,
+                               base_board) for eid, T_cb in board_grip],
+            "cube_fixed_cross": cross_pairs(cams, gTc, "fixed_cross"),
+            "cube_e2e": cross_pairs(cams, gTc, "e2e"),
+        }
+        out = {}
+        for name, pairs in groups.items():
+            trans, rot = [], []
+            for pred, target in pairs:
+                rv, tv = pose_error(pred, target)
+                trans.append(float(np.linalg.norm(tv) * 1000.0))
+                rot.append(float(np.degrees(np.linalg.norm(rv))))
+            out[name] = {
+                "n": int(len(pairs)),
+                "translation_rmse_mm": None if not trans else float(np.sqrt(np.mean(np.square(trans)))),
+                "rotation_rmse_deg": None if not rot else float(np.sqrt(np.mean(np.square(rot)))),
+            }
+        return out
+
+    cams0, gTc0, board0 = unpack(p0)
+    cross_specs_raw_n = len(cube_cross_specs)
+    cross_pairs0 = cross_pairs(cams0, gTc0)
+    cube_cross_specs = [
+        spec for spec, (pred, target) in zip(cube_cross_specs, cross_pairs0)
+        if (np.linalg.norm(pose_error(pred, target)[1]) * 1000.0 <= 30.0
+            and np.degrees(np.linalg.norm(pose_error(pred, target)[0])) <= 10.0)
+    ]
+    counts["cube_fixed_cross_pairs"] = int(
+        sum(1 for x in cube_cross_specs if x[0] == "fixed_cross"))
+    counts["cube_e2e_pairs"] = int(
+        sum(1 for x in cube_cross_specs if x[0] == "e2e"))
+    rejected_counts["cube_cross_path_pose_gate"] = int(
+        cross_specs_raw_n - len(cube_cross_specs))
+    r0 = residuals(p0)
+    try:
+        sol = least_squares(
+            residuals, p0, method="trf", loss="huber", f_scale=1.0,
+            max_nfev=int(max_nfev), xtol=1e-10, ftol=1e-10, gtol=1e-10,
+        )
+    except Exception as exc:
+        return dict(T_base_Ci), np.asarray(T_gTc, dtype=np.float64), {
+            "enabled": True, "adopted": False, "reason": f"optimizer failed: {exc}",
+            "observation_counts": counts,
+        }
+
+    cams1, gTc1, board1 = unpack(sol.x)
+    r1 = residuals(sol.x)
+    deltas = {}
+    all_safe = True
+    for name, before, after in [
+        *[(f"T_base_C{ci}", cams0[ci], cams1[ci]) for ci in cam_ids],
+        ("T_gripper_cam", gTc0, gTc1),
+    ]:
+        dt_mm = float(np.linalg.norm(after[:3, 3] - before[:3, 3]) * 1000.0)
+        dr_deg = rotation_error_deg(after[:3, :3], before[:3, :3])
+        deltas[name] = {"translation_mm": dt_mm, "rotation_deg": dr_deg}
+        if dt_mm > float(max_delta_trans_mm) or dr_deg > float(max_delta_rot_deg):
+            all_safe = False
+
+    initial_rms = float(np.sqrt(np.mean(np.square(r0))))
+    final_rms = float(np.sqrt(np.mean(np.square(r1))))
+    adopted = bool(sol.success and np.isfinite(final_rms) and final_rms < initial_rms and all_safe)
+    reason = "objective improved within transform guards" if adopted else (
+        "transform guard exceeded" if not all_safe else
+        f"optimizer not adopted (success={sol.success}, initial={initial_rms:.6g}, final={final_rms:.6g})"
+    )
+    diag = {
+        "enabled": True,
+        "mode": "cube_board_unified_fk_fixed",
+        "fk_mode": "fixed",
+        "adopted": adopted,
+        "reason": reason,
+        "optimizer_success": bool(sol.success),
+        "optimizer_message": str(sol.message),
+        "nfev": int(sol.nfev),
+        "initial_normalized_rms": initial_rms,
+        "final_normalized_rms": final_rms,
+        "translation_sigma_mm": float(translation_sigma_mm),
+        "rotation_sigma_deg": float(rotation_sigma_deg),
+        "cube_weight": float(cube_weight),
+        "board_weight": float(board_weight),
+        "cross_path_weight": float(cross_path_weight),
+        "observation_counts": counts,
+        "rejected_counts": rejected_counts,
+        "transform_deltas": deltas,
+        "metrics_before": physical_metrics(cams0, gTc0, board0),
+        "metrics_after": physical_metrics(cams1, gTc1, board1),
+        "T_base_board": np.asarray(board1 if adopted else board0, dtype=np.float64).tolist(),
+        "fk_set_indices": [int(x) for x in sorted(fk_cube_by_set)],
+    }
+    if not adopted:
+        return dict(T_base_Ci), np.asarray(T_gTc, dtype=np.float64), diag
+    refined = dict(T_base_Ci)
+    refined.update(cams1)
+    return refined, gTc1, diag
+
+
+def refine_joint_cube_board_reprojection_fk(
+        corner_observations,
+        robot_T: Dict[int, np.ndarray],
+        K_map: Dict[int, np.ndarray],
+        D_map: Dict[int, np.ndarray],
+        fixed_cam_ids: List[int],
+        gripper_cam_idx: int,
+        T_base_Ci: Dict[int, np.ndarray],
+        T_gTc: np.ndarray,
+        T_base_board: np.ndarray,
+        fk_cube_by_set: Dict[int, np.ndarray],
+        max_nfev: int = 300,
+        tol: float = 1e-8,
+        rotation_scale_rad: float = 1.0,
+        translation_scale_m: float = 1.0,
+        x_scale_mode: str = "jac",
+        max_delta_trans_mm: float = 50.0,
+        max_delta_rot_deg: float = 15.0):
+    """Opt-in production A3 through the canonical per-corner backend.
+
+    The legacy pose-SE(3) STEP-E remains the production default.  This adapter
+    only selects usable observations, constructs the A3 freeze mask, calls
+    ``solve_corner_reprojection``, and applies the production adoption guard.
+    The unguarded candidate is retained in diagnostics for entry-point
+    equivalence tests.
+    """
+    cam_ids = [int(ci) for ci in fixed_cam_ids if int(ci) in T_base_Ci]
+    usable = []
+    counts = defaultdict(int)
+    for obs in corner_observations:
+        if obs.marker == "cube":
+            if obs.set_idx is None or int(obs.set_idx) not in fk_cube_by_set:
+                continue
+        elif obs.marker != "board":
+            continue
+        if int(obs.cam) == int(gripper_cam_idx):
+            if int(obs.event) not in robot_T:
+                continue
+            role = "eih"
+        else:
+            if int(obs.cam) not in cam_ids:
+                continue
+            role = "e2h"
+        usable.append(obs)
+        counts[f"{obs.marker}_{role}_observations"] += 1
+        counts[f"{obs.marker}_{role}_corners"] += int(
+            len(np.asarray(obs.image_points).reshape(-1, 2)))
+    if not usable:
+        return dict(T_base_Ci), np.asarray(T_gTc, dtype=np.float64), {
+            "enabled": True,
+            "mode": "cube_board_unified_reprojection_fk_fixed",
+            "fk_mode": "fixed",
+            "adopted": False,
+            "reason": "no usable shared corner observations",
+        }
+    initial = CornerPoseState(
+        cams={ci: np.asarray(T_base_Ci[ci], dtype=np.float64) for ci in cam_ids},
+        gtc=np.asarray(T_gTc, dtype=np.float64),
+        board=np.asarray(T_base_board, dtype=np.float64),
+        cubes={int(s): np.asarray(T, dtype=np.float64)
+               for s, T in fk_cube_by_set.items()},
+    )
+    options = CornerSolverOptions(
+        method="trf",
+        loss="soft_l1",
+        f_scale_px=2.0,
+        max_nfev=int(max_nfev),
+        xtol=float(tol),
+        ftol=float(tol),
+        gtol=float(tol),
+        scaling=CornerSE3Scaling(
+            rotation_scale_rad=float(rotation_scale_rad),
+            translation_scale_m=float(translation_scale_m),
+        ),
+        x_scale_mode=str(x_scale_mode),
+    )
+    candidate, solver_diag = solve_corner_reprojection(
+        observations=usable,
+        variable_keys_=corner_variable_keys(
+            ("T_base_Ci", "T_gripper_cam", "T_base_board"), initial),
+        reference_state=initial,
+        robot_T=robot_T,
+        K_map=K_map,
+        D_map=D_map,
+        gripper_cam_idx=int(gripper_cam_idx),
+        options=options,
+        seed=0,
+    )
+    deltas = {}
+    all_safe = True
+    for name, before, after in [
+        *[(f"T_base_C{ci}", initial.cams[ci], candidate.cams[ci]) for ci in cam_ids],
+        ("T_gripper_cam", initial.gtc, candidate.gtc),
+        ("T_base_board", initial.board, candidate.board),
+    ]:
+        dt_mm, dr_deg = corner_pose_delta(before, after)
+        deltas[name] = {"translation_mm": dt_mm, "rotation_deg": dr_deg}
+        if dt_mm > float(max_delta_trans_mm) or dr_deg > float(max_delta_rot_deg):
+            all_safe = False
+    improved = (
+        np.isfinite(solver_diag["train_reprojection_rmse_px"])
+        and solver_diag["train_reprojection_rmse_px"]
+        < solver_diag["initial_reprojection_rmse_px"]
+    )
+    adopted = bool(solver_diag["success"] and improved and all_safe)
+    reason = ("corner objective converged and improved within transform guards"
+              if adopted else
+              ("transform guard exceeded" if not all_safe else
+               f"corner candidate not adopted (success={solver_diag['success']}, "
+               f"initial={solver_diag['initial_reprojection_rmse_px']:.6g}, "
+               f"final={solver_diag['train_reprojection_rmse_px']:.6g})"))
+    diag = {
+        **solver_diag,
+        "enabled": True,
+        "mode": "cube_board_unified_reprojection_fk_fixed",
+        "fk_mode": "fixed",
+        "adopted": adopted,
+        "reason": reason,
+        "observation_counts": dict(counts),
+        "transform_deltas": deltas,
+        "candidate_transforms": {
+            "T_base_Ci": {str(ci): candidate.cams[ci].tolist() for ci in cam_ids},
+            "T_gripper_cam": candidate.gtc.tolist(),
+            "T_base_board": candidate.board.tolist(),
+        },
+        "fk_set_indices": [int(s) for s in sorted(fk_cube_by_set)],
+    }
+    if not adopted:
+        return dict(T_base_Ci), np.asarray(T_gTc, dtype=np.float64), diag
+    refined = dict(T_base_Ci)
+    refined.update(candidate.cams)
+    return refined, candidate.gtc, diag
+
+
 def main():
     parser = argparse.ArgumentParser(description="Unified calibration (ChArUco hand-eye + cube multi-cam)")
     parser.add_argument("--root_folder", required=True)
@@ -1567,6 +2072,28 @@ def main():
     parser.add_argument("--emit_transform_sets", type=lambda s: str(s).lower() not in ("0", "false", "no"),
                         default=True,
                         help="summary['transform_sets'] 기록 여부(Step5 mode-comparison 리포트용). 기본 True.")
+    parser.add_argument("--joint_solve", type=str, default="fk_fixed",
+                        choices=["fk_fixed", "reprojection_fk_fixed", "off"],
+                        help="fk_fixed(기본): cube+board의 e2h/eih 관측으로 고정 카메라와 "
+                             "T_gripper_cam을 pose-SE(3) 목적함수에서 최종 공동 최적화. "
+                             "reprojection_fk_fixed(실험): 동일 변수를 canonical corner "
+                             "reprojection backend로 최적화하되 검증 전 opt-in으로만 사용. "
+                             "off: 단계식 초기해만 사용.")
+    parser.add_argument("--joint_max_nfev", type=int, default=300)
+    parser.add_argument("--joint_reprojection_tol", type=float, default=1e-8)
+    parser.add_argument("--joint_reprojection_rotation_scale_rad", type=float, default=1.0,
+                        help="Canonical rotation coordinate scale; study selected 1.0 rad.")
+    parser.add_argument("--joint_reprojection_translation_scale_m", type=float, default=1.0,
+                        help="Canonical translation coordinate scale; study selected 1.0 m.")
+    parser.add_argument("--joint_reprojection_x_scale_mode", choices=["unit", "jac"], default="jac",
+                        help="Canonical corner backend x_scale; train-only study selected jac.")
+    parser.add_argument("--joint_translation_sigma_mm", type=float, default=5.0)
+    parser.add_argument("--joint_rotation_sigma_deg", type=float, default=1.0)
+    parser.add_argument("--joint_cube_weight", type=float, default=1.0)
+    parser.add_argument("--joint_board_weight", type=float, default=1.0)
+    parser.add_argument("--joint_cross_path_weight", type=float, default=1.0)
+    parser.add_argument("--joint_max_delta_trans_mm", type=float, default=50.0)
+    parser.add_argument("--joint_max_delta_rot_deg", type=float, default=15.0)
     args = parser.parse_args()
 
     root = args.root_folder
@@ -2175,6 +2702,9 @@ def main():
 
     board_T_base_Ci = {}
     board_base_stats = {}
+    board_obs_by_cam: Dict[int, Dict[int, dict]] = {
+        int(gripper_cam_idx): dict(charuco_obs),
+    }
 
     # D-1: Board-based calibration
     print("  --- D-1: Board-based (ChArUco) ---")
@@ -2197,6 +2727,11 @@ def main():
                 ok = False
             if ok and n_cor >= 6:
                 T_cam_board = rodrigues_to_Rt(rv, tv)
+                board_obs_by_cam.setdefault(int(ci), {})[int(eid)] = {
+                    "T_cam_board": np.asarray(T_cam_board, dtype=np.float64),
+                    "reproj": float(reproj),
+                    "n_corners": int(n_cor),
+                }
                 T_est = T_base_board_per_event[eid] @ inv_T(T_cam_board)
                 Ts.append(T_est)
                 ws.append(1.0 / max(float(reproj), 1e-9))
@@ -2281,6 +2816,7 @@ def main():
         "stability": {},
         "per_set": {},
     }
+    corrected_set_priors: Dict[int, np.ndarray] = {}
 
     gripper_base_by_event, gripper_base_diag = build_gripper_event_base_transforms_from_fixed_cams(
         meta, pnp_obs, T_base_Ci, sorted(T_base_Ci.keys()), gripper_cam_idx,
@@ -2653,14 +3189,202 @@ def main():
             print(f"  [WARN] reprojection refinement skipped: {e}")
             reproj_refine_diag = {"enabled": False, "error": str(e)}
 
-    # Step E joint optimization remains deferred until the cube anchor path
-    # above is stable enough to avoid reinforcing ambiguous single-face poses.
+    # ══════════════════════════════════════════════════════════
+    # STEP E: True unified cube+board optimization with FK-fixed cube poses
+    # ══════════════════════════════════════════════════════════
+    joint_diag = {
+        "enabled": str(getattr(args, "joint_solve", "fk_fixed")) != "off",
+        "mode": "off",
+        "fk_mode": "none",
+        "adopted": False,
+        "reason": "disabled by --joint_solve=off",
+    }
+    selected_joint_solve = str(getattr(args, "joint_solve", "fk_fixed"))
+    if selected_joint_solve in ("fk_fixed", "reprojection_fk_fixed"):
+        print()
+        print("=" * 60)
+        print(
+            "[STEP-E] Joint cube+board optimization "
+            f"(e2h + eih, FK fixed, backend={selected_joint_solve})"
+        )
+        print("=" * 60)
+        if not corrected_set_priors:
+            joint_diag = {
+                "enabled": True,
+                "mode": "cube_board_unified_fk_fixed",
+                "fk_mode": "fixed",
+                "adopted": False,
+                "reason": (
+                    "aligned FK cube poses unavailable; refusing to use raw "
+                    "set_cube_center rotations as object-frame poses"
+                ),
+            }
+            print(f"  [JOINT] skipped: {joint_diag['reason']}")
+        elif selected_joint_solve == "reprojection_fk_fixed" and T_base_board is None:
+            joint_diag = {
+                "enabled": True,
+                "mode": "cube_board_unified_reprojection_fk_fixed",
+                "fk_mode": "fixed",
+                "adopted": False,
+                "reason": "T_base_board initialization unavailable",
+            }
+            print(f"  [JOINT] skipped: {joint_diag['reason']}")
+        else:
+            if selected_joint_solve == "fk_fixed":
+                T_base_Ci_joint, T_gTc_joint, joint_diag = refine_joint_cube_board_fk(
+                    meta=meta,
+                    robot_T=robot_T,
+                    pnp_obs=pnp_obs,
+                    board_obs_by_cam=board_obs_by_cam,
+                    fixed_cam_ids=fixed_cam_ids,
+                    gripper_cam_idx=int(gripper_cam_idx),
+                    T_base_Ci=T_base_Ci,
+                    T_gTc=T_gTc,
+                    fk_cube_by_set=corrected_set_priors,
+                    max_nfev=int(args.joint_max_nfev),
+                    translation_sigma_mm=float(args.joint_translation_sigma_mm),
+                    rotation_sigma_deg=float(args.joint_rotation_sigma_deg),
+                    cube_weight=float(args.joint_cube_weight),
+                    board_weight=float(args.joint_board_weight),
+                    cross_path_weight=float(args.joint_cross_path_weight),
+                    max_delta_trans_mm=float(args.joint_max_delta_trans_mm),
+                    max_delta_rot_deg=float(args.joint_max_delta_rot_deg),
+                )
+                print(
+                    f"  [JOINT] normalized pose RMS "
+                    f"{joint_diag.get('initial_normalized_rms', float('nan')):.4f} -> "
+                    f"{joint_diag.get('final_normalized_rms', float('nan')):.4f}; "
+                    f"adopted={joint_diag.get('adopted', False)}"
+                )
+            else:
+                corner_observations, corner_observation_diag = \
+                    load_cube_board_pixel_observations(
+                        root, meta, cube, K_map, D_map, all_cam_ids,
+                        int(gripper_cam_idx), exclude_gripped_cube=True,
+                        fixed_cube_min_corners=8)
+                T_base_Ci_joint, T_gTc_joint, joint_diag = \
+                    refine_joint_cube_board_reprojection_fk(
+                        corner_observations=corner_observations,
+                        robot_T=robot_T,
+                        K_map=K_map,
+                        D_map=D_map,
+                        fixed_cam_ids=fixed_cam_ids,
+                        gripper_cam_idx=int(gripper_cam_idx),
+                        T_base_Ci=T_base_Ci,
+                        T_gTc=T_gTc,
+                        T_base_board=T_base_board,
+                        fk_cube_by_set=corrected_set_priors,
+                        max_nfev=int(args.joint_max_nfev),
+                        tol=float(args.joint_reprojection_tol),
+                        rotation_scale_rad=float(args.joint_reprojection_rotation_scale_rad),
+                        translation_scale_m=float(args.joint_reprojection_translation_scale_m),
+                        x_scale_mode=str(args.joint_reprojection_x_scale_mode),
+                        max_delta_trans_mm=float(args.joint_max_delta_trans_mm),
+                        max_delta_rot_deg=float(args.joint_max_delta_rot_deg),
+                    )
+                joint_diag["corner_observation_loading"] = corner_observation_diag
+                print(
+                    f"  [JOINT] corner RMS "
+                    f"{joint_diag.get('initial_reprojection_rmse_px', float('nan')):.4f} -> "
+                    f"{joint_diag.get('train_reprojection_rmse_px', float('nan')):.4f}px; "
+                    f"adopted={joint_diag.get('adopted', False)}"
+                )
+            if joint_diag.get("adopted"):
+                T_base_Ci = T_base_Ci_joint
+                T_gTc = T_gTc_joint
+                T_B_O_by_set = {
+                    int(s): np.asarray(T, dtype=np.float64)
+                    for s, T in corrected_set_priors.items()
+                }
+                if len(T_B_O_by_set) > 1:
+                    T_B_O_avg = weighted_se3_average(
+                        [T_B_O_by_set[s] for s in sorted(T_B_O_by_set)])
+                else:
+                    T_B_O_avg = next(iter(T_B_O_by_set.values()))
+                t_base_o_source = (
+                    "aligned_fk_fixed_corner_joint"
+                    if selected_joint_solve == "reprojection_fk_fixed"
+                    else "aligned_fk_fixed_joint"
+                )
+                set_anchor_source = t_base_o_source
+
+                # Joint variables supersede staged outputs and all dependent
+                # relative/runtime transforms must be regenerated.
+                np.save(os.path.join(out_dir, "T_gripper_cam.npy"), T_gTc)
+                np.save(os.path.join(out_dir, "T_base_O.npy"), T_B_O_avg)
+                for ci, T in T_base_Ci.items():
+                    np.save(os.path.join(out_dir, f"T_base_C{int(ci)}.npy"),
+                            np.asarray(T, dtype=np.float64))
+                    key = f"T_base_C{int(ci)}"
+                    base_stats.setdefault(key, {})["joint_refined"] = True
+                    base_stats[key]["method_final"] = str(joint_diag.get("mode"))
+
+                if int(ref_fixed) in T_base_Ci:
+                    T_Cref_Ci = {
+                        int(ci): inv_T(T_base_Ci[int(ref_fixed)]) @ np.asarray(T, dtype=np.float64)
+                        for ci, T in T_base_Ci.items()
+                    }
+                    for ci, T in T_Cref_Ci.items():
+                        np.save(os.path.join(out_dir, f"T_C{int(ref_fixed)}_C{int(ci)}.npy"), T)
+
+                set_anchor_payload = {}
+                for set_index in sorted(T_B_O_by_set):
+                    key = get_object_anchor_key_for_set(set_index)
+                    T_set = np.asarray(T_B_O_by_set[set_index], dtype=np.float64)
+                    np.save(os.path.join(internal_runtime_dir, f"{key}.npy"), T_set)
+                    set_anchor_payload[str(int(set_index))] = {
+                        "transform_key": key,
+                        "transform": T_set.tolist(),
+                        "source": set_anchor_source,
+                        "support": int((set_cube_center_prior_diag.get("per_set", {}) or {})
+                                       .get(str(int(set_index)), {}).get("support", 0)),
+                    }
+                with open(os.path.join(internal_runtime_dir, "T_base_O_by_set.json"), "w") as f:
+                    json.dump(set_anchor_payload, f, indent=2)
+
+                gripper_base_by_event, gripper_base_diag = build_gripper_event_base_transforms_from_fixed_cams(
+                    meta, pnp_obs, T_base_Ci, sorted(T_base_Ci.keys()), gripper_cam_idx,
+                    robot_T, T_gTc, min_cams=max(int(args.event_anchor_min_cams), 2),
+                    extra_transforms={"set_cube_center_prior": set_cube_center_prior},
+                )
+                gripper_base_by_event, gripper_board_refine_diag = refine_gripper_event_base_transforms_with_board_anchor(
+                    gripper_base_by_event, charuco_obs,
+                    blend_alpha=float(args.gripper_board_blend_alpha),
+                )
+                gripper_base_diag["board_anchor_refinement"] = gripper_board_refine_diag
+                for eid, T_evt in sorted(gripper_base_by_event.items()):
+                    np.save(
+                        os.path.join(internal_runtime_dir,
+                                     f"T_base_C{gripper_cam_idx}_event{int(eid)}.npy"),
+                        np.asarray(T_evt, dtype=np.float64),
+                    )
+                if gripper_base_diag.get("events"):
+                    with open(os.path.join(
+                            internal_runtime_dir,
+                            f"T_base_C{gripper_cam_idx}_by_event.json"), "w") as f:
+                        json.dump(gripper_base_diag, f, indent=2)
+                gripper_pose_model = build_gripper_base_pose_model(
+                    meta, robot_T, T_gTc, gripper_base_by_event, gripper_cam_idx)
+                if gripper_pose_model is not None:
+                    with open(os.path.join(internal_runtime_dir,
+                                           "gripper_base_pose_model.json"), "w") as f:
+                        json.dump(gripper_pose_model, f, indent=2)
+            else:
+                print(f"  [JOINT] staged solution retained: {joint_diag.get('reason', 'unknown')}")
 
     # ══════════════════════════════════════════════════════════
     # Summary
     # ══════════════════════════════════════════════════════════
     summary = {
-        "calibration_type": "unified_charuco_cube",
+        "calibration_type": (
+            ("unified_charuco_cube_reprojection_fk_fixed"
+             if joint_diag.get("mode") == "cube_board_unified_reprojection_fk_fixed"
+             else "unified_charuco_cube_fk_fixed")
+            if joint_diag.get("adopted")
+            else "staged_charuco_cube"
+        ),
+        "unified": bool(joint_diag.get("adopted")),
+        "fk_mode": "fixed" if joint_diag.get("adopted") else "none",
         "handeye_data_source": "charuco" if use_charuco else "cube_pnp",
         "gripper_cam_idx": int(gripper_cam_idx),
         "ref_fixed_cam_idx": int(ref_fixed) if ref_fixed is not None else None,
@@ -2692,6 +3416,7 @@ def main():
             },
             "base_transforms": base_stats,
             "reprojection_refinement": reproj_refine_diag,
+            "joint_optimization": joint_diag,
             "cube_anchor": cube_anchor_diag,
             "cube_anchor_by_set": cube_anchor_by_set_diag,
             "gripper_event_base_transforms": gripper_base_diag,

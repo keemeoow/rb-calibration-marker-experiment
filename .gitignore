@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.claude/scheduled_tasks.lock
+
+# Superseded diagnostic outputs; canonical results live in the non-smoke folders.
+CP_result/*_smoke/
+CP_result/convergence_study_*/
+CP_result/sensitivity_7row_one_seed/
+CP_result/sensitivity_7row_resolution_seed33_recheck/
+
+# Local rollback/duplicate captures already recoverable from Git.
+data/session/meta.pre_depth_backup.json
+data/session(1)/

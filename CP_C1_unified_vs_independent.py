@@ -386,6 +386,49 @@ def learn_fk_ridge(model: dict, sc_train: Scene, train_sets: List[int],
     return np.linalg.solve(X.T @ X + reg, X.T @ Y)
 
 
+def learn_fk_offset(model: dict, sc_train: Scene,
+                    train_sets: List[int]) -> Optional[np.ndarray]:
+    """모델1 baseline: `[1]` 만 = train 잔차 (p_FK - p̂) 의 평균 offset (3,).
+
+    Ridge `[1,x,y]` 에서 x,y 기울기를 뺀 절편-only 판. held-out 감소가 단순 평균
+    offset 때문인지(=위치 무관 bias) 진짜 위치 의존 기울기 때문인지 구분하는 기준선."""
+    diffs = []
+    for s in train_sets:
+        p = predict_cube_base_pos(model, sc_train, s)
+        if p is None or int(s) not in sc_train.fk_cube:
+            continue
+        diffs.append(sc_train.fk_cube[int(s)][:3, 3] - p)
+    if not diffs:
+        return None
+    return np.mean(np.asarray(diffs, float), axis=0)
+
+
+def downstream_axis_errs(model: dict, sc_eval: Scene, eval_sets: List[int],
+                         W: Optional[np.ndarray] = None,
+                         T_rigid: Optional[np.ndarray] = None,
+                         offset: Optional[np.ndarray] = None) -> np.ndarray:
+    """downstream_rmse 와 동일 예측·보정. 축별 해석용으로 signed 오차 (N,3) mm 반환.
+
+    보정은 셋 중 하나만 준다: W(Ridge[1,x,y]) / T_rigid(SE(3)) / offset([1]). 모두
+    None 이면 raw. 축별 RMS 는 이 배열을 fold 간 pool 해서 계산한다(단일 test set 이면
+    fold 당 1행이라 per-fold RMS 는 절댓값과 같아져 왜곡되므로 pool 이 맞다)."""
+    errs = []
+    for s in eval_sets:
+        p = predict_cube_base_pos(model, sc_eval, s)
+        if p is None or int(s) not in sc_eval.fk_cube:
+            continue
+        if T_rigid is not None:
+            t = T_rigid[:3, :3] @ p + T_rigid[:3, 3]
+        elif offset is not None:
+            t = p + offset
+        elif W is not None:
+            t = p + _resid_feature(p) @ W
+        else:
+            t = p
+        errs.append((t - sc_eval.fk_cube[int(s)][:3, 3]) * 1000.0)
+    return np.asarray(errs, float) if errs else np.zeros((0, 3))
+
+
 def learn_fk_rigid(model: dict, sc_train: Scene,
                    train_sets: List[int]) -> Optional[np.ndarray]:
     """train 에서 (예측 큐브위치 -> FK 큐브위치) 를 강체 SE(3) 로 Kabsch 정렬한 T (4x4).
@@ -639,6 +682,32 @@ def main() -> None:
     print(f"[INFO] cube config source: {cfg_source}")
     print(f"[INFO] fixed={sc.fixed_cam_ids}, gripper=cam{sc.gripper_cam_idx}, sets={sc.sets}")
     print(f"[INFO] obs: fixed={len(sc.obs_fixed)}, gripper={len(sc.obs_grip)}, FK sets={len(sc.fk_cube)}")
+    dcc = cp.depth_scale_crosscheck(meta)
+    if dcc.get("n"):
+        pr = dcc.get("median_plane_residual_mm")
+        pr_txt = "n/a" if pr is None else f"{pr:.1f}mm"
+        print(f"[INFO] depth scale cross-check (diagnostic, NOT in solver): n={dcc['n']} "
+              f"pred/meas median={dcc['median_pred_over_meas']:.4f} "
+              f"(vision scale {dcc['implied_vision_scale_pct']:+.1f}%), plane residual median={pr_txt}")
+    else:
+        print(f"[INFO] depth scale cross-check: {dcc.get('reason', 'unavailable')}")
+    fcc = cp.fk_scale_crosscheck(meta)
+    if fcc.get("n"):
+        cams_txt = " ".join(
+            f"cam{ci}={d['median']:.4f}[{d['iqr_lo']:.3f},{d['iqr_hi']:.3f}]n{d['n']}"
+            for ci, d in sorted(fcc["per_cam"].items())
+        )
+        print(f"[INFO] FK scale cross-check (diagnostic, NOT in solver): "
+              f"reliable |dVis|/|dFK| median={fcc['reliable_median_vis_over_fk']:.4f} "
+              f"(FK scale {fcc['implied_fk_scale_pct']:+.1f}% vs vision; "
+              f"n_reliable={fcc['n_reliable']}/{fcc['n']}) | {cams_txt}")
+    else:
+        print(f"[INFO] FK scale cross-check: {fcc.get('reason', 'unavailable')}")
+    rps = cp.robot_pos_scale()
+    est = cp.estimate_robot_pos_scale(meta)
+    est_txt = (f"data estimate k={est['k']:.4f} (robot short {est['implied_robot_short_pct']:+.1f}%, "
+               f"n_reliable={est['n_reliable']})") if est.get("k") else f"data estimate: {est.get('reason','n/a')}"
+    print(f"[INFO] robot_pos_scale applied={rps:.4f} (RB_ROBOT_POS_SCALE); {est_txt}")
     if len(sc.sets) < 3:
         print(f"[WARN] only {len(sc.sets)} set(s) with FK cube — base gauge is weakly "
               f"constrained; treat numbers as smoke-test only (need >=3 sets).")

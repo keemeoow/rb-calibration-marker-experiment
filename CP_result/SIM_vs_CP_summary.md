@@ -6,14 +6,14 @@
 
 | 기여 | 지표 | baseline → proposed | 시뮬 base | 시뮬 prop | 시뮬 Δ% | CP base | CP prop | CP Δ% | 재현 |
 |---|---|---|---:|---:|---:|---:|---:|---:|:---:|
-| C1 | hand-eye gTc (sim: vs GT / CP: gripper-align RMSE) | independent → unified_joint | 23.095 | 0.169 | -99.3% | 15.06 | 13.67 | -9.2% | △  (방향만) |
-| C1 | shared-base consistency | independent → unified_joint | 17.933 | 1.204 | -93.3% | 15.98 | 15.25 | -4.6% | X  (효과없음) |
-| C1 | held-out cube prediction (no correction) | independent → unified_joint | 4.647 | 1.718 | -63.0% | 13.39 | 11.67 | -12.8% | △  (방향만) |
-| C1 | held-out cube prediction: effect of +fk correction | unified_joint → unified_joint +fk | 1.718 | 0.354 | -79.4% | 11.67 | 2.51 | -78.5% | O |
+| C1 | hand-eye gTc (sim: vs GT / CP: gripper-align RMSE) | independent → unified_joint | 23.095 | 0.169 | -99.3% | 15.56 | 14.26 | -8.3% | △  (방향만) |
+| C1 | shared-base consistency | independent → unified_joint | 17.933 | 1.204 | -93.3% | 15.68 | 15.30 | -2.4% | X  (효과없음) |
+| C1 | held-out cube prediction (no correction) | independent → unified_joint | 4.647 | 1.718 | -63.0% | 13.45 | 11.07 | -17.7% | O |
+| C1 | held-out cube prediction: effect of +fk correction | unified_joint → unified_joint +fk | 1.718 | 0.354 | -79.4% | 11.07 | 2.67 | -75.8% | O |
 | C2 | simultaneous observers | board → cube | 2.633 | 4.000 | 51.9% | 1.03 | 2.70 | 162.8% | O |
-| C2 | viewpoint coverage | board → cube | 71.823 | 79.964 | 11.3% | 118.73 | 103.84 | -12.5% | X  (반대) |
-| C2 | camera pose err (sim: vs GT / CP: cross-camera) | board_only → hybrid | 8.314 | 4.725 | -43.2% | 26.93 | 4.40 | -83.7% | O |
-| C2 | target pred. err (sim: vs GT / CP: pose repeatability) | board_only → hybrid | 10.356 | 6.817 | -34.2% | 26.93 | 4.41 | -83.6% | O |
+| C2 | viewpoint coverage | board → cube | 71.823 | 79.964 | 11.3% | 118.48 | 103.64 | -12.5% | X  (반대) |
+| C2 | camera pose err (sim: vs GT / CP: cross-camera) | board_only → hybrid | 8.314 | 4.725 | -43.2% | 28.26 | 3.95 | -86.0% | O |
+| C2 | target pred. err (sim: vs GT / CP: pose repeatability) | board_only → hybrid | 10.356 | 6.817 | -34.2% | 28.26 | 3.95 | -86.0% | O |
 | C3 | held-out prediction: FK prior vs camera-only | Camera-based → FK-based | 1.073 | 1.217 | 13.4% | 22.68 | 24.02 | 5.9% | O |
 | C3 | held-out prediction: effect of residual correction | sim: Camera-based / CP: fk-prior → + correction | 1.073 | 0.183 | -82.9% | 24.02 | 20.98 | -12.7% | △  (방향만) |
 | C3 | best method vs camera-only baseline | Camera-based / no-fk-prior → best | 1.073 | 0.183 | -82.9% | 22.68 | 20.98 | -7.5% | △  (방향만) |
