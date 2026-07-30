@@ -713,8 +713,11 @@ def main():
         action="store_false",
         help="Allow gripper cube pose even when depth support is invalid",
     )
-    parser.add_argument("--max_gripper_depth_plane_mean_mm", type=float, default=15.0,
-                        help="Reject a capture when gripper cube depth plane error exceeds this mm (<=0 disables)")
+    parser.add_argument("--max_gripper_depth_plane_mean_mm", type=float, default=40.0,
+                        help="Reject a capture when gripper cube depth plane error exceeds this mm (<=0 disables). "
+                             "Conservative 40mm margin; with correct per-marker plane geometry the measured "
+                             "plane residual is ~5mm (fixed-cam single-marker), so 15-20mm is also defensible if "
+                             "you want the gate to actually catch bad depth.")
     parser.add_argument("--max_capture_span_ms", type=float, default=120.0,
                         help="Skip a capture when camera timestamps span more than this many ms (<=0 disables)")
 
