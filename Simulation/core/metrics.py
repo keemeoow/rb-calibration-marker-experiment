@@ -10,7 +10,63 @@
 큐브 위치 예측: 고정 카메라 + 그리퍼(있으면)로 base 에서 예측 (median 합의).
 """
 import numpy as np
+import cv2
 from .se3 import inv_T, se3_avg, rot_deg, trans_mm
+from .targets import CubeTarget, BoardTarget
+from .project import DEFAULT_K, DEFAULT_DIST
+
+_CUBE = CubeTarget()
+_BOARD = BoardTarget()
+
+
+def unified_reproj(sc, model):
+    """통일 재투영 오차(px) — 캘리브된 카메라로 **보드+큐브 전체**를 GT 위치에 재투영해
+    GT 관측 코너와 비교. 캘리브에 어떤 마커를 썼든(보드만/큐브만) 동일 대상(보드+큐브)으로
+    평가 → 공정 비교. 낮을수록 카메라 외부파라미터가 정확.
+
+    방식: 추정 카메라 bTf_est 로 예측한 타깃 pose 를, GT 카메라가 실제 본 코너(노이즈 낀
+    관측)와 재투영 비교. 즉 '추정 카메라가 관측을 얼마나 재현하나'.
+    """
+    cams = model["cams"]
+    errs = []
+    for ci in sc.fixed_cam_ids:
+        if ci not in cams:
+            continue
+        for tgt, obs_dict in [(_CUBE, sc.obs_fix_cube), (_BOARD, sc.obs_fix_board)]:
+            for s in sc.sets:
+                if (ci, s) not in obs_dict:
+                    continue
+                # 추정 카메라로 본 타깃 pose = inv(bTf_est) @ (base 타깃위치)
+                base_t = sc.bTo[s] if tgt is _CUBE else sc.bTboard
+                T_pred = inv_T(cams[ci]) @ base_t          # camera_est←target
+                # GT 관측 pose (노이즈 낀 solvePnP 결과)
+                T_obs = obs_dict[(ci, s)]
+                errs.append(_reproj_between(tgt, T_pred, T_obs))
+    # 붕괴 케이스(캘리브 실패)는 이미지 밖으로 발산 → 화면 밖 상한(px)으로 클립.
+    #   합리적 상한 = 이미지 대각선(~800px) — "완전 실패"를 유한값으로.
+    CAP = 800.0
+    v = [min(e, CAP) for e in errs if e is not None]
+    return float(np.mean(v)) if v else None
+
+
+def _reproj_between(target, T_pred, T_obs):
+    """예측 pose T_pred 로 타깃 코너를 투영한 위치 vs 관측 pose T_obs 로 투영한 위치의
+    픽셀 오차(RMS). 두 pose 가 같으면 0."""
+    pts = []
+    for mid, c3d, normal in target.all_corners():
+        pts.append(c3d)
+    obj = np.concatenate(pts, 0)
+    def proj(T):
+        R = T[:3, :3]; t = T[:3, 3]
+        if np.any((R @ obj.T).T[:, 2] + t[2] <= 1e-3):
+            return None
+        p, _ = cv2.projectPoints(obj.reshape(-1, 1, 3), cv2.Rodrigues(R)[0],
+                                 t.reshape(3, 1), DEFAULT_K, DEFAULT_DIST)
+        return p.reshape(-1, 2)
+    pa, pb = proj(T_pred), proj(T_obs)
+    if pa is None or pb is None:
+        return None
+    return float(np.sqrt(np.mean(np.sum((pa - pb) ** 2, axis=1))))
 
 
 def predict_cube_pos(sc, model, s):
@@ -89,6 +145,6 @@ def eval_model(sc, model, train_sets, test_sets, W=None):
             cross.append(np.mean([np.linalg.norm(p - c) for p in pts]) * 1000)
     out["e_cross_mm"] = float(np.mean(cross)) if cross else None
 
-    # e_reproj : corner-level 필요 → pose-level 에선 미지원
-    out["e_reproj_px"] = None
+    # e_reproj : 통일 재투영 — 캘리브에 뭘 썼든(보드만/큐브만) 보드+큐브 전체로 평가 (공정)
+    out["e_reproj_px"] = unified_reproj(sc, model)
     return out
