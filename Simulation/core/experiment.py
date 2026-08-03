@@ -38,11 +38,16 @@ class ExpConfig:
 
 
 def calibrate(sc, cfg: ExpConfig, train_sets):
-    """설정대로 캘리브. corr 은 none(또는 unified) 로 캘리브 후 후보정 W 학습."""
+    """설정대로 캘리브.
+       - none  : FK 미사용 (anchor 없음). 순수 카메라 기반.
+       - corr  : FK soft anchor(gauge 안정, weight 5.0)로 캘리브 후 잔차 Ridge 후보정.
+       - fixed : 큐브를 FK 상수로 하드 고정.
+    """
     cfg.validate()
-    fk_solve = "none" if cfg.fk == "corr" else cfg.fk    # corr 의 캘리브는 FK 미사용
+    fk_solve = "none" if cfg.fk == "corr" else cfg.fk    # corr 캘리브는 큐브 자유(+anchor)
+    aw = 5.0 if cfg.fk == "corr" else 0.0                # FK 쓰는 corr 에만 soft anchor
     if cfg.solve == "unified":
-        model = solve_unified(sc, cfg.markers, fk_solve, train_sets)
+        model = solve_unified(sc, cfg.markers, fk_solve, train_sets, anchor_weight=aw)
     else:
         model = solve_independent(sc, cfg.markers, fk_solve, train_sets)
     W = None

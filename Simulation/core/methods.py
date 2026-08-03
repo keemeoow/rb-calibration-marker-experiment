@@ -72,9 +72,11 @@ def _bootstrap(sc, markers, train_sets):
 
 
 # ---------------------------------------------------------------- 통합(unified) BA
-def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=80):
-    """모든 관측을 하나의 비선형 최소제곱으로 동시 최적화.
-       fk_mode='fixed' 면 큐브를 FK 상수로 고정(미지수 제외)."""
+def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=200, anchor_weight=0.0):
+    """모든 관측을 하나의 비선형 최소제곱으로 동시 최적화 (CP_C1 solve_unified_joint 정합).
+       fk_mode='fixed' 면 큐브를 FK 상수로 고정(미지수 제외).
+       anchor_weight>0 이면 자유 큐브를 FK 로 약하게 당기는 soft anchor 항 추가 (gauge 안정화;
+       corr 방식에서 사용, CP_C1 anchor_weight=5.0)."""
     cam_ids = sc.fixed_cam_ids
     cams0, gTc0 = _bootstrap(sc, markers, train_sets)
     use_cube = "cube" in markers
@@ -117,6 +119,8 @@ def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=80):
             return vec_to_se3(p[idx[("cube", s)]:idx[("cube", s)]+6])
         return sc.fk_cube[s]                            # fixed: 상수
 
+    aw = float(anchor_weight)
+
     def resid(p):
         cams, gTc = unpack(p)
         r = []
@@ -126,6 +130,11 @@ def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=80):
                 r.append(se3_residual(cams[a] @ T_obs, Cs))
             else:
                 r.append(se3_residual(sc.bTg[a] @ gTc @ T_obs, Cs))
+        # FK soft anchor (gauge 고정): 자유 큐브를 FK prior 로 약하게 당김 (CP_C1 정합)
+        if aw > 0.0 and cube_free:
+            for s in train_sets:
+                if ("cube", s) in idx:
+                    r.append(aw * se3_residual(target_pose(p, "cube", s), sc.fk_cube[s]))
         return np.concatenate(r) if r else np.zeros(1)
 
     sol = least_squares(resid, p0, method="lm", max_nfev=max_nfev)
