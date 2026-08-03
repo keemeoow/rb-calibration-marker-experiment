@@ -17,6 +17,7 @@ ChArUco 보드 11×7)와 실측 카메라 K/왜곡을 반영. 노이즈는 코�
   fk_noise  : 로봇 FK 큐브 prior 에 SE(3) 섭동 (Fig B: FK 부정확 모델).
   (위치의존 systematic 편향은 렌즈 왜곡·시야각에서 자연 발생 — 별도 주입 불필요.)
 """
+import os
 import numpy as np
 from .se3 import inv_T, rand_se3, rot_axis_angle, look_at
 from .targets import CubeTarget, BoardTarget
@@ -27,31 +28,57 @@ from .project import observe
 _CUBE = CubeTarget()
 _BOARD = BoardTarget()
 
+# 실측 카메라 배치 (CP_result/C1 에서 추출, 높이 ~0.2m 거의 수평 하향 10°)
+_REAL = np.load(os.path.join(os.path.dirname(__file__), "real_setup", "real_cameras.npz"))
+_REAL_BTF = _REAL["bTf"]           # (3,4,4) base←camera
+_REAL_CENTER = _REAL["center"]     # 작업공간(큐브) 중심
+
 
 class SimScene:
     def __init__(self, seed=0, n_fixed_cams=3, n_sets=8, n_events_per_set=6,
                  sigma_px=0.3, fk_noise_mm=0.0, fk_noise_deg=0.0,
                  cam_radius_m=0.35, cam_height_m=0.35,
-                 incidence_max_deg=65.0):
+                 incidence_max_deg=75.0, use_real_cameras=True,
+                 cam_downtilt_deg=27.0):
         rng = np.random.default_rng(seed)
         self.rng = rng
         self.sigma_px = sigma_px
         self.incidence_max_deg = incidence_max_deg
-        self.fixed_cam_ids = list(range(n_fixed_cams))
-        self.sets = list(range(n_sets))
-        center = np.zeros(3)
 
-        # ---- GT 변환 (솔버가 복원해야 할 미지수) ----
+        # ---- 고정 카메라 배치 ----
+        # use_real_cameras=True: 실측 위치(높이 ~0.2m) 사용. 단, 저장된 캘리브 행렬의
+        #   하향각(9~16°)은 현재 실제 셋업(25~30° 내려봄, 보드가 보이는 정도)과 달라,
+        #   실측 카메라 *위치*는 유지하고 광축이 작업공간 중심을 향하되 하향각을
+        #   cam_downtilt_deg(기본 27°)로 맞춘다 → 평면 보드가 부분적으로 보임.
+        # False: 이상적 원형 look-at 배치 (개발/디버그용).
+        if use_real_cameras:
+            center = _REAL_CENTER.copy()
+            self.fixed_cam_ids = list(range(len(_REAL_BTF)))
+            self.bTf = {}
+            for ci in self.fixed_cam_ids:
+                pos = _REAL_BTF[ci][:3, 3].copy()        # 실측 카메라 위치
+                # 광축을 중심으로 향하되, 하향각을 cam_downtilt_deg 로 강제:
+                #   수평 방향(중심 향함) + 아래로 tilt 만큼 내림.
+                horiz = center - pos; horiz[2] = 0
+                horiz = horiz / (np.linalg.norm(horiz) + 1e-12)
+                td = np.deg2rad(cam_downtilt_deg)
+                aim_dir = np.array([horiz[0] * np.cos(td), horiz[1] * np.cos(td),
+                                    -np.sin(td)])         # 아래로 tilt 한 시선
+                self.bTf[ci] = look_at(pos, pos + aim_dir)
+        else:
+            self.fixed_cam_ids = list(range(n_fixed_cams))
+            self.bTf = {}
+            center = np.zeros(3)
+            for k, ci in enumerate(self.fixed_cam_ids):
+                th = 2 * np.pi * k / max(n_fixed_cams, 1)
+                pos = center + np.array([cam_radius_m * np.cos(th),
+                                         cam_radius_m * np.sin(th),
+                                         cam_height_m + rng.uniform(-0.02, 0.02)])
+                self.bTf[ci] = look_at(pos, center)
+        self.sets = list(range(n_sets))
+
         # 핸드아이 gTc: 카메라가 그리퍼 축에 대략 정렬(작은 오프셋).
         self.gTc = rand_se3(rng, t_range_m=0.05, ang_range_deg=20.0)
-        # 고정 카메라: 작업공간을 원형으로 둘러싸고 중심을 바라봄
-        self.bTf = {}
-        for k, ci in enumerate(self.fixed_cam_ids):
-            th = 2 * np.pi * k / max(n_fixed_cams, 1)
-            pos = center + np.array([cam_radius_m * np.cos(th),
-                                     cam_radius_m * np.sin(th),
-                                     cam_height_m + rng.uniform(-0.02, 0.02)])
-            self.bTf[ci] = look_at(pos, center)
         # 보드: 테이블에 고정 (윗면 +Z 위로)
         self.bTboard = np.eye(4)
         self.bTboard[:3, 3] = center.copy()

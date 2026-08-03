@@ -20,7 +20,7 @@ DEFAULT_DIST = np.array([0.0918, -0.2228, -0.0001, 0.0058, 0.0])   # brown k1,k2
 IMAGE_W, IMAGE_H = 640, 480
 
 
-def observe(target, T_cam_target, sigma_px=0.5, incidence_max_deg=65.0,
+def observe(target, T_cam_target, sigma_px=0.5, incidence_max_deg=75.0,
             K=DEFAULT_K, dist=DEFAULT_DIST, rng=None,
             min_markers=1, min_corners=4):
     """카메라가 타깃을 관측 → (T_cam_target_est, n_corners, reproj_px) 또는 None(미검출).
