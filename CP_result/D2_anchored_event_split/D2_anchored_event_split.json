@@ -1,0 +1,2118 @@
+{
+  "experiment": "D2_anchored_configuration_on_canonical_event_split",
+  "purpose": "fill the Table 1 cells that a soft anchor invalidates, using the canonical event split and the canonical metrics",
+  "reuses": "CP_ablation_7row.prepare_ablation_data (detection, split, FK artifact, initialization, solver options, path-evaluation mask)",
+  "split_seeds": [
+    20260729,
+    20260730,
+    20260731,
+    20260732,
+    20260733
+  ],
+  "num_inits": 3,
+  "anchor_lever_mm": 29.5,
+  "anchor_lambdas_px_per_mm": [
+    3.0
+  ],
+  "arm_specs": [
+    {
+      "key": "A2",
+      "row": "A2",
+      "anchor_lambda": 0.0,
+      "label": "reference: vision-estimated, no anchor (Table 1 A2)"
+    },
+    {
+      "key": "A3",
+      "row": "A3",
+      "anchor_lambda": null,
+      "label": "reference: FK-fixed (Table 1 A3)"
+    },
+    {
+      "key": "A2@lam3",
+      "row": "A2",
+      "anchor_lambda": 3.0,
+      "label": "vision-estimated + soft FK anchor lam=3 px/mm"
+    }
+  ],
+  "arm_keys": [
+    "A2",
+    "A3",
+    "A2@lam3"
+  ],
+  "solver_options": {
+    "method": "trf",
+    "loss": "soft_l1",
+    "f_scale_px": 2.0,
+    "max_nfev": 300,
+    "xtol": 1e-08,
+    "ftol": 1e-08,
+    "gtol": 1e-08,
+    "parameterization": "left_local_SE3_perturbation_with_retraction",
+    "rotation_scale_rad": 1.0,
+    "translation_scale_m": 1.0,
+    "scipy_x_scale": "jac"
+  },
+  "summary": {
+    "A2": {
+      "n_runs": 15,
+      "n_converged": 15,
+      "n_splits": 5,
+      "N_reg": {
+        "mean": 3.0,
+        "std": 0.0
+      },
+      "heldout_reprojection_overall_px": {
+        "mean": 4.557055564808456,
+        "std": 0.43252889241767567
+      },
+      "heldout_reprojection_cube_px": {
+        "mean": 7.240683120053856,
+        "std": 0.7233022909231396
+      },
+      "heldout_reprojection_board_px": {
+        "mean": 1.6489596769583739,
+        "std": 0.14328561795281042
+      },
+      "e_e2e_translation_mm": {
+        "mean": 15.24895289070328,
+        "std": 1.3520558441037263
+      },
+      "e_e2e_rotation_deg": {
+        "mean": 7.751622683507587,
+        "std": 0.5914296991391856
+      },
+      "e_cross_translation_mm": {
+        "mean": 36.85929143004555,
+        "std": 3.520845253284622
+      },
+      "e_cross_rotation_deg": {
+        "mean": 34.55474100427675,
+        "std": 4.317612971023122
+      },
+      "jacobian_condition": {
+        "mean": 327.66568584912403,
+        "std": 6.041671523235704
+      },
+      "nfev": {
+        "mean": 108.2,
+        "std": 9.173875952943773
+      },
+      "anchor_rms_cube_displacement_mm": {
+        "mean": null,
+        "std": null
+      }
+    },
+    "A3": {
+      "n_runs": 15,
+      "n_converged": 15,
+      "n_splits": 5,
+      "N_reg": {
+        "mean": 3.0,
+        "std": 0.0
+      },
+      "heldout_reprojection_overall_px": {
+        "mean": 4.716061123218139,
+        "std": 0.41936809744586306
+      },
+      "heldout_reprojection_cube_px": {
+        "mean": 7.4634811607195015,
+        "std": 0.7114485909268335
+      },
+      "heldout_reprojection_board_px": {
+        "mean": 1.7810519603892154,
+        "std": 0.08417792250849228
+      },
+      "e_e2e_translation_mm": {
+        "mean": 15.025908317169414,
+        "std": 1.2152894214736705
+      },
+      "e_e2e_rotation_deg": {
+        "mean": 7.734217997778027,
+        "std": 0.5855225320130137
+      },
+      "e_cross_translation_mm": {
+        "mean": 32.75473690250086,
+        "std": 3.2789563249041143
+      },
+      "e_cross_rotation_deg": {
+        "mean": 34.52680566155108,
+        "std": 4.315758789738147
+      },
+      "jacobian_condition": {
+        "mean": 50.9590578536778,
+        "std": 0.2243422803091299
+      },
+      "nfev": {
+        "mean": 20.2,
+        "std": 1.0022197585581945
+      },
+      "anchor_rms_cube_displacement_mm": {
+        "mean": null,
+        "std": null
+      }
+    },
+    "A2@lam3": {
+      "n_runs": 15,
+      "n_converged": 15,
+      "n_splits": 5,
+      "N_reg": {
+        "mean": 3.0,
+        "std": 0.0
+      },
+      "heldout_reprojection_overall_px": {
+        "mean": 4.56256705836399,
+        "std": 0.4303796606501518
+      },
+      "heldout_reprojection_cube_px": {
+        "mean": 7.251200800940817,
+        "std": 0.7240832464150332
+      },
+      "heldout_reprojection_board_px": {
+        "mean": 1.6476487049018345,
+        "std": 0.11525045408991416
+      },
+      "e_e2e_translation_mm": {
+        "mean": 15.116823696368794,
+        "std": 1.3114827425364624
+      },
+      "e_e2e_rotation_deg": {
+        "mean": 7.7341619943614806,
+        "std": 0.5882017982281391
+      },
+      "e_cross_translation_mm": {
+        "mean": 35.08718716624357,
+        "std": 3.53294411347008
+      },
+      "e_cross_rotation_deg": {
+        "mean": 34.55913696818766,
+        "std": 4.31955592510064
+      },
+      "jacobian_condition": {
+        "mean": 302.077688489166,
+        "std": 4.421231387657547
+      },
+      "nfev": {
+        "mean": 82.93333333333334,
+        "std": 10.270562031575707
+      },
+      "anchor_rms_cube_displacement_mm": {
+        "mean": 1.714043050849338,
+        "std": 0.05722003731490346
+      }
+    }
+  },
+  "reference_agreement": {
+    "n_splits_run": 5,
+    "tolerance_sigma": 2.0,
+    "note": "Table 1 is a five-seed mean; a run over fewer seeds is judged against Table 1's own split spread, not against its mean.",
+    "arms": {
+      "A2": {
+        "e_e2e_translation_mm": {
+          "table1_mean": 16.1955,
+          "table1_split_std": 1.2976,
+          "reproduced": 15.24895289070328,
+          "abs_diff": 0.9465471092967199,
+          "sigma": 0.729459856116461,
+          "within_tolerance": true
+        },
+        "e_cross_translation_mm": {
+          "table1_mean": 38.9338,
+          "table1_split_std": 3.4075,
+          "reproduced": 36.85929143004555,
+          "abs_diff": 2.074508569954446,
+          "sigma": 0.6088066236109893,
+          "within_tolerance": true
+        },
+        "heldout_reprojection_overall_px": {
+          "table1_mean": 4.5075,
+          "table1_split_std": 0.4387,
+          "reproduced": 4.557055564808456,
+          "abs_diff": 0.0495555648084558,
+          "sigma": 0.11296002919638888,
+          "within_tolerance": true
+        }
+      },
+      "A3": {
+        "e_e2e_translation_mm": {
+          "table1_mean": 16.1881,
+          "table1_split_std": 1.2856,
+          "reproduced": 15.025908317169414,
+          "abs_diff": 1.162191682830585,
+          "sigma": 0.9040072206211768,
+          "within_tolerance": true
+        },
+        "e_cross_translation_mm": {
+          "table1_mean": 38.048,
+          "table1_split_std": 3.5117,
+          "reproduced": 32.75473690250086,
+          "abs_diff": 5.293263097499143,
+          "sigma": 1.5073221224760494,
+          "within_tolerance": true
+        },
+        "heldout_reprojection_overall_px": {
+          "table1_mean": 4.623,
+          "table1_split_std": 0.4338,
+          "reproduced": 4.716061123218139,
+          "abs_diff": 0.09306112321813842,
+          "sigma": 0.2145254108301946,
+          "within_tolerance": true
+        }
+      }
+    },
+    "worst_sigma": 1.5073221224760494,
+    "passed": true
+  },
+  "paired_vs_A2": {
+    "heldout_reprojection_overall_px": {
+      "A3": {
+        "n_splits": 5,
+        "mean": 0.15900555840968272,
+        "std": 0.04286678479853785,
+        "se": 0.021433392399268926,
+        "t": 7.41859036813539,
+        "splits_improved": 0
+      },
+      "A2@lam3": {
+        "n_splits": 5,
+        "mean": 0.0055114935555335975,
+        "std": 0.014092184344109334,
+        "se": 0.007046092172054667,
+        "t": 0.7822057136000288,
+        "splits_improved": 2
+      }
+    },
+    "e_cross_translation_mm": {
+      "A3": {
+        "n_splits": 5,
+        "mean": -4.104554527544698,
+        "std": 0.34330159318331666,
+        "se": 0.1716507965916583,
+        "t": -23.91223698954955,
+        "splits_improved": 5
+      },
+      "A2@lam3": {
+        "n_splits": 5,
+        "mean": -1.772104263801983,
+        "std": 0.0995110969617316,
+        "se": 0.049755548480865795,
+        "t": -35.61621402854138,
+        "splits_improved": 5
+      }
+    },
+    "e_e2e_translation_mm": {
+      "A3": {
+        "n_splits": 5,
+        "mean": -0.22304457353386517,
+        "std": 0.23660376223278726,
+        "se": 0.11830188111639363,
+        "t": -1.8853848428193496,
+        "splits_improved": 3
+      },
+      "A2@lam3": {
+        "n_splits": 5,
+        "mean": -0.13212919433448356,
+        "std": 0.058066656821863405,
+        "se": 0.029033328410931702,
+        "t": -4.550948911690536,
+        "splits_improved": 5
+      }
+    }
+  },
+  "per_split": {
+    "20260729": {
+      "A2": [
+        {
+          "seed": 0,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.820645578145696,
+          "heldout_reprojection_cube_px": 7.673540622297932,
+          "heldout_reprojection_board_px": 1.6318065072945886,
+          "train_reprojection_overall_px": 4.8881882702142425,
+          "e_e2e_translation_mm": 14.448496446925011,
+          "e_e2e_rotation_deg": 8.176309804912428,
+          "e_cross_translation_mm": 38.788659550128244,
+          "e_cross_rotation_deg": 36.4041116333206,
+          "jacobian_condition": 330.9791216559287,
+          "n_parameters": 108,
+          "nfev": 135,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 52
+              },
+              "3": {
+                "cube": 106
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 1,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.820664499764104,
+          "heldout_reprojection_cube_px": 7.673552547174881,
+          "heldout_reprojection_board_px": 1.631862301145065,
+          "train_reprojection_overall_px": 4.888162565730567,
+          "e_e2e_translation_mm": 14.448230810178993,
+          "e_e2e_rotation_deg": 8.176057256742506,
+          "e_cross_translation_mm": 38.78873909823186,
+          "e_cross_rotation_deg": 36.404293080127744,
+          "jacobian_condition": 330.9917785349748,
+          "n_parameters": 108,
+          "nfev": 125,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 52
+              },
+              "3": {
+                "cube": 106
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 2,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.820658975620068,
+          "heldout_reprojection_cube_px": 7.6735496257255384,
+          "heldout_reprojection_board_px": 1.6318444922626676,
+          "train_reprojection_overall_px": 4.888173953483282,
+          "e_e2e_translation_mm": 14.448683893118469,
+          "e_e2e_rotation_deg": 8.176112197879242,
+          "e_cross_translation_mm": 38.78855458525943,
+          "e_cross_rotation_deg": 36.404223294722975,
+          "jacobian_condition": 330.9917944687263,
+          "n_parameters": 108,
+          "nfev": 111,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 52
+              },
+              "3": {
+                "cube": 106
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        }
+      ],
+      "A3": [
+        {
+          "seed": 0,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 5.026215805605157,
+          "heldout_reprojection_cube_px": 7.942551927169638,
+          "heldout_reprojection_board_px": 1.85216742080224,
+          "train_reprojection_overall_px": 5.035184033521465,
+          "e_e2e_translation_mm": 14.548131755035286,
+          "e_e2e_rotation_deg": 8.165150691140289,
+          "e_cross_translation_mm": 34.59873222960274,
+          "e_cross_rotation_deg": 36.37703845272508,
+          "jacobian_condition": 51.13402794073563,
+          "n_parameters": 30,
+          "nfev": 16,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 52
+              },
+              "3": {
+                "cube": 106
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 1,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 5.026240196015057,
+          "heldout_reprojection_cube_px": 7.9425648952210075,
+          "heldout_reprojection_board_px": 1.8522397138184306,
+          "train_reprojection_overall_px": 5.03518932463372,
+          "e_e2e_translation_mm": 14.547613673468708,
+          "e_e2e_rotation_deg": 8.165577002563074,
+          "e_cross_translation_mm": 34.59870974771592,
+          "e_cross_rotation_deg": 36.37702489416849,
+          "jacobian_condition": 51.13216410454033,
+          "n_parameters": 30,
+          "nfev": 21,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 52
+              },
+              "3": {
+                "cube": 106
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 2,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 5.026231012780214,
+          "heldout_reprojection_cube_px": 7.942574738455789,
+          "heldout_reprojection_board_px": 1.8521760433324612,
+          "train_reprojection_overall_px": 5.035182548038983,
+          "e_e2e_translation_mm": 14.547627475162988,
+          "e_e2e_rotation_deg": 8.165659100088057,
+          "e_cross_translation_mm": 34.598966421049155,
+          "e_cross_rotation_deg": 36.37695468858313,
+          "jacobian_condition": 51.130995551946015,
+          "n_parameters": 30,
+          "nfev": 23,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 52
+              },
+              "3": {
+                "cube": 106
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        }
+      ],
+      "A2@lam3": [
+        {
+          "seed": 0,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.846712520901698,
+          "heldout_reprojection_cube_px": 7.702132994629452,
+          "heldout_reprojection_board_px": 1.6752559407228775,
+          "train_reprojection_overall_px": 4.896886230861914,
+          "e_e2e_translation_mm": 14.40173646060532,
+          "e_e2e_rotation_deg": 8.16241649347194,
+          "e_cross_translation_mm": 37.12262825118708,
+          "e_cross_rotation_deg": 36.40843957482013,
+          "jacobian_condition": 305.12803371645265,
+          "n_parameters": 108,
+          "nfev": 57,
+          "anchor_rms_cube_displacement_mm": 1.6063847644132307,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 52
+              },
+              "3": {
+                "cube": 106
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 1,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.84667549614629,
+          "heldout_reprojection_cube_px": 7.702052511085296,
+          "heldout_reprojection_board_px": 1.6753005891190242,
+          "train_reprojection_overall_px": 4.896846370869913,
+          "e_e2e_translation_mm": 14.401885182252363,
+          "e_e2e_rotation_deg": 8.162188959255333,
+          "e_cross_translation_mm": 37.12241802698218,
+          "e_cross_rotation_deg": 36.40865800634043,
+          "jacobian_condition": 305.1457605906795,
+          "n_parameters": 108,
+          "nfev": 57,
+          "anchor_rms_cube_displacement_mm": 1.6063757237750957,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 52
+              },
+              "3": {
+                "cube": 106
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 2,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.846695874994919,
+          "heldout_reprojection_cube_px": 7.702088556506868,
+          "heldout_reprojection_board_px": 1.6752979186627432,
+          "train_reprojection_overall_px": 4.896860841228123,
+          "e_e2e_translation_mm": 14.40183146341033,
+          "e_e2e_rotation_deg": 8.162241713865768,
+          "e_cross_translation_mm": 37.12247441387375,
+          "e_cross_rotation_deg": 36.4086417721356,
+          "jacobian_condition": 305.1419246429892,
+          "n_parameters": 108,
+          "nfev": 88,
+          "anchor_rms_cube_displacement_mm": 1.6064423895419835,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 52
+              },
+              "3": {
+                "cube": 106
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        }
+      ]
+    },
+    "20260730": {
+      "A2": [
+        {
+          "seed": 0,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.410887179576032,
+          "heldout_reprojection_cube_px": 6.912436899708074,
+          "heldout_reprojection_board_px": 1.854074179330323,
+          "train_reprojection_overall_px": 4.9837872637322445,
+          "e_e2e_translation_mm": 15.363106654183843,
+          "e_e2e_rotation_deg": 7.325321932680995,
+          "e_cross_translation_mm": 35.210523811904984,
+          "e_cross_rotation_deg": 33.747839180429295,
+          "jacobian_condition": 325.86722192689757,
+          "n_parameters": 108,
+          "nfev": 93,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 131
+              },
+              "1": {
+                "cube": 114,
+                "board": 51
+              },
+              "3": {
+                "cube": 104
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 1,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.410873746798508,
+          "heldout_reprojection_cube_px": 6.9124182972833195,
+          "heldout_reprojection_board_px": 1.8540633707525074,
+          "train_reprojection_overall_px": 4.983787661222655,
+          "e_e2e_translation_mm": 15.362874528803259,
+          "e_e2e_rotation_deg": 7.325344200788088,
+          "e_cross_translation_mm": 35.21066212245779,
+          "e_cross_rotation_deg": 33.747847055067474,
+          "jacobian_condition": 325.86632266095313,
+          "n_parameters": 108,
+          "nfev": 114,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 131
+              },
+              "1": {
+                "cube": 114,
+                "board": 51
+              },
+              "3": {
+                "cube": 104
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 2,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.410870568392873,
+          "heldout_reprojection_cube_px": 6.912407033291469,
+          "heldout_reprojection_board_px": 1.854075281389725,
+          "train_reprojection_overall_px": 4.983780209503999,
+          "e_e2e_translation_mm": 15.36286495298255,
+          "e_e2e_rotation_deg": 7.325326437647753,
+          "e_cross_translation_mm": 35.21059889543043,
+          "e_cross_rotation_deg": 33.74786738992484,
+          "jacobian_condition": 325.8695048880054,
+          "n_parameters": 108,
+          "nfev": 134,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 131
+              },
+              "1": {
+                "cube": 114,
+                "board": 51
+              },
+              "3": {
+                "cube": 104
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        }
+      ],
+      "A3": [
+        {
+          "seed": 0,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.510330755024445,
+          "heldout_reprojection_cube_px": 7.075860537924408,
+          "heldout_reprojection_board_px": 1.8798111923391962,
+          "train_reprojection_overall_px": 5.157337845356161,
+          "e_e2e_translation_mm": 15.015441004909194,
+          "e_e2e_rotation_deg": 7.312598972397293,
+          "e_cross_translation_mm": 31.508941990273982,
+          "e_cross_rotation_deg": 33.72020859560811,
+          "jacobian_condition": 51.158895434665936,
+          "n_parameters": 30,
+          "nfev": 16,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 131
+              },
+              "1": {
+                "cube": 114,
+                "board": 51
+              },
+              "3": {
+                "cube": 104
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 1,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.510256407411124,
+          "heldout_reprojection_cube_px": 7.075748899243819,
+          "heldout_reprojection_board_px": 1.8797695653346593,
+          "train_reprojection_overall_px": 5.157313363849144,
+          "e_e2e_translation_mm": 15.015716910942244,
+          "e_e2e_rotation_deg": 7.312608949783677,
+          "e_cross_translation_mm": 31.508807122904468,
+          "e_cross_rotation_deg": 33.72026164990754,
+          "jacobian_condition": 51.156584901049925,
+          "n_parameters": 30,
+          "nfev": 23,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 131
+              },
+              "1": {
+                "cube": 114,
+                "board": 51
+              },
+              "3": {
+                "cube": 104
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 2,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.510246748172113,
+          "heldout_reprojection_cube_px": 7.075819075924085,
+          "heldout_reprojection_board_px": 1.8795838924541282,
+          "train_reprojection_overall_px": 5.157320223463866,
+          "e_e2e_translation_mm": 15.014925414134392,
+          "e_e2e_rotation_deg": 7.312870661543877,
+          "e_cross_translation_mm": 31.508905012614267,
+          "e_cross_rotation_deg": 33.72027006013562,
+          "jacobian_condition": 51.158452263615814,
+          "n_parameters": 30,
+          "nfev": 24,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 131
+              },
+              "1": {
+                "cube": 114,
+                "board": 51
+              },
+              "3": {
+                "cube": 104
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        }
+      ],
+      "A2@lam3": [
+        {
+          "seed": 0,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.400538608838171,
+          "heldout_reprojection_cube_px": 6.914278778803154,
+          "heldout_reprojection_board_px": 1.811197942070865,
+          "train_reprojection_overall_px": 4.987505850183845,
+          "e_e2e_translation_mm": 15.196778769086166,
+          "e_e2e_rotation_deg": 7.311725413331464,
+          "e_cross_translation_mm": 33.46273995929899,
+          "e_cross_rotation_deg": 33.75239737052658,
+          "jacobian_condition": 302.16403415527213,
+          "n_parameters": 108,
+          "nfev": 100,
+          "anchor_rms_cube_displacement_mm": 1.7713418364921305,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 131
+              },
+              "1": {
+                "cube": 114,
+                "board": 51
+              },
+              "3": {
+                "cube": 104
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 1,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.400524150845367,
+          "heldout_reprojection_cube_px": 6.9142396228999745,
+          "heldout_reprojection_board_px": 1.8112274797346075,
+          "train_reprojection_overall_px": 4.987486993774885,
+          "e_e2e_translation_mm": 15.196885124800698,
+          "e_e2e_rotation_deg": 7.311603661692941,
+          "e_cross_translation_mm": 33.46285868478853,
+          "e_cross_rotation_deg": 33.75253215352496,
+          "jacobian_condition": 302.1442434667149,
+          "n_parameters": 108,
+          "nfev": 90,
+          "anchor_rms_cube_displacement_mm": 1.7714049718499965,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 131
+              },
+              "1": {
+                "cube": 114,
+                "board": 51
+              },
+              "3": {
+                "cube": 104
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 2,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.400515853688526,
+          "heldout_reprojection_cube_px": 6.914236346969361,
+          "heldout_reprojection_board_px": 1.8112029932099472,
+          "train_reprojection_overall_px": 4.987505296969861,
+          "e_e2e_translation_mm": 15.196636113659913,
+          "e_e2e_rotation_deg": 7.311586935579833,
+          "e_cross_translation_mm": 33.46305038604748,
+          "e_cross_rotation_deg": 33.752568380422325,
+          "jacobian_condition": 302.13431603854383,
+          "n_parameters": 108,
+          "nfev": 81,
+          "anchor_rms_cube_displacement_mm": 1.7716420345035653,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 131
+              },
+              "1": {
+                "cube": 114,
+                "board": 51
+              },
+              "3": {
+                "cube": 104
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        }
+      ]
+    },
+    "20260731": {
+      "A2": [
+        {
+          "seed": 0,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 3.865576269835097,
+          "heldout_reprojection_cube_px": 6.094358221983192,
+          "heldout_reprojection_board_px": 1.4701520866607862,
+          "train_reprojection_overall_px": 5.110152638955599,
+          "e_e2e_translation_mm": 13.523329562039182,
+          "e_e2e_rotation_deg": 6.873262797756008,
+          "e_cross_translation_mm": 31.52395638726753,
+          "e_cross_rotation_deg": 27.245426152356128,
+          "jacobian_condition": 317.169129852922,
+          "n_parameters": 108,
+          "nfev": 90,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 50
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 1,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 3.8655537848055332,
+          "heldout_reprojection_cube_px": 6.094323644339877,
+          "heldout_reprojection_board_px": 1.4701414547881124,
+          "train_reprojection_overall_px": 5.110142290261404,
+          "e_e2e_translation_mm": 13.52304876890037,
+          "e_e2e_rotation_deg": 6.87301882032722,
+          "e_cross_translation_mm": 31.52416205968918,
+          "e_cross_rotation_deg": 27.245605389563472,
+          "jacobian_condition": 317.1726332047397,
+          "n_parameters": 108,
+          "nfev": 115,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 50
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 2,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 3.8655007740603216,
+          "heldout_reprojection_cube_px": 6.0942793760925476,
+          "heldout_reprojection_board_px": 1.4700274720376365,
+          "train_reprojection_overall_px": 5.110152280713885,
+          "e_e2e_translation_mm": 13.522950371995705,
+          "e_e2e_rotation_deg": 6.873058668661733,
+          "e_cross_translation_mm": 31.52436053764548,
+          "e_cross_rotation_deg": 27.245630020460435,
+          "jacobian_condition": 317.17358313684997,
+          "n_parameters": 108,
+          "nfev": 94,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 50
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        }
+      ],
+      "A3": [
+        {
+          "seed": 0,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.067226143213058,
+          "heldout_reprojection_cube_px": 6.365135939247685,
+          "heldout_reprojection_board_px": 1.6551472103363964,
+          "train_reprojection_overall_px": 5.259751552311612,
+          "e_e2e_translation_mm": 13.534527620306353,
+          "e_e2e_rotation_deg": 6.865065014023104,
+          "e_cross_translation_mm": 27.492993494598377,
+          "e_cross_rotation_deg": 27.220646723243004,
+          "jacobian_condition": 50.79491329202901,
+          "n_parameters": 30,
+          "nfev": 19,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 50
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 1,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.067212304773844,
+          "heldout_reprojection_cube_px": 6.365111455521391,
+          "heldout_reprojection_board_px": 1.6551478380352436,
+          "train_reprojection_overall_px": 5.25970316470981,
+          "e_e2e_translation_mm": 13.534136589567298,
+          "e_e2e_rotation_deg": 6.865001965568359,
+          "e_cross_translation_mm": 27.492888706465028,
+          "e_cross_rotation_deg": 27.22065500874177,
+          "jacobian_condition": 50.79098888085647,
+          "n_parameters": 30,
+          "nfev": 22,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 50
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 2,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.067238362644364,
+          "heldout_reprojection_cube_px": 6.365162340535494,
+          "heldout_reprojection_board_px": 1.6551360675190436,
+          "train_reprojection_overall_px": 5.259725240973351,
+          "e_e2e_translation_mm": 13.533830067909278,
+          "e_e2e_rotation_deg": 6.86521450563984,
+          "e_cross_translation_mm": 27.4930260739234,
+          "e_cross_rotation_deg": 27.220611010336093,
+          "jacobian_condition": 50.79259581848417,
+          "n_parameters": 30,
+          "nfev": 24,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 50
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        }
+      ],
+      "A2@lam3": [
+        {
+          "seed": 0,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 3.8754493499414777,
+          "heldout_reprojection_cube_px": 6.103446509837482,
+          "heldout_reprojection_board_px": 1.489278809529777,
+          "train_reprojection_overall_px": 5.1161351374243536,
+          "e_e2e_translation_mm": 13.444279707683553,
+          "e_e2e_rotation_deg": 6.860469519037952,
+          "e_cross_translation_mm": 29.63321716149122,
+          "e_cross_rotation_deg": 27.247382433068292,
+          "jacobian_condition": 294.68686318637873,
+          "n_parameters": 108,
+          "nfev": 79,
+          "anchor_rms_cube_displacement_mm": 1.7269181206441917,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 50
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 1,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 3.875413498083108,
+          "heldout_reprojection_cube_px": 6.103380244486489,
+          "heldout_reprojection_board_px": 1.4892881620487364,
+          "train_reprojection_overall_px": 5.116114186735236,
+          "e_e2e_translation_mm": 13.444490634488446,
+          "e_e2e_rotation_deg": 6.860113709057242,
+          "e_cross_translation_mm": 29.63323870006542,
+          "e_cross_rotation_deg": 27.247752727193596,
+          "jacobian_condition": 294.6717492878814,
+          "n_parameters": 108,
+          "nfev": 84,
+          "anchor_rms_cube_displacement_mm": 1.7269943318025827,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 50
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 2,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 3.8754408989142117,
+          "heldout_reprojection_cube_px": 6.103429922788268,
+          "heldout_reprojection_board_px": 1.489283295773495,
+          "train_reprojection_overall_px": 5.116135784388446,
+          "e_e2e_translation_mm": 13.444233666089596,
+          "e_e2e_rotation_deg": 6.860300181823184,
+          "e_cross_translation_mm": 29.633407718518036,
+          "e_cross_rotation_deg": 27.24757166423872,
+          "jacobian_condition": 294.6695621113812,
+          "n_parameters": 108,
+          "nfev": 95,
+          "anchor_rms_cube_displacement_mm": 1.7270373949093516,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 114,
+                "board": 132
+              },
+              "1": {
+                "cube": 114,
+                "board": 50
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        }
+      ]
+    },
+    "20260732": {
+      "A2": [
+        {
+          "seed": 0,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.526634362144558,
+          "heldout_reprojection_cube_px": 7.2799436043669825,
+          "heldout_reprojection_board_px": 1.5255297006081394,
+          "train_reprojection_overall_px": 4.949526860322758,
+          "e_e2e_translation_mm": 15.315304227137926,
+          "e_e2e_rotation_deg": 7.854323925894685,
+          "e_cross_translation_mm": 36.71225006988891,
+          "e_cross_rotation_deg": 34.85272158588211,
+          "jacobian_condition": 329.1571773855627,
+          "n_parameters": 108,
+          "nfev": 111,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 113,
+                "board": 130
+              },
+              "1": {
+                "cube": 113,
+                "board": 52
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 1,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.526628895245748,
+          "heldout_reprojection_cube_px": 7.27993754724357,
+          "heldout_reprojection_board_px": 1.5255205656694295,
+          "train_reprojection_overall_px": 4.949523192020922,
+          "e_e2e_translation_mm": 15.315226681421544,
+          "e_e2e_rotation_deg": 7.854212747060561,
+          "e_cross_translation_mm": 36.71228314614246,
+          "e_cross_rotation_deg": 34.852781659779524,
+          "jacobian_condition": 329.16153267210063,
+          "n_parameters": 108,
+          "nfev": 87,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 113,
+                "board": 130
+              },
+              "1": {
+                "cube": 113,
+                "board": 52
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 2,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.52662752512812,
+          "heldout_reprojection_cube_px": 7.279937443017858,
+          "heldout_reprojection_board_px": 1.525514506480157,
+          "train_reprojection_overall_px": 4.949522950868328,
+          "e_e2e_translation_mm": 15.315411956816424,
+          "e_e2e_rotation_deg": 7.854303786421615,
+          "e_cross_translation_mm": 36.71216941843154,
+          "e_cross_rotation_deg": 34.85272108982782,
+          "jacobian_condition": 329.1612900923529,
+          "n_parameters": 108,
+          "nfev": 105,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 113,
+                "board": 130
+              },
+              "1": {
+                "cube": 113,
+                "board": 52
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        }
+      ],
+      "A3": [
+        {
+          "seed": 0,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.695377475279459,
+          "heldout_reprojection_cube_px": 7.499140371896944,
+          "heldout_reprojection_board_px": 1.715463645023753,
+          "train_reprojection_overall_px": 5.115373632678746,
+          "e_e2e_translation_mm": 14.79754018315538,
+          "e_e2e_rotation_deg": 7.827743768263128,
+          "e_cross_translation_mm": 32.82335206435329,
+          "e_cross_rotation_deg": 34.823863109238815,
+          "jacobian_condition": 51.11603485511031,
+          "n_parameters": 30,
+          "nfev": 17,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 113,
+                "board": 130
+              },
+              "1": {
+                "cube": 113,
+                "board": 52
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 1,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.695372858522848,
+          "heldout_reprojection_cube_px": 7.499156799611596,
+          "heldout_reprojection_board_px": 1.715403821466473,
+          "train_reprojection_overall_px": 5.115368868081568,
+          "e_e2e_translation_mm": 14.797473530904307,
+          "e_e2e_rotation_deg": 7.827942397744512,
+          "e_cross_translation_mm": 32.823168773815304,
+          "e_cross_rotation_deg": 34.82390471484248,
+          "jacobian_condition": 51.11383947158849,
+          "n_parameters": 30,
+          "nfev": 21,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 113,
+                "board": 130
+              },
+              "1": {
+                "cube": 113,
+                "board": 52
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 2,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.6953695305463565,
+          "heldout_reprojection_cube_px": 7.499156467353085,
+          "heldout_reprojection_board_px": 1.7153904339742676,
+          "train_reprojection_overall_px": 5.115366055401257,
+          "e_e2e_translation_mm": 14.79773542019466,
+          "e_e2e_rotation_deg": 7.827917392315421,
+          "e_cross_translation_mm": 32.823309910615045,
+          "e_cross_rotation_deg": 34.823839119019546,
+          "jacobian_condition": 51.112391977034214,
+          "n_parameters": 30,
+          "nfev": 19,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 113,
+                "board": 130
+              },
+              "1": {
+                "cube": 113,
+                "board": 52
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        }
+      ],
+      "A2@lam3": [
+        {
+          "seed": 0,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.539016381983602,
+          "heldout_reprojection_cube_px": 7.292284817871003,
+          "heldout_reprojection_board_px": 1.5497508183815754,
+          "train_reprojection_overall_px": 4.9565006813692145,
+          "e_e2e_translation_mm": 15.125451933755434,
+          "e_e2e_rotation_deg": 7.83105606154416,
+          "e_cross_translation_mm": 35.0427573939229,
+          "e_cross_rotation_deg": 34.85500298148119,
+          "jacobian_condition": 300.7149547099049,
+          "n_parameters": 108,
+          "nfev": 62,
+          "anchor_rms_cube_displacement_mm": 1.7150234088495953,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 113,
+                "board": 130
+              },
+              "1": {
+                "cube": 113,
+                "board": 52
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 1,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.539021856359672,
+          "heldout_reprojection_cube_px": 7.292298580425252,
+          "heldout_reprojection_board_px": 1.5497396270458654,
+          "train_reprojection_overall_px": 4.956510999828366,
+          "e_e2e_translation_mm": 15.125539705037509,
+          "e_e2e_rotation_deg": 7.831007157418872,
+          "e_cross_translation_mm": 35.042778457926325,
+          "e_cross_rotation_deg": 34.85504545239522,
+          "jacobian_condition": 300.714131975264,
+          "n_parameters": 108,
+          "nfev": 77,
+          "anchor_rms_cube_displacement_mm": 1.714902981548966,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 113,
+                "board": 130
+              },
+              "1": {
+                "cube": 113,
+                "board": 52
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 2,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 4.53902044047148,
+          "heldout_reprojection_cube_px": 7.292288573680394,
+          "heldout_reprojection_board_px": 1.5497594722372385,
+          "train_reprojection_overall_px": 4.956502219749176,
+          "e_e2e_translation_mm": 15.125386568970224,
+          "e_e2e_rotation_deg": 7.8310175581866375,
+          "e_cross_translation_mm": 35.04278607529482,
+          "e_cross_rotation_deg": 34.855052132467655,
+          "jacobian_condition": 300.71931461882946,
+          "n_parameters": 108,
+          "nfev": 87,
+          "anchor_rms_cube_displacement_mm": 1.7151191393597358,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 113,
+                "board": 130
+              },
+              "1": {
+                "cube": 113,
+                "board": 52
+              },
+              "3": {
+                "cube": 105
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        }
+      ]
+    },
+    "20260733": {
+      "A2": [
+        {
+          "seed": 0,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 5.16158300103122,
+          "heldout_reprojection_cube_px": 8.243180775611217,
+          "heldout_reprojection_board_px": 1.7633362174852856,
+          "train_reprojection_overall_px": 4.808503447508326,
+          "e_e2e_translation_mm": 17.59483715510518,
+          "e_e2e_rotation_deg": 8.529287535537819,
+          "e_cross_translation_mm": 42.06085043688797,
+          "e_cross_rotation_deg": 40.523330736636524,
+          "jacobian_condition": 335.1428583647164,
+          "n_parameters": 108,
+          "nfev": 112,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 111,
+                "board": 131
+              },
+              "1": {
+                "cube": 111,
+                "board": 52
+              },
+              "3": {
+                "cube": 103
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 1,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 5.161562496699749,
+          "heldout_reprojection_cube_px": 8.243158180981412,
+          "heldout_reprojection_board_px": 1.7633021780423217,
+          "train_reprojection_overall_px": 4.808484663310361,
+          "e_e2e_translation_mm": 17.59481418080195,
+          "e_e2e_rotation_deg": 8.52926715755971,
+          "e_cross_translation_mm": 42.060937094459085,
+          "e_cross_rotation_deg": 40.52333083712015,
+          "jacobian_condition": 335.14347253702147,
+          "n_parameters": 108,
+          "nfev": 107,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 111,
+                "board": 131
+              },
+              "1": {
+                "cube": 111,
+                "board": 52
+              },
+              "3": {
+                "cube": 103
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 2,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 5.161565814879208,
+          "heldout_reprojection_cube_px": 8.243222981689954,
+          "heldout_reprojection_board_px": 1.7631448404288588,
+          "train_reprojection_overall_px": 4.808514343422615,
+          "e_e2e_translation_mm": 17.595113170138774,
+          "e_e2e_rotation_deg": 8.52913298274344,
+          "e_cross_translation_mm": 42.06066423685844,
+          "e_cross_rotation_deg": 40.52338595893222,
+          "jacobian_condition": 335.13786635510843,
+          "n_parameters": 108,
+          "nfev": 90,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 111,
+                "board": 131
+              },
+              "1": {
+                "cube": 111,
+                "board": 52
+              },
+              "3": {
+                "cube": 103
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        }
+      ],
+      "A3": [
+        {
+          "seed": 0,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 5.281225511488169,
+          "heldout_reprojection_cube_px": 8.434745078767454,
+          "heldout_reprojection_board_px": 1.8028981853783148,
+          "train_reprojection_overall_px": 4.957628720537336,
+          "e_e2e_translation_mm": 17.2353273714709,
+          "e_e2e_rotation_deg": 8.49966056452873,
+          "e_cross_translation_mm": 37.34982755011423,
+          "e_cross_rotation_deg": 40.49224726928564,
+          "jacobian_condition": 50.5984825461056,
+          "n_parameters": 30,
+          "nfev": 19,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 111,
+                "board": 131
+              },
+              "1": {
+                "cube": 111,
+                "board": 52
+              },
+              "3": {
+                "cube": 103
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 1,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 5.281180475311389,
+          "heldout_reprojection_cube_px": 8.434697361516012,
+          "heldout_reprojection_board_px": 1.802818282093894,
+          "train_reprojection_overall_px": 4.957621764983822,
+          "e_e2e_translation_mm": 17.234525900068885,
+          "e_e2e_rotation_deg": 8.499966011884602,
+          "e_cross_translation_mm": 37.349718765041025,
+          "e_cross_rotation_deg": 40.49227491846839,
+          "jacobian_condition": 50.59636155595122,
+          "n_parameters": 30,
+          "nfev": 23,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 111,
+                "board": 131
+              },
+              "1": {
+                "cube": 111,
+                "board": 52
+              },
+              "3": {
+                "cube": 103
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 2,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 5.281193261484477,
+          "heldout_reprojection_cube_px": 8.434791522404119,
+          "heldout_reprojection_board_px": 1.802626093929729,
+          "train_reprojection_overall_px": 4.957633061258994,
+          "e_e2e_translation_mm": 17.234071840311323,
+          "e_e2e_rotation_deg": 8.50029296918645,
+          "e_cross_translation_mm": 37.34970567442657,
+          "e_cross_rotation_deg": 40.4922847089626,
+          "jacobian_condition": 50.599139211453824,
+          "n_parameters": 30,
+          "nfev": 16,
+          "anchor_rms_cube_displacement_mm": null,
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 111,
+                "board": 131
+              },
+              "1": {
+                "cube": 111,
+                "board": 52
+              },
+              "3": {
+                "cube": 103
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        }
+      ],
+      "A2@lam3": [
+        {
+          "seed": 0,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 5.151153946098288,
+          "heldout_reprojection_cube_px": 8.243936006840837,
+          "heldout_reprojection_board_px": 1.7127283087126213,
+          "train_reprojection_overall_px": 4.810794564652639,
+          "e_e2e_translation_mm": 17.415666409238238,
+          "e_e2e_rotation_deg": 8.505615268224634,
+          "e_cross_translation_mm": 40.174492771027445,
+          "e_cross_rotation_deg": 40.531979403974354,
+          "jacobian_condition": 307.70697310822646,
+          "n_parameters": 108,
+          "nfev": 119,
+          "anchor_rms_cube_displacement_mm": 1.7504251396110166,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 111,
+                "board": 131
+              },
+              "1": {
+                "cube": 111,
+                "board": 52
+              },
+              "3": {
+                "cube": 103
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 1,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 5.151172444442845,
+          "heldout_reprojection_cube_px": 8.243969498313957,
+          "heldout_reprojection_board_px": 1.7127238018384028,
+          "train_reprojection_overall_px": 4.810818272467885,
+          "e_e2e_translation_mm": 17.415864479778715,
+          "e_e2e_rotation_deg": 8.505524950684237,
+          "e_cross_translation_mm": 40.174615306925375,
+          "e_cross_rotation_deg": 40.532006913225906,
+          "jacobian_condition": 307.71287332303035,
+          "n_parameters": 108,
+          "nfev": 56,
+          "anchor_rms_cube_displacement_mm": 1.7503211990250953,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 111,
+                "board": 131
+              },
+              "1": {
+                "cube": 111,
+                "board": 52
+              },
+              "3": {
+                "cube": 103
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        },
+        {
+          "seed": 2,
+          "converged": true,
+          "N_reg": 3,
+          "heldout_reprojection_overall_px": 5.15115455375019,
+          "heldout_reprojection_cube_px": 8.243949048974466,
+          "heldout_reprojection_board_px": 1.712695414439739,
+          "train_reprojection_overall_px": 4.8108039830440585,
+          "e_e2e_translation_mm": 17.415689226675422,
+          "e_e2e_rotation_deg": 8.505562332247996,
+          "e_cross_translation_mm": 40.17434418630395,
+          "e_cross_rotation_deg": 40.532023556999874,
+          "jacobian_condition": 307.71059240594053,
+          "n_parameters": 108,
+          "nfev": 112,
+          "anchor_rms_cube_displacement_mm": 1.7503123264135385,
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 111,
+                "board": 131
+              },
+              "1": {
+                "cube": 111,
+                "board": 52
+              },
+              "3": {
+                "cube": 103
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "solver_status": 2
+        }
+      ]
+    }
+  }
+}

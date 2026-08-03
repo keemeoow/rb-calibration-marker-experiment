@@ -73,4 +73,9 @@ Depth is always captured and used; there is no `--save_depth` flag.
 
 Paper experiments (`CP_*.py`) are documented separately in
 [CP_EXPERIMENTS_README.md](CP_EXPERIMENTS_README.md); synthetic counterparts live in
-[Simul_test/](Simul_test/).
+[Simul_test/](Simul_test/). The canonical results table is
+[CP_result/Calibration_Experiment_table.md](CP_result/Calibration_Experiment_table.md).
+
+[PRESENTATION_PROMPT.md](PRESENTATION_PROMPT.md) is the seminar-slide generation prompt:
+it fixes which claims the results support, which they do not, and the reporting rules
+(FK-proxy labelling, px/mm separation, common-component comparisons).

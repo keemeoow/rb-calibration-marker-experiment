@@ -7,6 +7,9 @@
 - `‡`: 외부 GT 오차가 아닌 내부 일관성 지표
 - `*`: 본 데이터가 아닌 인용 논문 보고값
 - `§`: 수정한 production 코드를 기존 세션에 적용한 격리 dry-run 값. 기존 `data/session/calib_out`은 덮어쓰지 않음
+- `¶`: **다른 split에서 측정한 값**. 위치(set) 단위 leave-one-out 13 fold(D1)이며, 같은 행의 다른 열(이벤트 단위 split)과 한 줄로 이어 읽지 않는다
+- `≡`: 위 행과 **수치가 동일**함. 잔차 보정은 `T_base_Ci`·`T_gripper_cam`을 바꾸지 않으므로 pose에서 파생되는 지표는 정의상 변하지 않는다
+- `‖`: **D2 재실행([`CP_D2_anchored_event_split.py`](../CP_D2_anchored_event_split.py))에서 측정한 값.** 이벤트 split·지표는 Table 1과 같지만 검출 RANSAC 변동 때문에 절대값이 미세하게 다르다. 같은 표의 A2/A3 셀과 **직접 빼지 말고**, D2가 함께 산출한 자체 A2/A3 기준값과 비교한다(아래 "채택 구성의 이벤트 split 평가")
 
 ## 남아 있는 사실 검증·보류 항목
 
@@ -32,28 +35,74 @@
 
 축(기여도) 정의:
 
-| 축(기여도) | 값 | 의미 |
-| --- | --- | --- |
-| Marker | board / cube / cube+board | 최적화에 실제로 들어간 target 종류 |
-| U | seq / U | e2h와 eih를 단계적으로 푸는가, 동일 목적함수에서 공동 최적화하는가 |
-| FK→cube | `FK-fixed` / `vision-estimated` / `vision-estimated + FK soft-anchor (λ)` / `—` | cube pose의 source와 최적화 상태. `FK-fixed`는 변수에서 제거하고, `vision-estimated`는 영상 corner reprojection으로 추정 |
+| 기여도 | 축 | 값 | 의미 |
+| --- | --- | --- | --- |
+| C2 | **Marker** | board / cube / cube+board | 어떤 타겟을 쓰는가 |
+| C1 | **U** | seq / U | eye-to-hand와 eye-in-hand를 순차로 푸는가, 한 목적함수로 푸는가 |
+| C3 | FK | ✗ / ✓ | 타겟 포즈를 FK로 확정하는가, 미지수로 추정하는가 |
 
 
-| # | Marker | Unified | FK→cube | 의미 | N_reg (base에 등록된 카메라 수) | e_task_pose (mm/°) (held-out 위치 큐브의 base 좌표 예측 오차) | e_e2e (mm/°) (eye-to-hand 경로 vs eye-in-hand 경로 큐브 위치 일치) | e_cross (mm) e_cross (mm)(고정 카메라들끼리의 일치도) | e_reproj overall (px) (재투영 오차 (카메라별)) | 상태 |
+| # | Marker | Unified | FK→cube | 의미 | N_reg (base에 등록된 카메라 수) | e_task_pose^{FK-proxy} (mm) (held-out **위치** 큐브중점의 base 좌표 예측 오차) | e_e2e (mm/°) (eye-to-hand 경로 vs eye-in-hand 경로 큐브 위치 일치) | e_cross (mm) e_cross (mm)(고정 카메라들끼리의 일치도) | e_reproj overall (px) (재투영 오차 (카메라별)) | 상태 |
 | --- | --- | :---: | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
 | A0 | board | seq | — | baseline | 2 | — | — | — | 1.4387±0.0995 | 5 splits×5 init, 25/25 수렴 |
 | A1 | cube+board | seq | vision-estimated | +cube | 3 | — | 16.3323±1.2684 / 7.7466±0.5970 | 39.5978±3.3399 | 4.6561±0.4574 | 5 splits×5 init, 25/25 수렴 |
-| A2 | cube+board | U | vision-estimated | +unified | 3 | — | 16.1955±1.2976 / 7.7423±0.5937 | 38.9338±3.4075 | 4.5075±0.4387 | 5 splits×5 init, 25/25 수렴 |
-| **A3★** | **cube+board** | **U** | **FK-fixed** | **Ours (full)** | 3 | — | **16.1881±1.2856 / 7.7087±0.5853** | **38.0480±3.5117** | **4.6230±0.4338** | 5 splits×5 init, 25/25 수렴 |
+| A2 | cube+board | U | vision-estimated | +unified | 3 | 3.451¶ | 16.1955±1.2976 / 7.7423±0.5937 | 38.9338±3.4075 | 4.5075±0.4387 | 5 splits×5 init, 25/25 수렴 |
+| ↳ A2 + 잔차보정 | cube+board | U | vision-estimated | +예측단계 Ridge`[1,x,y]` | ≡ | 1.847¶ | ≡ | ≡ | ≡ | 위치 LOO 13/13 fold 수렴 |
+| **↳ A2@λ=3 + 잔차보정 ★** | **cube+board** | **U** | **vision-estimated + soft FK anchor (λ=3 px/mm)** | **Ours (최종 채택)** | 3 | **1.586¶** | **15.1168±1.3115 / 7.7342±0.5882‖** | **35.0872±3.5329‖** | **4.5626±0.4304‖** | 위치 LOO 13/13 + 이벤트 5 splits×3 init, 15/15 수렴 |
+| A3 | cube+board | U | FK-fixed | 7행 full row | 3 | 2.988¶ | 16.1881±1.2856 / 7.7087±0.5853 | 38.0480±3.5117 | 4.6230±0.4338 | 5 splits×5 init, 25/25 수렴 |
+| ↳ A3 + 잔차보정 | cube+board | U | FK-fixed | +예측단계 Ridge`[1,x,y]` | ≡ | 2.355¶ | ≡ | ≡ | ≡ | 위치 LOO 13/13 fold 수렴 |
 | B1 | cube+board | seq | FK-fixed | −Unified | 3 | — | 16.1809±1.2931 / 7.7020±0.5852 | 38.1160±3.5083 | 4.6317±0.4352 | 5 splits×5 init, 25/25 수렴 |
 | B2 | cube only | U | FK-fixed | −board | 3 | — | 15.6887±1.2425 / 7.7399±0.5867 | 37.8594±3.5187 | 7.4004±0.7271 | 5 splits×5 init, 25/25 수렴 |
 | B3 | board only | U | — | −cube | 2 | — | — | — | 1.4387±0.0995 | 5 splits×5 init, 25/25 수렴 |
 
+**★ 최종 채택 구성(Ours) = `A2@λ=3 + 잔차보정`**: Unified 목적함수 + cube pose를 **미지수로
+추정하되 FK 쪽으로 soft anchor(λ=3 px/mm)를 걸고** + 예측 단계에서 FK로 지도학습한 `[1,x,y]`
+Ridge 잔차보정. 즉 **cube pose를 FK로 하드 고정하지 않는다.** FK는 (1) hand-eye 운동학 백본과
+gauge 초기화, (2) solve의 soft anchor, (3) 잔차보정의 지도 신호로 쓴다.
+
+채택 근거:
+
+1. **측정된 최저 셀**이다 — 1.586 mm. 고정 λ=0(1.847)과 A3(2.355)보다 낮다.
+2. **λ 선택이 사후 체리피킹이 아니다.** 중첩 교차검증(바깥 fold마다 나머지 12개로 λ를 고르고
+   그 fold에서 평가)에서 **13/13 fold 전부가 λ=3을 선택**했고, 절차 자체의 성능이 1.586 mm다.
+   28개 셀에서 우연히 좋은 값을 집은 것이라면 fold마다 다른 λ가 뽑혀야 하는데 그렇지 않다.
+3. λ=0 대비 **−0.238 mm, t=−2.96, 11/13 fold** 우세이며, λ=0.3→1→3에서 단조로 개선되는
+   추세 안에 있다.
+4. 시뮬레이션 Exp3의 최적 구성 `Camera + FK-correction`과 **같은 계열**이다(cube pose를 하드
+   고정하지 않고 FK를 보정 신호로 씀). 아래 "시뮬레이션과의 대응" 참조.
+
+**λ는 하이퍼파라미터이므로 "교차검증으로 정한다"고 명시해야 한다.** 임의로 고른 값이 아니다.
+
+**과대주장 금지 — 반드시 함께 말할 것.**
+
+- `A3 + 보정`(2.355) 대비 우위는 paired 검정에서 **유의하지 않다**(t=+1.05). FK 하드 고정이
+  나쁘다는 주장은 이 데이터로 할 수 없다.
+- 13개 위치를 계속 재사용한다. 중첩 CV도 같은 위치 풀 안에서 돌며, 바깥 fold의 위치가 λ
+  선택에 쓰인 다른 fold들의 **학습 데이터**에는 들어 있다(약한 누수).
+- 차이의 절대 크기가 0.26 mm로 작고, 정답이 FK 프록시다.
+- `‖` 열은 D2 재실행 값이므로 같은 표의 A2/A3 셀과 직접 빼지 않는다. paired 비교는 아래
+  "채택 구성의 이벤트 split 평가"에 D2 자체 기준값으로 정리했다.
+
+A3의 `의미` 열을 `7행 full row`로 적은 것은 [`CP_ablation_schema.py`](../CP_ablation_schema.py)가
+A3에 붙인 코드 라벨 `"Ours (full)"`이 **7행 ablation 안에서 모든 구성요소를 켠 행**을 뜻하기
+때문이다. 그 라벨은 최종 채택 구성을 가리키지 않는다. A3의 방어 가능한 강점은 정확도가 아니라
+**수렴 안정성과 조건수**다(Table 2a σ=1 px에서 A2 3/10 vs A3 10/10; 조건수 316→51).
+
 위 `±`는 5개 event split에서 얻은 split mean의 표준편차다. 각 split 안의 5개 initialization
 표준편차는 별도로 저장하며 overall reprojection 기준 평균 약 `10⁻⁵ px`로 split 분산보다
 훨씬 작다.
-`e_task_pose`는 외부 물리 GT가 없어 비워 두었다. 위치 hold-out FK 비교를 추가할 경우에도
-`e_task_pose^{FK-proxy}`로만 표기하며 absolute accuracy로 해석하지 않는다. 카메라별
+`e_task_pose` 열은 외부 물리 GT가 없으므로 **`FK-proxy`로만** 채운다. A2/A3와 그 잔차보정
+행의 값은 [`CP_D1_fk_correction_2x2.py`](../CP_D1_fk_correction_2x2.py)의 **위치(set) 단위
+leave-one-out 13 fold**에서 측정한 held-out 큐브중점 예측 오차 RMSE(mm)이며, 정답 자리에
+로봇 FK를 넣은 값이라 **absolute accuracy가 아니다.** 이 열만 다른 split이므로 `¶`로 표시했고,
+같은 행의 다른 열(이벤트 단위 split)과 한 줄로 이어 읽으면 안 된다. 큐브중점의 위치만
+예측하므로 회전 성분은 없다. 나머지 행이 `—`인 것은 D1이 A2/A3 대비만 측정했기 때문이다.
+
+`↳` 잔차보정 행에서 `N_reg`·`e_e2e`·`e_cross`·`e_reproj`가 `≡`인 것은 근사가 아니라 **정의상
+동일**하다. 보정은 캘리브레이션이 끝난 뒤 예측된 큐브중점에만 적용되고 `T_base_Ci`·
+`T_gripper_cam`을 전혀 바꾸지 않으므로, pose에서 파생되는 모든 지표가 비트 단위로 같다.
+따라서 **어떤 보정 결과도 재투영 개선으로 보고할 수 없다.** 근거와 paired 검정은 아래
+"A2/A3 위치 hold-out 재검증 — D1 2×2"에 있다. 카메라별
 `e_reproj`와 marker별 공통 component는
 [`ablation_multisplit/multisplit_ablation.md`](ablation_multisplit/multisplit_ablation.md)에
 반복 split 평균±표준편차로 분리해 두었다. target set이 다른 행의 overall 값은 직접 비교하지 않는다.
@@ -70,6 +119,56 @@
 | B3→A3 | U 고정 | board-only 대 full system의 **전체 구성 비교**; marker-only 인과 비교가 아님 |
 
 확정된 4행 외의 미정 행은 요청문에 적힌 2개가 아니라 A0·A1·B1의 **3개**다. 위 표가 세 행까지 포함한 전체 7행 runner 스펙이다. 보고 표에는 board pose-source 열을 두지 않지만, Runner는 board pose를 FK-fixed/soft-anchor로 지정하는 입력을 물리적으로 불가능한 조건으로 즉시 반려한다.
+
+### FK→cube 축이 실제로 바꾸는 것 — 자유도와 조건수
+
+FK 고정이 제거하는 것은 미지수 1개가 아니라 **위치당 6 DOF × 학습 위치 수**다. D1 fold 0
+(고정 카메라 3대, 학습 위치 12개)의 실측 `jacobian.n_params` (두 arm 모두 nullity 0):
+
+| arm | 자유 파라미터 | 구성 | Jacobian condition (13 fold mean) | nfev (mean) |
+| --- | ---: | --- | ---: | ---: |
+| A2 vision-estimated | 102 | 카메라 6×3 + gTc 6 + board 6 + **큐브 6×12 = 72** | 316.1 | 106.5 |
+| A3 FK-fixed | 30 | 카메라 6×3 + gTc 6 + board 6 | **51.2** | **19.4** |
+
+즉 A3는 72 DOF를 제거해 **조건수 약 6배·수렴 속도 약 5배**를 얻는다. 이것이 FK 고정이 사는
+것이며, 위 결과가 보여주듯 **정확도를 사는 것이 아니다.** 반대로 잔차 보정은 예측 단계에서
+전역 9 DOF(`Ridge [1,x,y]`)만 더한다. 따라서 두 설계의 차이는 "FK 정보를 쓰느냐"가 아니라
+**같은 FK 정보를 위치별 hard constraint(6S DOF)로 주입하느냐, 전역 smooth 회귀(9 DOF)로
+주입하느냐**다. 후자는 위치들에 걸쳐 FK 잡음이 평균화되고, 전자는 위치별 FK 오차가 그대로
+공유 변환(`bTCi`, `gTc`)에 실린다.
+
+큐브 pose 자체는 부실하게 결정되는 nuisance 파라미터가 아니다 — 기본 정보 표대로 고정 카메라
+평균 2.70대가 동시 관측하고(board 1.03대) 손목 카메라도 본다. 제거해서 얻는 식별성 이득은
+작고 FK 오차 주입 손실은 크다는 것이 위 수치의 해석이다.
+
+중간 지점인 soft anchor(`r_anchor = λ · r_SE3(bTO^(s), bTO,FK^(s))`)는 자유도를 남긴 채 gauge만
+잡는다. C1 LOSO 13-fold에서 `unified_joint(soft-anchor λ=5) + SE(3)` = 2.374 mm가 전체 셀
+최소값이었다. 다만 D1은 λ=0 끝점만, C1은 λ=5만, 그것도 서로 다른 backend·target set에서
+측정했다. **λ sweep은 미실행이며 Supplementary의 FK-weight sensitivity 항목이 그 자리다.**
+
+통제 지표 — 보정은 예측 시점에만 적용되고 `T_base_Ci`/`T_gripper_cam`을 바꾸지 않으므로 아래
+두 값은 보정 유무와 무관하게 동일하다. **어떤 보정 결과도 재투영 개선으로 보고할 수 없다.**
+
+| 통제 지표 | A2 | A3 | paired delta (A3−A2) |
+| --- | ---: | ---: | ---: |
+| held-out 재투영 (px, train 전용 FK pose) | 5.697±6.511 | 4.353±6.651 | −1.343, t=−6.66, 13/13 |
+| held-out `e_cross` (mm, FK 무관) | 22.127±31.294 | 20.525±27.165 | −1.602, t=−0.91, 7/13 |
+
+재투영 지표는 A3가 13/13으로 이기지만 **순환이다**: A3의 카메라는 FK 큐브 pose에 맞춰 적합된
+뒤 그 FK pose에서 픽셀로 평가된다. FK를 전혀 참조하지 않는 `e_cross`는 유의하지 않으므로
+(t=−0.91) **비순환 근거로 A3의 우위를 주장할 수 없다.** 두 지표는 항상 함께 인용한다.
+`e_cross`의 큰 표준편차는 Table 1에 기록한 cam 0 / PnP flip 꼬리와 같은 원인이다.
+
+이 결과는 Table 1의 A2→A3(+0.116 px, 5/5 악화)와 모순되지 않는다. Table 1은 held-out
+**이벤트의 재투영**이고 D1은 held-out **위치의 3D 예측**이다. 서로 다른 질문이므로 한
+줄에 놓고 비교하지 않는다.
+
+남은 한계: (1) 13개 위치로는 `|Δ| ≈ 0.4 mm`를 가릴 검정력이 없다. (2) 1차 지표가 FK를 정답으로
+쓰므로 최종 판정에는 외부 GT(Table 3, 보류)가 필요하다. (3) 보정 특징이 `[1,x,y]`뿐이며 큐브
+위치의 z 분산이 작아 z 항을 검정하지 못했다.
+
+산출물은 [`D1_fk_correction_2x2/D1_fk_correction_2x2.md`](D1_fk_correction_2x2/D1_fk_correction_2x2.md),
+[JSON](D1_fk_correction_2x2/D1_fk_correction_2x2.json), [CSV](D1_fk_correction_2x2/D1_fk_correction_2x2.csv)에 있다.
 
 ### 전용 runner 핵심 계약
 
@@ -132,10 +231,173 @@ FK-fixed(A2→A3)는 5/5 split에서 overall reprojection을 악화했고, board
 “board가 정확도를 높인다”고 주장하면 안 된다. 해당 인과 주장은 다음 synthetic noise sweep과
 low-N sensitivity에서 별도로 검증해야 한다.
 
+A2→A3(FK 고정)에 한정한 후속 검증은 바로 아래 "A2/A3 위치 hold-out 재검증 — D1 2×2"에 있다.
+그쪽은 split 단위와 지표가 달라(이벤트 재투영 px → 위치 3D 예측 mm) 위 delta 표와 같은
+줄에서 비교하지 않는다.
+
 카메라별 반복 split 평균에서 cam 0 reprojection은 A1/A2/A3가 각각
 11.021±1.201/10.654±1.164/10.961±1.145 px로 다른 카메라(대체로 0.73–1.64 px)보다
 현저히 크다. ungated cross 지표의 큰 값은 이 카메라/특정 event 문제와 연결되므로 별도
 detector/pose-ambiguity 진단 대상이다. 현재 결과에서 사후 제거하지 않는다.
+
+### A2/A3 위치 hold-out 재검증 — D1 2×2
+
+[`CP_D1_fk_correction_2x2.py`](../CP_D1_fk_correction_2x2.py)로 실행했다. "cube pose를 FK로
+고정하고 예측 단계에서 잔차를 보정하는 구성이 최선인가"는 지금까지 **동일 조건에서 측정된
+적이 없었다.** A3는 canonical corner backend·이벤트 split·px 지표이고, C1의 Ridge 후보정은
+historical SE(3) pose-residual 솔버·cube-only·set split·mm 지표였다. 이 표는 그 조합을 한
+backend·한 solver 설정·한 예측 mask에서 직접 측정한 결과다.
+
+Split은 **위치(set) 단위 leave-one-out 13 fold**다. 잔차 보정은 공간적 일반화 주장이므로
+모든 위치가 train에 들어가는 이벤트 split으로는 검증할 수 없다. 이 split의 역할은
+`POSITION_HOLDOUT_ROLE`에 따라 **`FK-proxy` 전용**이며 absolute accuracy로 해석하지 않는다.
+두 arm은 `T_base_cube_by_set`가 자유변수인지(A2) 학습셋 전용 FK artifact에 고정되는지(A3)만
+다르고, held-out 위치의 캡처 이벤트는 board 관측까지 양쪽 모두에서 제외했다. 13/13 수렴.
+
+Cube pose를 다루는 방식은 이산 선택이 아니라 **하나의 연속 축**이다. 목적함수에 soft anchor를
+더하고 그 세기 `λ`를 쓸면 A2와 A3가 그 축의 양 끝점이 된다.
+
+```
+min_Θ  Σ ρ(‖r_reproj‖²)  +  Σ_s ‖ λ · ( T_est(s)·P − T_FK(s)·P ) ‖²
+                              └── 큐브 probe 점의 변위 (mm) ──┘
+```
+
+`P`는 큐브 중심에서 ±29.5 mm 떨어진 6개 점이다. anchor 항이 재투영 항과 **같은 기하량**(코너가
+얼마나 움직였나)을 픽셀 대신 mm로 재므로 `λ`의 단위는 **px/mm**이고, `λ=1`은 "큐브 1 mm 변위 =
+재투영 1 px"를 뜻한다. `λ=0`이면 A2, `λ→∞`면 A3다.
+
+held-out 위치의 큐브중점 예측 오차 RMSE (mm, `FK-proxy`):
+
+| arm | λ (px/mm) | none | offset (3) | SE(3) (6) | Ridge `[1,x,y]` (9) | Jacobian cond | nfev |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| A3 (하드 고정) | ∞ | 2.988 | 2.341 | 2.401 | 2.355 | **51.2** | **19.4** |
+| A2 | 0 | 3.451 | 2.685 | 2.479 | 1.847 | 316.1 | 106.5 |
+| A2@λ=0.3 | 0.3 | 3.414 | 2.677 | 2.476 | 1.839 | 315.0 | 98.2 |
+| A2@λ=1 | 1 | 3.229 | 2.657 | 2.461 | 1.771 | 309.6 | 92.9 |
+| **A2@λ=3 ★** | 3 | 2.729 | 2.560 | 2.405 | **1.586** | 297.3 | 86.4 |
+| A2@λ=10 | 10 | **1.907** | **1.845** | 1.914 | 1.704 | 267.7 | 86.0 |
+| A2@λ=30 | 30 | 2.875 | 2.254 | 2.312 | 2.260 | 155.6 | 105.0 |
+| A2@λ=100 | 100 | 2.983 | 2.337 | 2.397 | 2.351 | 160.4 | 85.7 |
+
+**구현 검증**: λ=100의 값이 A3와 fold 단위 최대 **0.011 mm** 차이로 일치한다. anchor가 λ→∞에서
+하드 고정으로 정확히 수렴하므로 이 축은 실제로 연속이며, A2·A3가 같은 축의 두 끝점임이 확인된다.
+λ=0은 실행 시 canonical solver와 `max|ΔT| = 0` 동치를 assert로 검증한다.
+
+fold 단위 paired 검정 (음수가 개선):
+
+| 항목 | mean (mm) | SE | t | 개선 fold |
+| --- | ---: | ---: | ---: | ---: |
+| **λ=3 − λ=0 (Ridge)** | **−0.238** | 0.080 | **−2.96** | **11/13** |
+| λ=1 − λ=0 (Ridge) | −0.069 | 0.034 | −2.01 | 9/13 |
+| λ=10 − λ=0 (Ridge) | −0.162 | 0.204 | −0.79 | 7/13 |
+| A3 − λ=0 (Ridge) | +0.361 | 0.345 | +1.05 | 5/13 |
+| A3 − A2 @ none | −0.401 | 0.552 | −0.73 | 7/13 |
+| λ=0: Ridge − none | **−1.587** | 0.345 | **−4.59** | 11/13 |
+| λ=3: Ridge − none | **−1.138** | — | **−4.34** | 11/13 |
+| A3: Ridge − none | **−0.824** | 0.335 | **−2.46** | 10/13 |
+
+**중첩 교차검증** — 바깥 fold마다 나머지 12개 fold에서 λ를 고르고 그 fold에서만 평가했다.
+
+| | RMSE (mm) |
+| --- | ---: |
+| 중첩 CV (λ를 절차로 선택) | **1.586** |
+| 고정 λ=0 | 1.847 |
+| A3 | 2.355 |
+
+**13개 바깥 fold 전부가 λ=3을 선택했다.** 선택이 흔들리지 않으므로 λ=3의 우위는 28개 셀에서
+우연히 집힌 값이 아니며, 다중비교 보정을 근거로 기각할 사안이 아니다. 다중비교 방어는 선택이
+불안정할 때 필요한 것이다.
+
+판정:
+
+- **잔차 보정은 모든 arm에서 실재하는 효과다.** λ=0 −1.587 mm(t=−4.59), λ=3 −1.138 mm(t=−4.34),
+  A3 −0.824 mm(t=−2.46). 계수는 train 위치에서만 학습해 held-out 위치에 적용했으므로 이는
+  **공간적 일반화**다.
+- **보정 없는 열이 λ에 대해 U자를 그린다** — 3.451 → 1.907(λ=10) → 2.983(λ=100). 양 끝점이
+  둘 다 최적이 아니고 중간이 가장 좋다. cube pose를 완전히 자유롭게 두는 것도, FK에 하드
+  고정하는 것도 최선이 아니라는 직접 증거다.
+- **조건수는 λ와 함께 단조 개선된다**(316 → 51). 즉 λ는 "정확도 대 수치 안정성"을 연속적으로
+  조절하는 손잡이이며, 두 목표가 서로 다른 λ에서 최적이 된다.
+- **FK 하드 고정이 나쁘다는 주장은 할 수 없다.** A3 − λ=0은 t=+1.05로 유의하지 않다.
+- **"FK 고정만으로는 악화되고 후보정이 있어야 vision-estimated를 이긴다"는 가설은 지지되지
+  않는다.** 보정 전 A3는 A2보다 나쁘지 않았고(−0.401, t=−0.73), 보정 후에는 A2가 근소하게
+  앞선다(+0.361, t=+1.05). 어느 쪽도 유의하지 않다.
+
+### 채택 구성의 이벤트 split 평가 — D2
+
+D1은 위치 hold-out·mm 지표라 Table 1의 나머지 열을 채우지 못한다. soft anchor는 solve 자체를
+바꾸므로 잔차보정 행처럼 `≡`(정의상 동일)로 넘길 수도 없다. [`CP_D2_anchored_event_split.py`](../CP_D2_anchored_event_split.py)가
+그 칸을 채운다. **`CP_ablation_7row.py`는 수정하지 않았다** — 7행 계약 검증과 noise-free sanity
+gate가 걸려 있어 여덟 번째 arm을 넣으면 계약 재검증과 artifact desync가 발생한다. 대신 그
+runner의 `prepare_ablation_data()`(검출·이벤트 split·train 전용 FK artifact·초기화·solver
+설정·path mask)를 그대로 재사용하고 목적함수의 anchor 항만 교체했다.
+
+Canonical split seed 5개 × 3 initialization, 45 run, 45/45 수렴. split mean의 mean±std:
+
+| arm | λ | N_reg | e_reproj overall (px) | e_e2e (mm/°) | e_cross (mm) | Jacobian cond |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| A2 (기준) | 0 | 3 | 4.5571±0.4325 | 15.2490±1.3521 / 7.7516±0.5914 | 36.8593±3.5208 | 327.7 |
+| **A2@λ=3 ★** | 3 | 3 | **4.5626±0.4304** | **15.1168±1.3115 / 7.7342±0.5882** | **35.0872±3.5329** | 302.1 |
+| A3 (기준) | ∞ | 3 | 4.7161±0.4194 | 15.0259±1.2153 / 7.7342±0.5855 | 32.7547±3.2790 | 51.0 |
+
+**Table 1 재현 확인: 통과.** A2/A3는 Table 1과 같은 조건이므로 재현되어야 한다. 검출 RANSAC
+변동 때문에 정확한 일치는 기대할 수 없으므로 **Table 1이 스스로 보고한 split 간 표준편차로
+판정**했고, 최대 편차가 1.51σ로 허용 2σ 안이다(A2 재투영 0.11σ, A3 재투영 0.21σ, A3
+`e_cross` 1.51σ). 따라서 위 anchored 행은 Table 1의 A2/A3와 같은 척도 위에 있다.
+
+split 단위 paired delta — **A2(λ=0) 대비**, 음수가 개선:
+
+| 비교 | e_reproj overall (px) | e_e2e (mm) | e_cross (mm) |
+| --- | ---: | ---: | ---: |
+| **A2@λ=3 − A2** | +0.0055±0.0141, t=+0.78, 2/5 | **−0.1321±0.0581, t=−4.55, 5/5** | **−1.7721±0.0995, t=−35.62, 5/5** |
+| A3 − A2 | +0.1590±0.0429, t=+7.42, 0/5 | −0.2230±0.2366, t=−1.89, 3/5 | **−4.1046±0.3433, t=−23.91, 5/5** |
+
+판정:
+
+- **soft anchor는 재투영을 희생하지 않는다.** A2@λ=3 − A2는 +0.0055 px(t=+0.78)로 유의하지
+  않다. 반면 A3는 +0.1590 px(t=+7.42, 0/5)로 **모든 split에서 악화**한다. 즉 하드 고정이
+  치르는 재투영 대가를 soft anchor는 치르지 않는다.
+- **그러면서 경로 일치도는 일관되게 개선된다.** `e_cross` −1.772 mm(5/5, t=−35.62),
+  `e_e2e` −0.132 mm(5/5, t=−4.55). 이 두 지표는 잔차보정이 바꿀 수 없는 값이므로 이는
+  **캘리브레이션 자체가 좋아졌다**는 뜻이다.
+- **A3는 `e_cross`를 더 크게 줄이지만(−4.105) 재투영을 확실히 악화시킨다.** anchor 세기는
+  이 둘의 교환비를 정하는 손잡이이고, λ=3은 "재투영 손실 없이 얻을 수 있는 만큼"에 해당한다.
+- 따라서 채택 구성은 **위치 예측(D1 1.586 mm), 경로 일치도(D2 5/5 개선), 재투영(손실 없음)
+  세 축에서 동시에 방어된다.** 이는 D1만 있을 때보다 훨씬 강한 근거다.
+
+`e_e2e`·`e_cross`는 외부 GT가 아닌 내부 일관성 지표이므로 절대 정확도로 읽지 않는다. 산출물은
+[`D2_anchored_event_split/`](D2_anchored_event_split/)에 있다.
+
+### 시뮬레이션과의 대응 — 같은 최적 구성을 가리킨다
+
+`Simul_test/exp3_gtc_estimation.py`는 같은 세 방식을 GT가 있는 합성 장면에서 비교한다
+(8 sets, held-out 큐브 예측 mm; 원본 [`exp3_noise_sweep_data.json`](../Simul_test/figures/exp3_noise_sweep_data.json)).
+
+| 시뮬 방식 | σ=2 mm | σ=6 mm | σ=15 mm | D1 대응 |
+| --- | ---: | ---: | ---: | --- |
+| ① Camera-based (큐브=미지수) | 0.390 | 1.073 | 2.624 | A2 none |
+| ② FK-based (큐브=FK 고정) | 0.405 | 1.217 | **3.039** | A3 none |
+| ③ **Camera + FK-correction** | **0.069** | **0.183** | **0.470** | **A2 + Ridge** |
+
+③은 ①번 모델 **위에** 잔차 보정을 얹은 것이며 큐브는 끝까지 자유변수다
+(`W = learn_fk_residual(scene, m_cam, train_sets)`). 미지수를 실제로 제거한 ②는 held-out에서
+전 구간 꼴찌다. 시뮬의 gTc 복원 오차가 그 이유를 보여준다: σ=2→15 mm에서 camera-based는
+0.116→0.249 mm인데 FK-based는 0.130→**0.978 mm**로 4배 악화한다. **큐브를 상수로 만들면
+관측 노이즈를 흡수할 자유도가 사라져 `gTc`로 몰린다.**
+
+C1 시뮬(`unified_vs_independent.py`)에는 FK-fixed arm이 아예 없다. FK는 gauge 초기화에만
+쓰고 `+fk` 잔차 보정은 모든 방식에 대칭으로 적용하며, 최고는 `Joint+fk` 0.354 mm다.
+
+따라서 **시뮬과 실데이터의 최고 셀이 일치한다: `vision-estimated cube pose + FK-supervised
+잔차 보정`.** C3 LOSO도 같은 방향이다(`no_fk_prior` 12.199 < `fk_prior_correction` 13.054 mm).
+
+주의 — CP의 C3 구현(`05_fk_prior_correction`)은 시뮬과 달리 보정을 **fk-prior 위에** 얹는다.
+이는 [`CP_EXPERIMENTS_README.md`](../CP_EXPERIMENTS_README.md)에 명시된 의도적 divergence이며,
+시뮬 ③과 같은 방식이 아니다. 두 결과를 같은 방식으로 인용하지 않는다.
+
+또한 `CP_ablation_schema.py`가 A3에 붙인 `"Ours (full)"` 라벨은 **7행 ablation 안에서 모든
+구성요소를 켠 행**이라는 뜻이지, 위 대응이 가리키는 권장 구성이라는 뜻이 아니다. A3의 근거는
+정확도가 아니라 **수렴 안정성**(Table 2a: σ=1 px에서 A2 3/10 vs A3 10/10)이다.
 
 ### Canonical fixed-split 3-seed 해석
 
@@ -201,6 +463,8 @@ Strict-none 공정 비교 결과는 [`A2_strict_none_vs_A3_fk_fixed.md`](A2_stri
 | joint FK-fixed | 11.53 | 2.58 | 4.59 |
 
 이 값들은 fitting 후 FK residual을 학습한 결과이므로 Table 1의 raw A2/A3 셀에 넣지 않는다.
+위 세 행은 backend·target set·split·지표가 서로 다른 historical 결과이므로 이것만으로
+"FK-fixed + 후보정"의 우열을 말할 수 없다. 그 조합의 통제 비교는 위 "A2/A3 위치 hold-out 재검증 — D1 2×2"다.
 
 | C2 source | N_reg | e_cross mean (mm) | repeatability (mm/°) | cube/board reproj (px) |
 | --- | ---: | ---: | ---: | ---: |
@@ -210,38 +474,22 @@ Strict-none 공정 비교 결과는 [`A2_strict_none_vs_A3_fk_fixed.md`](A2_stri
 
 출처: [`C2_cube_vs_board.csv`](C2/C2_cube_vs_board.csv). C2는 marker-source 실험이지 U/FK 통제 실험이 아니다. Reprojection 값은 mode와 무관한 marker PnP 집계라 현재 ablation 판별력이 없다.
 
-## Table 2a — METRIC GT 데이터의 적용 가능성
+## Table 2a — Table 1의 시뮬레이션 (custom pixel-level GT)
 
-저장소의 `medium_workcell` METRIC 자료는 4대 eye-on-base 카메라와 checkerboard만 있고
-`calibration_setup: 1`이다. cube, eye-in-hand camera, `FK→cube` pose가 없어 A0–B3의
-Marker/U/FK factorial을 물리적으로 만들 수 없다. 따라서 아래 Table 2b custom simulator
-결과를 “METRIC 결과”로 부르지 않는다.
+**이 표는 Table 1과 같은 7행(A0–B3)을 GT가 있는 합성 장면에서 돌린 것이다.** 같은
+`CP_ablation_schema.MAIN_ABLATION_CONDITIONS`, 같은 canonical corner backend, 같은 variable
+partition과 freeze 규칙을 쓰므로 Table 1의 행과 1:1로 대응한다. 실데이터에는 외부 GT가 없어
+`FK-proxy`로만 말할 수 있는 것을, 여기서는 **참값 대비 오차**로 말할 수 있다는 점이 존재 이유다.
 
-호환 가능한 별도 실험은 [`CP_metric_board_only.py`](../CP_metric_board_only.py)로 실행했다.
-checkerboard 검출 수는 cam1–4 각각 52/99/90/72 views이고 robot pose는 251개다. 아래 값은
-번들 `GT/gt_cam*.csv`를 `T_base_cam`으로 해석한 뒤 4개 카메라 SE(3) 오차의 RMS다.
-Classical 방법은 카메라별 OpenCV hand-eye이고, joint 방법은 문서화된 eye-on-base 변환 체인과
-공유 `T_gripper_board`를 corner reprojection으로 푼 Python/SciPy **호환 재구현**이다.
+> **시뮬레이션 계열이 두 개라는 점에 주의.** 이 표의 출처는 [`CP_synthetic_7row.py`](../CP_synthetic_7row.py)이고,
+> [`Simul_test/`](../Simul_test/)는 **다른 계열**이다. `Simul_test/`는 C1(Unified vs
+> Independent) · C2(Board vs Cube) · C3(gTc estimation)라는 **세 축을 각각 따로** 검증하는
+> 초기 순수 SE(3) 기하 시뮬이며, A0–B3 factorial도 canonical corner backend도 쓰지 않는다.
+> 따라서 `Simul_test/`로는 이 표를 만들 수 없고, 그쪽 결과는 Table 1의 행과 직접 대응시키지
+> 않는다. `Simul_test/`의 결과는 채택 구성의 근거로서 Table 1 안의
+> "시뮬레이션과의 대응" 절에서 인용한다.
 
-| Method | 상태 | e_t RMS (mm) | e_r RMS (°) | train reproj (px) | runtime (s) |
-| --- | --- | ---: | ---: | ---: | ---: |
-| Tsai-Lenz | 수렴 | 1557.6214 | 63.3231 | 307.5653 | 0.176 |
-| Park-Martin | 수렴 | 173.2694 | 2.4656 | 37.7054 | 0.171 |
-| Horaud | 수렴 | 172.1610 | 2.1532 | 36.4326 | 0.178 |
-| Daniilidis | 수렴 | 367.1478 | 3.3385 | 73.9186 | 0.177 |
-| Joint corner reprojection (compatible) | 수렴, rank 30/30 | **0.9474** | **0.0626** | **0.2407** | 13.695 |
-
-Classical aggregate 오차는 cam1의 실패성 해에 크게 지배되며, per-camera raw 값은 JSON에
-보존했다. Joint 결과는 외부 GT이므로 real-session FK-proxy와 달리 physical transform accuracy로
-해석할 수 있지만, 이 데이터는 board-only라 A0–B3나 Ours(A3)의 결과가 아니다. 번들 Allegro
-C++/Ceres 실행기는 현재 환경에 `cmake`가 없어 빌드하지 못했으므로 joint 결과를 원본 바이너리
-실행값으로 표기하지 않는다. 산출물은 [`metric_board_only/metric_board_only.md`](metric_board_only/metric_board_only.md),
-[JSON](metric_board_only/metric_board_only.json), [CSV](metric_board_only/metric_board_only.csv)에 있다.
-
-## Table 2b — Custom pixel-level GT 코너 노이즈 강건성
-
-[`CP_synthetic_7row.py`](../CP_synthetic_7row.py)는 실제 7행과 같은 canonical corner backend,
-variable partition, freeze 규칙을 쓰는 custom GT simulator다. 셀은 모든 행에 공통인
+셀은 모든 행에 공통인
 calibration transforms `T_base_Ci`와 `T_gripper_cam`의 GT 오차 RMS `e_X (mm/°)`, 10개
 사전 선언 corner-noise seed의 mean±std다. Target-pose error는 headline에서 제외해 target set이
 다른 행도 같은 물리량으로 비교한다.
@@ -298,9 +546,40 @@ bias를 만들 수 있음을 보인다.
 - joint angle에 `N(0, σ_fk²)`를 주입한 뒤 FK를 다시 계산
 - A2와 A3 모두 hand-eye 정합용 백본 FK를 사용하므로 둘 다 joint/FK noise의 영향을 받는다.
 - A3에는 cube pose를 고정하는 `FK→cube` 경로가 추가되므로 A2 대비 추가 민감도를 측정한다.
-- A2를 수평선 또는 “FK noise 독립”으로 미리 가정하지 않고 실제 곡선과 반복실험 CI로 판단한다.
+- A2를 수평선 또는 “FK noise 독립”으로 미리 가정하지 않고 실제 곡선과 반복실험 CI로 판단한다. The you go. The power sippy there's the body open there. They saw liberation independent unified no it's contesting control
 - 두 곡선의 교차점이 관측되는 경우에만 “cube pose를 FK-fixed로 둘 수 있는 범위” 후보로 해석한다.
 - 현재는 joint noise→Cartesian pose error 전파와 실물 FK 정확도 추정법이 구현되지 않음
+
+## Table 2b — METRIC GT 데이터의 적용 가능성
+
+이 절은 Table 1의 시뮬레이션이 아니라 **외부 데이터셋을 쓸 수 있는지에 대한 판정 기록**이다.
+Table 1의 합성 대응은 위 Table 2a다.
+
+저장소의 `medium_workcell` METRIC 자료는 4대 eye-on-base 카메라와 checkerboard만 있고
+`calibration_setup: 1`이다. cube, eye-in-hand camera, `FK→cube` pose가 없어 A0–B3의
+Marker/U/FK factorial을 물리적으로 만들 수 없다. 따라서 위 Table 2a custom simulator
+결과를 “METRIC 결과”로 부르지 않는다.
+
+호환 가능한 별도 실험은 [`CP_metric_board_only.py`](../CP_metric_board_only.py)로 실행했다.
+checkerboard 검출 수는 cam1–4 각각 52/99/90/72 views이고 robot pose는 251개다. 아래 값은
+번들 `GT/gt_cam*.csv`를 `T_base_cam`으로 해석한 뒤 4개 카메라 SE(3) 오차의 RMS다.
+Classical 방법은 카메라별 OpenCV hand-eye이고, joint 방법은 문서화된 eye-on-base 변환 체인과
+공유 `T_gripper_board`를 corner reprojection으로 푼 Python/SciPy **호환 재구현**이다.
+
+| Method | 상태 | e_t RMS (mm) | e_r RMS (°) | train reproj (px) | runtime (s) |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Tsai-Lenz | 수렴 | 1557.6214 | 63.3231 | 307.5653 | 0.176 |
+| Park-Martin | 수렴 | 173.2694 | 2.4656 | 37.7054 | 0.171 |
+| Horaud | 수렴 | 172.1610 | 2.1532 | 36.4326 | 0.178 |
+| Daniilidis | 수렴 | 367.1478 | 3.3385 | 73.9186 | 0.177 |
+| Joint corner reprojection (compatible) | 수렴, rank 30/30 | **0.9474** | **0.0626** | **0.2407** | 13.695 |
+
+Classical aggregate 오차는 cam1의 실패성 해에 크게 지배되며, per-camera raw 값은 JSON에
+보존했다. Joint 결과는 외부 GT이므로 real-session FK-proxy와 달리 physical transform accuracy로
+해석할 수 있지만, 이 데이터는 board-only라 A0–B3나 Ours(A3)의 결과가 아니다. 번들 Allegro
+C++/Ceres 실행기는 현재 환경에 `cmake`가 없어 빌드하지 못했으므로 joint 결과를 원본 바이너리
+실행값으로 표기하지 않는다. 산출물은 [`metric_board_only/metric_board_only.md`](metric_board_only/metric_board_only.md),
+[JSON](metric_board_only/metric_board_only.json), [CSV](metric_board_only/metric_board_only.csv)에 있다.
 
 ## [*DEMO] Table 3 — Task-level (Pick and Place or peg in hole or 다트?) 물리 실행 : Soon ..........
 

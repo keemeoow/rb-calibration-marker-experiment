@@ -22,6 +22,7 @@
 | **C1** | Unified vs Independent | `unified_vs_independent.py` | `CP_C1_unified_vs_independent.py` | held-out 큐브예측(mm) + `+fk` 보정, consistency |
 | **C2** | Board vs Cube | `exp2_board_vs_cube.py` | `CP_C2_cube_vs_board.py` | 관측성(동시관측·시야각) + cross-camera/재투영 |
 | **C3** | gTc estimation (Camera / FK / Camera+FK) | `exp3_gtc_estimation.py` | `CP_C3_prior_vs_noprior.py` | held-out FK 위치오차(mm) 3방식 비교 |
+| **D1** | FK 고정 × 잔차 보정 2×2 | 시뮬 대응 없음 | `CP_D1_fk_correction_2x2.py` | held-out **위치**(set 단위 LOO) 큐브중점 예측(mm) |
 
 > 이번 정리에서 시뮬 대비 빠져 있던 **핵심 요소**를 실데이터 코드에 채웠다(아래 각 절 "정렬
 > 추가"). GT 전용 지표(bTf·gTc·카메라위치 절대오차)는 실데이터에서 측정 불가라 제외하고,
@@ -318,6 +319,41 @@ post-correction을 전혀 사용하지 않는다. A3는 동일 관측·optimizer
 aligned FK에 고정한다. 다만 이 독립 script는 canonical backend 추출 전 historical
 diagnostic이며, 핵심표의 A2/A3는 이제 7행 runner의 공통 backend 결과만 사용한다.
 종료조건 미도달 시 단일 오차값을 핵심표 값으로 채택하지 않는다.
+
+### D1 — FK 고정 × 잔차 보정 2×2 (`CP_D1_fk_correction_2x2.py`)
+
+"cube pose를 FK로 고정하고 예측 단계에서 잔차를 보정하는 구성이 최선인가"를 **동일
+backend·동일 solver 설정·동일 예측 mask**에서 직접 측정한다. 그 전까지 A3(7행 runner)와
+Ridge 후보정(C1)은 backend·target set·split·지표가 모두 달라 조합의 우열을 말할 수 없었다.
+
+```bash
+RB_ROBOT_POS_SCALE=<k> PYTHONPATH= python3 CP_D1_fk_correction_2x2.py \
+    --root_folder data/session --intrinsics_dir intrinsics \
+    --calib_dir data/session/calib_out \
+    --out_dir CP_result/D1_fk_correction_2x2
+#   (선택) --folds 0,4          # 스모크용 부분 fold
+#   (선택) --ridge_lambda 1e-3  # 보정 Ridge 세기
+```
+
+**Split은 위치(set) 단위 leave-one-out 13 fold다.** 잔차 보정은 공간적 일반화 주장이므로
+모든 위치가 train 에 들어가는 이벤트 split 으로는 검증할 수 없다. 이 split 의 역할은
+`CP_ablation_schema.POSITION_HOLDOUT_ROLE` 에 따라 **`FK-proxy` 전용**이다. Held-out 위치의
+캡처 이벤트는 board 관측까지 양쪽 arm 에서 동일하게 제외하고, FK artifact 도 fold 마다 train
+위치만으로 재추정한다(이벤트 누수는 assert 로 차단).
+
+Arm 은 canonical 스키마의 A2/A3 그대로이며 차이는 `T_base_cube_by_set` 가 자유변수인지
+(A2 vision-estimated) 학습셋 전용 FK artifact 에 고정되는지(A3 FK-fixed) 하나뿐이다. 보정은
+`none / offset(3) / SE(3)(6) / Ridge[1,x,y](9)` 네 단계이며 **train 위치에서만 학습해 held-out
+위치에만 적용**한다. 보정은 `T_base_Ci`·`T_gripper_cam` 을 바꾸지 않으므로 통제 지표(FK pose
+재투영 px, `e_cross` mm)는 보정 유무와 무관하게 동일하다 — **어떤 보정 결과도 재투영 개선으로
+보고할 수 없다.**
+
+**산출물** `CP_result/D1_fk_correction_2x2/` : `D1_fk_correction_2x2.{md,json,csv}`.
+결과·판정·한계는 핵심표 Table 1 안의
+["A2/A3 위치 hold-out 재검증 — D1 2×2"](CP_result/Calibration_Experiment_table.md)
+절에 있다. 요약하면 잔차 보정은 두 arm
+모두에서 실재하는 효과(A2 −1.587 mm, t=−4.59 / A3 −0.824 mm, t=−2.46)이고, FK 고정 여부는
+13개 위치로는 판정되지 않는다(모든 A3−A2 대비 `|t| ≤ 1.05`).
 
 ---
 
