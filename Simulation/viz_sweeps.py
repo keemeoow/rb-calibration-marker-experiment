@@ -105,16 +105,45 @@ def main():
                     ha="right", va="bottom", color="#555",
                     bbox=dict(boxstyle="round,pad=0.3", fc="#f4f4f4", ec="#ccc"))
 
-    # 마지막 칸: 범례 + N_reg 요약
-    axes[5].axis("off")
-    handles = [plt.Line2D([0], [0], color=STYLE[n][0], ls=STYLE[n][1],
-                          lw=(2.6 if n == "EXP1" else 1.6), marker=STYLE[n][3], ms=6)
-               for n in ["EXP1", "EXP2", "EXP3", "EXP4", "EXP5", "EXP6", "EXP7"]]
-    labels = [f"{n}  {STYLE[n][4]}" for n in
-              ["EXP1", "EXP2", "EXP3", "EXP4", "EXP5", "EXP6", "EXP7"]]
-    axes[5].legend(handles, labels, loc="center", fontsize=11, frameon=True,
-                   title="Methods  (line style: solid=FK-corr, dashed=no-FK, dash-dot=FK-fixed)",
-                   title_fontsize=9)
+    # 마지막 칸: 방식별 상세 표 (색선 + FK방식 / 통합·독립 / 마커)
+    lax = axes[5]
+    lax.axis("off")
+    # 각 방식의 세 축 정보 (configs.py 와 일치)
+    INFO = {   # name: (FK, solve, markers)
+        "EXP1": ("FK-corr", "unified", "cube+board"),
+        "EXP2": ("FK-corr", "separate", "cube+board"),
+        "EXP3": ("FK-corr", "unified", "cube-only"),
+        "EXP4": ("no-FK",   "unified", "cube+board"),
+        "EXP5": ("no-FK",   "separate", "cube+board"),
+        "EXP6": ("no-FK",   "unified", "board-only"),
+        "EXP7": ("FK-fixed", "unif=sep", "cube+board"),
+    }
+    order = ["EXP1", "EXP2", "EXP3", "EXP4", "EXP5", "EXP6", "EXP7"]
+    # 표 헤더
+    lax.text(0.02, 0.96, "Method", fontsize=9, fontweight="bold", transform=lax.transAxes)
+    lax.text(0.34, 0.96, "FK", fontsize=9, fontweight="bold", transform=lax.transAxes)
+    lax.text(0.55, 0.96, "solve", fontsize=9, fontweight="bold", transform=lax.transAxes)
+    lax.text(0.76, 0.96, "markers", fontsize=9, fontweight="bold", transform=lax.transAxes)
+    lax.plot([0.02, 0.98], [0.925, 0.925], color="#999", lw=0.8, transform=lax.transAxes)
+    y = 0.86
+    for n in order:
+        col, ls, lw, mk, lab = STYLE[n]
+        fk, solve, mkr = INFO[n]
+        bold = (n == "EXP1")
+        # 색선 샘플
+        lax.plot([0.02, 0.10], [y, y], color=col, ls=ls,
+                 lw=(2.8 if bold else 1.7), marker=mk, ms=6,
+                 transform=lax.transAxes, clip_on=False)
+        w = "bold" if bold else "normal"
+        lax.text(0.13, y, f"{n}" + (" ★" if bold else ""), fontsize=9,
+                 fontweight=w, va="center", transform=lax.transAxes, color=col)
+        lax.text(0.34, y, fk, fontsize=8.5, va="center", transform=lax.transAxes, fontweight=w)
+        lax.text(0.55, y, solve, fontsize=8.5, va="center", transform=lax.transAxes, fontweight=w)
+        lax.text(0.76, y, mkr, fontsize=8.5, va="center", transform=lax.transAxes, fontweight=w)
+        y -= 0.115
+    lax.text(0.02, -0.04,
+             "line style:  solid = FK-corr,  dashed = no-FK,  dash-dot = FK-fixed",
+             fontsize=7.5, color="#666", transform=lax.transAxes, style="italic")
 
     fig.suptitle(
         f"Noise sweep — {'corner σ (px)' if axis=='corner' else 'FK error (mm)'}   |   "
