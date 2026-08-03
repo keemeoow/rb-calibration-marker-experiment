@@ -13,15 +13,15 @@ import matplotlib.pyplot as plt
 
 FIG_DIR = os.path.join(os.path.dirname(__file__), "results", "figures")
 
-# 7방식 색/마커
+# 7방식 색/마커 (범례는 영문 — matplotlib 기본 폰트에 한글 없어 깨짐)
 STYLE = {
-    "EXP1": ("#4c72b0", "o", "Ours (통합·FK보정·큐브+보드)"),
-    "EXP2": ("#dd8452", "s", "−통합"),
-    "EXP3": ("#55a868", "^", "−보드(큐브만)"),
-    "EXP4": ("#c44e52", "v", "−FK"),
-    "EXP5": ("#8172b3", "D", "−FK−통합"),
-    "EXP6": ("#937860", "P", "−큐브(보드만)"),
-    "EXP7": ("#da8bc3", "X", "FK고정"),
+    "EXP1": ("#4c72b0", "o", "EXP1 Ours (unified+FKcorr+cube&board)"),
+    "EXP2": ("#dd8452", "s", "EXP2 -unified"),
+    "EXP3": ("#55a868", "^", "EXP3 -board (cube-only)"),
+    "EXP4": ("#c44e52", "v", "EXP4 -FK"),
+    "EXP5": ("#8172b3", "D", "EXP5 -FK-unified"),
+    "EXP6": ("#937860", "P", "EXP6 -cube (board-only)"),
+    "EXP7": ("#da8bc3", "X", "EXP7 FK-fixed"),
 }
 PANELS = [
     ("e_X_mm", "Camera+hand-eye e_X (mm)"),
