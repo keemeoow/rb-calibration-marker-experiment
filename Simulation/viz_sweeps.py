@@ -1,76 +1,130 @@
 #!/usr/bin/env python3
 """
 sweep 곡선 그림 — run_sweeps.py 의 JSON(코너/FK 축)에서 지표별 패널로 7방식 곡선 렌더.
+dataviz 원칙 적용: 색맹안전(Okabe-Ito), y축 캡(붕괴는 주석), Ours 강조, 직접 끝라벨.
 
   python viz_sweeps.py --json results/tables/sweep_corner.json
   python viz_sweeps.py --json results/tables/sweep_fk.json
-지표 6개(e_X, e_task, gTc, e_cross, reproj, N_reg)를 각 패널로. 7방식 곡선 + Ours 굵게.
 """
 import sys, os, json, argparse
+import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 FIG_DIR = os.path.join(os.path.dirname(__file__), "results", "figures")
 
-# 7방식 색/마커 (범례는 영문 — matplotlib 기본 폰트에 한글 없어 깨짐)
+# Okabe-Ito 색맹 안전 팔레트 + 선 스타일로 FK 방식 인코딩(solid=corr, dashed=none, dotted=fixed)
 STYLE = {
-    "EXP1": ("#4c72b0", "o", "EXP1 Ours (unified+FKcorr+cube&board)"),
-    "EXP2": ("#dd8452", "s", "EXP2 -unified"),
-    "EXP3": ("#55a868", "^", "EXP3 -board (cube-only)"),
-    "EXP4": ("#c44e52", "v", "EXP4 -FK"),
-    "EXP5": ("#8172b3", "D", "EXP5 -FK-unified"),
-    "EXP6": ("#937860", "P", "EXP6 -cube (board-only)"),
-    "EXP7": ("#da8bc3", "X", "EXP7 FK-fixed"),
+    "EXP1": ("#0072B2", "-",  3.0, "o", "Ours"),                 # 파랑 굵게
+    "EXP2": ("#E69F00", "-",  1.6, "s", "−unified"),             # 주황 (corr)
+    "EXP3": ("#009E73", "-",  1.6, "^", "−board"),               # 초록 (corr)
+    "EXP4": ("#D55E00", "--", 1.6, "v", "−FK"),                  # 주홍 (none, dashed)
+    "EXP5": ("#CC79A7", "--", 1.6, "D", "−FK−unified"),          # 자주 (none, dashed)
+    "EXP6": ("#000000", ":",  1.6, "P", "−cube (board-only)"),   # 검정 (none, dotted)
+    "EXP7": ("#56B4E9", "-.", 2.0, "X", "FK-fixed"),             # 하늘 (fixed, dash-dot)
 }
+ORDER = ["EXP4", "EXP5", "EXP2", "EXP3", "EXP7", "EXP1"]   # Ours 마지막(맨 위)
+# 각 지표: (key, 제목, 단위). y캡은 데이터에서 자동(붕괴 EXP6 제외한 최대의 1.15배).
 PANELS = [
-    ("e_X_mm", "Camera+hand-eye e_X (mm)"),
-    ("e_task_mm", "Held-out cube e_task (mm)"),
-    ("gTc_mm", "Hand-eye gTc (mm)"),
-    ("e_cross_mm", "Cross-camera e_cross (mm)"),
-    ("e_reproj_px", "Unified reproj (px, cube+board)"),
-    ("N_reg", "Registered cameras N_reg"),
+    ("e_task_mm", "Held-out cube prediction  e_task", "mm"),
+    ("gTc_mm", "Hand-eye  gTc", "mm"),
+    ("e_X_mm", "Camera+hand-eye  e_X", "mm"),
+    ("e_cross_mm", "Cross-camera consistency  e_cross", "mm"),
+    ("e_reproj_px", "Unified reproj (cube+board)", "px"),
 ]
+# 붕괴로 간주할 방식(항상 축 밖 처리) — 캘리브 실패해 값이 발산
+COLLAPSE = {"EXP6"}
+
+
+def _auto_cap(curves, key):
+    """붕괴(EXP6) 제외한 방식들의 최대값 → 그 1.15배를 y캡으로."""
+    mx = 0.0
+    for name in STYLE:
+        if name in COLLAPSE:
+            continue
+        ys = [y for y in curves[name][key] if y is not None]
+        if ys:
+            mx = max(mx, max(ys))
+    return mx * 1.15 if mx > 0 else 1.0
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", required=True)
-    ap.add_argument("--logy", action="store_true", help="y축 로그(붕괴 케이스 대비)")
     args = ap.parse_args()
     blob = json.load(open(args.json))
-    axis = blob["axis"]; unit = blob["unit"]; levels = blob["levels"]; curves = blob["curves"]
-    xlabel = f"corner noise σ ({unit})" if axis == "corner" else f"FK noise ({unit})"
+    axis, unit = blob["axis"], blob["unit"]
+    levels, curves = blob["levels"], blob["curves"]
+    xlabel = f"corner noise  σ ({unit})" if axis == "corner" else f"FK noise ({unit})"
+    x0 = 0.3 if axis == "corner" else None
 
-    fig, axes = plt.subplots(2, 3, figsize=(16, 9))
-    for ax, (key, title) in zip(axes.flat, PANELS):
-        for name, (col, mk, lab) in STYLE.items():
+    fig, axes = plt.subplots(2, 3, figsize=(17, 9.5))
+    axes = axes.flat
+    for ax, (key, title, yu) in zip(axes, PANELS):
+        cap = _auto_cap(curves, key)
+        offscale = []
+        for name in ORDER:
+            col, ls, lw, mk, lab = STYLE[name]
             ys = curves[name][key]
             xs = [x for x, y in zip(levels, ys) if y is not None]
             yv = [y for y in ys if y is not None]
             if not yv:
                 continue
-            ax.plot(xs, yv, marker=mk, color=col, ms=5,
-                    linewidth=(3 if name == "EXP1" else 1.6),
-                    zorder=(3 if name == "EXP1" else 2), label=lab)
-        ax.set_xlabel(xlabel); ax.set_ylabel(title.split("(")[-1].rstrip(")"))
-        ax.set_title(title, fontsize=10, fontweight="bold")
-        ax.grid(alpha=0.3)
-        if args.logy and key in ("e_X_mm", "e_reproj_px", "e_cross_mm"):
-            ax.set_yscale("log")
-        if axis == "corner":
-            ax.axvline(0.3, color="gray", ls="--", alpha=0.4)
-    axes.flat[0].legend(fontsize=7.5, ncol=1, loc="upper left")
+            # 값이 캡을 크게 넘으면(붕괴) 축 밖 → 주석. 아니면 그린다.
+            if np.median(yv) > cap:
+                offscale.append((lab, max(yv)))
+                continue
+            z = 5 if name == "EXP1" else 2
+            ax.plot(xs, yv, color=col, ls=ls, lw=lw, marker=mk, ms=6,
+                    zorder=z, label=lab, alpha=(1.0 if name == "EXP1" else 0.85),
+                    clip_on=True)
+            # 직접 끝 라벨 (마지막 점)
+            if name == "EXP1":
+                ax.annotate(lab, (xs[-1], min(yv[-1], cap * 0.98)), fontsize=9,
+                            fontweight="bold", color=col, va="center",
+                            xytext=(6, 0), textcoords="offset points")
+        ax.set_ylim(0, cap)
+        ax.set_xlabel(xlabel, fontsize=9)
+        ax.set_ylabel(yu, fontsize=9)
+        ax.set_title(title, fontsize=11, fontweight="bold", loc="left")
+        # 방향 표시: 이 6개 지표는 모두 낮을수록 좋음
+        ax.text(1.0, 1.015, "↓ lower = better", transform=ax.transAxes,
+                fontsize=8.5, color="#2a8a55", ha="right", va="bottom",
+                fontweight="bold")
+        ax.grid(axis="y", alpha=0.25, lw=0.7)
+        ax.spines[["top", "right"]].set_visible(False)
+        if x0 is not None:
+            ax.axvline(x0, color="gray", ls="--", alpha=0.4, lw=0.8, zorder=1)
+            ax.text(x0, cap * 0.97, " real σ", fontsize=7.5, color="gray", va="top")
+        # 축 밖(붕괴) 주석
+        if offscale:
+            txt = "off-scale (collapse):\n" + "\n".join(
+                f"  {l} →{v:.0f}{yu}" for l, v in offscale)
+            ax.text(0.98, 0.02, txt, transform=ax.transAxes, fontsize=7.5,
+                    ha="right", va="bottom", color="#555",
+                    bbox=dict(boxstyle="round,pad=0.3", fc="#f4f4f4", ec="#ccc"))
+
+    # 마지막 칸: 범례 + N_reg 요약
+    axes[5].axis("off")
+    handles = [plt.Line2D([0], [0], color=STYLE[n][0], ls=STYLE[n][1],
+                          lw=(2.6 if n == "EXP1" else 1.6), marker=STYLE[n][3], ms=6)
+               for n in ["EXP1", "EXP2", "EXP3", "EXP4", "EXP5", "EXP6", "EXP7"]]
+    labels = [f"{n}  {STYLE[n][4]}" for n in
+              ["EXP1", "EXP2", "EXP3", "EXP4", "EXP5", "EXP6", "EXP7"]]
+    axes[5].legend(handles, labels, loc="center", fontsize=11, frameon=True,
+                   title="Methods  (line style: solid=FK-corr, dashed=no-FK, dash-dot=FK-fixed)",
+                   title_fontsize=9)
 
     fig.suptitle(
-        f"Noise sweep ({'corner σ px' if axis=='corner' else 'FK mm'}) — 7 methods × all metrics\n"
-        f"corner-level sim, real cameras,  {blob['meta']['seeds']} seeds × "
-        f"{blob['meta']['pairs']} holdout pairs  (lower=better; N_reg higher=better)",
-        fontsize=12, y=1.0)
-    fig.tight_layout(rect=[0, 0, 1, 0.95])
+        f"Noise sweep — {'corner σ (px)' if axis=='corner' else 'FK error (mm)'}   |   "
+        f"7 methods, {blob['meta']['seeds']} seeds × {blob['meta']['pairs']} holdout pairs   "
+        f"(lower = better)",
+        fontsize=13, fontweight="bold")
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
     os.makedirs(FIG_DIR, exist_ok=True)
     out = os.path.join(FIG_DIR, f"sweep_{axis}.png")
-    fig.savefig(out, dpi=120, bbox_inches="tight")
+    fig.savefig(out, dpi=130, bbox_inches="tight")
     print(f"[저장] {out}")
 
 
