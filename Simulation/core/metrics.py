@@ -22,7 +22,8 @@ def predict_cube_pos(sc, model, s):
             pts.append((cams[ci] @ sc.obs_fix_cube[(ci, s)])[:3, 3])
     if gTc is not None:
         for e in sc.set_events.get(s, []):
-            pts.append((sc.bTg[e] @ gTc @ sc.obs_grip_cube[e])[:3, 3])
+            if e in sc.obs_grip_cube:
+                pts.append((sc.bTg[e] @ gTc @ sc.obs_grip_cube[e])[:3, 3])
     if not pts:
         return None
     p = np.median(np.array(pts), axis=0)
@@ -39,7 +40,8 @@ def predict_cube_pose(sc, model, s):
             Ts.append(cams[ci] @ sc.obs_fix_cube[(ci, s)])
     if gTc is not None:
         for e in sc.set_events.get(s, []):
-            Ts.append(sc.bTg[e] @ gTc @ sc.obs_grip_cube[e])
+            if e in sc.obs_grip_cube:
+                Ts.append(sc.bTg[e] @ gTc @ sc.obs_grip_cube[e])
     return se3_avg(Ts) if Ts else None
 
 

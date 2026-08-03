@@ -27,7 +27,8 @@ class SimScene:
     def __init__(self, seed=0, n_fixed_cams=3, n_sets=8, n_events_per_set=6,
                  noise_mm=6.0, noise_kind="systematic", gauss_mm=0.0,
                  base_jitter_mm=2.0, fk_noise_mm=0.0, fk_noise_deg=0.0,
-                 cam_radius_m=0.45, cam_height_m=0.35, gripper_tilt_deg=35.0):
+                 cam_radius_m=0.45, cam_height_m=0.35, gripper_tilt_deg=35.0,
+                 level="pose", sigma_px=0.5):
         rng = np.random.default_rng(seed)
         self.rng = rng
         self.base_jitter_mm = base_jitter_mm
@@ -35,7 +36,9 @@ class SimScene:
         self.sets = list(range(n_sets))
 
         # ---- GT 변환 (솔버가 복원해야 할 미지수) ----
-        self.gTc = rand_se3(rng, t_range_m=0.1, ang_range_deg=180.0)     # 핸드아이
+        # 핸드아이 gTc: 실물처럼 카메라가 그리퍼 축에 대략 정렬(작은 오프셋). 완전 랜덤이면
+        #   eye-in-hand 카메라가 아무 데나 봐서 타깃을 못 봄.
+        self.gTc = rand_se3(rng, t_range_m=0.05, ang_range_deg=20.0)     # 핸드아이(소오프셋)
         center = np.zeros(3)
         # 고정 카메라: 작업공간을 원형으로 둘러싸고 중심을 바라봄
         self.bTf = {}
@@ -48,13 +51,19 @@ class SimScene:
         # 보드: 테이블(작업공간)에 고정
         self.bTboard = rand_se3(rng, t_range_m=0.15, ang_range_deg=180.0)
         self.bTboard[:3, 3] = center + np.array([0.0, 0.0, 0.0])
-        # 큐브: set 마다 재배치 (작업공간 중심 근처 + 자세 변동)
+        # 큐브: set 마다 재배치. 실물처럼 "테이블에 앉은" 자세 — 윗면(+Z) 위로, yaw 자유 +
+        #   작은 틸트만(뒤집힘 없음). 둘러싼 고정 카메라는 옆면을, 위 그리퍼는 윗면을 봄.
         self.bTo = {}
         for s in self.sets:
+            yaw = rng.uniform(-np.pi, np.pi)
+            Ryaw = rot_axis_angle(np.array([0, 0, 1.0]), yaw)
+            ax = rng.normal(size=3); ax[2] = 0; ax /= (np.linalg.norm(ax) + 1e-12)
+            Rtilt = rot_axis_angle(ax, np.deg2rad(rng.uniform(-15, 15)))   # 작은 틸트
             T = np.eye(4)
-            ax = rng.normal(size=3); ax /= (np.linalg.norm(ax) + 1e-12)
-            T[:3, :3] = rot_axis_angle(ax, np.deg2rad(rng.uniform(-180, 180)))
-            T[:3, 3] = center + rng.uniform(-0.12, 0.12, size=3)
+            T[:3, :3] = Rtilt @ Ryaw
+            T[:3, 3] = center + np.array([rng.uniform(-0.1, 0.1),
+                                          rng.uniform(-0.1, 0.1),
+                                          rng.uniform(0.0, 0.05)])
             self.bTo[s] = T
 
         # ---- 로봇 그리퍼 자세 bTg (event 마다). 작업공간 위에서 내려다봄 ----
@@ -64,17 +73,14 @@ class SimScene:
         eid = 0
         for s in self.sets:
             for _ in range(n_events_per_set):
-                x, y = rng.uniform(-0.15, 0.15, size=2)
-                z = rng.uniform(0.20, 0.40)
-                tilt = gripper_tilt_deg
-                ax = rng.normal(size=3); ax /= (np.linalg.norm(ax) + 1e-12)
-                # 아래(-z)를 바라보는 기본자세 + 작은 틸트
-                Rdown = rot_axis_angle(np.array([1.0, 0, 0]), np.pi)        # 뒤집어 아래 봄
-                Rtilt = rot_axis_angle(ax, np.deg2rad(rng.uniform(-tilt, tilt)))
-                T = np.eye(4)
-                T[:3, :3] = Rtilt @ Rdown
-                T[:3, 3] = np.array([x, y, z])
-                self.bTg[eid] = T
+                # 그리퍼 카메라를 작업공간 위쪽에 두고 중심(큐브·보드)을 바라보게 (look-at).
+                #   → eye-in-hand 카메라가 실제로 타깃을 관측. bTg 는 그로부터 역산.
+                cam_pos = center + np.array([rng.uniform(-0.12, 0.12),
+                                             rng.uniform(-0.12, 0.12),
+                                             rng.uniform(0.30, 0.45)])
+                look = center + rng.uniform(-0.03, 0.03, size=3)   # 중심 근처 약간 흔들림
+                cam_pose = look_at(cam_pos, look)
+                self.bTg[eid] = cam_pose @ inv_T(self.gTc)         # cam = bTg @ gTc
                 self.event_set[eid] = s
                 self.events.append(eid)
                 eid += 1
@@ -92,12 +98,22 @@ class SimScene:
                 T[:3, 3] = T[:3, 3] + rng.normal(0, fk_noise_mm / 1000, 3)
             self.fk_cube[s] = T
 
-        # ---- 관측 생성 (노이즈 주입) ----
+        # ---- 관측 생성 ----
         self._setup_noise(seed, noise_mm, noise_kind)
         self.noise_kind = noise_kind
         self.gauss_mm = gauss_mm
+        self.level = level                      # "pose" | "corner"
+        self.sigma_px = sigma_px
         self.obs_fix_cube, self.obs_fix_board = {}, {}
         self.obs_grip_cube, self.obs_grip_board = {}, {}
+        self.reproj = {}                        # 관측키 → 재투영오차(px) (corner-level)
+        if level == "corner":
+            self._gen_corner_obs(seed)
+        else:
+            self._gen_pose_obs()
+
+    def _gen_pose_obs(self):
+        """pose-level 관측: GT pose 에 직접 노이즈(systematic+jitter)."""
         for ci in self.fixed_cam_ids:
             R_cb = inv_T(self.bTf[ci])[:3, :3]
             for s in self.sets:
@@ -116,6 +132,34 @@ class SimScene:
             self.obs_grip_board[e] = self._obs(
                 inv_T(self.bTg[e] @ self.gTc) @ self.bTboard, R_cb,
                 self.bTboard[:2, 3], self.G_grip, ("g", e, "gb"))
+
+    def _gen_corner_obs(self, seed):
+        """corner-level 관측: 3D 코너→2D 투영→픽셀노이즈→solvePnP. 실물 마커 기하 반영.
+        면 가시성(입사각)으로 큐브 다면성/보드 평면 차이가 자연 발생. 미검출은 관측 없음."""
+        from .targets import CubeTarget, BoardTarget
+        from .project import observe
+        cube, board = CubeTarget(), BoardTarget()
+        rng = np.random.default_rng(7000 + seed)
+        for ci in self.fixed_cam_ids:
+            for s in self.sets:
+                self._obs_corner(cube, inv_T(self.bTf[ci]) @ self.bTo[s],
+                                 self.obs_fix_cube, (ci, s), rng)
+                self._obs_corner(board, inv_T(self.bTf[ci]) @ self.bTboard,
+                                 self.obs_fix_board, (ci, s), rng)
+        for e in self.events:
+            s = self.event_set[e]
+            base_g = inv_T(self.bTg[e] @ self.gTc)
+            self._obs_corner(cube, base_g @ self.bTo[s], self.obs_grip_cube, e, rng)
+            self._obs_corner(board, base_g @ self.bTboard, self.obs_grip_board, e, rng)
+
+    def _obs_corner(self, target, T_gt, store, key, rng):
+        from .project import observe
+        r = observe(target, T_gt, sigma_px=self.sigma_px, rng=rng)
+        if r is not None:
+            T_est, ncorner, reproj = r
+            store[key] = T_est
+            self.reproj[(str(store is self.obs_fix_board or store is self.obs_grip_board),
+                         str(key))] = reproj
 
     # ------------------------------------------------------------------
     def _setup_noise(self, seed, noise_mm, noise_kind):

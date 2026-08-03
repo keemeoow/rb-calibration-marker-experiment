@@ -27,15 +27,19 @@ def _gather_obs(sc, markers, train_sets):
     if "cube" in markers:
         for ci in sc.fixed_cam_ids:
             for s in train_sets:
-                recs.append(("fix", ci, s, "cube", sc.obs_fix_cube[(ci, s)]))
+                if (ci, s) in sc.obs_fix_cube:
+                    recs.append(("fix", ci, s, "cube", sc.obs_fix_cube[(ci, s)]))
         for e in [e for s in train_sets for e in sc.set_events[s]]:
-            recs.append(("grip", e, sc.event_set[e], "cube", sc.obs_grip_cube[e]))
+            if e in sc.obs_grip_cube:
+                recs.append(("grip", e, sc.event_set[e], "cube", sc.obs_grip_cube[e]))
     if "board" in markers:
         for ci in sc.fixed_cam_ids:
             for s in train_sets:
-                recs.append(("fix", ci, s, "board", sc.obs_fix_board[(ci, s)]))
+                if (ci, s) in sc.obs_fix_board:
+                    recs.append(("fix", ci, s, "board", sc.obs_fix_board[(ci, s)]))
         for e in [e for s in train_sets for e in sc.set_events[s]]:
-            recs.append(("grip", e, sc.event_set[e], "board", sc.obs_grip_board[e]))
+            if e in sc.obs_grip_board:
+                recs.append(("grip", e, sc.event_set[e], "board", sc.obs_grip_board[e]))
     return recs
 
 
@@ -45,19 +49,23 @@ def _bootstrap(sc, markers, train_sets):
     for ci in sc.fixed_cam_ids:
         Ts = []
         if "cube" in markers:
-            Ts += [sc.fk_cube[s] @ inv_T(sc.obs_fix_cube[(ci, s)]) for s in train_sets]
+            Ts += [sc.fk_cube[s] @ inv_T(sc.obs_fix_cube[(ci, s)])
+                   for s in train_sets if (ci, s) in sc.obs_fix_cube]
+        if "board" in markers:
+            Ts += [sc.bTboard @ inv_T(sc.obs_fix_board[(ci, s)])
+                   for s in train_sets if (ci, s) in sc.obs_fix_board]
         if Ts:
             cams[ci] = se3_avg(Ts)
-        elif "board" in markers:                      # board only: nominal = GT (gauge 근사)
-            cams[ci] = sc.bTf[ci].copy()
     # gTc 초기: 그리퍼가 본 타깃을 base 로 (FK 큐브 or 보드 GT)
     g = []
     if "cube" in markers:
         for e in [e for s in train_sets for e in sc.set_events[s]]:
+            if e not in sc.obs_grip_cube: continue
             s = sc.event_set[e]
             g.append(inv_T(sc.bTg[e]) @ sc.fk_cube[s] @ inv_T(sc.obs_grip_cube[e]))
     elif "board" in markers:
         for e in [e for s in train_sets for e in sc.set_events[s]]:
+            if e not in sc.obs_grip_board: continue
             g.append(inv_T(sc.bTg[e]) @ sc.bTboard @ inv_T(sc.obs_grip_board[e]))
     gTc = se3_avg(g) if g else np.eye(4)
     return cams, gTc
@@ -83,15 +91,15 @@ def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=80):
         for s in train_sets:
             Ts = []
             if use_cube:
-                Ts += [cams0[ci] @ sc.obs_fix_cube[(ci, s)] for ci in cam_ids if ci in cams0]
-                Ts += [sc.bTg[e] @ gTc0 @ sc.obs_grip_cube[e] for e in sc.set_events[s]]
+                Ts += [cams0[ci] @ sc.obs_fix_cube[(ci, s)] for ci in cam_ids if ci in cams0 and (ci,s) in sc.obs_fix_cube]
+                Ts += [sc.bTg[e] @ gTc0 @ sc.obs_grip_cube[e] for e in sc.set_events[s] if e in sc.obs_grip_cube]
             cube0[s] = se3_avg(Ts) if Ts else sc.fk_cube[s]
             idx[("cube", s)] = off; off += 6; p0.append(se3_to_vec(cube0[s]))
     if use_board:
         Ts = [cams0[ci] @ sc.obs_fix_board[(ci, s)]
-              for ci in cam_ids if ci in cams0 for s in train_sets]
+              for ci in cam_ids if ci in cams0 for s in train_sets if (ci,s) in sc.obs_fix_board]
         Ts += [sc.bTg[e] @ gTc0 @ sc.obs_grip_board[e]
-               for s in train_sets for e in sc.set_events[s]]
+               for s in train_sets for e in sc.set_events[s] if e in sc.obs_grip_board]
         board0 = se3_avg(Ts) if Ts else sc.bTboard
         idx[("board",)] = off; off += 6; p0.append(se3_to_vec(board0))
     p0 = np.concatenate(p0)
@@ -137,7 +145,8 @@ def solve_independent(sc, markers, fk_mode, train_sets):
         # 큐브=FK 고정 → 각 카메라 closed-form 역산
         cams = {}
         for ci in cam_ids:
-            Ts = [sc.fk_cube[s] @ inv_T(sc.obs_fix_cube[(ci, s)]) for s in train_sets]
+            Ts = [sc.fk_cube[s] @ inv_T(sc.obs_fix_cube[(ci, s)]) for s in train_sets if (ci,s) in sc.obs_fix_cube]
+            if not Ts: continue
             cams[ci] = se3_avg(Ts)
         gTc = _handeye_to_fk(sc, train_sets)            # 그리퍼도 FK 큐브에 정합
         return {"cams": cams, "gTc": gTc, "mode": "indep/fixed", "align": None}
@@ -149,13 +158,13 @@ def solve_independent(sc, markers, fk_mode, train_sets):
     if use_cube:
         cube_c = {}
         for s in train_sets:
-            Ts = [cams0[ci] @ sc.obs_fix_cube[(ci, s)] for ci in cam_ids if ci in cams0]
+            Ts = [cams0[ci] @ sc.obs_fix_cube[(ci, s)] for ci in cam_ids if ci in cams0 and (ci,s) in sc.obs_fix_cube]
             if Ts:
                 cube_c[s] = se3_avg(Ts)
         cams = {}
         for ci in cam_ids:
             Ts = [cube_c[s] @ inv_T(sc.obs_fix_cube[(ci, s)])
-                  for s in train_sets if s in cube_c]
+                  for s in train_sets if s in cube_c and (ci,s) in sc.obs_fix_cube]
             cams[ci] = se3_avg(Ts) if Ts else cams0[ci]
     # 그리퍼 핸드아이 (독립: 고정 정보 미사용). none/corr 은 FK 미사용(순수 AX=XB).
     if use_cube:
@@ -171,6 +180,7 @@ def _handeye_to_fk(sc, train_sets):
     """그리퍼 gTc 를 FK 큐브 절대위치에 정합 (fixed 모드 독립 핸드아이)."""
     g = []
     for e in [e for s in train_sets for e in sc.set_events[s]]:
+        if e not in sc.obs_grip_cube: continue
         s = sc.event_set[e]
         g.append(inv_T(sc.bTg[e]) @ sc.fk_cube[s] @ inv_T(sc.obs_grip_cube[e]))
     return se3_avg(g) if g else np.eye(4)
@@ -186,8 +196,8 @@ def _handeye_freecube(sc, train_sets, max_nfev=60):
         return np.eye(4)
     # 초기: FK 큐브로 대략 (초기값일 뿐, 잔차엔 FK 미사용)
     gTc0 = _handeye_to_fk(sc, train_sets)
-    cube0 = {s: se3_avg([sc.bTg[e] @ gTc0 @ sc.obs_grip_cube[e] for e in sc.set_events[s]])
-             for s in train_sets if sc.set_events[s]}
+    cube0 = {s: se3_avg([sc.bTg[e] @ gTc0 @ sc.obs_grip_cube[e] for e in sc.set_events[s] if e in sc.obs_grip_cube])
+             for s in train_sets if any(e in sc.obs_grip_cube for e in sc.set_events[s])}
     sets = [s for s in train_sets if s in cube0]
     p0 = np.concatenate([se3_to_vec(gTc0)] + [se3_to_vec(cube0[s]) for s in sets])
     cidx = {s: 6 + i * 6 for i, s in enumerate(sets)}
@@ -198,6 +208,7 @@ def _handeye_freecube(sc, train_sets, max_nfev=60):
         for s in sets:
             Cs = vec_to_se3(p[cidx[s]:cidx[s]+6])
             for e in sc.set_events[s]:
+                if e not in sc.obs_grip_cube: continue
                 r.append(se3_residual(sc.bTg[e] @ gTc @ sc.obs_grip_cube[e], Cs))
         return np.concatenate(r) if r else np.zeros(1)
 
@@ -209,6 +220,7 @@ def _handeye_to_board(sc, train_sets):
     """보드만: 그리퍼 gTc 를 보드(자유 pose)에 대해 AX=XB 로. 여기선 GT 보드로 근사 정합."""
     g = []
     for e in [e for s in train_sets for e in sc.set_events[s]]:
+        if e not in sc.obs_grip_board: continue
         g.append(inv_T(sc.bTg[e]) @ sc.bTboard @ inv_T(sc.obs_grip_board[e]))
     return se3_avg(g) if g else np.eye(4)
 
@@ -219,8 +231,8 @@ def _rigid_align(sc, cams, gTc, markers, train_sets):
         return None
     P_grip, P_fix = [], []
     for s in train_sets:
-        Tf = [cams[ci] @ sc.obs_fix_cube[(ci, s)] for ci in sc.fixed_cam_ids if ci in cams]
-        Tg = [sc.bTg[e] @ gTc @ sc.obs_grip_cube[e] for e in sc.set_events[s]]
+        Tf = [cams[ci] @ sc.obs_fix_cube[(ci, s)] for ci in sc.fixed_cam_ids if ci in cams and (ci,s) in sc.obs_fix_cube]
+        Tg = [sc.bTg[e] @ gTc @ sc.obs_grip_cube[e] for e in sc.set_events[s] if e in sc.obs_grip_cube]
         if Tf and Tg:
             P_fix.append(se3_avg(Tf)[:3, 3]); P_grip.append(se3_avg(Tg)[:3, 3])
     if len(P_fix) >= 3:
