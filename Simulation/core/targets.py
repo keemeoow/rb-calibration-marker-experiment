@@ -12,11 +12,16 @@
 import numpy as np
 from .se3 import rot_axis_angle
 
-# ---- 실물 큐브 config (config.py 의 get_default_cube_config 값) ----
-CUBE_MARKER_SIZE_M = 0.051
+# ---- 실물 큐브 config (config.py) ----
+#   윗면(+Z, id 0·1) 마커는 25mm, 옆면(id 2~5) 마커는 51mm (실물 크기 다름).
+CUBE_TOP_SIZE_M = 0.025
+CUBE_SIDE_SIZE_M = 0.051
 CUBE_ID_TO_FACE = {0: "+Z", 1: "+Z", 2: "+X", 3: "+Y", 4: "-X", 5: "-Y"}
 CUBE_FACE_ROLL_DEG = {0: 0.0, 1: 0.0, 2: 90.0, 3: 180.0, 4: 270.0, 5: 0.0}
-CUBE_HALF_M = 0.051 / 2.0    # 큐브 반변 길이(면 중심 오프셋). 마커면과 유사 스케일로 근사.
+CUBE_MARKER_SIZE = {0: CUBE_TOP_SIZE_M, 1: CUBE_TOP_SIZE_M,
+                    2: CUBE_SIDE_SIZE_M, 3: CUBE_SIDE_SIZE_M,
+                    4: CUBE_SIDE_SIZE_M, 5: CUBE_SIDE_SIZE_M}
+CUBE_HALF_M = CUBE_SIDE_SIZE_M / 2.0   # 큐브 반변(면 중심 오프셋). 옆면 크기 기준.
 
 # 면 정의: 이름 -> (면 중심 오프셋 방향 = 법선, 면 내 u축, v축)
 _FACE_DEFS = {
@@ -50,7 +55,7 @@ class CubeTarget:
             Rr = rot_axis_angle(n, roll)                        # 면 법선 축 roll
             u2, v2 = Rr @ u, Rr @ v
             center = n * CUBE_HALF_M
-            loc = _marker_local_corners(CUBE_MARKER_SIZE_M)
+            loc = _marker_local_corners(CUBE_MARKER_SIZE[mid])   # 윗면 25 / 옆면 51mm
             # 로컬(u,v,평면) → rig 3D
             corners3d = np.array([center + c[0] * u2 + c[1] * v2 for c in loc])
             self.markers[mid] = {"corners3d": corners3d, "normal": n, "center": center}

@@ -13,7 +13,7 @@ from configs import ALL
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", type=int, default=20)
-    ap.add_argument("--noise", type=float, default=6.0)
+    ap.add_argument("--sigma_px", type=float, default=0.3)
     ap.add_argument("--dump", type=str, default="results/tables/table2a.json")
     args = ap.parse_args()
 
@@ -24,7 +24,7 @@ def main():
     hdr = f"{'#':<6}{'설명':<26}{'N_reg':>7}{'e_X(mm/°)':>16}{'e_task(mm/°)':>16}{'e_cross(mm)':>13}"
     print(hdr); print("-" * 92)
     for cfg in ALL:
-        st = run_config(cfg, seeds=args.seeds, noise_mm=args.noise)
+        st = run_config(cfg, seeds=args.seeds, sigma_px=args.sigma_px)
         rows[cfg.name] = {"config": cfg.__dict__, "stats": st}
         def g(k, d=1):
             m = st.get(k, (None,))[0]

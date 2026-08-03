@@ -51,21 +51,22 @@ def calibrate(sc, cfg: ExpConfig, train_sets):
     return model, W
 
 
-def run_config(cfg: ExpConfig, seeds=20, n_sets=8, noise_mm=6.0,
-               noise_kind="systematic", train_size=6, gauss_mm=0.0,
+def run_config(cfg: ExpConfig, seeds=20, n_sets=10, sigma_px=0.3, train_size=8,
                fk_noise_mm=0.0, fk_noise_deg=0.0, n_fixed_cams=3,
-               n_events_per_set=4, n_splits=3):
+               n_events_per_set=6, n_splits=3):
     """한 설정을 여러 seed × (seed당 n_splits 개의 train/test holdout)로 평가.
-       n_splits: seed 당 평가할 holdout 조합 수 (전체 조합은 느려서 제한; 통계는 seed 수로 확보)."""
+       코너 수준(실물 마커 투영→PnP). sigma_px = 코너 픽셀 노이즈.
+       n_splits: seed 당 평가할 holdout 조합 수 (전체는 느려 제한; 통계는 seed 수로 확보)."""
     cfg.validate()
+    import numpy as _np
     KEYS = ["N_reg", "e_X_mm", "e_X_deg", "e_task_mm", "e_task_deg",
-            "e_cross_mm", "bTf_mm", "gTc_mm"]
+            "e_cross_mm", "bTf_mm", "gTc_mm", "e_reproj_px"]
     acc = {k: [] for k in KEYS}
     for seed in range(seeds):
         sc = SimScene(seed=seed, n_fixed_cams=n_fixed_cams, n_sets=n_sets,
-                      n_events_per_set=n_events_per_set,
-                      noise_mm=noise_mm, noise_kind=noise_kind, gauss_mm=gauss_mm,
+                      n_events_per_set=n_events_per_set, sigma_px=sigma_px,
                       fk_noise_mm=fk_noise_mm, fk_noise_deg=fk_noise_deg)
+        reproj_seed = float(_np.mean(list(sc.reproj.values()))) if getattr(sc, "reproj", None) else None
         sets = sc.sets
         splits = 0
         for test_sets in itertools.combinations(sets, 2):
@@ -74,7 +75,10 @@ def run_config(cfg: ExpConfig, seeds=20, n_sets=8, noise_mm=6.0,
             model, W = calibrate(sc, cfg, list(train_sets))
             res = eval_model(sc, model, list(train_sets), list(test_sets), W=W)
             for k in KEYS:
-                if res.get(k) is not None:
+                if k == "e_reproj_px":
+                    if reproj_seed is not None:
+                        acc[k].append(reproj_seed)
+                elif res.get(k) is not None:
                     acc[k].append(res[k])
             splits += 1
             if splits >= n_splits:

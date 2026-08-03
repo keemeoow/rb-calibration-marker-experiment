@@ -13,10 +13,10 @@ from configs import EXP2
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", type=int, default=20)
-    ap.add_argument("--noise", type=float, default=6.0)
+    ap.add_argument("--sigma_px", type=float, default=0.3)
     ap.add_argument("--dump", type=str, default=None)
     args = ap.parse_args()
-    stats = run_config(EXP2, seeds=args.seeds, noise_mm=args.noise)
+    stats = run_config(EXP2, seeds=args.seeds, sigma_px=args.sigma_px)
     print(summarize(EXP2, stats))
     if args.dump:
         json.dump({"config": EXP2.__dict__, "stats": stats},

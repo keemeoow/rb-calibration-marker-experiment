@@ -14,8 +14,9 @@ import numpy as np
 import cv2
 
 
-DEFAULT_K = np.array([[600.0, 0, 320.0], [0, 600.0, 240.0], [0, 0, 1.0]])
-DEFAULT_DIST = np.zeros(5)
+# 실측 카메라 intrinsic (intrinsics/charuco_intrinsics_report.json 4대 평균, 640x480)
+DEFAULT_K = np.array([[597.5, 0, 327.3], [0, 599.7, 245.7], [0, 0, 1.0]])
+DEFAULT_DIST = np.array([0.0918, -0.2228, -0.0001, 0.0058, 0.0])   # brown k1,k2,p1,p2,k3
 IMAGE_W, IMAGE_H = 640, 480
 
 
