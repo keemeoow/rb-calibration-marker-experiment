@@ -44,7 +44,7 @@
 - 핵심 특징: **FK를 100% 신뢰** — FK 오차가 답에 그대로 박힘
 - 표에서의 역할: "FK 통째로 믿기" 진영의 표준 공식
 
-## 4. Tabb & Ahmad Yousef (2017) — 재투영 반복해: "공식 한 방 대신, 사진에 대고 수렴까지 반복 수정"
+## 4. Tabb & Ahmad Yousef (2017) — 재투영 반복: "공식 한 방 대신, 사진에 대고 수렴까지 반복 수정"
 
 > 📄 Tabb & Ahmad Yousef, *"Solving the Robot-World Hand-Eye(s) Calibration Problem with Iterative Methods"*, Machine Vision and Applications, 2017 — [PDF](https://arxiv.org/pdf/1907.12425) · 💻 [코드](https://github.com/amy-tabb/RWHEC-Tabb-AhmadYousef)
 
@@ -72,7 +72,7 @@
 
 ## 6. Calib3R (2025) — "보드 없이 AI가 장면을 3D 복원"
 
-> 📄 Allegro 외, *"Calib3R: A 3D Foundation Model for Multi-Camera to Robot Calibration and 3D Metric-Scaled Scene Reconstruction"*, arXiv:2509.08813, 2025 — [PDF](https://arxiv.org/pdf/2509.08813) · 💻 [코드](https://github.com/davidea97/Calib3R)
+> 📄 Allegro 외, *"Calib3R: A 3D Foundation Model for Multi-Camera to Robot Calibration and 3D Metric-Scaled Scene Reconstruction"*, arXiv:2509.08813, 2025 — [PDF](https://arxiv.org/pdf/2509.08813) · ⚠️ 코드: davidea97/Calib3R **현재 404** (비공개 전환 추정, 논문에도 공개 언급 없음) → 공개 재개 모니터링 + 대안 검토
 
 - 셋업: 마커 없음 — 카메라로 **일반 풍경** 촬영
 - 풀이 절차
@@ -139,10 +139,12 @@
 - **Allegro**: 애초에 멀티카메라 논문
   - 할 일: 같은 세션을 그들 형식으로 변환 (`cameraX/image/` + `pose/*.csv` + intrinsics yaml, `calibration_setup: 1`)
   - 그리퍼캠: eye-in-hand 모드(`calibration_setup: 0`) + 바닥 보드 데이터로 별도 실행
-- **Calib3R**: 명시 지원은 "로봇 **탑재** 카메라" 기준 — 우리 고정캠은 비탑재·정지 상태
-  - 가능성: 전 카메라 사진을 한 3D 장면으로 정합하는 구조 → 그리퍼캠이 크기·정렬 담당,
-    고정캠은 장면 등록으로 편입되는 구성이 원리상 가능해 보임
-  - 할 일: **코드 조사로 지원 여부 판정** (불가 시 그리퍼캠 비교로 축소 + 논문에 사유 명시)
+- **Calib3R**: ⚠️ **코드 리포가 현재 404** (비공개 전환 추정) — 아래 3안 중 택1
+  - 1안: 공개 재개 대기 (심사 통과 후 공개 관례) + 저자 이메일로 코드 요청
+  - 2안: **대체 구성** — Calib3R 논문 자신의 베이스라인인 "MASt3R-SfM(코드 공개) + 핸드아이 정렬"을
+    우리가 직접 조합 → "타깃리스 진영" 행을 이걸로 대체 (공개 코드 기준 충족)
+  - 3안: 타깃리스는 related work 인용만 (코드 미공개 사유 명시) — 표에서 제외
+  - (참고: 원래도 "로봇 탑재 카메라" 기준이라 고정캠 지원 여부 조사가 필요했음)
 
 ### 공통 준비물
 
