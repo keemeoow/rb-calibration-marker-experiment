@@ -63,7 +63,7 @@ def fig_A(blob):
         ax.set_ylim(0, cap)
         ax.set_xlabel(xlabel, fontsize=9); ax.set_ylabel("e_task (mm, GT)", fontsize=9)
         ax.set_title(xlabel.split("(")[0].strip(), fontsize=11, fontweight="bold", loc="left")
-        ax.text(1.0, 1.015, "downarrow lower=better", transform=ax.transAxes, fontsize=8,
+        ax.text(1.0, 1.015, "(lower is better)", transform=ax.transAxes, fontsize=8,
                 color="#2a8a55", ha="right", va="bottom", fontweight="bold")
         ax.grid(axis="y", alpha=0.25); ax.spines[["top", "right"]].set_visible(False)
         if off:
