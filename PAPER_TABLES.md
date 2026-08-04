@@ -21,10 +21,10 @@ T-RO 2편(Ulrich, Gauss–Helmert)은 제외 확정 (상용 구현/원리적 부
 
 부록행: Park, Horaud, Andreff, Li (OpenCV 플래그 스윕). 조건부: Koide 2019 (g2o 빌드 성공 시).
 
-**시뮬 vs 실데이터 역할 분담**
-- **시뮬 (GT 있음)**: 내부 4방법 + pose 기반 솔버(OpenCV 5종, Shah)만. 이미지 기반 SOTA(Allegro, Calib3R)는
-  렌더링이 없어 입력 자체가 불가 → 시뮬은 "메커니즘 분석·조건 스윕", SOTA 서열전이 아님을 본문에 명시.
-- **실데이터**: 전 시스템 동일 캡처, 동일 지표.
+**시뮬 vs 실데이터 역할 분담 (사용자 확정 2026-08: 타 방법 비교는 실데이터 전용)**
+- **시뮬 (GT 있음)**: **내부 4방법(fixed-FK/no-FK/ours-A/ours-B)만** — 메커니즘 분석·조건 스윕 전용.
+  외부 방법은 시뮬에서 돌리지 않음 (이미지 기반 SOTA는 입력 자체 불가, pose 기반도 실데이터로 통일).
+- **실데이터**: 외부 6방법 + ours 전부, 동일 캡처·동일 지표. SOTA 비교는 여기서만.
 
 ---
 
@@ -63,14 +63,13 @@ T-RO 2편(Ulrich, Gauss–Helmert)은 제외 확정 (상용 구현/원리적 부
 - Allegro는 보드-온-EE 세션 입력, 나머지는 큐브 세션 — **관측 세션이 다른 방법은 각주로 명시**
   (동일 워크셀·동일 카메라·같은 날 캡처로 공정성 확보).
 
-## 3. Table II — 시뮬레이션 GT 표 (골격)
+## 3. Table II — 시뮬레이션 GT 표 (골격, 내부 방법 전용)
 
-*합성 장면(실측 배치·실측 K/D 반영), nominal 노이즈(px 0.3–0.5 + 계통 1%), 20+ seeds.*
+*합성 장면(실측 배치·실측 K/D 반영), nominal 노이즈(px 0.3–0.5 + 계통 1%), 20+ seeds.
+외부 방법 없음 — 시뮬은 우리 4방법의 메커니즘 분석 전용 (사용자 확정).*
 
 | Method | e_cam vs GT (mm/deg) ↓ | e_gTc vs GT (mm/deg) ↓ | M1 e_task (mm) ↓ |
 |---|---|---|---|
-| Tsai / Daniilidis (per-cam) | TBD | TBD | TBD |
-| Shah | TBD | TBD | TBD |
 | fixed-FK | TBD | TBD | TBD |
 | no-FK | TBD | TBD | TBD |
 | ours-A | TBD | TBD | TBD |
