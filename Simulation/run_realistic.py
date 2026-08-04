@@ -23,6 +23,9 @@ SIG = [0.3, 0.6, 1.0]       # 마커 인지정확도 (코너 검출 σ px)
 FK_MM = 0.0                 # FK 거의 완벽
 
 
+MKEYS = ["e_task_mm", "e_X_mm", "gTc_mm", "bTf_mm"]   # held-out + 캘리브 자체 정확도
+
+
 def _job(a):
     mi, seed, si, gi, grip, n_sets, n_events, train, pairs = a
     from core.scene import SimScene
@@ -30,7 +33,7 @@ def _job(a):
     from core.metrics import eval_model
     sysv, sig = SYS[si], SIG[gi]
     cfg = METHODS[mi]
-    et = []
+    acc = {k: [] for k in MKEYS}
     try:
         sc = SimScene(seed=seed, n_sets=n_sets, n_events_per_set=n_events,
                       sigma_px=sig, fk_noise_mm=FK_MM, fk_noise_deg=0.0,
@@ -40,14 +43,15 @@ def _job(a):
             tr = [s for s in sc.sets if s not in test][:train]
             model, W = calibrate(sc, cfg, tr)
             res = eval_model(sc, model, tr, list(test), W=W)
-            if res.get("e_task_mm") is not None:
-                et.append(res["e_task_mm"])
+            for k in MKEYS:
+                if res.get(k) is not None:
+                    acc[k].append(res[k])
             n += 1
             if n >= pairs:
                 break
     except Exception:
         pass
-    return (mi, si, gi), (np.mean(et) if et else None)
+    return (mi, si, gi), {k: (float(np.mean(v)) if v else None) for k, v in acc.items()}
 
 
 def main():
@@ -67,54 +71,51 @@ def main():
     print(f"[realistic] {len(jobs)} jobs (FK~0, gripped {args.gripped}, "
           f"{args.sets}sets×{args.events}eih), {args.workers} workers", flush=True)
 
-    acc = {}
+    acc = {}    # (mi,si,gi) -> list of metric dicts
     done = 0
     with ProcessPoolExecutor(max_workers=args.workers) as ex:
-        for key, v in ex.map(_job, jobs):
-            acc.setdefault(key, []).append(v)
+        for key, d in ex.map(_job, jobs):
+            acc.setdefault(key, []).append(d)
             done += 1
             if done % 20 == 0:
                 print(f"  {done}/{len(jobs)}", flush=True)
 
-    def mean(mi, si, gi):
-        vs = [x for x in acc.get((mi, si, gi), []) if x is not None]
+    def mean(mi, si, gi, metric):
+        vs = [dd[metric] for dd in acc.get((mi, si, gi), []) if dd.get(metric) is not None]
         return float(np.mean(vs)) if vs else None
 
-    print("\n" + "=" * 70)
-    print("현실 시나리오 — held-out e_task (mm), FK~0, gripped 130")
-    print("=" * 70)
-    out = {}
-    for si, sysv in enumerate(SYS):
-        for gi, sig in enumerate(SIG):
-            cell = {}
-            for mi, cfg in enumerate(METHODS):
-                cell[cfg.name] = mean(mi, si, gi)
-            valid = {n: v for n, v in cell.items() if v is not None}
-            win = min(valid, key=valid.get) if valid else None
-            out[f"sys{sysv}_sig{sig}"] = {"cell": cell, "winner": win}
-    # 표 출력
-    hdr = f"{'계통/마커σ':>10s}"
-    for sig in SIG:
-        hdr += f" | σ={sig}"
-    print(hdr)
-    for mi, cfg in enumerate(METHODS):
-        print(f"\n-- {cfg.label} --")
+    METRIC_TITLE = {"e_X_mm": "카메라 자기위치+핸드아이 정확도 e_X",
+                    "bTf_mm": "고정카메라 base 위치 bTf",
+                    "gTc_mm": "hand-eye gTc",
+                    "e_task_mm": "held-out 큐브예측 e_task"}
+    out = {"SYS": SYS, "SIG": SIG, "metrics": {}}
+    for metric in ["e_X_mm", "bTf_mm", "gTc_mm", "e_task_mm"]:
+        print("\n" + "=" * 70)
+        print(f"현실 시나리오 — {METRIC_TITLE[metric]} (mm), FK~0, gripped 130")
+        print("=" * 70)
+        mout = {}
+        for mi, cfg in enumerate(METHODS):
+            print(f"-- {cfg.label} --")
+            for si, sysv in enumerate(SYS):
+                row = f"  계통{sysv:>5.0%}:"
+                for gi, sig in enumerate(SIG):
+                    v = mean(mi, si, gi, metric)
+                    row += f" {v:8.2f}" if v is not None else "     -- "
+                print(row)
+        # 승자 맵
+        print(f"  [승자] " + "".join(f" σ={sig:>4}" for sig in SIG))
         for si, sysv in enumerate(SYS):
-            row = f"  계통{sysv:>5.0%}:"
+            row = f"  계통{sysv:>4.0%}:"
             for gi, sig in enumerate(SIG):
-                v = mean(mi, si, gi)
-                row += f" {v:7.2f}" if v is not None else "    -- "
+                cell = {cfg.name: mean(mi, si, gi, metric) for mi, cfg in enumerate(METHODS)}
+                valid = {n: v for n, v in cell.items() if v is not None}
+                w = min(valid, key=valid.get) if valid else None
+                mout[f"{sysv}_{sig}"] = {"cell": cell, "winner": w}
+                row += f" {w or '--':>7s}"
             print(row)
-    print("\n[승자] (셀별 e_task 최저)")
-    print(f"{'계통/σ':>10s}" + "".join(f" | σ={sig:>4}" for sig in SIG))
-    for si, sysv in enumerate(SYS):
-        row = f"  {sysv:>8.0%}:"
-        for gi, sig in enumerate(SIG):
-            w = out[f"sys{sysv}_sig{sig}"]["winner"]
-            row += f" | {w or '--':>8s}"
-        print(row)
+        out["metrics"][metric] = mout
     os.makedirs("results/tables", exist_ok=True)
-    json.dump({"SYS": SYS, "SIG": SIG, "cells": out}, open("results/tables/realistic.json", "w"), indent=2)
+    json.dump(out, open("results/tables/realistic.json", "w"), indent=2)
     print("\n[저장] results/tables/realistic.json")
 
 
