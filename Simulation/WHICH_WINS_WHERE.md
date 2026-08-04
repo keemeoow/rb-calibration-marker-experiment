@@ -17,9 +17,9 @@
 실측 카메라 배치·실물 마커 기하(AprilTag 큐브 6면, ChArUco 보드 11×7, 실측 K/왜곡)를 반영한 코너 수준
 시뮬레이션. 렌더링 없이 3D 코너 → 2D 투영 → 픽셀노이즈 → solvePnP 로 관측을 생성한다.
 
-![시뮬레이션 리그](results/figures/fig_sim_scene_paper.png)
+![시뮬레이션 리그](results/figures/fig_sim_scene.png)
 
-*(a) 고정 카메라 3대(eye-to-hand) + 그리퍼 카메라(eye-in-hand) + 큐브(set별 재배치) + 보드. (b) 고정 카메라가 실제로 보는 2D 투영(체커보드 + 검출 코너 + 큐브 면, 0.3px 노이즈). 그림에서는 가독성을 위해 큐브를 보드 옆으로 옮겨 그렸다(시뮬 기하 자체는 미변경).*
+*좌: 3D 원근 리그 — 고정 카메라 3대(eye-to-hand) + 그리퍼 카메라(eye-in-hand) 경로 + 큐브(set별 재배치) + ChArUco 보드 + robot base 좌표축. 우상: 위에서 본 배치(bird's-eye). 우하: 고정 카메라 C0가 실제로 보는 2D 투영(보드 코너 + 큐브 면, 0.3px 픽셀노이즈) — solvePnP 입력.*
 
 ### 비교한 4방법
 
