@@ -740,6 +740,9 @@ def write_outputs(result: Mapping, out_dir: str) -> None:
         "",
         f"- split: **position (set-level) hold-out**, {result['split']['strategy']}, "
         f"{summary['n_folds_usable']}/{summary['n_folds_total']} folds usable",
+        f"- `RB_ROBOT_POS_SCALE` = **{result['robot_pos_scale']:.4f}** "
+        f"({'로봇 원본 값 그대로' if result['robot_pos_scale'] == 1.0 else '병진 보정 적용'}). "
+        "다른 값으로 만든 결과와는 FK 기준 자체가 달라 비교할 수 없다.",
         f"- 모든 위치 오차는 `{PROXY_LABEL}`다. 외부 GT가 아니므로 절대 정확도로 읽지 않는다.",
         f"- position hold-out의 역할 규정: `{POSITION_HOLDOUT_ROLE}`",
         "- 모든 arm이 동일 backend·동일 solver 설정·동일 예측 mask를 쓴다. 차이는 "
@@ -1004,6 +1007,11 @@ def main() -> None:
         "cube_detection": cube_reason,
         "solver_options": ab.canonical_solver_options(args).to_dict(),
         "ridge_lambda": float(args.ridge_lambda),
+        # Record the load-time robot translation scale.  Results produced under
+        # different values are not comparable -- the FK cube poses they anchor
+        # and supervise against differ by ~12mm -- and nothing else in the
+        # artifact reveals which value was used.
+        "robot_pos_scale": cp.robot_pos_scale(),
         "control_invariance": control_invariance_report(folds),
         "summary": summary,
         "folds": folds,

@@ -43,6 +43,7 @@ from typing import Dict, List, Mapping, Sequence
 import numpy as np
 
 import CP_ablation_7row as ab
+import CP_common
 from CP_ablation_schema import MAIN_ABLATION_CONDITIONS, UNIFIED_FREE_VARIABLES
 from CP_D1_fk_correction_2x2 import solve_anchored_corner_reprojection
 from calibration_path_evaluation import evaluate_paths_with_common_mask
@@ -124,6 +125,9 @@ def run_arm(spec: Mapping, data, args, seed: int) -> dict:
         "anchor_rms_cube_displacement_mm": diag.get("anchor_rms_cube_displacement_mm"),
         "initialization": init_diag,
         "solver_status": diag["status"],
+        # Frozen pose set, so cross-target evaluation can re-score this arm on the
+        # shared cube corners without refitting (CP_cross_target_cube_eval.py).
+        "transforms": ab.serialize_state(state),
     }
 
 
@@ -282,6 +286,10 @@ def write_outputs(result: Mapping, out_dir: str) -> None:
         "실행이다. D1은 위치 hold-out·mm 지표였고 이 표는 **Table 1과 동일한 이벤트 split·"
         "동일 지표**다.",
         "",
+        f"- `RB_ROBOT_POS_SCALE` = **{result['robot_pos_scale']:.4f}** "
+        f"({'로봇 원본 값 그대로' if result['robot_pos_scale'] == 1.0 else '병진 보정 적용'}). "
+        "아래 재현 확인은 이 값이 Table 1과 같을 때만 의미가 있다 — 게이트의 허용치가 "
+        "split 표준편차라서 스케일 불일치를 단독으로는 걸러내지 못한다.",
         f"- split seeds: {result['split_seeds']}, 각 split당 {result['num_inits']} initialization",
         f"- 총 {result['summary'][arm_keys[0]]['n_runs']} run/arm, "
         f"anchor lever {result['anchor_lever_mm']:.1f} mm, λ 단위 px/mm",
@@ -429,6 +437,11 @@ def main() -> None:
         "arm_specs": specs,
         "arm_keys": arm_keys,
         "solver_options": ab.canonical_solver_options(args).to_dict(),
+        # Record the load-time robot translation scale.  Results produced under
+        # different values are not comparable -- the FK cube poses they anchor
+        # against differ by ~12mm -- and the reference_agreement gate below is
+        # too coarse to catch a scale mismatch on its own.
+        "robot_pos_scale": CP_common.robot_pos_scale(),
         "summary": summary,
         "reference_agreement": reference_agreement(summary, len(seeds)),
         "paired_vs_A2": {

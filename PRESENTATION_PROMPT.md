@@ -9,7 +9,7 @@
 
 ## 시스템 개요 (배경)
 
-- 로봇: Rainbow Robotics 6-DOF 팔. 손목에 eye-in-hand RealSense 1대, 작업공간 주변에 eye-to-hand 고정 RealSense N대.
+- 로봇: 6-DOF 협동로봇 팔 `[확인 필요: 제조사·모델명. meta.json에 기록이 없다. 추측해서 쓰지 말 것]`. 손목에 eye-in-hand RealSense 1대, 작업공간 주변에 eye-to-hand 고정 RealSense 3대(cam 0·1·3, 손목은 cam 2).
 - 타깃: (a) ChArUco board (11×7, checker 25 mm, marker 18 mm), (b) 로봇이 잡을 수 있는 AprilTag cube (한 변 59 mm, top tag 25 mm, side tag 51 mm).
 - 좌표계: `base → gripper`(FK), `gripper → cam`(hand-eye `gTc`), `base → 고정카메라 i`(`bTCi`), `base → 타깃`(`bTO`, `bTB`).
 - 목표: **고정 카메라 + 손목 카메라 + 로봇 FK를 하나의 목적함수로 동시 캘리브레이션**하고, 그 설계 선택이 오차 전파에 어떤 영향을 주는지 실험으로 분리 검증.
