@@ -10,7 +10,7 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from configs import ALL          # EXP1~7 (7방법)
 
-KEYS = ["e_task_mm", "e_task_deg", "e_X_mm", "e_reproj_px", "e_cross_mm"]
+KEYS = ["e_task_mm", "e_task_deg", "e_X_mm", "bTf_mm", "e_reproj_px", "e_cross_mm"]
 N_GRIPPED = 40                   # fork 로 워커 상속
 
 # 노이즈 축 (그림 A) — 한 축만 변화, 나머지는 baseline(σ0.3, 나머지 0)
