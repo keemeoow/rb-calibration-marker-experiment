@@ -250,27 +250,36 @@ def _rigid_align(sc, cams, gTc, markers, train_sets):
 
 
 # ---------------------------------------------------------------- FK 후보정 (corr)
-def _feat(t):
-    """위치 특징 [1, x, y]."""
-    return np.array([1.0, t[0], t[1]])
+def _feat(t, degree=1):
+    """위치 특징. degree=1: [1,x,y] (CP_C1 정합, 기본). degree=2: [1,x,y,x²,y²,xy,z]
+    (intrinsic 편향 등 비선형 systematic 까지 학습)."""
+    x, y, z = t[0], t[1], t[2]
+    if degree >= 2:
+        return np.array([1.0, x, y, x*x, y*y, x*y, z])
+    return np.array([1.0, x, y])
 
 
-def learn_fk_correction(sc, model, train_sets, lam=1e-3):
-    """train 에서 (예측 큐브위치 vs FK) 잔차를 [1,x,y] Ridge 회귀 → W(3x3)."""
+def learn_fk_correction(sc, model, train_sets, lam=1e-3, degree=1):
+    """train 에서 (예측 큐브위치 vs FK) 잔차를 특징에 Ridge 회귀 → 계수 W.
+    degree=1: [1,x,y](CP_C1 동일). degree=2: 2차 특징(intrinsic 편향 학습 강화)."""
     from .metrics import predict_cube_pos          # 지연 import (순환 방지)
     X, Y = [], []
     for s in train_sets:
         p = predict_cube_pos(sc, model, s)
         if p is None:
             continue
-        X.append(_feat(p)); Y.append(sc.fk_cube[s][:3, 3] - p)
-    if len(X) < 3:
+        X.append(_feat(p, degree)); Y.append(sc.fk_cube[s][:3, 3] - p)
+    ncoef = len(_feat(np.zeros(3), degree))
+    if len(X) < ncoef:                                 # 표본이 특징수보다 적으면 과적합
         return None
     X = np.array(X); Y = np.array(Y)
-    reg = lam * np.eye(3); reg[0, 0] = 0.0             # 절편 정규화 제외
-    return np.linalg.solve(X.T @ X + reg, X.T @ Y)
+    reg = lam * np.eye(ncoef); reg[0, 0] = 0.0         # 절편 정규화 제외
+    W = np.linalg.solve(X.T @ X + reg, X.T @ Y)
+    return {"W": W, "degree": degree}                  # degree 를 함께 반환(적용 시 동일 특징)
 
 
 def apply_fk_correction(p, W):
-    """예측 위치 p 에 후보정 적용."""
-    return p if W is None else p + _feat(p) @ W
+    """예측 위치 p 에 후보정 적용. W 는 {'W','degree'} dict 또는 None."""
+    if W is None:
+        return p
+    return p + _feat(p, W["degree"]) @ W["W"]

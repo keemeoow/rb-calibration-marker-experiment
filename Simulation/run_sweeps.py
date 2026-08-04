@@ -23,19 +23,27 @@ FK_NOISES = [0.0, 1.0, 2.0, 4.0, 8.0, 16.0]         # mm (회전은 mm/10 deg �
 
 
 def _job(a):
-    """(cfg_idx, seed, axis, level, n_sets, n_events, train_size, pairs) → 지표 리스트."""
-    ci, seed, axis, level, n_sets, n_events, train_size, pairs = a
+    """(cfg_idx, seed, axis, level, n_sets, n_events, train_size, pairs, (intr,outl))."""
+    ci, seed, axis, level, n_sets, n_events, train_size, pairs, ba = a
     from core.scene import SimScene
     from core.experiment import calibrate
     from core.metrics import eval_model
     cfg = ALL[ci]
-    kw = dict(seed=seed, n_sets=n_sets, n_events_per_set=n_events)
-    if axis == "corner":
-        kw["sigma_px"] = level
-    else:                                            # fk 축: 코너는 실측 0.3 고정
+    intr, outl = ba                                  # 배경 노이즈(intrinsic, outlier)
+    kw = dict(seed=seed, n_sets=n_sets, n_events_per_set=n_events,
+              intrinsic_err=intr, outlier_rate=outl)
+    if axis == "fk":
         kw["sigma_px"] = 0.3
         kw["fk_noise_mm"] = level
         kw["fk_noise_deg"] = level / 10.0            # 16mm ↔ 1.6° 비례
+    elif axis == "intrinsic":
+        kw["sigma_px"] = 0.3
+        kw["intrinsic_err"] = level                  # intrinsic 오차 자체를 sweep
+    elif axis == "outlier":
+        kw["sigma_px"] = 0.3
+        kw["outlier_rate"] = level                   # outlier 비율 sweep
+    else:                                            # corner 축
+        kw["sigma_px"] = level
     sc = SimScene(**kw)
     out = {k: [] for k in KEYS}
     n = 0
@@ -53,24 +61,30 @@ def _job(a):
     return (ci, level), out
 
 
+INTRINSIC_ERRS = [0.0, 0.005, 0.01, 0.02, 0.03, 0.05]   # 상대오차
+OUTLIER_RATES = [0.0, 0.02, 0.05, 0.10, 0.20]           # 코너 이상치 비율
+
+
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--axis", choices=["corner", "fk"], required=True)
+    ap.add_argument("--axis", choices=["corner", "fk", "intrinsic", "outlier"], required=True)
     ap.add_argument("--seeds", type=int, default=20)
     ap.add_argument("--workers", type=int, default=os.cpu_count() - 2)
     ap.add_argument("--sets", type=int, default=10)
     ap.add_argument("--events", type=int, default=6)
     ap.add_argument("--train", type=int, default=8)
     ap.add_argument("--pairs", type=int, default=6)      # held-out 조합 수/seed
+    # 배경 노이즈(sweep 축이 아닌 축은 이 값으로 고정)
+    ap.add_argument("--bg_intrinsic", type=float, default=0.0)
+    ap.add_argument("--bg_outlier", type=float, default=0.0)
     ap.add_argument("--dump", type=str, default=None)
     args = ap.parse_args()
 
-    levels = CORNER_SIGMAS if args.axis == "corner" else FK_NOISES
+    levels = {"corner": CORNER_SIGMAS, "fk": FK_NOISES,
+              "intrinsic": INTRINSIC_ERRS, "outlier": OUTLIER_RATES}[args.axis]
     dump = args.dump or f"results/tables/sweep_{args.axis}.json"
-    jobs = [(ci, seed, args.axis, None, args.sets, args.events, args.train, args.pairs)
-            for ci in range(len(ALL)) for lv in levels for seed in range(args.seeds)]
-    # level 을 job 에 심기 (kw 는 _job 에서 axis+level 로)
-    jobs = [(ci, seed, args.axis, lv, args.sets, args.events, args.train, args.pairs)
+    ba = (args.bg_intrinsic, args.bg_outlier)            # 배경 노이즈
+    jobs = [(ci, seed, args.axis, lv, args.sets, args.events, args.train, args.pairs, ba)
             for ci in range(len(ALL)) for lv in levels for seed in range(args.seeds)]
     print(f"[{args.axis} sweep] {len(jobs)} jobs "
           f"({len(ALL)}방식 × {len(levels)}레벨 × {args.seeds}seed), {args.workers} workers",
@@ -94,10 +108,12 @@ def main():
             curves[cfg.name][k] = [
                 float(np.mean(acc[(ci, lv)][k])) if acc[(ci, lv)][k] else None
                 for lv in levels]
+    unit = {"corner": "px", "fk": "mm", "intrinsic": "rel", "outlier": "rate"}[args.axis]
     os.makedirs(os.path.dirname(dump), exist_ok=True)
-    json.dump({"axis": args.axis, "levels": levels, "unit": "px" if args.axis == "corner" else "mm",
-               "meta": {"seeds": args.seeds, "pairs": args.pairs}, "curves": curves},
-              open(dump, "w"), indent=2)
+    json.dump({"axis": args.axis, "levels": levels, "unit": unit,
+               "meta": {"seeds": args.seeds, "pairs": args.pairs,
+                        "bg_intrinsic": args.bg_intrinsic, "bg_outlier": args.bg_outlier},
+               "curves": curves}, open(dump, "w"), indent=2)
     print(f"[저장] {dump}")
     # 미리보기
     for name, c in curves.items():

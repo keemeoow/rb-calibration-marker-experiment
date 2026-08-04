@@ -23,5 +23,7 @@ EXP4 = ExpConfig("EXP4", fk="none",  solve="unified",     markers=CB, label="−
 EXP5 = ExpConfig("EXP5", fk="none",  solve="independent", markers=CB, label="−FK −통합")
 EXP6 = ExpConfig("EXP6", fk="none",  solve="unified",     markers=B,  label="−큐브 (보드만)")
 EXP7 = ExpConfig("EXP7", fk="fixed", solve="unified",     markers=CB, label="FK 고정 (통합=독립)")
+# EXP8: Ours + 2차 후보정 특징 — 참고용(표본 적으면 과적합. 기본 sweep 에선 제외).
+EXP8 = ExpConfig("EXP8", fk="corr",  solve="unified",     markers=CB, label="Ours+ (2차 후보정)", fk_degree=2)
 
-ALL = [EXP1, EXP2, EXP3, EXP4, EXP5, EXP6, EXP7]
+ALL = [EXP1, EXP2, EXP3, EXP4, EXP5, EXP6, EXP7]      # 기본 7방식 (EXP8은 참고용, 별도)

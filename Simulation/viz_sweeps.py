@@ -56,8 +56,12 @@ def main():
     blob = json.load(open(args.json))
     axis, unit = blob["axis"], blob["unit"]
     levels, curves = blob["levels"], blob["curves"]
-    xlabel = f"corner noise  σ ({unit})" if axis == "corner" else f"FK noise ({unit})"
-    x0 = 0.3 if axis == "corner" else None
+    XLAB = {"corner": "corner noise  σ (px)", "fk": "FK error (mm)",
+            "intrinsic": "intrinsic error (relative)", "outlier": "outlier rate"}
+    xlabel = XLAB.get(axis, f"{axis} ({unit})")
+    # 실측 지점 수직선 (해당 축에서 실제 값)
+    X0 = {"corner": 0.3, "intrinsic": None, "outlier": None, "fk": None}
+    x0 = X0.get(axis)
 
     fig, axes = plt.subplots(2, 3, figsize=(17, 9.5))
     axes = axes.flat
@@ -145,10 +149,14 @@ def main():
              "line style:  solid = FK-corr,  dashed = no-FK,  dash-dot = FK-fixed",
              fontsize=7.5, color="#666", transform=lax.transAxes, style="italic")
 
+    bg = blob["meta"].get("bg_intrinsic", 0), blob["meta"].get("bg_outlier", 0)
+    bgtxt = ""
+    if bg[0] or bg[1]:
+        bgtxt = f"   [background noise: intrinsic {bg[0]:.0%}, outlier {bg[1]:.0%}]"
     fig.suptitle(
-        f"Noise sweep — {'corner σ (px)' if axis=='corner' else 'FK error (mm)'}   |   "
+        f"Noise sweep — {XLAB.get(axis, axis)}   |   "
         f"7 methods, {blob['meta']['seeds']} seeds × {blob['meta']['pairs']} holdout pairs   "
-        f"(lower = better)",
+        f"(lower = better){bgtxt}",
         fontsize=13, fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     os.makedirs(FIG_DIR, exist_ok=True)

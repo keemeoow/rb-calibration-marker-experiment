@@ -27,6 +27,7 @@ class ExpConfig:
     solve: str                   # unified | independent
     markers: Tuple[str, ...]     # ("cube","board") 등
     label: str = ""
+    fk_degree: int = 1           # corr 후보정 특징 차수: 1=[1,x,y](CP_C1), 2=2차(강화)
 
     def validate(self):
         if set(self.markers) == {"board"} and self.fk in ("fixed", "corr"):
@@ -52,7 +53,7 @@ def calibrate(sc, cfg: ExpConfig, train_sets):
         model = solve_independent(sc, cfg.markers, fk_solve, train_sets)
     W = None
     if cfg.fk == "corr":
-        W = learn_fk_correction(sc, model, train_sets)
+        W = learn_fk_correction(sc, model, train_sets, degree=cfg.fk_degree)
     return model, W
 
 

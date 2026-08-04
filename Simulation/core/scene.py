@@ -21,7 +21,7 @@ import os
 import numpy as np
 from .se3 import inv_T, rand_se3, rot_axis_angle, look_at
 from .targets import CubeTarget, BoardTarget
-from .project import observe
+from .project import observe, DEFAULT_K
 
 
 # 모든 씬이 공유하는 타깃 기하 (한 번만 생성)
@@ -37,6 +37,7 @@ _REAL_CENTER = _REAL["center"]     # 작업공간(큐브) 중심
 class SimScene:
     def __init__(self, seed=0, n_fixed_cams=3, n_sets=8, n_events_per_set=6,
                  sigma_px=0.3, fk_noise_mm=0.0, fk_noise_deg=0.0,
+                 intrinsic_err=0.0, outlier_rate=0.0,
                  cam_radius_m=0.35, cam_height_m=0.35,
                  incidence_max_deg=75.0, use_real_cameras=True,
                  cam_downtilt_deg=27.0):
@@ -44,6 +45,8 @@ class SimScene:
         self.rng = rng
         self.sigma_px = sigma_px
         self.incidence_max_deg = incidence_max_deg
+        self.outlier_rate = outlier_rate
+        self.intrinsic_err = intrinsic_err
 
         # ---- 고정 카메라 배치 ----
         # use_real_cameras=True: 실측 위치(높이 ~0.2m) 사용. 단, 저장된 캘리브 행렬의
@@ -123,6 +126,22 @@ class SimScene:
                 T[:3, 3] = T[:3, 3] + rng.normal(0, fk_noise_mm / 1000, 3)
             self.fk_cube[s] = T
 
+        # ---- 카메라별 부정확 intrinsic (K_pnp) — intrinsic 캘리브 오차 모델 ----
+        #   참값 DEFAULT_K/DIST 로 투영하지만 PnP 는 카메라마다 고정 섭동된 K_pnp 를 씀
+        #   → 위치의존 systematic 편향(FK 후보정이 학습 가능). 그리퍼는 키 'g'.
+        self.K_pnp = {}
+        rk = np.random.default_rng(9000 + seed)
+        cam_keys = list(self.fixed_cam_ids) + ["g"]
+        for ck in cam_keys:
+            Kp = DEFAULT_K.copy()
+            if intrinsic_err > 0:
+                # 초점거리·주점을 상대오차(intrinsic_err)만큼 섭동
+                Kp[0, 0] *= 1 + rk.normal(0, intrinsic_err)
+                Kp[1, 1] *= 1 + rk.normal(0, intrinsic_err)
+                Kp[0, 2] += rk.normal(0, intrinsic_err * 100)   # 주점 px
+                Kp[1, 2] += rk.normal(0, intrinsic_err * 100)
+            self.K_pnp[ck] = Kp
+
         # ---- 코너 수준 관측 생성 ----
         self.obs_fix_cube, self.obs_fix_board = {}, {}
         self.obs_grip_cube, self.obs_grip_board = {}, {}
@@ -131,19 +150,20 @@ class SimScene:
         for ci in self.fixed_cam_ids:
             for s in self.sets:
                 self._obs(_CUBE, inv_T(self.bTf[ci]) @ self.bTo[s],
-                          self.obs_fix_cube, (ci, s), orng)
+                          self.obs_fix_cube, (ci, s), orng, ci)
                 self._obs(_BOARD, inv_T(self.bTf[ci]) @ self.bTboard,
-                          self.obs_fix_board, (ci, s), orng)
+                          self.obs_fix_board, (ci, s), orng, ci)
         for e in self.events:
             s = self.event_set[e]
             base_g = inv_T(self.bTg[e] @ self.gTc)
-            self._obs(_CUBE, base_g @ self.bTo[s], self.obs_grip_cube, e, orng)
-            self._obs(_BOARD, base_g @ self.bTboard, self.obs_grip_board, e, orng)
+            self._obs(_CUBE, base_g @ self.bTo[s], self.obs_grip_cube, e, orng, "g")
+            self._obs(_BOARD, base_g @ self.bTboard, self.obs_grip_board, e, orng, "g")
 
-    def _obs(self, target, T_gt, store, key, rng):
-        """3D 코너 투영→픽셀노이즈→PnP. 미검출(면 안 보임)이면 저장 안 함."""
+    def _obs(self, target, T_gt, store, key, rng, cam_key):
+        """3D 코너 투영→픽셀노이즈(+outlier)→PnP(부정확 K_pnp). 미검출이면 저장 안 함."""
         r = observe(target, T_gt, sigma_px=self.sigma_px,
-                    incidence_max_deg=self.incidence_max_deg, rng=rng)
+                    incidence_max_deg=self.incidence_max_deg, rng=rng,
+                    K_pnp=self.K_pnp[cam_key], outlier_rate=self.outlier_rate)
         if r is not None:
             T_est, ncorner, reproj = r
             store[key] = T_est
