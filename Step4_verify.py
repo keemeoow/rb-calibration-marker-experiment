@@ -46,6 +46,9 @@ if not os.environ.get("FORCE_GUI"):
     matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+from figure_style import apply_paper_style, save_figure
+
+apply_paper_style()
 
 from apriltag_cube import AprilTagCubeTarget, AprilTagCubeModel, rodrigues_to_Rt, inv_T
 from calibration_runtime_utils import (
@@ -929,7 +932,7 @@ def visualize_candidate_examples(meta, rows, save_dir):
         fig.suptitle(f"cam{ci} accepted/rejected cube candidates", fontsize=12)
         plt.tight_layout()
         out_path = os.path.join(save_dir, f"cam{ci}_candidate_examples.png")
-        fig.savefig(out_path, dpi=150)
+        save_figure(fig, out_path, close=False)
         plt.close(fig)
         saved.append(out_path)
     return saved
@@ -1511,7 +1514,7 @@ def main():
             view_azim=float(args.view_azim),
         )
         fig_3d_path = os.path.join(save_dir, "3d_overview.png")
-        fig_3d.savefig(fig_3d_path, dpi=150)
+        save_figure(fig_3d, fig_3d_path, close=False)
         print(f"[SAVE] {fig_3d_path}")
         fig_3d_cv = figure_to_bgr(fig_3d)
         fig_3d_cv_path = os.path.join(save_dir, "base_frame_overview_3d_cv.png")
@@ -1638,7 +1641,7 @@ def main():
         view_azim=float(args.view_azim),
     )
     fig_3d_path = os.path.join(save_dir, "3d_overview.png")
-    fig_3d.savefig(fig_3d_path, dpi=150)
+    save_figure(fig_3d, fig_3d_path, close=False)
     print(f"[SAVE] {fig_3d_path}")
     fig_3d_cv = figure_to_bgr(fig_3d)
     fig_3d_cv_path = os.path.join(save_dir, "base_frame_overview_3d_cv.png")
@@ -1651,7 +1654,7 @@ def main():
 
     # ─── Visualize ───
     fig_err = visualize_errors(cross_err, reproj_err, he_err)
-    fig_err.savefig(os.path.join(save_dir, "error_histograms.png"), dpi=150)
+    save_figure(fig_err, os.path.join(save_dir, "error_histograms.png"), close=False)
     print(f"[SAVE] {os.path.join(save_dir, 'error_histograms.png')}")
 
     print("\n" + "=" * 60)
@@ -1669,13 +1672,13 @@ def main():
         fig_scatter = visualize_cube_candidate_scatter(cand_rows)
         if fig_scatter is not None:
             scatter_path = os.path.join(save_dir, "cube_candidate_scatter.png")
-            fig_scatter.savefig(scatter_path, dpi=150)
+            save_figure(fig_scatter, scatter_path, close=False)
             print(f"[SAVE] {scatter_path}")
 
         fig_health = visualize_marker_health(cand_rows)
         if fig_health is not None:
             health_path = os.path.join(save_dir, "cube_marker_health.png")
-            fig_health.savefig(health_path, dpi=150)
+            save_figure(fig_health, health_path, close=False)
             print(f"[SAVE] {health_path}")
 
         example_paths = visualize_candidate_examples(meta, cand_rows, save_dir)
@@ -1698,7 +1701,7 @@ def main():
         fig_override = visualize_marker_override_summary(override_report)
         if fig_override is not None:
             override_path = os.path.join(save_dir, "cube_override_summary.png")
-            fig_override.savefig(override_path, dpi=150)
+            save_figure(fig_override, override_path, close=False)
             print(f"[SAVE] {override_path}")
 
         for mid in sorted(override_report):
@@ -1710,7 +1713,7 @@ def main():
             fig_gallery = render_marker_gallery(row)
             if fig_gallery is not None:
                 gallery_path = os.path.join(save_dir, f"marker_id{mid}_gallery.png")
-                fig_gallery.savefig(gallery_path, dpi=150)
+                save_figure(fig_gallery, gallery_path, close=False)
                 plt.close(fig_gallery)
                 print(f"[SAVE] {gallery_path}")
     else:

@@ -50,7 +50,9 @@ from calibration_runtime_utils import (
     rotation_error_deg,
     select_consistent_event_cube_candidates,
     select_primary_cube_candidate,
+    validate_cube_model_against_captures,
 )
+import CP_common as cp
 from config import CubeConfig, get_default_cube_config
 from cube_config_utils import (
     cube_config_to_dict,
@@ -374,6 +376,127 @@ def refine_fixed_cams_with_set_anchors(
         }
 
     return refined_cams, T_B_O_by_set, diag
+
+
+def refine_fixed_cams_with_reprojection(
+    root: str,
+    meta: dict,
+    cube: AprilTagCubeTarget,
+    K_map: Dict[int, np.ndarray],
+    D_map: Dict[int, np.ndarray],
+    T_base_Ci: Dict[int, np.ndarray],
+    T_B_O_by_event: Dict[int, np.ndarray],
+    fixed_cam_ids: List[int],
+    gripper_cam_idx: int,
+    max_delta_trans_mm: float = 20.0,
+    max_delta_rot_deg: float = 3.0,
+    corner_obs: Optional[list] = None,
+):
+    """STEP-D-3: 고정 카메라를 마커 코너의 픽셀 재투영오차로 최종 정제 (방법 04).
+
+    앞선 STEP-B/D 는 큐브 pose 를 SE(3) 로 평균해 카메라를 등록한다(= C3 의 02
+    pnp_robust_se3). 여기서는 그 결과를 초기값으로, **per-event 큐브 pose
+    T_B_O_by_event 를 base gauge 로 고정**한 채 카메라 자세만 움직여 재투영오차를
+    직접 최소화한다. objects 를 고정하므로 base 프레임(로봇 기준)은 절대 틀어지지
+    않고, 카메라끼리도 결합이 없어 **카메라별로 독립 최적화**할 수 있다.
+
+    코너 관측이 부족한 카메라는 03(pose-consistency) 급인 기존 robust-평균 값을
+    그대로 둔다(= 04→03 폴백). 각 카메라는 재투영 RMSE 가 실제로 낮아지고 이동량이
+    guard 안일 때만 채택한다(그렇지 않으면 초기값 유지 — 조용히 나빠지지 않게).
+
+    Returns (refined_T_base_Ci, diag).
+    """
+    if corner_obs is None:
+        corner_obs, reason = cp.detect_corner_observations(
+            root=root, meta=meta, cube=cube, K_map=K_map, D_map=D_map,
+            all_cam_ids=fixed_cam_ids, gripper_cam_idx=int(gripper_cam_idx),
+            max_err_fixed=3.0, max_err_gripper=5.0,
+            min_aspect_fixed=0.0, min_aspect_gripper=0.0,
+            exclude_gripped=True,
+        )
+    else:
+        reason = "precomputed"
+    by_cam: Dict[int, list] = defaultdict(list)
+    for o in corner_obs:
+        if int(o.cam) in fixed_cam_ids and int(o.event) in T_B_O_by_event:
+            by_cam[int(o.cam)].append(o)
+
+    def _reproj_rms(ci: int, T_base_ci: np.ndarray) -> Tuple[float, int]:
+        T_ci_base = inv_T(T_base_ci)
+        errs = []
+        for o in by_cam.get(ci, []):
+            T_C_O = T_ci_base @ T_B_O_by_event[int(o.event)]
+            rvec = cv2.Rodrigues(T_C_O[:3, :3])[0]
+            tvec = T_C_O[:3, 3].reshape(3, 1)
+            proj, _ = cv2.projectPoints(o.object_points.astype(np.float64), rvec, tvec,
+                                        K_map[ci], D_map[ci])
+            d = proj.reshape(-1, 2) - o.image_points.reshape(-1, 2)
+            errs.extend(np.linalg.norm(d, axis=1).tolist())
+        if not errs:
+            return float("nan"), 0
+        return float(np.sqrt(np.mean(np.square(errs)))), len(errs)
+
+    def _vec(T):
+        v = np.zeros(6)
+        v[:3] = cv2.Rodrigues(T[:3, :3])[0].reshape(3)
+        v[3:] = T[:3, 3]
+        return v
+
+    def _T(v):
+        T = np.eye(4)
+        T[:3, :3] = cv2.Rodrigues(np.asarray(v[:3]).reshape(3, 1))[0]
+        T[:3, 3] = v[3:]
+        return T
+
+    refined: Dict[int, np.ndarray] = {}
+    diag: Dict[str, Any] = {"per_cam": {}, "corner_reason": reason}
+    for ci in fixed_cam_ids:
+        ci = int(ci)
+        T_old = np.asarray(T_base_Ci.get(ci), dtype=np.float64) if ci in T_base_Ci else None
+        if T_old is None:
+            continue
+        obs_ci = by_cam.get(ci, [])
+        rms0, npts = _reproj_rms(ci, T_old)
+        if len(obs_ci) < 4 or npts == 0:
+            refined[ci] = T_old
+            diag["per_cam"][f"T_base_C{ci}"] = {
+                "adopted": False, "method": "03_kept_robust_se3",
+                "reason": "insufficient corner observations", "n_corner_obs": int(len(obs_ci))}
+            continue
+
+        def resid(v):
+            T_ci_base = inv_T(_T(v))
+            out = []
+            for o in obs_ci:
+                T_C_O = T_ci_base @ T_B_O_by_event[int(o.event)]
+                rvec = cv2.Rodrigues(T_C_O[:3, :3])[0]
+                tvec = T_C_O[:3, 3].reshape(3, 1)
+                proj, _ = cv2.projectPoints(o.object_points.astype(np.float64), rvec, tvec,
+                                            K_map[ci], D_map[ci])
+                out.extend((proj.reshape(-1, 2) - o.image_points.reshape(-1, 2)).reshape(-1).tolist())
+            return np.asarray(out, dtype=np.float64)
+
+        from scipy.optimize import least_squares as _ls
+        sol = _ls(resid, _vec(T_old), method="trf", loss="huber", f_scale=2.0,
+                  max_nfev=200, xtol=1e-10, ftol=1e-10)
+        T_new = _T(sol.x)
+        rms1, _ = _reproj_rms(ci, T_new)
+        dt = float(np.linalg.norm(T_new[:3, 3] - T_old[:3, 3]) * 1000.0)
+        dr = rotation_error_deg(T_new[:3, :3], T_old[:3, :3])
+        improved = np.isfinite(rms1) and rms1 < rms0
+        within = dt <= float(max_delta_trans_mm) and dr <= float(max_delta_rot_deg)
+        adopt = bool(improved and within)
+        refined[ci] = T_new if adopt else T_old
+        diag["per_cam"][f"T_base_C{ci}"] = {
+            "adopted": adopt, "method": "04_direct_reprojection" if adopt else "03_kept_robust_se3",
+            "n_corner_obs": int(len(obs_ci)),
+            "reproj_rms_px_before": rms0, "reproj_rms_px_after": rms1,
+            "delta_trans_mm": dt, "delta_rot_deg": dr,
+            "reason": ("adopted" if adopt else
+                       ("no reprojection improvement" if not improved else
+                        f"delta exceeds guard ({dt:.1f}mm/{dr:.2f}deg)")),
+        }
+    return refined, diag
 
 
 def candidate_weight(cand: dict, single_face_scale: float = 0.35) -> float:
@@ -1404,6 +1527,11 @@ def main():
     parser.add_argument("--gripper_cam_idx", type=int, default=None)
     parser.add_argument("--ref_fixed_cam_idx", type=int, default=None)
     parser.add_argument("--handeye_method", type=str, default="AUTO")
+    parser.add_argument("--fixed_cam_solve", type=str, default="reproj",
+                        choices=["reproj", "off"],
+                        help="reproj(기본): 고정 카메라를 STEP-D-3 에서 재투영오차로 최종 "
+                             "정제(방법 04, 코너 부족 카메라는 03 급 robust 값 유지). "
+                             "off: 정제 생략(예전 동작, robust SE(3) 평균에서 멈춤).")
     parser.add_argument("--capture_block", type=str, default="ALL",
                         choices=["ALL", "A_placement", "B_eyetohand"],
                         help="특정 capture_block 만 사용해 캘리브 "
@@ -1534,6 +1662,29 @@ def main():
 
     pnp_obs: Dict[int, Dict[int, dict]] = {ci: {} for ci in all_cam_ids}
     cube = AprilTagCubeTarget(cfg)
+
+    # ── Cube-model self-check (regression guard) ──────────────────────────────
+    # Every face seen in one frame must yield the same cube pose. A large median
+    # disagreement means config.py's cube geometry (face_roll_deg / id_to_face)
+    # disagrees with the physical cube — the failure mode that once silently
+    # produced a 49mm/22.75px calibration. Fail loudly rather than proceed.
+    _cube_chk = validate_cube_model_against_captures(meta, K_map, D_map, cube)
+    if _cube_chk["status"] == "skip":
+        print("[cube-model] self-check skipped (no multi-face frames)")
+    else:
+        print(f"[cube-model] inter-face agreement: median={_cube_chk['median_deg']:.2f}deg "
+              f"({_cube_chk['n_pairs']} pairs, {_cube_chk['n_frames']} frames) -> {_cube_chk['status']}")
+    if _cube_chk["status"] == "fail":
+        raise RuntimeError(
+            f"Cube model does not match the photographed cube: faces disagree by "
+            f"median {_cube_chk['median_deg']:.1f}deg (expected <15deg).\n"
+            f"  Fix config.py CubeConfig — almost always face_roll_deg (per-face marker\n"
+            f"  rotation, in 90deg steps) or id_to_face. Calibrating with a wrong cube\n"
+            f"  model silently corrupts every cube-based transform, so this is fatal."
+        )
+    if _cube_chk["status"] == "warn":
+        print("[cube-model][WARN] faces disagree more than expected; verify config.py "
+              "face_roll_deg / id_to_face before trusting cube-based transforms.")
 
     for cap in meta.get("captures", []):
         eid = int(cap.get("event_id", -1))
@@ -2467,6 +2618,41 @@ def main():
             print(f"  T_base_C{ci}: {len(Ts2)}fr (cube) "
                   f"rot={st['rotation_std_deg']:.3f}deg trans={st['translation_std_mm']:.2f}mm")
 
+    # ══════════════════════════════════════════════════════════
+    # STEP-D-3: 재투영오차 기반 고정 카메라 최종 정제 (방법 04, 03 폴백)
+    # ══════════════════════════════════════════════════════════
+    # objects(T_B_O_by_event)를 base gauge 로 고정하고 카메라만 픽셀 재투영으로 다듬는다.
+    reproj_refine_diag = {"enabled": False}
+    if str(getattr(args, "fixed_cam_solve", "reproj")) != "off" and T_B_O_by_event:
+        print()
+        print("=" * 60)
+        print("[STEP-D-3] Reprojection refinement of T_base_C* (method 04, objects fixed)")
+        print("=" * 60)
+        try:
+            reproj_cams, reproj_refine_diag = refine_fixed_cams_with_reprojection(
+                root, meta, cube, K_map, D_map, T_base_Ci, T_B_O_by_event,
+                fixed_cam_ids, gripper_cam_idx)
+            reproj_refine_diag["enabled"] = True
+            for cam_key, info in reproj_refine_diag["per_cam"].items():
+                if info.get("adopted"):
+                    print(f"  refined {cam_key} [04]: reproj {info['reproj_rms_px_before']:.2f}"
+                          f"->{info['reproj_rms_px_after']:.2f}px "
+                          f"(Δ {info['delta_trans_mm']:.2f}mm/{info['delta_rot_deg']:.3f}°, "
+                          f"{info['n_corner_obs']} corner-obs)")
+                else:
+                    print(f"  KEPT    {cam_key} [03]: {info.get('reason', '')}"
+                          + (f" (reproj {info['reproj_rms_px_before']:.2f}"
+                             f"->{info['reproj_rms_px_after']:.2f}px)"
+                             if 'reproj_rms_px_after' in info else ""))
+            T_base_Ci = reproj_cams
+            for ci in fixed_cam_ids:
+                if int(ci) in T_base_Ci:
+                    np.save(os.path.join(out_dir, f"T_base_C{int(ci)}.npy"),
+                            np.asarray(T_base_Ci[int(ci)], dtype=np.float64))
+        except Exception as e:
+            print(f"  [WARN] reprojection refinement skipped: {e}")
+            reproj_refine_diag = {"enabled": False, "error": str(e)}
+
     # Step E joint optimization remains deferred until the cube anchor path
     # above is stable enough to avoid reinforcing ambiguous single-face poses.
 
@@ -2505,6 +2691,7 @@ def main():
                 for k, v in method_results.items()
             },
             "base_transforms": base_stats,
+            "reprojection_refinement": reproj_refine_diag,
             "cube_anchor": cube_anchor_diag,
             "cube_anchor_by_set": cube_anchor_by_set_diag,
             "gripper_event_base_transforms": gripper_base_diag,

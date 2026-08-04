@@ -1,187 +1,305 @@
 {
   "experiment": "C2_cube_vs_board",
-  "calib_dir": "/private/tmp/claude-501/-Users-woo-Documents-GitHub-Robot-Lab-rb-calibration-marker-experiment/be131aba-41ec-498b-80bf-13799ab5a1fe/scratchpad/c2_out",
+  "calib_dir": "data/session/calib_out",
   "cube_config_source": "config_py:CubeConfig",
   "modes": [
+    "board_only",
     "cube_only",
     "hybrid"
   ],
   "rows": [
     {
+      "mode": "board_only",
+      "num_base_cameras": "2",
+      "base_cameras": "cam0, cam1",
+      "cross_camera_mean_mm": "26.94",
+      "cube_reproj_mean_px": "0.619",
+      "board_reproj_mean_px": "0.671",
+      "mesh_rmse_mm": "3.73",
+      "dimension_err_mm": "1.87",
+      "pose_repeat_mm": "26.94",
+      "pose_repeat_deg": "15.603",
+      "handeye_pass": "PASS"
+    },
+    {
       "mode": "cube_only",
       "num_base_cameras": "3",
       "base_cameras": "cam0, cam1, cam3",
-      "cross_camera_mean_mm": "22.57",
-      "cube_reproj_mean_px": "19.972",
-      "board_reproj_mean_px": "0.209",
-      "mesh_rmse_mm": "3.27",
-      "dimension_err_mm": "1.50",
-      "pose_repeat_mm": "22.57",
-      "pose_repeat_deg": "25.553",
-      "handeye_pass": "FAIL"
+      "cross_camera_mean_mm": "4.69",
+      "cube_reproj_mean_px": "0.619",
+      "board_reproj_mean_px": "0.671",
+      "mesh_rmse_mm": "3.49",
+      "dimension_err_mm": "1.67",
+      "pose_repeat_mm": "4.69",
+      "pose_repeat_deg": "1.904",
+      "handeye_pass": "PASS"
     },
     {
       "mode": "hybrid",
       "num_base_cameras": "3",
       "base_cameras": "cam0, cam1, cam3",
-      "cross_camera_mean_mm": "34.31",
-      "cube_reproj_mean_px": "19.972",
-      "board_reproj_mean_px": "0.209",
-      "mesh_rmse_mm": "3.25",
-      "dimension_err_mm": "1.82",
-      "pose_repeat_mm": "34.31",
-      "pose_repeat_deg": "36.958",
-      "handeye_pass": "FAIL"
+      "cross_camera_mean_mm": "4.86",
+      "cube_reproj_mean_px": "0.619",
+      "board_reproj_mean_px": "0.671",
+      "mesh_rmse_mm": "3.37",
+      "dimension_err_mm": "1.75",
+      "pose_repeat_mm": "4.86",
+      "pose_repeat_deg": "1.830",
+      "handeye_pass": "PASS"
     }
   ],
+  "observability": {
+    "n_events": 232,
+    "n_fixed_cams": 3,
+    "geom_mode": "hybrid",
+    "min_board_corners": 6,
+    "targets": {
+      "board": {
+        "n_target_events": 105,
+        "mean_simul_observers": 1.0285714285714285,
+        "pct_events_2plus_observers": 2.857142857142857,
+        "mean_angular_coverage_deg": 118.87655170463209,
+        "per_cam_seen_events": {
+          "0": 104,
+          "1": 4
+        }
+      },
+      "cube": {
+        "n_target_events": 232,
+        "mean_simul_observers": 2.7025862068965516,
+        "pct_events_2plus_observers": 89.65517241379311,
+        "mean_angular_coverage_deg": 104.02968906091712,
+        "per_cam_seen_events": {
+          "0": 232,
+          "1": 206,
+          "3": 189
+        }
+      }
+    }
+  },
   "verification": {
-    "cube_only": {
+    "board_only": {
       "cross_camera": {
-        "events_with_2plus_cams": 14,
-        "num_errors": 28,
-        "mean_mm": 22.56661345148885,
-        "median_mm": 26.636013914423437,
-        "max_mm": 48.640863694647905,
-        "std_mm": 13.372538346405307,
+        "events_with_2plus_cams": 20,
+        "num_errors": 40,
+        "mean_mm": 26.936105967621792,
+        "median_mm": 13.654661027490263,
+        "max_mm": 79.6789509290848,
+        "std_mm": 24.93234624713974,
         "pass": false
       },
       "reprojection": {
-        "total_observations": 47,
-        "mean_px": 19.971705341288317,
-        "median_px": 21.010073602398986,
-        "max_px": 45.78290808314601,
-        "lt_1px_count": 9,
-        "pass": false
+        "total_observations": 765,
+        "mean_px": 0.619151485336142,
+        "median_px": 0.5871419959419637,
+        "max_px": 2.15922731488127,
+        "lt_1px_count": 707,
+        "pass": true
       },
       "handeye": {
-        "frames": 6,
-        "board_position_std_mm": 0.8805189453557803,
-        "board_position_max_mm": 5.321821552995645,
-        "board_rotation_mean_deg": 1.0054045541768162,
-        "board_rotation_max_deg": 1.825028588813358,
-        "pass": false
+        "frames": 146,
+        "board_position_std_mm": 1.2868869211680192,
+        "board_position_max_mm": 7.704706323954023,
+        "board_rotation_mean_deg": 0.7907029135661637,
+        "board_rotation_max_deg": 1.3926523798125936,
+        "pass": true
       },
       "board_reprojection": {
-        "total_frames": 6,
-        "mean_px": 0.20913676420847574,
-        "median_px": 0.1970490887761116,
-        "max_px": 0.26933515071868896,
-        "pass": true,
+        "total_frames": 400,
+        "mean_px": 0.6707569541130215,
+        "median_px": 0.4068986028432846,
+        "max_px": 13.324397087097168,
+        "pass": false,
         "per_camera": {
           "cam0": {
-            "frames": 0,
-            "mean_px": null
+            "frames": 176,
+            "mean_px": 0.9977034719195217
           },
           "cam1": {
-            "frames": 0,
-            "mean_px": null
+            "frames": 77,
+            "mean_px": 0.5046666887673464
           },
           "cam2": {
-            "frames": 6,
-            "mean_px": 0.20913676420847574
+            "frames": 146,
+            "mean_px": 0.27755642784376666
           },
           "cam3": {
-            "frames": 0,
-            "mean_px": null
+            "frames": 1,
+            "mean_px": 13.324397087097168
           }
         }
       },
       "pose_repeatability": {
-        "num_events": 14,
-        "mean_dt_mm": 22.56661345148885,
-        "mean_dr_deg": 25.552922499481195,
-        "max_dt_mm": 80.31486958434834,
-        "max_dr_deg": 79.79775807391806,
+        "num_events": 20,
+        "mean_dt_mm": 26.936105967621803,
+        "mean_dr_deg": 15.60314292429788,
+        "max_dt_mm": 107.96400692648893,
+        "max_dr_deg": 116.83444440315952,
         "pass": false
       },
       "mesh_alignment": {
-        "usable_clouds": 27,
-        "usable_events": 14,
-        "mean_rmse_mm": 3.2688097536741783,
-        "median_rmse_mm": 3.2984127787773305,
-        "max_rmse_mm": 4.818176002751154,
+        "usable_clouds": 430,
+        "usable_events": 232,
+        "mean_rmse_mm": 3.7334329197617286,
+        "median_rmse_mm": 3.9433164486160766,
+        "max_rmse_mm": 5.400537754345151,
         "pass": true
       },
       "dimension_accuracy": {
-        "usable_events": 12,
-        "mean_abs_err_mm": 1.5021660307290505,
-        "median_abs_err_mm": 1.5668900728587758,
-        "max_abs_err_mm": 2.958496261766026,
+        "usable_events": 228,
+        "mean_abs_err_mm": 1.8669612746342996,
+        "median_abs_err_mm": 1.8145802550748202,
+        "max_abs_err_mm": 4.207906582612941,
+        "pass": true
+      }
+    },
+    "cube_only": {
+      "cross_camera": {
+        "events_with_2plus_cams": 208,
+        "num_errors": 564,
+        "mean_mm": 4.687886373970794,
+        "median_mm": 2.561059317704174,
+        "max_mm": 87.28694803583724,
+        "std_mm": 11.069936264994324,
+        "pass": true
+      },
+      "reprojection": {
+        "total_observations": 765,
+        "mean_px": 0.619151485336142,
+        "median_px": 0.5871419959419637,
+        "max_px": 2.15922731488127,
+        "lt_1px_count": 707,
+        "pass": true
+      },
+      "handeye": {
+        "frames": 146,
+        "board_position_std_mm": 1.2868869211680192,
+        "board_position_max_mm": 7.704706323954023,
+        "board_rotation_mean_deg": 0.7907029135661637,
+        "board_rotation_max_deg": 1.3926523798125936,
+        "pass": true
+      },
+      "board_reprojection": {
+        "total_frames": 400,
+        "mean_px": 0.6707569541130215,
+        "median_px": 0.4068986028432846,
+        "max_px": 13.324397087097168,
+        "pass": false,
+        "per_camera": {
+          "cam0": {
+            "frames": 176,
+            "mean_px": 0.9977034719195217
+          },
+          "cam1": {
+            "frames": 77,
+            "mean_px": 0.5046666887673464
+          },
+          "cam2": {
+            "frames": 146,
+            "mean_px": 0.27755642784376666
+          },
+          "cam3": {
+            "frames": 1,
+            "mean_px": 13.324397087097168
+          }
+        }
+      },
+      "pose_repeatability": {
+        "num_events": 208,
+        "mean_dt_mm": 4.688377046356739,
+        "mean_dr_deg": 1.9037383989456695,
+        "max_dt_mm": 115.67918195733779,
+        "max_dr_deg": 119.50014533629576,
+        "pass": false
+      },
+      "mesh_alignment": {
+        "usable_clouds": 577,
+        "usable_events": 232,
+        "mean_rmse_mm": 3.4875721730809204,
+        "median_rmse_mm": 3.60490214852054,
+        "max_rmse_mm": 5.400537754345151,
+        "pass": true
+      },
+      "dimension_accuracy": {
+        "usable_events": 229,
+        "mean_abs_err_mm": 1.670846654461076,
+        "median_abs_err_mm": 1.61931391162991,
+        "max_abs_err_mm": 3.920912922610348,
         "pass": true
       }
     },
     "hybrid": {
       "cross_camera": {
-        "events_with_2plus_cams": 14,
-        "num_errors": 28,
-        "mean_mm": 34.31406995242214,
-        "median_mm": 29.547936290113093,
-        "max_mm": 116.14334635484565,
-        "std_mm": 23.489764452151032,
-        "pass": false
+        "events_with_2plus_cams": 208,
+        "num_errors": 432,
+        "mean_mm": 4.855967743498906,
+        "median_mm": 2.6828893129074842,
+        "max_mm": 85.85592486142149,
+        "std_mm": 11.6016349339744,
+        "pass": true
       },
       "reprojection": {
-        "total_observations": 47,
-        "mean_px": 19.971705341288317,
-        "median_px": 21.010073602398986,
-        "max_px": 45.78290808314601,
-        "lt_1px_count": 9,
-        "pass": false
+        "total_observations": 765,
+        "mean_px": 0.619151485336142,
+        "median_px": 0.5871419959419637,
+        "max_px": 2.15922731488127,
+        "lt_1px_count": 707,
+        "pass": true
       },
       "handeye": {
-        "frames": 6,
-        "board_position_std_mm": 0.8805189453557803,
-        "board_position_max_mm": 5.321821552995645,
-        "board_rotation_mean_deg": 1.0054045541768162,
-        "board_rotation_max_deg": 1.825028588813358,
-        "pass": false
+        "frames": 146,
+        "board_position_std_mm": 1.2868869211680192,
+        "board_position_max_mm": 7.704706323954023,
+        "board_rotation_mean_deg": 0.7907029135661637,
+        "board_rotation_max_deg": 1.3926523798125936,
+        "pass": true
       },
       "board_reprojection": {
-        "total_frames": 6,
-        "mean_px": 0.20913676420847574,
-        "median_px": 0.1970490887761116,
-        "max_px": 0.26933515071868896,
-        "pass": true,
+        "total_frames": 400,
+        "mean_px": 0.6707569541130215,
+        "median_px": 0.4068986028432846,
+        "max_px": 13.324397087097168,
+        "pass": false,
         "per_camera": {
           "cam0": {
-            "frames": 0,
-            "mean_px": null
+            "frames": 176,
+            "mean_px": 0.9977034719195217
           },
           "cam1": {
-            "frames": 0,
-            "mean_px": null
+            "frames": 77,
+            "mean_px": 0.5046666887673464
           },
           "cam2": {
-            "frames": 6,
-            "mean_px": 0.20913676420847574
+            "frames": 146,
+            "mean_px": 0.27755642784376666
           },
           "cam3": {
-            "frames": 0,
-            "mean_px": null
+            "frames": 1,
+            "mean_px": 13.324397087097168
           }
         }
       },
       "pose_repeatability": {
-        "num_events": 14,
-        "mean_dt_mm": 34.31406995242214,
-        "mean_dr_deg": 36.95751526426796,
-        "max_dt_mm": 117.12480732006543,
-        "max_dr_deg": 83.37338497350692,
+        "num_events": 208,
+        "mean_dt_mm": 4.864346374039182,
+        "mean_dr_deg": 1.8300359481057198,
+        "max_dt_mm": 119.1510716966698,
+        "max_dr_deg": 113.63027325446328,
         "pass": false
       },
       "mesh_alignment": {
-        "usable_clouds": 28,
-        "usable_events": 14,
-        "mean_rmse_mm": 3.2465653674857893,
-        "median_rmse_mm": 3.4096459592682646,
-        "max_rmse_mm": 4.900086449310156,
+        "usable_clouds": 445,
+        "usable_events": 232,
+        "mean_rmse_mm": 3.37000947120026,
+        "median_rmse_mm": 3.3607970936663927,
+        "max_rmse_mm": 5.400537754345151,
         "pass": true
       },
       "dimension_accuracy": {
-        "usable_events": 14,
-        "mean_abs_err_mm": 1.8205551448534885,
-        "median_abs_err_mm": 1.5300906158159482,
-        "max_abs_err_mm": 4.213651743826957,
+        "usable_events": 226,
+        "mean_abs_err_mm": 1.748051758336246,
+        "median_abs_err_mm": 1.6829908325137408,
+        "max_abs_err_mm": 3.75803161579881,
         "pass": true
       }
     }

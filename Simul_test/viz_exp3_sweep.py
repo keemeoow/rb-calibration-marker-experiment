@@ -11,9 +11,16 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+from figure_style import CATEGORY_COLORS, apply_paper_style, clean_axis, save_figure
+
+apply_paper_style()
+
 FIG_DIR = os.path.join(os.path.dirname(__file__), "figures")
-COLORS = {"Camera-based": "#4c72b0", "FK-based": "#c44e52",
-          "Camera+FK-corr": "#55a868"}
+COLORS = {"Camera-based": CATEGORY_COLORS[1], "FK-based": CATEGORY_COLORS[2],
+          "Camera+FK-corr": CATEGORY_COLORS[3]}
 MARK = {"Camera-based": "o", "FK-based": "s", "Camera+FK-corr": "^"}
 
 
@@ -33,7 +40,7 @@ def make_figure(blob, out="fig_exp3_noise_sweep.png", show=False):
         ax.set_xlabel(xlabel)
         ax.set_ylabel("error (mm)")
         ax.set_title(f"{title}\n(↓ better)", fontsize=11, fontweight="bold")
-        ax.grid(alpha=0.3)
+        clean_axis(ax)
         ax.legend(fontsize=9)
 
     fig.suptitle(
@@ -44,7 +51,7 @@ def make_figure(blob, out="fig_exp3_noise_sweep.png", show=False):
     fig.tight_layout(rect=[0, 0, 1, 0.92])
     os.makedirs(FIG_DIR, exist_ok=True)
     path = os.path.join(FIG_DIR, out)
-    fig.savefig(path, dpi=130, bbox_inches="tight")
+    save_figure(fig, path, close=False)
     print(f"[저장] {path}")
     if show:
         plt.show()
