@@ -30,6 +30,7 @@ METHODS = [
     ExpConfig("oursB", fk="corr",  solve="unified", markers=CB, anchor_weight=0.5, label="ours-B (anchor=0.5)"),
 ]
 KEYS = ["e_task_mm", "gTc_mm", "e_X_mm", "e_cross_mm", "e_reproj_px"]
+N_GRIPPED = 0        # gripped 캡처 수 (main 에서 설정; fork 로 워커에 상속)
 
 # 조건 축 레벨
 FK_LEVELS = [0.0, 1.0, 2.0, 4.0, 8.0, 16.0]              # mm (회전 = mm/10 deg)
@@ -54,7 +55,8 @@ def _job(a):
     cfg = METHODS[mi]
     out = {k: [] for k in KEYS}
     try:
-        sc = SimScene(seed=seed, n_sets=n_sets, n_events_per_set=n_events, **cond)
+        sc = SimScene(seed=seed, n_sets=n_sets, n_events_per_set=n_events,
+                      n_gripped_events=N_GRIPPED, **cond)
         n = 0
         for test in itertools.combinations(sc.sets, 2):
             train = [s for s in sc.sets if s not in test][:train_size]
@@ -79,8 +81,12 @@ def main():
     ap.add_argument("--events", type=int, default=6)
     ap.add_argument("--train", type=int, default=8)
     ap.add_argument("--pairs", type=int, default=6)
+    ap.add_argument("--gripped", type=int, default=0,
+                    help="gripped 캡처 수(큐브 들고 회전, 고정 카메라 관측). 실제 130.")
     ap.add_argument("--outdir", type=str, default="results/tables")
     args = ap.parse_args()
+    global N_GRIPPED
+    N_GRIPPED = int(args.gripped)      # fork 로 워커에 상속됨
 
     # 모든 job 을 하나의 풀에 넣는다. tag 로 어느 그림/셀인지 구분.
     jobs = []
