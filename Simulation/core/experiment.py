@@ -28,6 +28,7 @@ class ExpConfig:
     markers: Tuple[str, ...]     # ("cube","board") 등
     label: str = ""
     fk_degree: int = 1           # corr 후보정 특징 차수: 1=[1,x,y](CP_C1), 2=2차(강화)
+    anchor_weight: float = 5.0   # corr 1차 soft anchor 세기 (0=ours-A, >0=ours-B)
 
     def validate(self):
         if set(self.markers) == {"board"} and self.fk in ("fixed", "corr"):
@@ -46,7 +47,7 @@ def calibrate(sc, cfg: ExpConfig, train_sets):
     """
     cfg.validate()
     fk_solve = "none" if cfg.fk == "corr" else cfg.fk    # corr 캘리브는 큐브 자유(+anchor)
-    aw = 5.0 if cfg.fk == "corr" else 0.0                # FK 쓰는 corr 에만 soft anchor
+    aw = cfg.anchor_weight if cfg.fk == "corr" else 0.0  # corr 만 soft anchor (0=ours-A)
     if cfg.solve == "unified":
         model = solve_unified(sc, cfg.markers, fk_solve, train_sets, anchor_weight=aw)
     else:
