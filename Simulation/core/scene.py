@@ -40,7 +40,7 @@ class SimScene:
                  intrinsic_err=0.0, outlier_rate=0.0,
                  cam_radius_m=0.35, cam_height_m=0.35,
                  incidence_max_deg=75.0, use_real_cameras=True,
-                 cam_downtilt_deg=27.0):
+                 cam_downtilt_deg=27.0, n_gripped_events=0):
         rng = np.random.default_rng(seed)
         self.rng = rng
         self.sigma_px = sigma_px
@@ -158,6 +158,32 @@ class SimScene:
             base_g = inv_T(self.bTg[e] @ self.gTc)
             self._obs(_CUBE, base_g @ self.bTo[s], self.obs_grip_cube, e, orng, "g")
             self._obs(_BOARD, base_g @ self.bTboard, self.obs_grip_board, e, orng, "g")
+
+        # ---- gripped 캡처: 로봇이 큐브를 들고 넓게 회전, 고정 카메라가 관측 ----
+        #   고전적 eye-to-hand: 큐브가 그리퍼에 강체(gripper_cube_X)로 붙어 이동.
+        #   큐브 pose(base) = bTg_grip @ X. 고정 카메라만 관측(그리퍼 카메라는 타깃과 함께
+        #   움직여 퇴화 → 미사용). 이 관측이 고정 카메라를 로봇 모션으로 base 에 앵커한다
+        #   (FK 큐브 prior 에 덜 의존). 실제 세션의 cube_gripped 캡처에 대응.
+        self.gripper_cube_X = rand_se3(rng, t_range_m=0.04, ang_range_deg=25.0)  # 진값(미지, 추정대상)
+        self.gripped_events = []
+        self.bTg_grip = {}
+        self.cube_grip = {}                              # ge -> 큐브 pose(base) 진값
+        self.obs_fix_cube_grip = {}                      # (ci, ge) -> 고정카메라 관측
+        geid = 10000
+        for _ in range(int(n_gripped_events)):
+            Tc = np.eye(4)                               # 큐브를 들어 넓게 회전(여러 면 노출)
+            ax = rng.normal(size=3); ax /= (np.linalg.norm(ax) + 1e-12)
+            Tc[:3, :3] = rot_axis_angle(ax, rng.uniform(0, np.pi))
+            Tc[:3, 3] = center + np.array([rng.uniform(-0.10, 0.10),
+                                           rng.uniform(-0.10, 0.10),
+                                           rng.uniform(0.03, 0.13)])
+            self.cube_grip[geid] = Tc
+            self.bTg_grip[geid] = Tc @ inv_T(self.gripper_cube_X)   # bTg = cube @ inv(X)
+            self.gripped_events.append(geid)
+            for ci in self.fixed_cam_ids:
+                self._obs(_CUBE, inv_T(self.bTf[ci]) @ Tc,
+                          self.obs_fix_cube_grip, (ci, geid), orng, ci)
+            geid += 1
 
     def _obs(self, target, T_gt, store, key, rng, cam_key):
         """3D 코너 투영→픽셀노이즈(+outlier)→PnP(부정확 K_pnp). 미검출이면 저장 안 함."""

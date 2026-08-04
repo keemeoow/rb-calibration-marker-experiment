@@ -82,6 +82,12 @@ def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=200, anchor_weight=
     use_cube = "cube" in markers
     use_board = "board" in markers
     cube_free = use_cube and (fk_mode != "fixed")
+    # gripped 관측: 고정 카메라가 그리퍼-큐브를 관측 (eye-to-hand via 로봇 모션).
+    #   cube(base) = bTg_grip @ X. X(그리퍼→큐브)는 신규 미지수. train/test 무관 항상 포함
+    #   (held-out 은 테이블 큐브 set 이라 gripped 는 순수 캘리브 보강).
+    grip_recs = [(ci, ge, T) for (ci, ge), T in getattr(sc, "obs_fix_cube_grip", {}).items()
+                 if ci in cam_ids] if use_cube else []
+    use_grip = len(grip_recs) > 0
 
     # 파라미터 레이아웃
     p0 = [se3_to_vec(cams0.get(ci, np.eye(4))) for ci in cam_ids]
@@ -104,6 +110,10 @@ def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=200, anchor_weight=
                for s in train_sets for e in sc.set_events[s] if e in sc.obs_grip_board]
         board0 = se3_avg(Ts) if Ts else sc.bTboard
         idx[("board",)] = off; off += 6; p0.append(se3_to_vec(board0))
+    if use_grip:                                         # 그리퍼→큐브 장착 X (신규 미지수)
+        Xs = [inv_T(sc.bTg_grip[ge]) @ cams0[ci] @ T for (ci, ge, T) in grip_recs if ci in cams0]
+        X0 = se3_avg(Xs) if Xs else np.eye(4)
+        idx[("X",)] = off; off += 6; p0.append(se3_to_vec(X0))
     p0 = np.concatenate(p0)
     recs = _gather_obs(sc, markers, train_sets)
 
@@ -135,11 +145,20 @@ def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=200, anchor_weight=
             for s in train_sets:
                 if ("cube", s) in idx:
                     r.append(aw * se3_residual(target_pose(p, "cube", s), sc.fk_cube[s]))
+        # gripped: 고정카메라 @ 관측 == bTg_grip @ X (로봇 모션 기반 eye-to-hand)
+        if use_grip:
+            Xm = vec_to_se3(p[idx[("X",)]:idx[("X",)]+6])
+            for (ci, ge, T_obs) in grip_recs:
+                if ci in cams:
+                    r.append(se3_residual(cams[ci] @ T_obs, sc.bTg_grip[ge] @ Xm))
         return np.concatenate(r) if r else np.zeros(1)
 
     sol = least_squares(resid, p0, method="lm", max_nfev=max_nfev)
     cams, gTc = unpack(sol.x)
-    return {"cams": cams, "gTc": gTc, "mode": f"unified/{fk_mode}"}
+    model = {"cams": cams, "gTc": gTc, "mode": f"unified/{fk_mode}"}
+    if use_grip:
+        model["X"] = vec_to_se3(sol.x[idx[("X",)]:idx[("X",)]+6])
+    return model
 
 
 # ---------------------------------------------------------------- 독립(independent)
