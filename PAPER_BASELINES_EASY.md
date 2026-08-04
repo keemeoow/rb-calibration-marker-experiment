@@ -1,6 +1,6 @@
-# 비교 방법 6개, 아주 쉬운 설명 (개조식)
+# Baseline 비교 실험
 
-## 0. 푸는 문제
+## 개념
 
 - 로봇과 카메라는 **서로 다른 "자기 기준"** 으로 위치를 잼
   - 로봇: "내 발바닥(base)에서 오른쪽 30cm, 앞 20cm"
@@ -17,6 +17,8 @@
 
 ## 1. Tsai–Lenz (1989) — 원조, "회전 먼저·이동 나중"
 
+> 📄 Tsai & Lenz, *"A New Technique for Fully Autonomous and Efficient 3D Robotics Hand/Eye Calibration"*, IEEE Trans. Robotics and Automation, 1989 — [PDF](https://kmlee.gatech.edu/me6406/handeye.pdf) · 💻 OpenCV `calibrateHandEye(TSAI)`
+
 - 문제 형태: **AX=XB** (A=손의 움직임(FK), B=카메라가 느낀 움직임, X=손→카메라 변환)
   - 셀카봉 비유: 손 궤적(내가 앎) + 폰이 본 장면 변화(폰이 앎) → 봉의 생김새(X) 역산
 - 풀이: 2단계 분리 — ① 회전 먼저 → ② 그 답으로 이동 계산
@@ -26,6 +28,8 @@
 
 ## 2. Daniilidis (1999) — "회전+이동 한 번에"
 
+> 📄 Daniilidis, *"Hand-Eye Calibration Using Dual Quaternions"*, IJRR, 1999 — [PDF](https://www.cis.upenn.edu/~kostas/mypub.dir/ijrr99.pdf) · 💻 OpenCV `calibrateHandEye(DANIILIDIS)`
+
 - 풀이: **듀얼 쿼터니언** — 회전·이동을 한 묶음으로 포장해 **연립 한 방**
 - 효과: 오차 전염 없음 → 노이즈에 강함
 - 위상: "공식 한 방(closed-form)" 계열의 **베스트**
@@ -33,12 +37,16 @@
 
 ## 3. Shah (2013) — "미지수 2개를 공식 한 방에"
 
+> 📄 Shah, *"Solving the Robot-World/Hand-Eye Calibration Problem Using the Kronecker Product"*, ASME J. Mechanisms and Robotics, 2013 — [PDF (ResearchGate)](https://www.researchgate.net/publication/275087810_Solving_the_Robot-WorldHand-Eye_Calibration_Problem_Using_the_Kronecker_Product) · 💻 OpenCV `calibrateRobotWorldHandEye(SHAH)`
+
 - 문제 형태: **AX=ZB** (X=카메라 변환 + Z=보드 위치, **미지수 2개**)
 - 풀이: Kronecker 곱 트릭 → 대입하면 답 나오는 **닫힌 해**, X·Z 동시 산출
 - 핵심 특징: **FK를 100% 신뢰** — FK 오차가 답에 그대로 박힘
 - 표에서의 역할: "FK 통째로 믿기" 진영의 표준 공식
 
 ## 4. Tabb & Ahmad Yousef (2017) — "공식 대신 사진에 대고 반복 수정"
+
+> 📄 Tabb & Ahmad Yousef, *"Solving the Robot-World Hand-Eye(s) Calibration Problem with Iterative Methods"*, Machine Vision and Applications, 2017 — [PDF (arXiv)](https://arxiv.org/pdf/1907.12425) · 💻 [코드](https://github.com/amy-tabb/RWHEC-Tabb-AhmadYousef)
 
 - 통찰: **오차의 근원 = 사진의 픽셀** (코너 검출이 1~2px씩 틀림) — 공식 한 방은 재는 자가 다름
 - 풀이 절차
@@ -52,6 +60,8 @@
 
 ## 5. Allegro 외 (RA-L 2024) — "멀티카메라를 서로 검증시키며 한꺼번에"
 
+> 📄 Allegro, Terreran & Ghidoni, *"Multi-Camera Hand-Eye Calibration for Human-Robot Collaboration in Industrial Robotic Workcells"*, IEEE RA-L, 2024 (ICRA 2025) — [PDF (arXiv)](https://arxiv.org/pdf/2406.11392) · 💻 [코드](https://github.com/davidea97/Multi-Camera-Hand-Eye-Calibration) (리포에 사본 있음)
+
 - 배경: 1~4는 전부 1카메라용 → 따로 풀면 각자 오차를 안고 끝 (상호 검증 없음)
 - 셋업: 보드를 **로봇 손에 부착** → 로봇이 움직여줌 → 전 카메라가 동시 관측
 - 풀이: 전 카메라 **동시 최적화**, 제약 2가지
@@ -61,6 +71,8 @@
 - 표에서의 역할: 마커 기반 멀티카메라 **현재 SOTA**, 우리의 최근접 경쟁자 (FK는 100% 신뢰)
 
 ## 6. Calib3R (2025) — "보드 없이 AI가 장면을 3D 복원"
+
+> 📄 Allegro 외, *"Calib3R: A 3D Foundation Model for Multi-Camera to Robot Calibration and 3D Metric-Scaled Scene Reconstruction"*, arXiv:2509.08813, 2025 — [PDF (arXiv)](https://arxiv.org/pdf/2509.08813) · 💻 [코드](https://github.com/davidea97/Calib3R)
 
 - 셋업: 마커 없음 — 카메라로 **일반 풍경** 촬영
 - 풀이 절차
@@ -143,5 +155,3 @@
 
 ---
 
-*연관 문서: 표 골격 [PAPER_TABLES.md](PAPER_TABLES.md) · 코드·적용성 분석
-[PAPER_BASELINES.md](PAPER_BASELINES.md) · 수식 버전 Simul_test/FK_METHODS_FORMULATION.md*
