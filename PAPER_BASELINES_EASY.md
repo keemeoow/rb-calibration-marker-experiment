@@ -44,9 +44,9 @@
 - 핵심 특징: **FK를 100% 신뢰** — FK 오차가 답에 그대로 박힘
 - 표에서의 역할: "FK 통째로 믿기" 진영의 표준 공식
 
-## 4. Tabb & Ahmad Yousef (2017) — "공식 대신 사진에 대고 반복 수정"
+## 4. Tabb & Ahmad Yousef (2017) — 재투영 반복해: "공식 한 방 대신, 사진에 대고 수렴까지 반복 수정"
 
-> 📄 Tabb & Ahmad Yousef, *"Solving the Robot-World Hand-Eye(s) Calibration Problem with Iterative Methods"*, Machine Vision and Applications, 2017 — [PDF (arXiv)](https://arxiv.org/pdf/1907.12425) · 💻 [코드](https://github.com/amy-tabb/RWHEC-Tabb-AhmadYousef)
+> 📄 Tabb & Ahmad Yousef, *"Solving the Robot-World Hand-Eye(s) Calibration Problem with Iterative Methods"*, Machine Vision and Applications, 2017 — [PDF](https://arxiv.org/pdf/1907.12425) · 💻 [코드](https://github.com/amy-tabb/RWHEC-Tabb-AhmadYousef)
 
 - 통찰: **오차의 근원 = 사진의 픽셀** (코너 검출이 1~2px씩 틀림) — 공식 한 방은 재는 자가 다름
 - 풀이 절차
@@ -60,7 +60,7 @@
 
 ## 5. Allegro 외 (RA-L 2024) — "멀티카메라를 서로 검증시키며 한꺼번에"
 
-> 📄 Allegro, Terreran & Ghidoni, *"Multi-Camera Hand-Eye Calibration for Human-Robot Collaboration in Industrial Robotic Workcells"*, IEEE RA-L, 2024 (ICRA 2025) — [PDF (arXiv)](https://arxiv.org/pdf/2406.11392) · 💻 [코드](https://github.com/davidea97/Multi-Camera-Hand-Eye-Calibration) (리포에 사본 있음)
+> 📄 Allegro, Terreran & Ghidoni, *"Multi-Camera Hand-Eye Calibration for Human-Robot Collaboration in Industrial Robotic Workcells"*, IEEE RA-L, 2024 (ICRA 2025) — [PDF](https://arxiv.org/pdf/2406.11392) · 💻 [코드](https://github.com/davidea97/Multi-Camera-Hand-Eye-Calibration) (리포에 사본 있음)
 
 - 배경: 1~4는 전부 1카메라용 → 따로 풀면 각자 오차를 안고 끝 (상호 검증 없음)
 - 셋업: 보드를 **로봇 손에 부착** → 로봇이 움직여줌 → 전 카메라가 동시 관측
@@ -72,7 +72,7 @@
 
 ## 6. Calib3R (2025) — "보드 없이 AI가 장면을 3D 복원"
 
-> 📄 Allegro 외, *"Calib3R: A 3D Foundation Model for Multi-Camera to Robot Calibration and 3D Metric-Scaled Scene Reconstruction"*, arXiv:2509.08813, 2025 — [PDF (arXiv)](https://arxiv.org/pdf/2509.08813) · 💻 [코드](https://github.com/davidea97/Calib3R)
+> 📄 Allegro 외, *"Calib3R: A 3D Foundation Model for Multi-Camera to Robot Calibration and 3D Metric-Scaled Scene Reconstruction"*, arXiv:2509.08813, 2025 — [PDF](https://arxiv.org/pdf/2509.08813) · 💻 [코드](https://github.com/davidea97/Calib3R)
 
 - 셋업: 마커 없음 — 카메라로 **일반 풍경** 촬영
 - 풀이 절차
