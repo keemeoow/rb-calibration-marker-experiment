@@ -109,9 +109,10 @@ def fig_B(blob):
     ax.set_xlabel("systematic intrinsic err ->", fontsize=10)
     ax.set_ylabel("outlier rate (marker misdetection) ->", fontsize=10)
     ax.set_xlim(-0.5, len(SYS)-0.5); ax.set_ylim(-0.5, len(OUT)-0.5)
-    ax.set_title("Figure B. Winner map (lowest e_task, GT) - FK~0 regime\n"
-                 "cell: method / e_task / margin   (EXP6 -cube excluded: calibration collapses)",
-                 fontsize=11, fontweight="bold", loc="left"); ax.set_aspect("equal")
+    ax.set_title("Figure B. Winner map - FK error fixed at 0 (accurate FK)\n"
+                 "x = systematic noise, y = outlier rate; cell: method / e_task / margin"
+                 "  (EXP6 excluded: calib collapses)",
+                 fontsize=10.5, fontweight="bold", loc="left"); ax.set_aspect("equal")
     legend = [Patch(facecolor=color[n], label=f"{n} {STYLE[n][4]}") for n in CAND]
     ax.legend(handles=legend, loc="upper left", bbox_to_anchor=(1.02, 1.0),
               frameon=False, fontsize=9, title="method")
