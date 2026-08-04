@@ -1,60 +1,159 @@
-# 논문 비교대상(Baseline) 분석표
+# Baseline 비교 실험
 
-ours-B(soft FK anchor + 잔차보정, 멀티카메라 unified)와 비교할 후보 전수 분석.
-기준: **① 어떤 계열인가 ② 공개 코드가 실사용 가능한가 ③ 우리 세팅(ZEUS 로봇, 고정 3~4대 + 그리퍼 1대, 파지 큐브)에 적용 가능한가**.
+## 개념
 
-## 1. 실험 표에 넣을 baseline (전부 공개 코드, 실행 가능)
+- 로봇과 카메라는 **서로 다른 "자기 기준"** 으로 위치를 잼
+  - 로봇: "내 발바닥(base)에서 오른쪽 30cm, 앞 20cm"
+  - 카메라: "내 렌즈에서 정면 50cm, 왼쪽 10cm"
+- 캘리브레이션 = **"카메라 좌표 → 로봇 좌표" 번역표** 를 찾는 일
+  - 이 표가 없으면: 카메라가 "컵 여기!"라고 해도 로봇은 못 집음
+  - 이 표의 정확도가 논문 전체의 주제
+- 모든 방법의 공통 재료 2가지
+  - **FK(순기구학)**: 로봇은 모터 각도 센서로 자기 손 위치를 항상 앎
+  - **마커 + PnP**: 마커의 실제 크기를 아니까, 사진 속 찌그러짐으로 카메라↔마커 거리·각도 역산
+- 방법 간 차이 = "FK와 카메라 관측을 **어떤 수학으로, 무엇을 믿고** 연결하나"
 
-| # | 방법 (논문) | 연도 / venue | 계열 | FK 사용 | 타깃 | 멀티캠 | 코드 | 적용 비용 | ours 대비 역할 |
-|---|---|---|---|---|---|---|---|---|---|
-| 1 | Tsai–Lenz / Park–Martin / Horaud / Andreff / Daniilidis | 1989–1999 | 고전 AX=XB, **카메라별 independent** | 모션쌍으로만 (상대 FK) | 임의 (우린 큐브/보드) | ✗ (per-cam 반복) | OpenCV `calibrateHandEye` 내장 | **0 — 이미 파이프라인 사용 중** | "independent 진영" 하한선 |
-| 2 | Shah / Li | 2013 / 2010 | robot-world **AX=ZB closed-form** | **하드** (base–world 동시해) | 보드 | ✗ (per-cam) | OpenCV ≥4.5 `calibrateRobotWorldHandEye` 내장 | 반나절 (Python 직호출) | "fixed-FK 진영" 표준해 |
-| 3 | Tabb & Ahmad Yousef | 2017 / MVA | robot-world **재투영(px) 반복해** | 하드 | 보드(체스보드) | **✅ eye(s) 지원** | [amy-tabb/RWHEC-Tabb-AhmadYousef](https://github.com/amy-tabb/RWHEC-Tabb-AhmadYousef) (C++/OpenCV4, ~2019 유지보수) | 중간 (빌드 + 입력포맷 변환) | 재투영 목적함수 고전 대표 — 우리 px 목적함수의 선행 |
-| 4 | **Allegro·Terreran·Ghidoni** | **RA-L 2024 / ICRA 2025** | **멀티카메라 unified SOTA** (보드를 EE에 부착) | **하드** (bTg 상수 신뢰) | EE 부착 ChArUco | **✅ 핵심 기여** | [davidea97/Multi-Camera-Hand-Eye-Calibration](https://github.com/davidea97/Multi-Camera-Hand-Eye-Calibration) (C++/Ceres) — **리포에 소스 복사본 있음** | 중간 (Ceres 빌드; ChArUco 관측만 사용해야) | **최근접 경쟁자 + FK-하드 진영 최신 대표. 우선순위 1** |
-| 5 | **Calib3R** | 2025 (arXiv) | **타깃리스, 3D foundation model(MASt3R) unified** | FK pose 로 스케일/정렬 | **없음 (타깃리스)** — URDF 도 불필요 | **✅** | ⚠️ davidea97/Calib3R **2026-08 현재 404** (비공개 전환 추정, 논문에 공개 언급 없음) | 보류 — 공개 대기/저자 요청, 대안: "MASt3R-SfM(공개)+핸드아이 정렬" 자체 구성 또는 인용만 | "학습기반/타깃리스" 최신 대표 — '왜 아직 마커냐' 방어 |
-| 6 | Koide & Menegatti *(조건부)* | RA-L 4(2):1021–1028, 2019 (ICRA'19) | 재투영 pose-graph (단일캠) | 모션쌍 | 보드 | ✗ (per-cam) | [koide3/st_handeye_graph](https://github.com/koide3/st_handeye_graph) (C++/g2o, 2019 이후 정체) | 높음 (g2o 버전 고정 → 빌드 리스크) | px 직최적화 선행 — 빌드 실패 시 인용으로 강등 |
+---
 
-**착수 순서 권장: 4 → 2 → 5 → 3 → (6 조건부)** — 비용 대비 서사 기여 순.
+## 1. Tsai–Lenz (1989) — 원조, "회전 먼저·이동 나중"
 
-### 내부 ablation ↔ 외부 baseline 매핑 (논문 서사)
+> 📄 Tsai & Lenz, *"A New Technique for Fully Autonomous and Efficient 3D Robotics Hand/Eye Calibration"*, IEEE Trans. Robotics and Automation, 1989 — [PDF](https://kmlee.gatech.edu/me6406/handeye.pdf) · 💻 OpenCV `calibrateHandEye(TSAI)`
 
-| 내부 4방법 | 대응하는 외부 진영 | 외부 대표 |
+- 문제 형태: **AX=XB** (A=손의 움직임(FK), B=카메라가 느낀 움직임, X=손→카메라 변환)
+  - 셀카봉 비유: 손 궤적(내가 앎) + 폰이 본 장면 변화(폰이 앎) → 봉의 생김새(X) 역산
+- 풀이: 2단계 분리 — ① 회전 먼저 → ② 그 답으로 이동 계산
+- 장점: 빠르고 단순
+- 약점: ①의 오차가 ②로 **전염** (첫 단추 구조)
+- 표에서의 역할: 가장 기본 방식의 **출발선**
+
+## 2. Daniilidis (1999) — "회전+이동 한 번에"
+
+> 📄 Daniilidis, *"Hand-Eye Calibration Using Dual Quaternions"*, IJRR, 1999 — [PDF](https://www.cis.upenn.edu/~kostas/mypub.dir/ijrr99.pdf) · 💻 OpenCV `calibrateHandEye(DANIILIDIS)`
+
+- 풀이: **듀얼 쿼터니언** — 회전·이동을 한 묶음으로 포장해 **연립 한 방**
+- 효과: 오차 전염 없음 → 노이즈에 강함
+- 위상: "공식 한 방(closed-form)" 계열의 **베스트**
+- 표에서의 역할: 고전의 최강자 — 이보다 나아야 새 방법의 의미 있음
+
+## 3. Shah (2013) — "미지수 2개를 공식 한 방에"
+
+> 📄 Shah, *"Solving the Robot-World/Hand-Eye Calibration Problem Using the Kronecker Product"*, ASME J. Mechanisms and Robotics, 2013 — [PDF (ResearchGate)](https://www.researchgate.net/publication/275087810_Solving_the_Robot-WorldHand-Eye_Calibration_Problem_Using_the_Kronecker_Product) · 💻 OpenCV `calibrateRobotWorldHandEye(SHAH)`
+
+- 문제 형태: **AX=ZB** (X=카메라 변환 + Z=보드 위치, **미지수 2개**)
+- 풀이: Kronecker 곱 트릭 → 대입하면 답 나오는 **닫힌 해**, X·Z 동시 산출
+- 핵심 특징: **FK를 100% 신뢰** — FK 오차가 답에 그대로 박힘
+- 표에서의 역할: "FK 통째로 믿기" 진영의 표준 공식
+
+## 4. Tabb & Ahmad Yousef (2017) — 재투영 반복: "공식 한 방 대신, 사진에 대고 수렴까지 반복 수정"
+
+> 📄 Tabb & Ahmad Yousef, *"Solving the Robot-World Hand-Eye(s) Calibration Problem with Iterative Methods"*, Machine Vision and Applications, 2017 — [PDF](https://arxiv.org/pdf/1907.12425) · 💻 [코드](https://github.com/amy-tabb/RWHEC-Tabb-AhmadYousef)
+
+- 통찰: **오차의 근원 = 사진의 픽셀** (코너 검출이 1~2px씩 틀림) — 공식 한 방은 재는 자가 다름
+- 풀이 절차
+  1. 공식 한 방(Shah류)으로 대충의 답
+  2. 그 답 기준 "코너가 찍혀야 할 픽셀"을 사진에 겹쳐 그림 (**재투영**)
+  3. 실제 검출 위치와의 픽셀 어긋남을 재고, 줄어드는 방향으로 답 수정
+  4. 수렴까지 2~3 반복
+- 효과: 실데이터에서 공식 한 방보다 꾸준히 정확
+- 우리와의 연결: "픽셀 기준 반복 수정" 철학은 우리와 동일
+- 표에서의 역할: 재투영·반복 진영의 고전 대표 (단, FK는 100% 신뢰)
+
+## 5. Allegro 외 (RA-L 2024) — "멀티카메라를 서로 검증시키며 한꺼번에"
+
+> 📄 Allegro, Terreran & Ghidoni, *"Multi-Camera Hand-Eye Calibration for Human-Robot Collaboration in Industrial Robotic Workcells"*, IEEE RA-L, 2024 (ICRA 2025) — [PDF](https://arxiv.org/pdf/2406.11392) · 💻 [코드](https://github.com/davidea97/Multi-Camera-Hand-Eye-Calibration) (리포에 사본 있음)
+
+- 배경: 1~4는 전부 1카메라용 → 따로 풀면 각자 오차를 안고 끝 (상호 검증 없음)
+- 셋업: 보드를 **로봇 손에 부착** → 로봇이 움직여줌 → 전 카메라가 동시 관측
+- 풀이: 전 카메라 **동시 최적화**, 제약 2가지
+  - ① 각 카메라 답이 로봇 FK와 일치
+  - ② **카메라끼리 서로 본 것끼리 무모순** (같은 순간 같은 보드 → 답 일치해야)
+- 핵심: ②의 교차 검증 — 시험 답안 4명이 맞춰보기 → 개별 실수 검출·평균화
+- 표에서의 역할: 마커 기반 멀티카메라 **현재 SOTA**, 우리의 최근접 경쟁자 (FK는 100% 신뢰)
+
+## 6. Calib3R (2025) — "보드 없이 AI가 장면을 3D 복원"
+
+> 📄 Allegro 외, *"Calib3R: A 3D Foundation Model for Multi-Camera to Robot Calibration and 3D Metric-Scaled Scene Reconstruction"*, arXiv:2509.08813, 2025 — [PDF](https://arxiv.org/pdf/2509.08813) · ⚠️ 코드: davidea97/Calib3R **현재 404** (비공개 전환 추정, 논문에도 공개 언급 없음) → 공개 재개 모니터링 + 대안 검토
+
+- 셋업: 마커 없음 — 카메라로 **일반 풍경** 촬영
+- 풀이 절차
+  - 3D 파운데이션 모델(AI)이 여러 사진에서 장면의 3D 구조 복원
+  - 복원 3D는 **크기를 모름** → 로봇의 "정확히 10cm 이동"(FK)으로 크기 결정 + 로봇 기준 정렬
+- 장단: 마커 준비 수고 없음 ↔ 마커만큼 정밀하기 어려움(통념)
+- 표에서의 역할: 보드-프리 AI 진영 최신 대표 — 우리가 이기면 "왜 아직 마커냐"에 실험으로 답
+
+---
+
+## 7. 우리(ours)의 차별점
+
+- 여섯 방법의 FK 취급: Shah·Tabb·Allegro = **100% 신뢰** / Tsai·Daniilidis = 움직임 비교만 / Calib3R = 크기 결정만
+- 우리 = **"적당히 믿기" + "반복 오차 지우기"**
+  - **soft anchor**: FK를 부드러운 닻으로 — 멀어지면 살짝 당기되, 관측이 강하게 반대하면 관측 우선
+    - 당기는 세기 λ도 사람이 아니라 **데이터(CV)로 선택**
+  - **잔차보정**: 캘리브 후 남는 "위치에 따라 반복되는 오차 패턴"(예: 작업대 왼쪽 = 항상 2mm 왼쪽 틀림)을
+    직선 공식으로 학습해 미리 차감
+- 요약: 이 2가지는 **여섯 방법 중 어디에도 없음** = 우리 기여
+
+## 8. 평가: 실제 로봇에서만, "정답을 아는 값" 4가지로 채점 (확정)
+
+| 채점 방식 | 비유 | 신뢰 근거 |
 |---|---|---|
-| fixed-FK | robot-world AX=ZB / FK 하드 unified | #2 Shah·Li, #3 Tabb, **#4 Allegro** |
-| no-FK | 순수 카메라 합의 | #1 고전 (+ Evangelista 인용) |
-| ours-A (λ=0 + 잔차보정) | — (우리 기여) | — |
-| **ours-B (soft anchor + 잔차보정)** | — (우리 기여) | — |
+| 숨겨둔 문제 (held-out) | 안 보여준 문제로 시험 | 일반화 실력만 통함 (암기 불가) |
+| 자로 잰 치수 | 복원한 큐브 변 길이 vs 캘리퍼 실측 | 물리 실측 = 진짜 정답 |
+| 정확히 아는 이동량 | "100.0mm 직진" 명령 vs 카메라 측정 | 모터의 **상대 이동**은 매우 정확 |
+| 사진과의 어긋남 (px) | 답을 사진에 겹쳐 그려 오차 측정 | 검출 코너 자체가 기준 |
 
-## 2. 인용만 (코드 없음 / 로봇 종속 / 문제설정 상이)
+- 조건: 전 방법을 **같은 날·같은 카메라·같은 데이터**로 실행 → 동일 지표 채점 = 메인 표(Table I)
 
-| 논문 | 연도 | 계열 | 제외 사유 | 인용 위치 |
-|---|---|---|---|---|
-| Evangelista et al. (graph-based multi-cam HEC) | ICRA 2023 | 멀티캠 pose-graph | 공개 리포 특정 불가; 후속작 #4가 코드 공개+성능 상회 | A군 related work |
-| EasyHeC / EasyHeC++ | RA-L 2023 / IROS 2024 | 학습 미분가능 렌더링 (로봇 몸체=타깃) | **CAD/URDF 필수인데 사용자 결정으로 CAD 미사용** (ZEUS CAD 입수 불가; UR3(CB3) 보유하나 세팅 교체 비용 큼) | E군 |
-| Ali et al. (comparative study) | Sensors 2019 | 비교연구 | 방법이 아니라 프로토콜 | 평가지표 근거 |
-| Zhuang 1994 / Horaud–Dornaika 1995 | 1994–95 | AX=ZB / AX=XB 기원 | 고전, OpenCV 구현으로 대체 | related work |
-| CtRNet / CtRNet-X | CVPR'23 / ICRA'25 | 학습 키포인트+렌더링 | **학습된 로봇 전용** — ZEUS 재학습 비용 과다 | E군 |
-| DREAM (NVlabs) | ICRA 2020 | 학습 키포인트+PnP | 동일 (Panda/KUKA/Baxter 전용) | E군 |
-| RoboPose / RoboKeyGen / RoboTAG / MonoSE(3)-Diffusion | 2021–2025 | render-compare / diffusion | 로봇 종속 + 단일캠 pose 추정이 목적 | E군 |
-| Hydra / PlaneHEC / LRBO2 | 2025 | RGB-D 마커프리 | 코드 미확인, 세팅 상이 | E군 |
-| Furrer et al. | FSR 2017 | 시간동기+핸드아이 | 시간동기는 우리와 직교 (정적 캡처) | B군 각주 |
-| ATOM (Pedrosa et al.) | 2021– | 멀티센서 통합 캘리브 프레임워크 | ROS 통합 무거움, 선택적 | A군 한 줄 |
-| Peters et al. (actuated 3D sensor self-calib) | JFR 2024 | 운동학 포함 BA | 로봇 스케일 발견의 선행 사례 | D군 |
-| GP/DNN FK 잔차보정 계열 (Active-GP 2023, GPR Measurement 2025, ICAR 2025, GA-DNN 2020) | 2020–25 | 기구학 오차 보상 | 레이저트래커 GT 전제 — 우리 Ridge 선형 선택의 대비군 | D군 |
-| Sun & Hollerbach / Borm & Meng / Visual-Biased OI | 1991–2024 | 관측성 지표 | 방법 아님 — "13 set 충분성" 방어용 | F군 |
-| Calib3R 외 동일저자 MEMROC | 2024 | 모바일로봇 멀티캠 | 플랫폼 상이 | 각주 |
+---
 
-## 3. 학습기반 관련 핵심 판단 근거
+## 9. 논문별 핵심 차이 (그들에게 "없는 것")
 
-- 로봇 몸체를 타깃으로 쓰는 계열(EasyHeC·CtRNet·DREAM·RoboPose)은 **로봇 3D 모델(URDF+메시)이 원리적으로 필수** — 몸체 모델이 곧 마커 정의. 키포인트 계열은 추가로 로봇별 사전학습 필요.
-- **URDF 없이 가능한 학습기반은 Calib3R가 유일** (foundation model 이 장면을 복원, 로봇 모델 불필요) → 학습기반 대표로 확정.
-- **사용자 결정 (2026-08): CAD 모델은 사용하지 않는다.** ZEUS CAD 입수 불가. UR3(CB3)는 보유하나
-  (UR3 는 URDF 공개 + DREAM/CtRNet 학습 로봇), 본 시스템이 ZEUS 기준이므로 로봇 교체 실험은 범위 밖.
-  → 학습기반 비교 = Calib3R 단일. 논문에는 "robot-body 기반 학습 계열은 로봇 3D 모델·가시성을
-  전제하므로 모델 미제공 로봇(본 세팅)에 부적용"으로 한 줄 방어.
+| 방법 | 없는 것 |
+|---|---|
+| **Tsai** | ① 카메라 결합 ② FK 닻 ③ 잔차보정 (+ 오차 전염되는 2단계 풀이) |
+| **Daniilidis** | ① 결합 ② FK 닻 ③ 보정 (Tsai 대비 풀이만 개선) |
+| **Shah** | ① 결합 ③ 보정 + FK **100% 신뢰** (우리는 soft) |
+| **Tabb** | FK 100% 신뢰 + 보정 없음 (재투영·반복 철학은 우리와 동일 → 차이가 "FK 취급·보정"으로 깨끗이 분리) |
+| **Allegro** | FK 100% 신뢰 + 보정 없음 + 평가가 자기일관성 (결합은 있음 — 최근접 경쟁자) |
+| **Calib3R** | 마커 미사용(정밀도↔편의 트레이드) + FK는 크기용 + 보정 없음 |
 
-## 4. 서지 확정 사항
+- 한 줄 요약: **결합은 Allegro만 보유. soft anchor·잔차보정은 여섯 모두 없음 → 우리 기여**
+- Tsai vs 내부 no-FK 구분
+  - 공통: FK를 목적함수에 안 넣음
+  - 차이: no-FK = 전 카메라가 공유 큐브로 묶여 **합의(통합)** / Tsai = 카메라별 **완전 독립**
+  - 표의 역할 분담: Tsai↔no-FK 차이 = "결합의 가치", no-FK↔ours-B 차이 = "anchor+보정의 가치"
 
-- Koide & Menegatti, "General Hand-Eye Calibration Based on Reprojection Error Minimization," IEEE RA-L 4(2):1021–1028, 2019. DOI 10.1109/LRA.2019.2893612.
-- Furrer et al., "Evaluation of Combined Time-Offset Estimation and Hand-Eye Calibration on Robotic Datasets," FSR 2017 (Springer PAR). 코드: ethz-asl/hand_eye_calibration.
-- Tabb & Ahmad Yousef, "Solving the robot-world hand-eye(s) calibration problem with iterative methods," MVA 2017. 코드 2019.03까지 갱신, 공식 데이터셋 USDA 공개.
+## 10. 멀티카메라 비교로 만드는 법 — 전부 가능 (그래서 선정)
+
+### 부류 1: 원래 1카메라용 → "한 대씩 N번 + 조립" (Tsai · Daniilidis · Shah)
+
+- 그리퍼캠: 기존 바닥 보드 데이터로 gTc 계산
+- 고정캠 각각: 보드-온-EE 세션(로봇 손의 보드 움직임 관측)으로 **카메라별 독립** 계산
+- 변환 N+1개를 모으면 시스템 전체 완성
+- 의미: 이 "따로 풀고 조립" = **현업 표준 관행** → 결합 부재의 약점을 보여주는 행
+
+### 부류 2: 원래부터 멀티카메라 (Tabb · Allegro) + 조건부 (Calib3R)
+
+- **Tabb**: 제목의 "eye(**s**)" = 멀티 지원 내장
+  - 할 일: 보드-온-EE 세션 전체 카메라 이미지 + FK를 그들 폴더 형식으로 변환
+- **Allegro**: 애초에 멀티카메라 논문
+  - 할 일: 같은 세션을 그들 형식으로 변환 (`cameraX/image/` + `pose/*.csv` + intrinsics yaml, `calibration_setup: 1`)
+  - 그리퍼캠: eye-in-hand 모드(`calibration_setup: 0`) + 바닥 보드 데이터로 별도 실행
+- **Calib3R**: ⚠️ **코드 리포가 현재 404** (비공개 전환 추정) — 아래 3안 중 택1
+  - 1안: 공개 재개 대기 (심사 통과 후 공개 관례) + 저자 이메일로 코드 요청
+  - 2안: **대체 구성** — Calib3R 논문 자신의 베이스라인인 "MASt3R-SfM(코드 공개) + 핸드아이 정렬"을
+    우리가 직접 조합 → "타깃리스 진영" 행을 이걸로 대체 (공개 코드 기준 충족)
+  - 3안: 타깃리스는 related work 인용만 (코드 미공개 사유 명시) — 표에서 제외
+  - (참고: 원래도 "로봇 탑재 카메라" 기준이라 고정캠 지원 여부 조사가 필요했음)
+
+### 공통 준비물
+
+| 준비물 | 사용처 |
+|---|---|
+| **보드-온-EE 캡처 세션 1회** (보드 EE 강체 고정, 자세 20~30개, 전 고정캠 동시 촬영 + FK 기록) | Tsai·Daniilidis·Shah(고정캠), Tabb, Allegro |
+| 기존 바닥 보드 데이터 | Tsai·Daniilidis·Shah(그리퍼캠), Allegro(그리퍼캠) |
+| 기존 장면 사진 + FK (또는 텍스처 있는 신규 시퀀스) | Calib3R |
+| 포맷 변환 스크립트 3개 (OpenCV 직호출 / Tabb 형식 / Allegro 형식) | 공통 |
+
+---
+
