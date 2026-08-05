@@ -10,9 +10,9 @@
 
 ## 실험 셋업 (시뮬 씬)
 
-![시뮬 씬](results/figures/fig_sim_scene_paper.png)
+![시뮬 씬](results/figures/fig_sim_scene_3d.png)
 
-*(a) 3D 리그 — 고정 카메라 3대(eye-to-hand) + 그리퍼 카메라(eye-in-hand) + 큐브(set별 재배치) + ChArUco 보드 + robot base 좌표축. (b) 고정 카메라가 실제로 보는 2D 투영(체커보드 + 검출 코너 + 큐브 면, 0.3px 노이즈) = solvePnP 입력. 그림에선 가독성을 위해 큐브를 보드 옆으로 옮겨 그렸다(시뮬 기하 자체는 미변경).*
+*3D 리그 — 고정 카메라 3대(eye-to-hand, 파랑) + 그리퍼 카메라(eye-in-hand, 주황 경로) + 큐브(set별 재배치, 초록) + ChArUco 보드(갈색, 테이블 고정) + robot base 좌표축. 실측 카메라 배치·실물 마커 기하 반영.*
 
 ## 방법 (7가지 ablation)
 
