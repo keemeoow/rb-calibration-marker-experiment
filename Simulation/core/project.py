@@ -88,16 +88,23 @@ def observe(target, T_cam_target, sigma_px=0.5, incidence_max_deg=75.0,
     if len(obj) < min_corners:
         return None
 
-    # solvePnP: 노이즈 낀 2D 코너 + 3D 코너 → pose 복원.
-    #   PnP 는 K_pnp/dist_pnp(부정확 intrinsic)를 씀 → 참값(K/dist)과 다르면 systematic 편향.
-    ok, rvec, tvec = cv2.solvePnP(obj.reshape(-1, 1, 3), img.reshape(-1, 1, 2),
-                                  K_pnp, dist_pnp, flags=cv2.SOLVEPNP_ITERATIVE)
-    if not ok:
+    # robust PnP: solvePnPRansac 로 이상치 코너 제거 (모든 방법 동일 전처리).
+    #   K_pnp/dist_pnp(부정확 intrinsic) 사용 → 참값과 다르면 systematic 편향(의도된 모델).
+    #   Ransac 출력(rvec/tvec)은 내부에서 inlier·good-init 로 이미 정제됨 → 별도 refine 생략
+    #   (coplanar 소수 inlier 를 init 없이 재-solvePnP 하면 ITERATIVE 가 degenerate/crash).
+    ok, rvec, tvec, inliers = cv2.solvePnPRansac(
+        obj.reshape(-1, 1, 3), img.reshape(-1, 1, 2), K_pnp, dist_pnp,
+        reprojectionError=3.0, iterationsCount=100, flags=cv2.SOLVEPNP_ITERATIVE)
+    if not ok or inliers is None or len(inliers) < min_corners:
+        return None
+    inl = inliers.reshape(-1)
+    obj, img = obj[inl], img[inl]                          # inlier 만 유지 (reproj 계산용)
+    if float(tvec.reshape(3)[2]) <= 1e-3:                  # degenerate(카메라 뒤/영점) → 미검출
         return None
     R_est, _ = cv2.Rodrigues(rvec)
     T_est = np.eye(4); T_est[:3, :3] = R_est; T_est[:3, 3] = tvec.reshape(3)
 
-    # 재투영 오차 (px) — PnP 가 쓴 K_pnp 기준
+    # 재투영 오차 (px) — inlier 기준
     reproj, _ = cv2.projectPoints(obj.reshape(-1, 1, 3), rvec, tvec, K_pnp, dist_pnp)
     reproj = reproj.reshape(-1, 2)
     reproj_px = float(np.sqrt(np.mean(np.sum((reproj - img) ** 2, axis=1))))

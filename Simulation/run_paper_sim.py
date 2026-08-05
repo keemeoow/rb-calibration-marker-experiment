@@ -15,6 +15,7 @@ KEYS = ["e_task_mm", "e_task_deg", "e_X_mm", "gTc_mm", "e_rel_mm", "e_reproj_px"
 N_GRIPPED = 130
 N_SETS = 13
 N_EVENTS = 13
+N_SPLITS = 3                     # (method,cond,seed) 당 held-out split 수 (평균)
 OUTLIER_PX = 2.0                 # 실측: 오검출 크기 ~1-2px (max 2.0)
 BASE_SIGMA = 0.2                 # 실측: 코너 σ median 0.15~mean 0.19
 
@@ -87,11 +88,15 @@ def _job(a):
                 if res.get(k) is not None:
                     acc[k].append(res[k])
             n += 1
-            if n >= 2:
+            if n >= N_SPLITS:
                 break
-    except Exception:
-        pass
-    return (mi, _ckey(*cond)), {k: (float(np.mean(v)) if v else None) for k, v in acc.items()}
+    except Exception as e:      # 실패 숨기지 않고 표면화 (리뷰 ⑤). 풀은 죽이지 않음.
+        import traceback
+        print(f"[FAIL] {cfg.name} seed={seed} cond={_ckey(*cond)}: "
+              f"{type(e).__name__}: {e}", file=sys.stderr, flush=True)
+        traceback.print_exc()
+    # split 별 raw 값 그대로 반환 → main 에서 median·발산율 계산 (리뷰 ⑤: robust 집계)
+    return (mi, _ckey(*cond)), {k: list(v) for k, v in acc.items()}
 
 
 def main():
@@ -101,9 +106,11 @@ def main():
     ap.add_argument("--gripped", type=int, default=130)
     ap.add_argument("--sets", type=int, default=13)
     ap.add_argument("--events", type=int, default=13)
+    ap.add_argument("--splits", type=int, default=3)
     args = ap.parse_args()
-    global N_GRIPPED, N_SETS, N_EVENTS
+    global N_GRIPPED, N_SETS, N_EVENTS, N_SPLITS
     N_GRIPPED = int(args.gripped); N_SETS = int(args.sets); N_EVENTS = int(args.events)
+    N_SPLITS = int(args.splits)
 
     conds, layout = _all_conditions()
     jobs = [(mi, sd, conds[ck]) for mi in range(len(ALL))
@@ -111,43 +118,66 @@ def main():
     print(f"[paper-sim] {len(jobs)} jobs (7방법 × {len(conds)}조건 × {args.seeds}seed, "
           f"gripped {N_GRIPPED}), {args.workers} workers", flush=True)
 
-    agg = {}     # (mi, ckey) -> {metric: [vals]}
+    agg = {}     # (mi, ckey) -> {metric: [모든 seed×split raw vals]}
     done = 0
     with ProcessPoolExecutor(max_workers=args.workers) as ex:
         for key, d in ex.map(_job, jobs):
             slot = agg.setdefault(key, {k: [] for k in KEYS})
             for k in KEYS:
-                if d.get(k) is not None:
-                    slot[k].append(d[k])
+                vs = d.get(k)
+                if vs:
+                    slot[k].extend(vs)      # seed·split raw 값 pool (append 아님)
             done += 1
             if done % 40 == 0:
                 print(f"  {done}/{len(jobs)}", flush=True)
 
-    def mean(mi, ck, metric):
-        v = agg.get((mi, ck), {}).get(metric, [])
-        return float(np.mean(v)) if v else None
+    DIVERGE_MM = 100.0    # e_task 100mm 초과(또는 비유한) = 발산(수렴 실패)로 간주
 
-    # results[ckey][method_name][metric]
+    def stat(mi, ck, metric):
+        """robust 대표값 = median (발산 1건이 평균 파괴하는 것 방지; 리뷰 ⑤).
+           비유한값(inf/nan)은 median 에서 제외 (JSON·median 오염 방지)."""
+        v = [x for x in agg.get((mi, ck), {}).get(metric, []) if np.isfinite(x)]
+        return float(np.median(v)) if v else None
+
+    def diverge_rate(mi, ck):
+        """e_task 가 DIVERGE_MM 초과 or 비유한(inf/nan) 인 split 비율 (수렴 실패율 — 정직한 보고)."""
+        v = agg.get((mi, ck), {}).get("e_task_mm", [])
+        if not v:
+            return None
+        return float(np.mean([1.0 if (not np.isfinite(x) or x > DIVERGE_MM) else 0.0 for x in v]))
+
+    def nsamp(mi, ck):
+        return len(agg.get((mi, ck), {}).get("e_task_mm", []))
+
+    # results[ckey][method_name][metric]  (대표값=median) + _diverge/_n 부가
     results = {}
     for ck in conds:
         results[ck] = {}
         for mi, cfg in enumerate(ALL):
-            results[ck][cfg.name] = {k: mean(mi, ck, k) for k in KEYS}
+            r = {k: stat(mi, ck, k) for k in KEYS}
+            r["_diverge"] = diverge_rate(mi, ck)
+            r["_n"] = nsamp(mi, ck)
+            results[ck][cfg.name] = r
 
     out = {"methods": [c.name for c in ALL],
            "method_labels": [c.label for c in ALL],
-           "meta": {"seeds": args.seeds, "gripped": N_GRIPPED,
+           "meta": {"seeds": args.seeds, "gripped": N_GRIPPED, "splits": N_SPLITS,
+                    "agg": "median", "diverge_mm": DIVERGE_MM,
                     "protocol": "%d sets x %d eih + gripped %d" % (N_SETS, N_EVENTS, N_GRIPPED)},
            "layout": layout, "results": results}
     os.makedirs("results/tables", exist_ok=True)
     json.dump(out, open("results/tables/paper_sim.json", "w"), indent=2)
     print("[저장] results/tables/paper_sim.json")
-    # 미리보기 (realistic e_task)
+    # 미리보기 (realistic: median e_task + 발산율)
     rk = layout["table"]["realistic"]
-    print("\nrealistic e_task(mm):")
+    print("\nrealistic (median e_task mm | e_rel mm | reproj px | 발산율 | n):")
     for cfg in ALL:
-        v = results[rk][cfg.name]["e_task_mm"]
-        print(f"  {cfg.name:5s} {cfg.label:22s} {v:.2f}" if v else f"  {cfg.name} —")
+        r = results[rk][cfg.name]
+        v = r["e_task_mm"]
+        if v is None:
+            print(f"  {cfg.name} —"); continue
+        print(f"  {cfg.name:5s} {cfg.label:22s} task={v:6.2f}  rel={r['e_rel_mm']:6.2f}  "
+              f"reproj={r['e_reproj_px']:5.2f}  발산={r['_diverge']*100:4.0f}%  n={r['_n']}")
 
 
 if __name__ == "__main__":

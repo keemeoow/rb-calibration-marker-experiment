@@ -16,9 +16,10 @@ CB = ("cube", "board")
 C = ("cube",)
 B = ("board",)
 
-EXP1 = ExpConfig("EXP1", fk="corr",  solve="unified",     markers=CB, label="Ours (FK보정·통합·큐브+보드)")
-EXP2 = ExpConfig("EXP2", fk="corr",  solve="independent", markers=CB, label="−통합 (따로)")
-EXP3 = ExpConfig("EXP3", fk="corr",  solve="unified",     markers=C,  label="−보드 (큐브만)")
+# anchor_weight 는 모든 corr 방법에서 0.5 로 동결 (스크립트 간 불일치 제거; 리뷰 ⑤).
+EXP1 = ExpConfig("EXP1", fk="corr",  solve="unified",     markers=CB, anchor_weight=0.5, label="Ours (FK보정·통합·큐브+보드)")
+EXP2 = ExpConfig("EXP2", fk="corr",  solve="independent", markers=CB, anchor_weight=0.5, label="−통합 (따로)")
+EXP3 = ExpConfig("EXP3", fk="corr",  solve="unified",     markers=C,  anchor_weight=0.5, label="−보드 (큐브만)")
 EXP4 = ExpConfig("EXP4", fk="none",  solve="unified",     markers=CB, label="−FK (FK 안씀)")
 EXP5 = ExpConfig("EXP5", fk="none",  solve="independent", markers=CB, label="−FK −통합")
 EXP6 = ExpConfig("EXP6", fk="none",  solve="unified",     markers=B,  label="−큐브 (보드만)")
