@@ -5,6 +5,18 @@ real 데이터(`data/session`, 13 sets·232 captures)와 실측 config(`config.p
 하나씩 대조한 결과. **정본 = `config.py`** (인접 `rb-ArucoCube_Robot_multi_calibration`는
 옛 30mm ArUco 큐브라 무관).
 
+## 반영 요약 (2026-08)
+
+| # | 항목 | 상태 |
+|---|---|---|
+| 1 | FK 오차 = systematic (실측 ~6.6mm) | ✅ 반영 (FK 있음/없음 둘 다 실험). + 보정 메커니즘이 real 과 반대임을 발견 |
+| 2 | 카메라별 개별 intrinsic | ✅ 반영 |
+| 3 | 하향각 27° | ✅ 유지 (물리 셋업 재조정 확인) |
+| 4 | 프로토콜 11 eih/set · 89 gripped | ✅ 반영 |
+| 5 | 고정캠 set당 관측 1→11 | ⬜ 후순위 (랭킹 무관) |
+| 6 | pose-flip 오검출 5.3% 꼬리 | ⬜ 선택 |
+| 7 | 마커중심 self-cal (~1.5mm) | ⬜ 선택 (영향 미미) |
+
 ## ✅ 일치 (조치 불필요)
 
 | 항목 | real | 시뮬 |
@@ -22,7 +34,7 @@ real 데이터(`data/session`, 13 sets·232 captures)와 실측 config(`config.p
 
 ## ❌ 불일치 (조치 필요) — 우선순위순
 
-### 🔴 1. FK 오차 모델 — 가장 큰 불일치 (결론에 직접 영향)
+### ✅ 1. FK 오차 모델 — 반영됨 (systematic FK 추가, FK 있음/없음 둘 다 실험)
 - **real**: FK 큐브 prior 가 **systematic**. `T_set_cube_center_to_object` = **~180° flip + 37mm Z 오프셋**,
   prior 위치오차 **median 6.6mm**, 그리퍼 pose 잔차 ~11.5mm, 일관성 15~17mm, **5.3% gross flip(~138mm)**.
   (`set_cube_center_prior.json`, `gripper_base_pose_model.json`, `verification_metrics.json`,
@@ -30,14 +42,21 @@ real 데이터(`data/session`, 13 sets·232 captures)와 실측 config(`config.p
 - **시뮬**: realistic 프리셋 FK≈0, FK sweep 은 **random 제로평균** 노이즈(`scene.py:127`).
 - **영향**: **FK 보정(Ours의 핵심)은 systematic 오차를 제거하는 게 목적인데, 시뮬은 그걸 안 넣음.**
   → 앞선 "FK 보정 무의미" 재판정은 **불공정한 FK 모델** 탓. real 처럼 systematic FK 를 넣어야 공정.
-- **조치**: FK 오차를 **systematic**(위치의존 smooth + 상수 오프셋, 실측 ~6.6mm)으로 모델링.
-  180° flip 은 프레임 규약(gauge)이라 별도. realistic 프리셋의 FK 도 ≈0 이 아니라 실측값으로.
+- **조치 (반영됨)**: `scene.py` 에 `fk_sys_mm/deg` 추가 — 위치의존 affine 편향(씬 고정, param=median mm).
+  `run_paper_sim.py` 는 systematic FK(주)·random FK(대조) 를 분리 sweep, **realistic(FK 없음)** vs
+  **realistic_sysfk(FK 있음, 6.6mm)** 표 조건으로 둘 다 실험. 180° flip 은 gauge 규약이라 제외.
+- **⚠️ 추가 발견 (config 넘어 방법 충실성)**: 시뮬 FK 보정(`learn_fk_correction`)은 `Y=fk−visual` 을
+  학습해 예측을 **FK 쪽으로 당김** → FK 가 편향되면 편향을 주입(systematic FK 에서 corr 이 오히려 나빠짐).
+  **real 파이프라인은 반대** — `T_delta=inv(FK)@vision` 으로 **FK 를 vision 에 맞춰 de-bias**(vision=정답).
+  de-bias 방식은 고정카메라 vision 과 중복이라 **≈ no-FK(EXP4)** 로 수렴. → 어느 쪽이든 FK 보정은
+  고정카메라 멀티캠에선 no-FK 대비 이득 없음. (순수 eye-in-hand 라면 달라질 수 있음.)
 
-### 🟠 2. 카메라 intrinsic — 개별 vs 평균
+### ✅ 2. 카메라 intrinsic — 반영됨 (개별 실측 K 4개)
 - **real**: 카메라 4대 각자 다른 K (cy 최대 ~22px, cx ~15px, fx ~10px 차이).
   fixed=cam0/1/3, gripper=cam2. (`charuco_intrinsics_report.json`)
 - **시뮬**: 4대에 **평균 K 하나**(DEFAULT_K)만 사용. per-camera 개별성 없음.
-- **조치**: **개별 실측 K 4개**를 카메라별로 사용 (아래 값). intrinsic_err 랜덤섭동 대신 실측 개별값.
+- **조치 (반영됨)**: `project.REAL_CAM_INTR` 에 카메라별 실측 K/dist. `scene.py` 가 sim 고정캠 0/1/2 →
+  real cam 0/1/3, 그리퍼 → real cam2 로 매핑해 투영·PnP 에 개별 K 사용 (K_true/dist_true/K_pnp/dist_pnp).
 
 ### ✅ 3. 카메라 하향각(downtilt) — 27° 유지 (해결: 물리 셋업 재조정됨)
 - **real 캘리브 파일**: 하향각 ~10~15° (T_base_C0 11.5°, C1 15.5°, C3 9.9°; npz 9~12°).
@@ -45,10 +64,9 @@ real 데이터(`data/session`, 13 sets·232 captures)와 실측 config(`config.p
   → 저장된 캘리브가 stale 이고 **시뮬 27° 가 현재 물리 셋업에 맞음**.
 - **판정**: **조치 불필요. 시뮬 27° 유지.** (저장 npz 하향각은 무시하고 27° 강제하는 현 로직이 옳음.)
 
-### 🟡 4. 프로토콜 카운트 — eih/set, gripped 수
+### ✅ 4. 프로토콜 카운트 — 반영됨 (11 eih/set, 89 gripped)
 - **real**: eye-in-hand **11 shots/set**(143 total), gripped **89**(set당 2~9, 불균일).
-- **시뮬**: N_EVENTS=**13**/set, N_GRIPPED=**130**.
-- **조치**: N_EVENTS=11, N_GRIPPED=89 로. (랭킹엔 영향 적고 절대값 현실화.)
+- **시뮬**: N_EVENTS=13/set, N_GRIPPED=130 → **11 / 89 로 변경** (`run_paper_sim.py` 기본값·args).
 
 ### 🟡 5. 고정카메라 set당 관측 수 — 1 vs 11
 - **real**: 각 set 에서 11 event 마다 4대 동시 촬영 → 고정캠이 정지 큐브를 **11번**(중복, 노이즈 평균).
