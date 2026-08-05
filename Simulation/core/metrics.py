@@ -101,8 +101,9 @@ def reproj_pixel(sc, model, sets, use_gt=False):
             pc = (R @ obj.T).T + t
             if np.any(pc[:, 2] <= 1e-3):              # 카메라 뒤 → 붕괴
                 errs.append(CAP); continue
+            dpnp = sc.dist_pnp[ci] if hasattr(sc, "dist_pnp") else DEFAULT_DIST
             p, _ = cv2.projectPoints(obj.reshape(-1, 1, 3), cv2.Rodrigues(R)[0],
-                                     t.reshape(3, 1), sc.K_pnp[ci], DEFAULT_DIST)
+                                     t.reshape(3, 1), sc.K_pnp[ci], dpnp)
             e = float(np.sqrt(np.mean(np.sum((p.reshape(-1, 2) - img) ** 2, axis=1))))
             errs.append(min(e, CAP))
     return float(np.mean(errs)) if errs else None

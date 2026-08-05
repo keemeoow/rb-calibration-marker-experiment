@@ -13,54 +13,63 @@ from configs import ALL          # EXP1~7 (7방법)
 KEYS = ["e_task_mm", "e_task_deg", "e_X_mm", "gTc_mm", "e_rel_mm",
         "e_reproj_px", "e_reproj_raw_px", "e_cross_mm"]
 # 실제 규모/실측 노이즈 (main 에서 args 로 설정; fork 로 워커 상속)
-N_GRIPPED = 130
-N_SETS = 13
-N_EVENTS = 13
+N_GRIPPED = 89                   # 실측 data/session: gripped 89
+N_SETS = 13                      # 실측: 13 sets
+N_EVENTS = 11                    # 실측: eye-in-hand 11 shots/set
 N_SPLITS = 3                     # (method,cond,seed) 당 held-out split 수 (평균)
 OUTLIER_PX = 2.0                 # 실측: 오검출 크기 ~1-2px (max 2.0)
 BASE_SIGMA = 0.2                 # 실측: 코너 σ median 0.15~mean 0.19
+SYS_FK_REAL = 6.6                # 실측 systematic FK 위치오차 median (realistic 'FK 있음')
 
 # 노이즈 축 (그림 A) — 한 축만 변화, 나머지는 baseline(실측값). 실측 기준으로 스윕.
-SIGMAS = [0.2, 0.3, 0.5, 1.0, 1.5]
-SYSS   = [0.0, 0.005, 0.01, 0.02]       # 계통 intrinsic (실측 <1%)
-FKS    = [0.0, 2.0, 5.0, 10.0, 16.0]    # FK 병진 mm (실측 잔차 5~17)
-OUTS   = [0.0, 0.02, 0.05, 0.10]        # 오검출률 (실측 ~2%)
-# 그림 B 격자: 계통 × 오검출 (FK≈0)
+#   FK 는 두 종류를 분리: systematic(위치의존, 학습가능=보정 대상) vs random(제로평균, 학습불가).
+SIGMAS  = [0.2, 0.3, 0.5, 1.0, 1.5]
+SYSS    = [0.0, 0.005, 0.01, 0.02]        # 계통 intrinsic (실측 <1%)
+FK_SYS  = [0.0, 2.0, 5.0, 6.6, 10.0]      # systematic FK mm (실측 median 6.6) — 주 FK축
+FK_RAND = [0.0, 2.0, 5.0, 10.0, 16.0]     # random FK mm (대조: 보정 불가)
+OUTS    = [0.0, 0.02, 0.05, 0.10]         # 오검출률 (실측 ~2%)
+# 그림 B 격자: 계통 × 오검출 (FK=0)
 GRID_SYS = [0.0, 0.005, 0.01, 0.02]
 GRID_OUT = [0.0, 0.02, 0.05, 0.10]
-# 표 조건 (실측값 기반)
+# 표 조건 — cond = (sigma, sys, fk_random, fk_systematic, outlier). 실측값 기반.
+#   realistic(FK 없음/정확) 과 realistic_sysfk(FK 있음/실측 systematic) 를 나란히 비교.
 TABLE_CONDS = {
-    "ideal":     (0.0, 0.0, 0.0, 0.0),
-    "realistic": (0.2, 0.005, 0.0, 0.02),   # 실측: σ0.2 + 계통0.5% + FK≈0(목표) + 오검출2%
-    "fk_err":    (0.2, 0.0, 5.0, 0.0),       # FK 잔차오차(실측 5mm) 스트레스
-    "outlier":   (0.2, 0.0, 0.0, 0.05),
+    "ideal":           (0.0, 0.0,   0.0, 0.0,         0.0),
+    "realistic":       (0.2, 0.005, 0.0, 0.0,         0.02),   # FK 없음: σ0.2+계통0.5%+오검출2%
+    "realistic_sysfk": (0.2, 0.005, 0.0, SYS_FK_REAL, 0.02),   # FK 있음: +systematic FK 6.6mm(실측)
+    "fk_sys":          (0.2, 0.0,   0.0, SYS_FK_REAL, 0.0),    # systematic FK 격리
+    "fk_rand":         (0.2, 0.0,   5.0, 0.0,         0.0),    # random FK 격리 (대조)
+    "outlier":         (0.2, 0.0,   0.0, 0.0,         0.05),
 }
 
 
-def _ckey(sigma, sysv, fk, outl):
-    return f"{sigma:.3f}_{sysv:.3f}_{fk:.3f}_{outl:.3f}"
+def _ckey(sigma, sysv, fkr, fks, outl):
+    return f"{sigma:.3f}_{sysv:.3f}_{fkr:.3f}_{fks:.3f}_{outl:.3f}"
 
 
 def _all_conditions():
-    """필요한 모든 (sigma,sys,fk,outl) 유니크 집합 + 레이아웃."""
+    """필요한 모든 (sigma,sys,fk_rand,fk_sys,outl) 유니크 집합 + 레이아웃."""
     conds = {}
     def add(c): conds[_ckey(*c)] = c
     layout = {"figA": {}, "figB": {"sys": GRID_SYS, "out": GRID_OUT, "cells": {}}, "table": {}}
-    # 그림 A (비-스윕 축은 baseline=BASE_SIGMA·나머지0)
+    # 그림 A (비-스윕 축은 baseline=BASE_SIGMA·나머지0). FK 축은 systematic 을 주로.
     B = BASE_SIGMA
-    for s in SIGMAS: add((s, 0.0, 0.0, 0.0))
-    for v in SYSS:   add((B, v, 0.0, 0.0))
-    for f in FKS:    add((B, 0.0, f, 0.0))
-    for o in OUTS:   add((B, 0.0, 0.0, o))
-    layout["figA"]["sigma"] = {"levels": SIGMAS, "keys": [_ckey(s,0,0,0) for s in SIGMAS]}
-    layout["figA"]["sys"]   = {"levels": SYSS,   "keys": [_ckey(B,v,0,0) for v in SYSS]}
-    layout["figA"]["fk"]    = {"levels": FKS,    "keys": [_ckey(B,0,f,0) for f in FKS]}
-    layout["figA"]["outl"]  = {"levels": OUTS,   "keys": [_ckey(B,0,0,o) for o in OUTS]}
-    # 그림 B (계통 × 오검출, FK≈0)
+    for s in SIGMAS:  add((s, 0.0, 0.0, 0.0, 0.0))
+    for v in SYSS:    add((B, v, 0.0, 0.0, 0.0))
+    for f in FK_SYS:  add((B, 0.0, 0.0, f, 0.0))
+    for f in FK_RAND: add((B, 0.0, f, 0.0, 0.0))
+    for o in OUTS:    add((B, 0.0, 0.0, 0.0, o))
+    layout["figA"]["sigma"]  = {"levels": SIGMAS,  "keys": [_ckey(s,0,0,0,0) for s in SIGMAS]}
+    layout["figA"]["sys"]    = {"levels": SYSS,    "keys": [_ckey(B,v,0,0,0) for v in SYSS]}
+    layout["figA"]["fk_sys"] = {"levels": FK_SYS,  "keys": [_ckey(B,0,0,f,0) for f in FK_SYS]}
+    layout["figA"]["outl"]   = {"levels": OUTS,    "keys": [_ckey(B,0,0,0,o) for o in OUTS]}
+    # 대조: random FK sweep (보정 불가 확인용)
+    layout["fk_rand"] = {"levels": FK_RAND, "keys": [_ckey(B,0,f,0,0) for f in FK_RAND]}
+    # 그림 B (계통 × 오검출, FK=0)
     for xi, v in enumerate(GRID_SYS):
         for yi, o in enumerate(GRID_OUT):
-            add((B, v, 0.0, o))
-            layout["figB"]["cells"][f"{xi}_{yi}"] = _ckey(B, v, 0.0, o)
+            add((B, v, 0.0, 0.0, o))
+            layout["figB"]["cells"][f"{xi}_{yi}"] = _ckey(B, v, 0.0, 0.0, o)
     # 표
     for name, c in TABLE_CONDS.items():
         add(c); layout["table"][name] = _ckey(*c)
@@ -72,12 +81,13 @@ def _job(a):
     from core.scene import SimScene
     from core.experiment import calibrate
     from core.metrics import eval_model
-    sigma, sysv, fk, outl = cond
+    sigma, sysv, fkr, fks, outl = cond
     cfg = ALL[mi]
     acc = {k: [] for k in KEYS}
     try:
         sc = SimScene(seed=seed, n_sets=N_SETS, n_events_per_set=N_EVENTS,
-                      sigma_px=sigma, fk_noise_mm=fk, fk_noise_deg=fk / 10.0,
+                      sigma_px=sigma, fk_noise_mm=fkr, fk_noise_deg=fkr / 10.0,
+                      fk_sys_mm=fks, fk_sys_deg=fks * 0.08,   # 실측 dr~0.5°@6.6mm 비율
                       intrinsic_err=sysv, outlier_rate=outl, outlier_px=OUTLIER_PX,
                       n_gripped_events=N_GRIPPED)
         n = 0
@@ -104,9 +114,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--seeds", type=int, default=4)
     ap.add_argument("--workers", type=int, default=12)
-    ap.add_argument("--gripped", type=int, default=130)
+    ap.add_argument("--gripped", type=int, default=89)      # 실측 data/session
     ap.add_argument("--sets", type=int, default=13)
-    ap.add_argument("--events", type=int, default=13)
+    ap.add_argument("--events", type=int, default=11)       # 실측 eih/set
     ap.add_argument("--splits", type=int, default=3)
     args = ap.parse_args()
     global N_GRIPPED, N_SETS, N_EVENTS, N_SPLITS
@@ -169,16 +179,15 @@ def main():
     os.makedirs("results/tables", exist_ok=True)
     json.dump(out, open("results/tables/paper_sim.json", "w"), indent=2)
     print("[저장] results/tables/paper_sim.json")
-    # 미리보기 (realistic: median e_task + 발산율)
-    rk = layout["table"]["realistic"]
-    print("\nrealistic (median e_task mm | e_rel mm | reproj px | 발산율 | n):")
+    # 미리보기: FK 없음(realistic) vs FK 있음(realistic_sysfk) — median e_task
+    r0 = layout["table"]["realistic"]; r1 = layout["table"]["realistic_sysfk"]
+    print("\nFK 없음(realistic) vs FK 있음(systematic 6.6mm) — median e_task mm | reproj_raw px:")
+    print(f"  {'방법':22s} {'task(없음)':>10s} {'task(있음)':>10s} {'rawpx(없음)':>11s} {'rawpx(있음)':>11s}")
     for cfg in ALL:
-        r = results[rk][cfg.name]
-        v = r["e_task_mm"]
-        if v is None:
-            print(f"  {cfg.name} —"); continue
-        print(f"  {cfg.name:5s} {cfg.label:22s} task={v:6.2f}  rel={r['e_rel_mm']:6.2f}  "
-              f"reproj={r['e_reproj_px']:5.2f}  발산={r['_diverge']*100:4.0f}%  n={r['_n']}")
+        a = results[r0][cfg.name]; b = results[r1][cfg.name]
+        def g(d, k): return f"{d[k]:.2f}" if d.get(k) is not None else "—"
+        print(f"  {cfg.name} {cfg.label:18s} {g(a,'e_task_mm'):>10s} {g(b,'e_task_mm'):>10s} "
+              f"{g(a,'e_reproj_raw_px'):>11s} {g(b,'e_reproj_raw_px'):>11s}")
 
 
 if __name__ == "__main__":

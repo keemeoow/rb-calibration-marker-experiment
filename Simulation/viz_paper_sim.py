@@ -27,7 +27,7 @@ STYLE = {
 ORDER = ["EXP4", "EXP5", "EXP2", "EXP3", "EXP7", "EXP6", "EXP1"]
 COLLAPSE = {"EXP6"}
 AXES = [("sigma", "marker corner sigma (px)"), ("sys", "systematic intrinsic err"),
-        ("fk", "FK error (mm, random)"), ("outl", "outlier rate")]
+        ("fk_sys", "systematic FK error (mm)"), ("outl", "outlier rate")]
 
 
 def _cap(blob, keys, metric):
@@ -144,10 +144,22 @@ def tables(blob):
         dvs = f"{dv*100:.0f}%" if dv is not None else "—"
         lines.append(f"| {m} {LAB[m]} | {g('e_task_mm')} | {g('e_X_mm')} | {g('e_rel_mm')} | "
                      f"{g('e_reproj_raw_px')} | {g('e_cross_mm')} | {dvs} |")
-    # 표 1b: e_task 조건별
+    # 표 1c: FK 없음 vs 있음 (핵심 — FK 보정의 가치)
+    r0 = lay["table"]["realistic"]; r1 = lay["table"]["realistic_sysfk"]
+    lines += ["\n## 표 1c — FK 없음 vs FK 있음(systematic 6.6mm 실측) (median e_task mm)\n",
+              "*같은 realistic 조건에서 FK 오차만 추가. FK 보정(corr)이 systematic FK 를 얼마나 잡나.*\n",
+              "| 방법 | FK 없음 | FK 있음 | Δ(있음−없음) |", "|---|--:|--:|--:|"]
+    for m in METH:
+        a = R[r0][m].get("e_task_mm"); b = R[r1][m].get("e_task_mm")
+        if a is None or b is None:
+            lines.append(f"| {m} {LAB[m]} | — | — | — |"); continue
+        lines.append(f"| {m} {LAB[m]} | {a:.2f} | {b:.2f} | {b-a:+.2f} |")
+    # 표 1b: e_task 조건별 (systematic vs random FK 분리)
     lines += ["\n## 표 1b — 시뮬 · 조건별 e_task (mm, GT)\n",
-              "| 방법 | 이상적 | 현실종합 | +FK오차 | +오검출 |", "|---|--:|--:|--:|--:|"]
-    order = ["ideal", "realistic", "fk_err", "outlier"]
+              "*FK_sys=systematic(학습가능·보정대상), FK_rand=random(학습불가·대조).*\n",
+              "| 방법 | 이상적 | 현실(FK없음) | 현실+FK_sys | FK_sys격리 | FK_rand격리 | +오검출 |",
+              "|---|--:|--:|--:|--:|--:|--:|"]
+    order = ["ideal", "realistic", "realistic_sysfk", "fk_sys", "fk_rand", "outlier"]
     for m in METH:
         vals = []
         for c in order:

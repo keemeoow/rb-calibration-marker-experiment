@@ -19,6 +19,20 @@ DEFAULT_K = np.array([[597.5, 0, 327.3], [0, 599.7, 245.7], [0, 0, 1.0]])
 DEFAULT_DIST = np.array([0.0918, -0.2228, -0.0001, 0.0058, 0.0])   # brown k1,k2,p1,p2,k3
 IMAGE_W, IMAGE_H = 640, 480
 
+# 실측 카메라별 개별 intrinsic (charuco_intrinsics_report.json). real 은 카메라마다 K 가 달라
+#   (cy 최대 ~22px 차) 평균 K 하나가 아니라 개별값을 써야 충실. fixed=cam0/1/3, gripper=cam2.
+#   dist 는 [k1,k2,p1,p2,k3], k3=0 고정 (dist_model=brown_conrady_fixk3).
+REAL_CAM_INTR = {
+    0: {"K": np.array([[592.785, 0, 326.205], [0, 595.882, 258.082], [0, 0, 1.0]]),
+        "dist": np.array([0.07230, -0.18836, 0.00746, 0.00613, 0.0])},
+    1: {"K": np.array([[595.188, 0, 322.448], [0, 597.633, 249.406], [0, 0, 1.0]]),
+        "dist": np.array([0.09137, -0.22003, -0.00185, 0.00808, 0.0])},
+    2: {"K": np.array([[602.506, 0, 337.486], [0, 603.523, 236.303], [0, 0, 1.0]]),
+        "dist": np.array([0.08259, -0.19207, -0.00278, 0.00881, 0.0])},   # gripper (eye-in-hand)
+    3: {"K": np.array([[599.711, 0, 323.207], [0, 601.883, 239.089], [0, 0, 1.0]]),
+        "dist": np.array([0.12098, -0.29069, -0.00310, 0.00036, 0.0])},
+}
+
 
 def observe(target, T_cam_target, sigma_px=0.5, incidence_max_deg=75.0,
             K=DEFAULT_K, dist=DEFAULT_DIST, rng=None,
