@@ -70,7 +70,7 @@
 - 핵심: ②의 교차 검증 — 시험 답안 4명이 맞춰보기 → 개별 실수 검출·평균화
 - 표에서의 역할: 마커 기반 멀티카메라 **현재 SOTA**, 우리의 최근접 경쟁자 (FK는 100% 신뢰)
 
-## 6. Calib3R (2025) — "보드 없이 AI가 장면을 3D 복원"
+## 6. Calib3R (2025) — "보드 없이 AI가 장면을 3D 복원" ⚠️ 실험군 제외 → 인용만 (코드 미공개)
 
 > 📄 Allegro 외, *"Calib3R: A 3D Foundation Model for Multi-Camera to Robot Calibration and 3D Metric-Scaled Scene Reconstruction"*, arXiv:2509.08813, 2025 — [PDF](https://arxiv.org/pdf/2509.08813) · ⚠️ 코드: davidea97/Calib3R **현재 404** (비공개 전환 추정, 논문에도 공개 언급 없음) → 공개 재개 모니터링 + 대안 검토
 
@@ -139,7 +139,8 @@
 - **Allegro**: 애초에 멀티카메라 논문
   - 할 일: 같은 세션을 그들 형식으로 변환 (`cameraX/image/` + `pose/*.csv` + intrinsics yaml, `calibration_setup: 1`)
   - 그리퍼캠: eye-in-hand 모드(`calibration_setup: 0`) + 바닥 보드 데이터로 별도 실행
-- **Calib3R**: ⚠️ **코드 리포가 현재 404** (비공개 전환 추정) — 아래 3안 중 택1
+- **Calib3R**: ⚠️ **코드 404 → 실험군 제외 확정 (2026-08-05, 3안 채택)** — related work 인용만,
+  "코드 미공개로 정량 비교 불가" 명시. 코드 재공개 또는 저자 회신 시 복귀. (기록용 3안:)
   - 1안: 공개 재개 대기 (심사 통과 후 공개 관례) + 저자 이메일로 코드 요청
   - 2안: **대체 구성** — Calib3R 논문 자신의 베이스라인인 "MASt3R-SfM(코드 공개) + 핸드아이 정렬"을
     우리가 직접 조합 → "타깃리스 진영" 행을 이걸로 대체 (공개 코드 기준 충족)
