@@ -147,6 +147,7 @@ class SimScene:
         self.obs_fix_cube, self.obs_fix_board = {}, {}
         self.obs_grip_cube, self.obs_grip_board = {}, {}
         self.reproj = {}
+        self.corn = {}      # (id(store), key) -> (obj_rig3d, img2d_noisy, cam_key) : held-out 픽셀 재투영(③)용
         orng = np.random.default_rng(7000 + seed)
         for ci in self.fixed_cam_ids:
             for s in self.sets:
@@ -193,6 +194,7 @@ class SimScene:
                     K_pnp=self.K_pnp[cam_key], outlier_rate=self.outlier_rate,
                     outlier_px=self.outlier_px)
         if r is not None:
-            T_est, ncorner, reproj = r
+            T_est, ncorner, reproj, obj, img = r
             store[key] = T_est
             self.reproj[(id(store), key)] = reproj
+            self.corn[(id(store), key)] = (obj, img, cam_key)

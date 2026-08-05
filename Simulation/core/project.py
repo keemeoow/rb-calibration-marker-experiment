@@ -108,4 +108,5 @@ def observe(target, T_cam_target, sigma_px=0.5, incidence_max_deg=75.0,
     reproj, _ = cv2.projectPoints(obj.reshape(-1, 1, 3), rvec, tvec, K_pnp, dist_pnp)
     reproj = reproj.reshape(-1, 2)
     reproj_px = float(np.sqrt(np.mean(np.sum((reproj - img) ** 2, axis=1))))
-    return T_est, len(obj), reproj_px
+    # inlier raw corner 반환: obj(rig 3D), img(노이즈 낀 2D). held-out 픽셀 재투영(③)용.
+    return T_est, len(obj), reproj_px, obj.copy(), img.copy()

@@ -10,7 +10,8 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from configs import ALL          # EXP1~7 (7방법)
 
-KEYS = ["e_task_mm", "e_task_deg", "e_X_mm", "gTc_mm", "e_rel_mm", "e_reproj_px", "e_cross_mm"]
+KEYS = ["e_task_mm", "e_task_deg", "e_X_mm", "gTc_mm", "e_rel_mm",
+        "e_reproj_px", "e_reproj_raw_px", "e_cross_mm"]
 # 실제 규모/실측 노이즈 (main 에서 args 로 설정; fork 로 워커 상속)
 N_GRIPPED = 130
 N_SETS = 13

@@ -69,6 +69,45 @@ def _reproj_between(target, T_pred, T_obs):
     return float(np.sqrt(np.mean(np.sum((pa - pb) ** 2, axis=1))))
 
 
+def reproj_pixel(sc, model, sets, use_gt=False):
+    """held-out 픽셀 재투영(③) — 저장된 raw 2D corner 에 직접 재투영.
+
+    방식: 각 held-out set 의 큐브 base pose 를 **모델로 예측**(predict_cube_pose,
+    카메라당 1표 합의) → 각 고정 카메라 프레임으로 옮겨 큐브 rig 3D corner 를
+    그 카메라의 K_pnp 로 투영 → **관측 당시 저장한 noisy 2D corner** 와 픽셀 RMS 비교.
+    카메라 외부파라미터·핸드아이·정합이 모두 좋아야 하나의 예측 pose 가 모든 카메라의
+    실제 corner 를 재현 → 낮음. pose-level 이 아니라 **픽셀-level**, held-out 전용.
+
+    use_gt=True 면 예측 대신 GT 큐브 pose 사용(외부파라미터만 격리한 상한 참고용).
+    """
+    cams = model["cams"]
+    if not cams:
+        return None
+    CAP = 800.0                                   # 붕괴 시 화면밖 상한(px)
+    errs = []
+    for s in sets:
+        bTcube = sc.bTo[s] if use_gt else predict_cube_pose(sc, model, s)
+        if bTcube is None:
+            continue
+        for ci in sc.fixed_cam_ids:
+            if ci not in cams:
+                continue
+            ckey = (id(sc.obs_fix_cube), (ci, s))
+            if ckey not in sc.corn:
+                continue
+            obj, img, _ = sc.corn[ckey]
+            cTt = inv_T(cams[ci]) @ bTcube            # camera_est ← cube(예측)
+            R = cTt[:3, :3]; t = cTt[:3, 3]
+            pc = (R @ obj.T).T + t
+            if np.any(pc[:, 2] <= 1e-3):              # 카메라 뒤 → 붕괴
+                errs.append(CAP); continue
+            p, _ = cv2.projectPoints(obj.reshape(-1, 1, 3), cv2.Rodrigues(R)[0],
+                                     t.reshape(3, 1), sc.K_pnp[ci], DEFAULT_DIST)
+            e = float(np.sqrt(np.mean(np.sum((p.reshape(-1, 2) - img) ** 2, axis=1))))
+            errs.append(min(e, CAP))
+    return float(np.mean(errs)) if errs else None
+
+
 def _align_T(align):
     """독립 rigid 정합 (R,t) → 4x4. None 이면 항등."""
     if align is None:
@@ -170,6 +209,9 @@ def eval_model(sc, model, train_sets, test_sets, W=None):
             cross.append(np.mean([np.linalg.norm(p - c) for p in pts]) * 1000)
     out["e_cross_mm"] = float(np.mean(cross)) if cross else None
 
-    # e_reproj : 통일 재투영 — 캘리브에 뭘 썼든(보드만/큐브만) 보드+큐브 전체로 평가 (공정)
+    # e_reproj : 통일 재투영(pose-level) — 캘리브에 뭘 썼든 보드+큐브 전체로 평가 (공정, 참고)
     out["e_reproj_px"] = unified_reproj(sc, model)
+    # e_reproj_raw : held-out 픽셀 재투영(③) — 모델 예측 pose 를 저장된 raw 2D corner 에 직접
+    #   재투영. 픽셀-level·held-out 전용·방법별(외부파라미터+핸드아이+정합 모두 반영).  ← 논문 주 지표
+    out["e_reproj_raw_px"] = reproj_pixel(sc, model, test_sets, use_gt=False)
     return out
