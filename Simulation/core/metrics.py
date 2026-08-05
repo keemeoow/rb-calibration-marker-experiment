@@ -130,6 +130,19 @@ def eval_model(sc, model, train_sets, test_sets, W=None):
     out["bTf_mm"] = float(np.mean(ce)) if ce else None
     out["gTc_mm"] = g_mm
 
+    # e_rel : 카메라 쌍 상대 외부파라미터 정확도 (gauge 불변) — 멀티캠 상대 정합(3D 정합)
+    #   전역 좌표계 드리프트 제거 → "카메라끼리 얼마나 정확히 맞물렸나"만 본다.
+    rel_mm, rel_deg = [], []
+    cids = [ci for ci in sc.fixed_cam_ids if ci in cams]
+    for a in range(len(cids)):
+        for b in range(a + 1, len(cids)):
+            i, j = cids[a], cids[b]
+            re = inv_T(cams[i]) @ cams[j]
+            rg = inv_T(sc.bTf[i]) @ sc.bTf[j]
+            rel_mm.append(trans_mm(re, rg)); rel_deg.append(rot_deg(re, rg))
+    out["e_rel_mm"] = float(np.mean(rel_mm)) if rel_mm else None
+    out["e_rel_deg"] = float(np.mean(rel_deg)) if rel_deg else None
+
     # e_task : held-out 큐브 예측 오차 — **자세(스냅샷)마다** 예측(4카메라 median)하고 오차 평균.
     #   한 자세=고정3+그리퍼1(카메라당 1표). 그리퍼가 고정 실패를 못 가림(3표가 이김).
     t_mm, t_deg = [], []
@@ -141,11 +154,17 @@ def eval_model(sc, model, train_sets, test_sets, W=None):
     out["e_task_mm"] = float(np.mean(t_mm)) if t_mm else None
     out["e_task_deg"] = float(np.mean(t_deg)) if t_deg else None
 
-    # e_cross : 카메라 간 큐브위치 예측 일관성 (train)
+    # e_cross : 카메라 간 큐브위치 예측 일관성 (train) — 고정3 + 그리퍼1 (카메라당 1표, 독립 align)
+    gTc = model.get("gTc"); A = _align_T(model.get("align"))
     cross = []
     for s in train_sets:
         pts = [(cams[ci] @ sc.obs_fix_cube[(ci, s)])[:3, 3]
                for ci in sc.fixed_cam_ids if ci in cams and (ci, s) in sc.obs_fix_cube]
+        if gTc is not None:                       # 그리퍼 1표 = 이벤트들 median (독립이면 align)
+            gps = [(A @ (sc.bTg[e] @ gTc @ sc.obs_grip_cube[e]))[:3, 3]
+                   for e in sc.set_events.get(s, []) if e in sc.obs_grip_cube]
+            if gps:
+                pts.append(np.median(np.array(gps), axis=0))
         if len(pts) >= 2:
             c = np.mean(pts, 0)
             cross.append(np.mean([np.linalg.norm(p - c) for p in pts]) * 1000)

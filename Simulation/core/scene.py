@@ -37,7 +37,7 @@ _REAL_CENTER = _REAL["center"]     # 작업공간(큐브) 중심
 class SimScene:
     def __init__(self, seed=0, n_fixed_cams=3, n_sets=8, n_events_per_set=6,
                  sigma_px=0.3, fk_noise_mm=0.0, fk_noise_deg=0.0,
-                 intrinsic_err=0.0, outlier_rate=0.0,
+                 intrinsic_err=0.0, outlier_rate=0.0, outlier_px=15.0,
                  cam_radius_m=0.35, cam_height_m=0.35,
                  incidence_max_deg=75.0, use_real_cameras=True,
                  cam_downtilt_deg=27.0, n_gripped_events=0):
@@ -46,6 +46,7 @@ class SimScene:
         self.sigma_px = sigma_px
         self.incidence_max_deg = incidence_max_deg
         self.outlier_rate = outlier_rate
+        self.outlier_px = outlier_px
         self.intrinsic_err = intrinsic_err
 
         # ---- 고정 카메라 배치 ----
@@ -189,7 +190,8 @@ class SimScene:
         """3D 코너 투영→픽셀노이즈(+outlier)→PnP(부정확 K_pnp). 미검출이면 저장 안 함."""
         r = observe(target, T_gt, sigma_px=self.sigma_px,
                     incidence_max_deg=self.incidence_max_deg, rng=rng,
-                    K_pnp=self.K_pnp[cam_key], outlier_rate=self.outlier_rate)
+                    K_pnp=self.K_pnp[cam_key], outlier_rate=self.outlier_rate,
+                    outlier_px=self.outlier_px)
         if r is not None:
             T_est, ncorner, reproj = r
             store[key] = T_est
