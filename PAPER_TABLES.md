@@ -13,7 +13,6 @@ T-RO 2편(Ulrich, Gauss–Helmert)은 제외 확정 (상용 구현/원리적 부
 | Shah (robot-world) | closed-form AX=ZB | ✗ | 하드 | ✗ | OpenCV `calibrateRobotWorldHandEye` |
 | Tabb & Ahmad Yousef 2017 | iterative reproj. AX=ZB | 부분(공유 Z) | 하드 | ✗ | 공개 C++ (빌드) |
 | Allegro RA-L 2024 | unified 멀티카메라 | ✅ | 하드 | ✗ | 공개 C++ (리포 내 소스) — **이미지 필요 → 실데이터 전용** |
-| ~~Calib3R 2025~~ **제외 (2026-08)** | targetless foundation model | ✅ | 정렬용 | ✗ | **코드 404 (비공개 전환)** → 인용만. 코드 재공개/저자 회신 시 복귀 |
 | **Kalib (IROS 2025) — 학습기반 ① 확정** | AI 기준점 추적 (마커리스, CAD 불필요) | ✗ (per-cam) | FK 3D 좌표 사용 | ✗ | 피어리뷰 ✅ 코드·가중치 ✅ — 고정캠 전용, EE 스윕 영상 필요 |
 | **MASt3R-SfM+FK앵커 (ECCV'24/3DV'25) — 학습기반 ② 확정** | AI 장면복원 + 로봇 앵커 | ✅ (멀티뷰 정합) | 앵커(스케일·base)만 | ✗ | 피어리뷰 ✅ 코드·체크포인트 ✅ — Calib3R 자체 베이스라인 구성 그대로. 사전 정합 테스트 필요 |
 | fixed-FK (내부) | unified, 큐브=FK 하드 | ✅ | 하드 | ✗ | 우리 파이프라인 설정 |
@@ -96,4 +95,4 @@ T-RO 2편(Ulrich, Gauss–Helmert)은 제외 확정 (상용 구현/원리적 부
 1. 보드-온-EE 캡처 세션 (Tabb·Allegro·Shah 고정캠용) — PAPER_BASELINES.md 참조
 2. M3용 정밀 변위 시퀀스 캡처 (몇 분이면 됨 — 같은 날 세션에 포함 권장)
 3. M2용 큐브 치수 캘리퍼 실측 (1회)
-4. Calib3R 적용성 조사 (고정캠 지원 여부)
+4. MASt3R-SfM 사전 정합 테스트 (기존 캡처 사진, 30분) + Kalib 리포 의존성 점검
