@@ -81,9 +81,9 @@
 - 장단: 마커 준비 수고 없음 ↔ 마커만큼 정밀하기 어려움(통념)
 - 표에서의 역할: 보드-프리 AI 진영 최신 대표 — 우리가 이기면 "왜 아직 마커냐"에 실험으로 답
 
-## 6B. Kalib (2024) — Calib3R 대체 AI 후보: "AI가 그리퍼 끝점을 추적" ✅ 실험군 편입 후보
+## 6B. Kalib (IROS 2025) — 학습기반 baseline ① 확정: "AI가 그리퍼 끝점을 추적"
 
-> 📄 Tang 외, *"Kalib: Easy Hand-Eye Calibration with Reference Point Tracking"*, arXiv:2408.10562, 2024 — [PDF](https://arxiv.org/pdf/2408.10562) · 💻 [코드](https://github.com/robotflow-initiative/Kalib) (공개 ✅)
+> 📄 Tang, Liu, Xu & Lu, *"Kalib: Easy Hand-Eye Calibration with Reference Point Tracking"*, **IROS 2025** (DOI 10.1109/IROS60139.2025.11247188) — [PDF](https://arxiv.org/pdf/2408.10562) · 💻 [코드](https://github.com/robotflow-initiative/Kalib) (공개 ✅, 기성 파운데이션 트래커 가중치 공개)
 
 - 셋업: 마커 없음 — 로봇 위 **기준점 1개**(그리퍼 끝)만 정의
 - 풀이 절차
@@ -97,7 +97,23 @@
   - 픽셀 트래킹 정밀도 < 마커 코너 검출 → 우리에게 유리하되 공정한 비교군
 - 데이터 요구: 스냅샷이 아닌 **연속 영상** (각 고정캠 30초~1분, 로봇 EE 스윕) + 동기화 FK
   → 보드-온-EE 캡처 세션 날 몇 분 추가로 해결
-- 표에서의 역할: **AI/학습기반 진영 행을 Calib3R 대신 담당**
+- 표에서의 역할: **학습기반 ① — AI 추적 계열 대표** (피어리뷰·코드·가중치·CAD-프리 전부 충족)
+
+## 6C. MASt3R-SfM + FK 앵커 — 학습기반 baseline ② 확정: "AI 장면복원 + 로봇 앵커"
+
+> 📄 MASt3R: Leroy, Cabon & Revaud, *"Grounding Image Matching in 3D with MASt3R"*, **ECCV 2024 (oral)** /
+> MASt3R-SfM: *"a Fully-Integrated Solution for Unconstrained Structure-from-Motion"*, **3DV 2025**
+> — 💻 [naver/mast3r](https://github.com/naver/mast3r) (코드 + 공식 체크포인트 공개 ✅)
+
+- 구성: [1단] MASt3R-SfM 으로 고정캠 멀티뷰 상대 기하 복원(스케일 미지) → [2단] FK 앵커 1개로
+  미터 스케일 + base 정렬 (**Calib3R 논문의 자체 베이스라인 "MASt3R-SfM + Calib" 구성 그대로** — 자의적 조립 아님)
+- 역할: **학습기반 ② — AI 장면복원 계열 대표** (로봇-프리 멀티카메라 학습 계열 전체를 이 행이 대표)
+- 주의
+  - 앵커 단계는 우리 구현 (전 방법 공통 적용으로 공정성 확보)
+  - 넓은 베이스라인 + 텍스처 빈약 워크셀 = 장면 기반 최악 조건 → **기존 캡처로 30분 사전 정합
+    테스트 후 최종 확정**. 실패 시 VGGT(CVPR 2025, 가중치 공개)로 교체 시도
+- 배제 재확인: EasyHeC++(IROS 2024, 피어리뷰·코드 있음)는 **CAD 필수**라 제외 — Calib3R 도 robot-body
+  학습 계열을 동일 사유로 비교에서 제외한 선례 있음
 
 ---
 
