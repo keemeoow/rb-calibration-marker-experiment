@@ -69,36 +69,43 @@ def _reproj_between(target, T_pred, T_obs):
     return float(np.sqrt(np.mean(np.sum((pa - pb) ** 2, axis=1))))
 
 
-def predict_cube_pos(sc, model, s):
-    """캘리브된 카메라들로 set s 큐브 중심(base)을 예측 (축별 median)."""
-    cams = model["cams"]; gTc = model.get("gTc")
-    pts = []
-    for ci in sc.fixed_cam_ids:
-        if ci in cams and (ci, s) in sc.obs_fix_cube:
-            pts.append((cams[ci] @ sc.obs_fix_cube[(ci, s)])[:3, 3])
+def _align_T(align):
+    """독립 rigid 정합 (R,t) → 4x4. None 이면 항등."""
+    if align is None:
+        return np.eye(4)
+    R, t = align
+    A = np.eye(4); A[:3, :3] = R; A[:3, 3] = t
+    return A
+
+
+def predict_cube_snapshots(sc, model, s):
+    """한 자세(그리퍼 스냅샷)마다 4카메라(고정3 + 그리퍼1) median 으로 큐브 pose 예측.
+    카메라당 1표 (그리퍼는 그 스냅샷 1장). 독립(align)이면 그리퍼 예측을 고정 프레임으로 정합.
+    → 스냅샷별 pose(4x4) 리스트. 그리퍼 없으면 고정만 1개."""
+    cams = model["cams"]; gTc = model.get("gTc"); A = _align_T(model.get("align"))
+    fixed = [cams[ci] @ sc.obs_fix_cube[(ci, s)]
+             for ci in sc.fixed_cam_ids if ci in cams and (ci, s) in sc.obs_fix_cube]
+    out = []
     if gTc is not None:
         for e in sc.set_events.get(s, []):
-            if e in sc.obs_grip_cube:
-                pts.append((sc.bTg[e] @ gTc @ sc.obs_grip_cube[e])[:3, 3])
-    if not pts:
-        return None
-    p = np.median(np.array(pts), axis=0)
-    # 독립(indep)의 rigid 정합이 있으면 그리퍼 예측을 고정 base 로 (여기선 합의 median 사용)
-    return p
+            if e not in sc.obs_grip_cube:
+                continue
+            gp = A @ (sc.bTg[e] @ gTc @ sc.obs_grip_cube[e])   # 독립이면 고정 프레임으로 정합
+            out.append(se3_avg(fixed + [gp]))                   # 고정3 + 그리퍼1 = 카메라당 1표
+    if not out and fixed:
+        out.append(se3_avg(fixed))
+    return out
 
 
 def predict_cube_pose(sc, model, s):
-    """set s 큐브 **pose(4x4)** 예측 — 카메라 합의(회전 포함)."""
-    cams = model["cams"]; gTc = model.get("gTc")
-    Ts = []
-    for ci in sc.fixed_cam_ids:
-        if ci in cams and (ci, s) in sc.obs_fix_cube:
-            Ts.append(cams[ci] @ sc.obs_fix_cube[(ci, s)])
-    if gTc is not None:
-        for e in sc.set_events.get(s, []):
-            if e in sc.obs_grip_cube:
-                Ts.append(sc.bTg[e] @ gTc @ sc.obs_grip_cube[e])
-    return se3_avg(Ts) if Ts else None
+    """set 대표 pose = 스냅샷 예측들의 합의 (W 학습·요약용)."""
+    snaps = predict_cube_snapshots(sc, model, s)
+    return se3_avg(snaps) if snaps else None
+
+
+def predict_cube_pos(sc, model, s):
+    p = predict_cube_pose(sc, model, s)
+    return None if p is None else p[:3, 3]
 
 
 def eval_model(sc, model, train_sets, test_sets, W=None):
@@ -123,15 +130,14 @@ def eval_model(sc, model, train_sets, test_sets, W=None):
     out["bTf_mm"] = float(np.mean(ce)) if ce else None
     out["gTc_mm"] = g_mm
 
-    # e_task : held-out 큐브 pose 예측 오차 (위치 mm + 회전°)
+    # e_task : held-out 큐브 예측 오차 — **자세(스냅샷)마다** 예측(4카메라 median)하고 오차 평균.
+    #   한 자세=고정3+그리퍼1(카메라당 1표). 그리퍼가 고정 실패를 못 가림(3표가 이김).
     t_mm, t_deg = [], []
     for s in test_sets:
-        p = predict_cube_pose(sc, model, s)
-        if p is None:
-            continue
-        pos = apply_fk_correction(p[:3, 3], W) if W is not None else p[:3, 3]
-        t_mm.append(np.linalg.norm(pos - sc.bTo[s][:3, 3]) * 1000)
-        t_deg.append(rot_deg(p, sc.bTo[s]))
+        for p in predict_cube_snapshots(sc, model, s):
+            pos = apply_fk_correction(p[:3, 3], W) if W is not None else p[:3, 3]
+            t_mm.append(np.linalg.norm(pos - sc.bTo[s][:3, 3]) * 1000)
+            t_deg.append(rot_deg(p, sc.bTo[s]))
     out["e_task_mm"] = float(np.mean(t_mm)) if t_mm else None
     out["e_task_deg"] = float(np.mean(t_deg)) if t_deg else None
 
