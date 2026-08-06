@@ -36,6 +36,7 @@ from typing import Dict, List, Sequence
 import numpy as np
 
 import CP_ablation_7row as ab
+import CP_common
 from calibration_reprojection_backend import PoseState, inv_T, project_points
 
 ROWS = ["A0", "A1", "A2", "A3", "B1", "B2", "B3"]
@@ -87,10 +88,16 @@ def install_detection_cache():
     ab.detect_observations = cached
 
 
-def load_split_rows(multisplit_dir: str, seed: int) -> dict:
-    path = os.path.join(multisplit_dir, f"split_{seed}", "seven_row_ablation.json")
+def load_split_rows(multisplit_dir: str, seed: int, root_folder: str) -> dict:
+    split_dir = os.path.join(multisplit_dir, f"split_{seed}")
+    path = os.path.join(split_dir, "seven_row_ablation.json")
     with open(path) as handle:
-        return json.load(handle)["rows"]
+        payload = json.load(handle)
+    CP_common.assert_artifact_robot_pos_scale(
+        payload, path,
+        fk_cube_path=os.path.join(split_dir, "shared_board_free_fk_cube.json"),
+        root_folder=root_folder)
+    return payload["rows"]
 
 
 def load_d2_runs(path: str, seed: int) -> List[dict]:
@@ -99,6 +106,9 @@ def load_d2_runs(path: str, seed: int) -> List[dict]:
         return []
     with open(path) as handle:
         payload = json.load(handle)
+    # These runs are scored side by side with the multisplit rows above; a scale
+    # mismatch between the two is exactly what put them on different bases before.
+    CP_common.assert_artifact_robot_pos_scale(payload, path)
     runs = payload.get("per_split", {}).get(str(seed), {}).get(D2_ARM, [])
     if not runs or "transforms" not in runs[0]:
         return []
@@ -174,7 +184,7 @@ def main() -> None:
         prepared = ab.prepare_ablation_data(split_args)
         K_MAP, D_MAP = prepared.K_map, prepared.D_map
         gripper = prepared.gripper
-        stored = load_split_rows(args.multisplit_dir, seed)
+        stored = load_split_rows(args.multisplit_dir, seed, args.root_folder)
         runs_by_row = {row: stored[row]["runs"] for row in ROWS}
         for row in ROWS:
             conditions[row] = stored[row]["condition"]

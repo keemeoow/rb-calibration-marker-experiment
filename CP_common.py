@@ -228,6 +228,94 @@ def robot_pos_scale() -> float:
     return ROBOT_POS_SCALE_PINNED
 
 
+def artifact_robot_pos_scale(payload: dict):
+    """The ``robot_pos_scale`` a stored result recorded, or None if it predates it.
+
+    Producers write the key either at the top level (D1, D2) or inside
+    ``protocol`` (the 7-row runner, the repeated-split aggregate).
+    """
+    for holder in (payload, payload.get("protocol") if isinstance(payload, dict) else None):
+        if isinstance(holder, dict) and "robot_pos_scale" in holder:
+            return float(holder["robot_pos_scale"])
+    return None
+
+
+def verify_stored_fk_cube_scale(fk_cube_path: str, meta: dict,
+                                tol_mm: float = 1e-3) -> float:
+    """Recompute the FK cube poses at the pinned k and return the max deviation (mm).
+
+    Independent of any recorded metadata: ``shared_board_free_fk_cube.json`` stores
+    ``raw_fk_pose_by_set``, which is exactly what
+    ``Step3_calibration.load_nominal_set_cube_transforms`` produces, so recomputing
+    it at the current pin either reproduces the stored poses or does not.  This is
+    how the k=1.0229 contamination was originally caught — the same poses agreed to
+    0.0000 mm at k=1.0 and differed by 12.36 mm mean / 16.50 mm max at k=1.0229.
+
+    Raises if the artifact was produced at a different scale.
+    """
+    import Step3_calibration  # local: Step3 imports this module at load time
+
+    with open(fk_cube_path) as handle:
+        stored = json.load(handle).get("raw_fk_pose_by_set")
+    if not stored:
+        raise RuntimeError(
+            f"{fk_cube_path} stores no raw_fk_pose_by_set, so its robot scale "
+            "cannot be verified.")
+    recomputed = Step3_calibration.load_nominal_set_cube_transforms(meta)
+    worst = 0.0
+    for set_id, pose in stored.items():
+        current = recomputed.get(int(set_id))
+        if current is None:
+            continue
+        delta = np.asarray(pose, dtype=np.float64)[:3, 3] - current[:3, 3]
+        worst = max(worst, float(np.linalg.norm(delta)) * 1000.0)
+    if worst > tol_mm:
+        raise RuntimeError(
+            f"{fk_cube_path} does not reproduce at "
+            f"CP_common.ROBOT_POS_SCALE_PINNED={ROBOT_POS_SCALE_PINNED}: FK cube "
+            f"centers differ by up to {worst:.4f} mm. It was produced at a different "
+            "robot scale — regenerate it instead of reusing it.")
+    return worst
+
+
+def assert_artifact_robot_pos_scale(payload: dict, path: str,
+                                    fk_cube_path: str = None,
+                                    root_folder: str = None) -> None:
+    """Refuse to reuse a stored artifact that was produced at a different k.
+
+    ``robot_pos_scale()`` guards the *shell* — it stops a stale environment
+    variable from producing a second scale.  It cannot stop the other half of the
+    failure: reading a result file that was written before the pin changed.  That
+    is what actually happened; Table 1 ended up with A0-B3 at k=1.0 and the
+    adopted-configuration rows at k=1.0229, and D2's own ``reference_agreement``
+    tolerance was too coarse (3.5 mm split std vs a 5.3 mm shift) to notice.
+
+    Artifacts written before ``robot_pos_scale`` was recorded carry no metadata to
+    check, so they are accepted only when ``fk_cube_path``/``root_folder`` let the
+    scale be verified from the stored FK cube poses themselves.  Unverifiable is
+    refused — trusting an unlabelled artifact is the exact mistake this guard is for.
+    """
+    stored = artifact_robot_pos_scale(payload)
+    if stored is not None:
+        if stored != ROBOT_POS_SCALE_PINNED:
+            raise RuntimeError(
+                f"{path} was produced at robot_pos_scale={stored}, but "
+                f"CP_common.ROBOT_POS_SCALE_PINNED={ROBOT_POS_SCALE_PINNED}. Results at "
+                "two scales are silently incomparable — regenerate this artifact "
+                "instead of mixing it with freshly computed rows.")
+        return
+    if fk_cube_path and root_folder and os.path.exists(fk_cube_path):
+        with open(os.path.join(root_folder, "meta.json")) as handle:
+            meta = json.load(handle)
+        verify_stored_fk_cube_scale(fk_cube_path, meta)
+        return
+    raise RuntimeError(
+        f"{path} records no robot_pos_scale and has no FK cube artifact to verify "
+        f"against, so it cannot be shown to match "
+        f"CP_common.ROBOT_POS_SCALE_PINNED={ROBOT_POS_SCALE_PINNED}. Regenerate it "
+        "instead of reusing it.")
+
+
 def pose6_to_T_base_gripper(pose6: List[float]) -> np.ndarray:
     # Project convention: robot 6-DoF pose is [x,y,z (mm), rz,ry,rx (deg)] and
     # euler_deg_to_matrix returns the full 4x4 with translation in meters.

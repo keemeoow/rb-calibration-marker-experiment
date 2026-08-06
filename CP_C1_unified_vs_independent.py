@@ -707,7 +707,8 @@ def main() -> None:
     est = cp.estimate_robot_pos_scale(meta)
     est_txt = (f"data estimate k={est['k']:.4f} (robot short {est['implied_robot_short_pct']:+.1f}%, "
                f"n_reliable={est['n_reliable']})") if est.get("k") else f"data estimate: {est.get('reason','n/a')}"
-    print(f"[INFO] robot_pos_scale applied={rps:.4f} (RB_ROBOT_POS_SCALE); {est_txt}")
+    print(f"[INFO] robot_pos_scale applied={rps:.4f} "
+          f"(CP_common.ROBOT_POS_SCALE_PINNED); {est_txt}")
     if len(sc.sets) < 3:
         print(f"[WARN] only {len(sc.sets)} set(s) with FK cube — base gauge is weakly "
               f"constrained; treat numbers as smoke-test only (need >=3 sets).")

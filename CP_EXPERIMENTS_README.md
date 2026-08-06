@@ -8,7 +8,7 @@
 각 CP 실험은 C1/C2/C3 서로 독립 실행되며, 공유 로더/기하/지표는 `CP_common.py` 에 있다.
 
 > **논문 핵심표의 source of truth는
-> [`CP_result/Calibration_Experiment_table.md`](CP_result/Calibration_Experiment_table.md)다.** 아래의 기존
+> [`Calibration_Experiment_table.md`](Calibration_Experiment_table.md)다.** 아래의 기존
 > C1/C2/C3는 서로 다른 historical/component 실험이므로, canonical A0–B3의 통제된 인과 비교나
 > 외부-GT accuracy로 재해석하지 않는다. 특히 C1의 FK 후보정과 C2의 marker-source 결과는
 > Main Ablation 행에 섞지 않는다.
@@ -135,7 +135,7 @@ target pose source이며, [`CP_ablation_schema.py`](CP_ablation_schema.py)에 7�
 단일 **board-free FK artifact**, event-stratified held-out reprojection 평가, noise-free
 `A1=A2`/`B1=A3` sanity gate도 포함된다. Train reprojection은 최적화 진단값으로만
 보고하고 method 순위의 1차 지표로 사용하지 않는다. 상세 계약은
-[`CP_result/Calibration_Experiment_table.md`](CP_result/Calibration_Experiment_table.md)에 있다.
+[`Calibration_Experiment_table.md`](Calibration_Experiment_table.md)에 있다.
 
 FK-fixed 행의 artifact는 board hand-eye보다 먼저, raw `set_cube_center_6dof`와 train eih
 cube corners만으로 `T_gripper_cam`과 FK-cube→tag-object delta를 공동 추정한다.
@@ -299,7 +299,7 @@ SOTA 표는 서로 다른 논문의 mm/°를 `e_task_pose` 하나로 합치지 �
   보고하며, 외부 논문의 mm/°와 순위를 만들지 않는다.
 
 원문 링크와 전체 표·runtime/view 정의는
-[`CP_result/Calibration_Experiment_table.md`](CP_result/Calibration_Experiment_table.md)의 Table 6에 있다.
+[`Calibration_Experiment_table.md`](Calibration_Experiment_table.md)의 Table 6에 있다.
 
 ### A2 strict-none vs A3 FK-fixed — historical 진단
 
@@ -327,7 +327,7 @@ backend·동일 solver 설정·동일 예측 mask**에서 직접 측정한다. �
 Ridge 후보정(C1)은 backend·target set·split·지표가 모두 달라 조합의 우열을 말할 수 없었다.
 
 ```bash
-RB_ROBOT_POS_SCALE=<k> PYTHONPATH= python3 CP_D1_fk_correction_2x2.py \
+PYTHONPATH= python3 CP_D1_fk_correction_2x2.py \
     --root_folder data/session --intrinsics_dir intrinsics \
     --calib_dir data/session/calib_out \
     --out_dir CP_result/D1_fk_correction_2x2
@@ -350,10 +350,10 @@ Arm 은 canonical 스키마의 A2/A3 그대로이며 차이는 `T_base_cube_by_s
 
 **산출물** `CP_result/D1_fk_correction_2x2/` : `D1_fk_correction_2x2.{md,json,csv}`.
 결과·판정·한계는 핵심표 Table 1 안의
-["A2/A3 위치 hold-out 재검증 — D1 2×2"](CP_result/Calibration_Experiment_table.md)
+["A2/A3 위치 hold-out 재검증 — D1 2×2"](Calibration_Experiment_table.md)
 절에 있다. 요약하면 잔차 보정은 두 arm
-모두에서 실재하는 효과(A2 −1.587 mm, t=−4.59 / A3 −0.824 mm, t=−2.46)이고, FK 고정 여부는
-13개 위치로는 판정되지 않는다(모든 A3−A2 대비 `|t| ≤ 1.05`).
+모두에서 실재하는 효과(Ridge 보정: A2 −2.361 mm, t=−3.86, 12/13 fold / A3 −2.227 mm, t=−5.13,
+12/13 fold)이고, FK 고정 여부는 13개 위치로는 판정되지 않는다(A3−A2 @ ridge `t = −1.66`).
 
 ---
 

@@ -1,4 +1,6 @@
+import os
 from types import SimpleNamespace
+from unittest import mock
 import unittest
 
 import cv2
@@ -25,6 +27,7 @@ from CP_ablation_multisplit import summarize_effects
 from CP_synthetic_7row import ROWS as SYNTHETIC_ROWS, aggregate_pixel_trials
 from CP_sensitivity_7row import select_balanced_events
 from CP_metric_board_only import handeye_camera
+import CP_common
 from CP_common import _finalize_opt
 from calibration_fk_cube_artifact import estimate_board_free_fk_cube_artifact
 from calibration_path_evaluation import (
@@ -443,6 +446,43 @@ class SevenRowAblationContractTest(unittest.TestCase):
         dt, dr = pose_delta(legacy_gtc, corner_gtc)
         self.assertLess(dt, 1e-3)
         self.assertLess(dr, 1e-5)
+
+
+class RobotPosScaleGuardTest(unittest.TestCase):
+    """The k guard, on both halves of the failure it exists for.
+
+    Half one is the shell: a stale ``RB_ROBOT_POS_SCALE`` producing a second
+    scale.  Half two is the stored artifact: reading a result written at a
+    different pin.  Mixing the two is what put Table 1's A0-B3 rows on k=1.0 and
+    its adopted-configuration rows on k=1.0229 without any check firing.
+    """
+
+    def test_env_override_disagreeing_with_pin_is_refused(self):
+        with mock.patch.dict(
+                os.environ, {"RB_ROBOT_POS_SCALE": str(CP_common.ROBOT_POS_SCALE_PINNED + 0.02)}):
+            with self.assertRaises(RuntimeError):
+                CP_common.robot_pos_scale()
+
+    def test_env_override_agreeing_with_pin_is_allowed(self):
+        with mock.patch.dict(
+                os.environ, {"RB_ROBOT_POS_SCALE": str(CP_common.ROBOT_POS_SCALE_PINNED)}):
+            self.assertEqual(CP_common.robot_pos_scale(), CP_common.ROBOT_POS_SCALE_PINNED)
+
+    def test_artifact_recorded_at_other_scale_is_refused(self):
+        stale = {"robot_pos_scale": CP_common.ROBOT_POS_SCALE_PINNED + 0.0229}
+        with self.assertRaises(RuntimeError):
+            CP_common.assert_artifact_robot_pos_scale(stale, "stale.json")
+
+    def test_artifact_recorded_in_protocol_block_is_read(self):
+        matching = {"protocol": {"robot_pos_scale": CP_common.ROBOT_POS_SCALE_PINNED}}
+        CP_common.assert_artifact_robot_pos_scale(matching, "ok.json")
+        self.assertEqual(CP_common.artifact_robot_pos_scale(matching),
+                         CP_common.ROBOT_POS_SCALE_PINNED)
+
+    def test_unlabelled_unverifiable_artifact_is_refused(self):
+        """Silence is not agreement — an artifact that cannot be checked is refused."""
+        with self.assertRaises(RuntimeError):
+            CP_common.assert_artifact_robot_pos_scale({"summary": {}}, "unlabelled.json")
 
 
 if __name__ == "__main__":

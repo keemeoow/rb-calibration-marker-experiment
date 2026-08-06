@@ -22,6 +22,8 @@ set 마다 두 방법을 한 세션에 촬영하도록 두 종류 waypoint 를 �
   python tools/build_waypoints_from_pool.py \
       --grip ./grip_poses.json --poses ./capture_poses.json --sets ./capture_sets.json \
       --output ./data/session/capture_waypoints.json \
+      --safe_joints_empty d1,d2,d3,d4,d5,d6 \
+      --safe_joints_gripped d1,d2,d3,d4,d5,d6 \
       --n_grip_per_set 10 --n_per_set 5 --seed 0
 """
 import argparse
@@ -29,6 +31,15 @@ import json
 import os
 import random
 import sys
+
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+from waypoint_safety import (
+    validate_joint_vector,
+    validate_safe_joint_config,
+    validate_waypoint_semantics,
+)
 
 
 def _load(path, key):
@@ -57,21 +68,33 @@ def _pick(rng, pool, n, allow_repeat):
     return rng.sample(pool, n)
 
 
+def _joint_csv(value):
+    try:
+        parsed = [float(x.strip()) for x in value.split(",")]
+        return validate_joint_vector(parsed, "safe joints")
+    except (TypeError, ValueError) as exc:
+        raise argparse.ArgumentTypeError(str(exc))
+
+
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--poses", default="./capture_poses.json",
                     help="A placement 뷰포인트 풀 (recpose 출력)")
     ap.add_argument("--grip", default="./grip_poses.json",
-                    help="B 그립-스윕 포즈 풀 (recgrip 출력). n_grip_per_set=0 이면 생략")
+                    help="B 그립-스윕 포즈 풀 (recgrip 출력)")
     ap.add_argument("--sets", default="./capture_sets.json",
                     help="큐브 set 배치 (recset 출력)")
     ap.add_argument("--output", default="./data/session/capture_waypoints.json",
                     help="출력 waypoint JSON (서버 소비 포맷)")
+    ap.add_argument("--safe_joints_empty", type=_joint_csv, required=True,
+                    help="물리 검증한 empty-gripper safe joint 6개(쉼표 구분)")
+    ap.add_argument("--safe_joints_gripped", type=_joint_csv, required=True,
+                    help="물리 검증한 gripped-cube safe joint 6개(쉼표 구분)")
     ap.add_argument("--n_per_set", type=int, default=5,
                     help="set 당 A placement 포즈 수 (기본 5)")
     ap.add_argument("--n_grip_per_set", type=int, default=10,
-                    help="set 당 B 그립-스윕 포즈 수 (기본 10). 0 이면 B 생략")
+                    help="set 당 B 그립-스윕 포즈 수 (기본 10, paired 실험은 1 이상)")
     ap.add_argument("--b_ref_set", type=int, default=0,
                     help="B 스윕 패턴을 기록한 기준 set 의 인덱스(0-based). 그 set 의 "
                          "큐브중심(C_ref)을 기준으로 각 set 큐브중심으로 x,y,z 평행이동")
@@ -105,10 +128,9 @@ def main():
         print(f"[INFO] B 기준 set index={args.b_ref_set}  "
               f"C_ref(xyz)={[round(v, 1) for v in c_ref[:3]]}")
 
-    if args.n_per_set < 0 or args.n_grip_per_set < 0:
-        sys.exit("[ERROR] --n_per_set / --n_grip_per_set 은 0 이상")
-    if args.n_per_set == 0 and not use_grip:
-        sys.exit("[ERROR] A/B 둘 다 0 이면 생성할 게 없음")
+    if args.n_per_set <= 0 or args.n_grip_per_set <= 0:
+        sys.exit("[ERROR] 최종 paired 실험은 모든 set에 A/B가 모두 필요하므로 "
+                 "--n_per_set / --n_grip_per_set 은 1 이상이어야 함")
     if args.n_per_set > len(poses) and not args.allow_repeat:
         sys.exit(f"[ERROR] --n_per_set {args.n_per_set} > A 포즈 수 {len(poses)} "
                  f"(--allow_repeat 또는 포즈 추가)")
@@ -178,6 +200,8 @@ def main():
     n_b = sum(1 for w in waypoints if w["capture_block"] == "B_eyetohand")
     n_a = sum(1 for w in waypoints if w["capture_block"] == "A_placement")
     out = {
+        "safe_joints_empty": args.safe_joints_empty,
+        "safe_joints_gripped": args.safe_joints_gripped,
         "set_joints": [float(x) for x in sets[0]["place_joints"]],
         "set_tcp": ([float(x) for x in sets[0]["place_tcp"]]
                     if isinstance(sets[0].get("place_tcp"), list) else None),
@@ -197,6 +221,8 @@ def main():
             "total_A_placement": n_a,
         },
     }
+    validate_safe_joint_config(out)
+    validate_waypoint_semantics(out)
 
     print(f"[INFO] 총 waypoints: {len(waypoints)}  (B eye-to-hand: {n_b}, A placement: {n_a})")
 

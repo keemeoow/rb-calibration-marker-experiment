@@ -26,7 +26,7 @@ script says so instead of quietly reporting.
 
 Usage
 -----
-    RB_ROBOT_POS_SCALE=<k> PYTHONPATH= python3 CP_D2_anchored_event_split.py \
+    PYTHONPATH= python3 CP_D2_anchored_event_split.py \
         --root_folder data/session --intrinsics_dir intrinsics \
         --calib_dir data/session/calib_out \
         --out_dir CP_result/D2_anchored_event_split
@@ -286,7 +286,7 @@ def write_outputs(result: Mapping, out_dir: str) -> None:
         "실행이다. D1은 위치 hold-out·mm 지표였고 이 표는 **Table 1과 동일한 이벤트 split·"
         "동일 지표**다.",
         "",
-        f"- `RB_ROBOT_POS_SCALE` = **{result['robot_pos_scale']:.4f}** "
+        f"- `CP_common.ROBOT_POS_SCALE_PINNED` = **{result['robot_pos_scale']:.4f}** "
         f"({'로봇 원본 값 그대로' if result['robot_pos_scale'] == 1.0 else '병진 보정 적용'}). "
         "아래 재현 확인은 이 값이 Table 1과 같을 때만 의미가 있다 — 게이트의 허용치가 "
         "split 표준편차라서 스케일 불일치를 단독으로는 걸러내지 못한다.",

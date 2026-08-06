@@ -3,7 +3,9 @@
 RealSense camera wrapper with threaded capture.
 Supports multiple cameras simultaneously.
 
-Each camera keeps a short ring buffer of (timestamp, color, depth) frames
+Each camera keeps a short ring buffer with a host-monotonic receipt timestamp
+and the RealSense device timestamp. Cross-camera matching uses the host clock;
+device timestamps are not assumed to share an epoch across independent devices.
 so callers can retrieve the frame closest to a target timestamp via
 `get_at()`, enabling software synchronization across multiple cameras.
 
@@ -208,31 +210,60 @@ class RealSenseCamera:
                 if self.use_color and color is None:
                     continue
 
-                ts_ms = None
+                device_ts_ms = None
+                timestamp_domain = None
                 if color is not None:
-                    ts_ms = float(color.get_timestamp())
+                    device_ts_ms = float(color.get_timestamp())
+                    try:
+                        timestamp_domain = str(color.get_frame_timestamp_domain())
+                    except Exception:
+                        timestamp_domain = None
                 elif depth is not None:
-                    ts_ms = float(depth.get_timestamp())
+                    device_ts_ms = float(depth.get_timestamp())
+                    try:
+                        timestamp_domain = str(depth.get_frame_timestamp_domain())
+                    except Exception:
+                        timestamp_domain = None
+
+                # Comparable across all camera threads in this process. Independent
+                # RealSense hardware clocks can differ by minutes after reset.
+                host_ts_ms = time.monotonic() * 1000.0
 
                 color_arr = None if color is None else np.asanyarray(color.get_data()).copy()
                 depth_arr = None if depth is None else np.asanyarray(depth.get_data()).copy()
 
                 with self._lock:
-                    self._buf.append((ts_ms, color_arr, depth_arr))
+                    self._buf.append(
+                        (host_ts_ms, device_ts_ms, timestamp_domain, color_arr, depth_arr)
+                    )
             except Exception:
                 time.sleep(0.005)
 
     def get_latest(self) -> Tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[float]]:
-        """Return (color_bgr, depth_u16, timestamp_ms) - copies of most recent frame."""
+        """Return color/depth and comparable host-monotonic receipt time in ms."""
         with self._lock:
             if not self._buf:
                 return None, None, None
-            ts, c, d = self._buf[-1]
-        return (None if c is None else c.copy()), (None if d is None else d.copy()), ts
+            host_ts, _device_ts, _domain, c, d = self._buf[-1]
+        return (None if c is None else c.copy()), (None if d is None else d.copy()), host_ts
+
+    def get_latest_with_timestamps(self):
+        """Return color/depth plus host and device clock diagnostics."""
+        with self._lock:
+            if not self._buf:
+                return None, None, None, None, None
+            host_ts, device_ts, domain, c, d = self._buf[-1]
+        return (
+            None if c is None else c.copy(),
+            None if d is None else d.copy(),
+            host_ts,
+            device_ts,
+            domain,
+        )
 
     def get_at(self, target_ts_ms: float
                ) -> Tuple[Optional[np.ndarray], Optional[np.ndarray], Optional[float]]:
-        """Return the buffered frame whose timestamp is closest to `target_ts_ms`.
+        """Return the buffered frame whose host timestamp is closest to `target_ts_ms`.
 
         Used for software-synchronized multi-camera capture: pick a reference
         timestamp across cameras and have each camera return its closest frame.
@@ -244,5 +275,23 @@ class RealSenseCamera:
                 self._buf,
                 key=lambda x: abs(x[0] - target_ts_ms) if x[0] is not None else float("inf"),
             )
-            ts, c, d = best
-        return (None if c is None else c.copy()), (None if d is None else d.copy()), ts
+            host_ts, _device_ts, _domain, c, d = best
+        return (None if c is None else c.copy()), (None if d is None else d.copy()), host_ts
+
+    def get_at_with_timestamps(self, target_ts_ms: float):
+        """Like :meth:`get_at`, also returning device timestamp/domain for audit."""
+        with self._lock:
+            if not self._buf:
+                return None, None, None, None, None
+            best = min(
+                self._buf,
+                key=lambda x: abs(x[0] - target_ts_ms) if x[0] is not None else float("inf"),
+            )
+            host_ts, device_ts, domain, c, d = best
+        return (
+            None if c is None else c.copy(),
+            None if d is None else d.copy(),
+            host_ts,
+            device_ts,
+            domain,
+        )

@@ -11,7 +11,7 @@ Step 2: 멀티카메라 캘리브레이션용 캡처 수집.
 """
 
 """
-python Step2_capture.py --root_folder ./data/session \
+python Step2_capture.py --data_root ./data \
     --intrinsics_dir ./intrinsics --use_robot --manual_robot \
     --robot_ip 192.168.0.23 --robot_port 12348 --show --save_depth
 
@@ -43,6 +43,8 @@ from charuco_utils import CharucoTarget
 from config import CubeConfig, CharucoBoardConfig, get_default_cube_config
 from calibration_runtime_utils import resolve_cube_config_for_run
 from capture_detection_utils import detect_cube_markers_in_frame
+from capture_gate import evaluate_capture_gate
+from capture_session import allocate_next_capture_session
 from cube_config_utils import (
     cube_config_mismatch_keys,
     cube_config_to_dict,
@@ -50,6 +52,7 @@ from cube_config_utils import (
     load_cube_config_from_meta,
 )
 from robot_comm import euler_deg_to_matrix
+from waypoint_safety import validate_safe_joint_config, validate_waypoint_semantics
 
 
 def ensure_dir(p: str) -> str:
@@ -291,158 +294,52 @@ def make_quad_image(frames_dict, cam_order, cube, gripper_cam_idx):
 
 
 def make_capture_gate_config(args) -> dict:
+    common_span = float(args.max_capture_span_ms)
     return {
-        "min_cams_with_cube": int(args.min_cams_with_cube),
-        "min_fixed_cams_with_cube": int(args.min_fixed_cams_with_cube),
-        "min_cube_pnp_ok_cams": int(args.min_cube_pnp_ok_cams),
-        "min_fixed_cube_pnp_ok_cams": int(args.min_fixed_cube_pnp_ok_cams),
-        "min_gripper_charuco_corners": int(args.min_gripper_charuco_corners),
-        "require_gripper_cube_pnp": bool(args.require_gripper_cube_pnp),
-        "require_gripper_depth_valid": bool(args.require_gripper_depth_valid),
-        "max_gripper_depth_plane_mean_mm": float(args.max_gripper_depth_plane_mean_mm),
-        "max_capture_span_ms": float(args.max_capture_span_ms),
-    }
-
-
-def evaluate_capture_gate(frames_dict: Dict[int, dict],
-                          gate_cfg: dict,
-                          gripper_cam_idx: Optional[int] = None) -> dict:
-    cams_with_cube = 0
-    fixed_visible = 0
-    cube_pnp_ok_cams = 0
-    fixed_cube_pnp_ok_cams = 0
-    depth_valid_cams = 0
-    fixed_depth_valid_cams = 0
-    capture_ts = []
-    per_camera = {}
-    gripper_markers = 0
-    gripper_charuco_corners = 0
-    gripper_cube_pnp_ok = False
-    gripper_depth_valid = False
-    gripper_depth_plane_mean_mm = None
-
-    for ci, fr in frames_dict.items():
-        n_markers = int(fr.get("n_markers", 0))
-        cube_visible = bool(fr.get("ok", False))
-        cube_pnp = fr.get("cube_pnp")
-        cube_pnp_ok = bool(cube_pnp is not None)
-        depth_valid = bool(cube_pnp and cube_pnp.get("depth_valid"))
-        depth_plane_mean_mm = None if not cube_pnp else cube_pnp.get("depth_plane_mean_mm")
-        ts_ms = fr.get("ts_ms")
-        if ts_ms is not None:
-            capture_ts.append(float(ts_ms))
-        if cube_visible:
-            cams_with_cube += 1
-            if gripper_cam_idx is None or int(ci) != int(gripper_cam_idx):
-                fixed_visible += 1
-        if cube_pnp_ok:
-            cube_pnp_ok_cams += 1
-            if gripper_cam_idx is None or int(ci) != int(gripper_cam_idx):
-                fixed_cube_pnp_ok_cams += 1
-        if depth_valid:
-            depth_valid_cams += 1
-            if gripper_cam_idx is None or int(ci) != int(gripper_cam_idx):
-                fixed_depth_valid_cams += 1
-        if gripper_cam_idx is not None and int(ci) == int(gripper_cam_idx):
-            gripper_markers = int(n_markers)
-            ch_ids = fr.get("ch_ids")
-            gripper_charuco_corners = 0 if ch_ids is None else len(ch_ids)
-            gripper_cube_pnp_ok = cube_pnp_ok
-            gripper_depth_valid = depth_valid
-            if depth_plane_mean_mm is not None:
-                gripper_depth_plane_mean_mm = float(depth_plane_mean_mm)
-        per_camera[int(ci)] = {
-            "n_markers": n_markers,
-            "cube_visible": cube_visible,
-            "cube_pnp_ok": cube_pnp_ok,
-            "depth_valid": depth_valid,
-        }
-
-    capture_span_ms = (max(capture_ts) - min(capture_ts)) if len(capture_ts) >= 2 else 0.0
-    reasons = []
-    min_cams_with_cube = int(gate_cfg.get("min_cams_with_cube", 0))
-    min_fixed_cams_with_cube = int(gate_cfg.get("min_fixed_cams_with_cube", 0))
-    min_cube_pnp_ok_cams = int(gate_cfg.get("min_cube_pnp_ok_cams", 0))
-    min_fixed_cube_pnp_ok_cams = int(gate_cfg.get("min_fixed_cube_pnp_ok_cams", 0))
-    min_gripper_charuco_corners = int(gate_cfg.get("min_gripper_charuco_corners", 0))
-    require_gripper_cube_pnp = bool(gate_cfg.get("require_gripper_cube_pnp", False))
-    require_gripper_depth_valid = bool(gate_cfg.get("require_gripper_depth_valid", False))
-    max_gripper_depth_plane_mean_mm = float(gate_cfg.get("max_gripper_depth_plane_mean_mm", 0.0))
-    max_capture_span_ms = float(gate_cfg.get("max_capture_span_ms", 0.0))
-
-    if cams_with_cube < min_cams_with_cube:
-        reasons.append(
-            "cube-visible cams {} < required {}".format(cams_with_cube, min_cams_with_cube)
-        )
-    if fixed_visible < min_fixed_cams_with_cube:
-        reasons.append(
-            "fixed cube-visible cams {} < required {}".format(fixed_visible, min_fixed_cams_with_cube)
-        )
-    if cube_pnp_ok_cams < min_cube_pnp_ok_cams:
-        reasons.append(
-            "cube_pnp-ok cams {} < required {}".format(cube_pnp_ok_cams, min_cube_pnp_ok_cams)
-        )
-    if fixed_cube_pnp_ok_cams < min_fixed_cube_pnp_ok_cams:
-        reasons.append(
-            "fixed cube_pnp-ok cams {} < required {}".format(
-                fixed_cube_pnp_ok_cams, min_fixed_cube_pnp_ok_cams
-            )
-        )
-    if require_gripper_cube_pnp and not gripper_cube_pnp_ok:
-        reasons.append("gripper cube_pnp missing")
-    if min_gripper_charuco_corners > 0 and gripper_charuco_corners < min_gripper_charuco_corners:
-        reasons.append(
-            "gripper charuco corners {} < required {}".format(
-                gripper_charuco_corners, min_gripper_charuco_corners
-            )
-        )
-    if require_gripper_depth_valid and require_gripper_cube_pnp and gripper_cube_pnp_ok and not gripper_depth_valid:
-        reasons.append("gripper depth support invalid")
-    if (
-        require_gripper_depth_valid
-        and gripper_depth_valid
-        and max_gripper_depth_plane_mean_mm > 0
-        and gripper_depth_plane_mean_mm is not None
-        and float(gripper_depth_plane_mean_mm) > max_gripper_depth_plane_mean_mm
-    ):
-        reasons.append(
-            "gripper depth plane {:.1f}mm > {:.1f}mm".format(
-                float(gripper_depth_plane_mean_mm), max_gripper_depth_plane_mean_mm
-            )
-        )
-    if max_capture_span_ms > 0 and capture_span_ms > float(max_capture_span_ms):
-        reasons.append(
-            "timestamp span {:.1f}ms > {:.1f}ms".format(
-                float(capture_span_ms), float(max_capture_span_ms)
-            )
-        )
-
-    status = "PASS" if not reasons else "FAIL"
-    reason = " | ".join(reasons) if reasons else "capture gate satisfied"
-    return {
-        "pass": bool(not reasons),
-        "status": status,
-        "reason": reason,
-        "reasons": reasons,
-        "cams_with_cube": int(cams_with_cube),
-        "min_cams_with_cube": int(min_cams_with_cube),
-        "capture_span_ms": float(capture_span_ms),
-        "max_capture_span_ms": float(max_capture_span_ms),
-        "fixed_visible_cams": int(fixed_visible),
-        "min_fixed_cams_with_cube": int(min_fixed_cams_with_cube),
-        "cube_pnp_ok_cams": int(cube_pnp_ok_cams),
-        "min_cube_pnp_ok_cams": int(min_cube_pnp_ok_cams),
-        "fixed_cube_pnp_ok_cams": int(fixed_cube_pnp_ok_cams),
-        "min_fixed_cube_pnp_ok_cams": int(min_fixed_cube_pnp_ok_cams),
-        "depth_valid_cams": int(depth_valid_cams),
-        "fixed_depth_valid_cams": int(fixed_depth_valid_cams),
-        "gripper_markers": int(gripper_markers),
-        "gripper_charuco_corners": int(gripper_charuco_corners),
-        "min_gripper_charuco_corners": int(min_gripper_charuco_corners),
-        "gripper_cube_pnp_ok": bool(gripper_cube_pnp_ok),
-        "gripper_depth_valid": bool(gripper_depth_valid),
-        "gripper_depth_plane_mean_mm": gripper_depth_plane_mean_mm,
-        "per_camera": per_camera,
+        "schema_version": "capture_gate_profiles_v1",
+        "profiles": {
+            "A_placement": {
+                "expected_cube_gripped": False,
+                "min_cams_with_cube": int(args.min_cams_with_cube),
+                "min_fixed_cams_with_cube": int(args.min_fixed_cams_with_cube),
+                "min_fixed_multimarker_cams": int(args.a_min_fixed_multimarker_cams),
+                "fixed_multimarker_min_markers": int(args.fixed_multimarker_min_markers),
+                "max_cube_pnp_reproj_mean_px": float(args.max_cube_pnp_reproj_mean_px),
+                "min_depth_samples": int(args.min_depth_samples),
+                "min_cube_pnp_ok_cams": int(args.min_cube_pnp_ok_cams),
+                "min_fixed_cube_pnp_ok_cams": int(args.min_fixed_cube_pnp_ok_cams),
+                "min_fixed_depth_quality_cams": 0,
+                "min_gripper_markers": int(args.gripper_cube_min_markers),
+                "min_gripper_charuco_corners": int(args.min_gripper_charuco_corners),
+                "require_gripper_cube_pnp": bool(args.require_gripper_cube_pnp),
+                "require_gripper_depth_valid": bool(args.require_gripper_depth_valid),
+                "max_gripper_depth_plane_mean_mm": float(args.max_gripper_depth_plane_mean_mm),
+                "max_fixed_depth_plane_mean_mm": 0.0,
+                "max_capture_span_ms": common_span,
+                "require_all_frame_timestamps": True,
+            },
+            "B_eyetohand": {
+                "expected_cube_gripped": True,
+                # The gripper camera is not an observation requirement in B.
+                "min_cams_with_cube": 0,
+                "min_fixed_cams_with_cube": int(args.b_min_fixed_cams_with_cube),
+                "min_fixed_multimarker_cams": int(args.b_min_fixed_multimarker_cams),
+                "fixed_multimarker_min_markers": int(args.fixed_multimarker_min_markers),
+                "max_cube_pnp_reproj_mean_px": float(args.max_cube_pnp_reproj_mean_px),
+                "min_depth_samples": int(args.min_depth_samples),
+                "min_cube_pnp_ok_cams": 0,
+                "min_fixed_cube_pnp_ok_cams": int(args.b_min_fixed_cube_pnp_ok_cams),
+                "min_fixed_depth_quality_cams": int(args.b_min_fixed_depth_quality_cams),
+                "min_gripper_markers": 0,
+                "min_gripper_charuco_corners": 0,
+                "require_gripper_cube_pnp": False,
+                "require_gripper_depth_valid": False,
+                "max_gripper_depth_plane_mean_mm": 0.0,
+                "max_fixed_depth_plane_mean_mm": float(args.b_max_fixed_depth_plane_mean_mm),
+                "max_capture_span_ms": common_span,
+                "require_all_frame_timestamps": True,
+            },
+        },
     }
 
 
@@ -450,7 +347,8 @@ def build_capture_gate_lines(gate: dict,
                              gripper_cam_idx: Optional[int],
                              frames_dict: Dict[int, dict]) -> List[str]:
     line1 = (
-        "SAVE gate: {} | visible cams {}/{} | span {:.1f}/{:.1f} ms".format(
+        "SAVE gate [{}]: {} | visible cams {}/{} | span {:.1f}/{:.1f} ms".format(
+            gate.get("capture_block", "A_placement"),
             gate.get("status", "N/A"),
             int(gate.get("cams_with_cube", 0)),
             int(gate.get("min_cams_with_cube", 0)),
@@ -480,12 +378,15 @@ def build_capture_gate_lines(gate: dict,
         )
     )
     line3 = (
-        "PnP quality: total ok cams {}/{} | fixed ok cams {}/{} | depth-valid cams={}".format(
+        "PnP/depth: total {}/{} | fixed {}/{} | fixed multi {}/{} | fixed depth-quality {}/{}".format(
             int(gate.get("cube_pnp_ok_cams", 0)),
             int(gate.get("min_cube_pnp_ok_cams", 0)),
             int(gate.get("fixed_cube_pnp_ok_cams", 0)),
             int(gate.get("min_fixed_cube_pnp_ok_cams", 0)),
-            int(gate.get("depth_valid_cams", 0)),
+            int(gate.get("fixed_multimarker_cams", 0)),
+            int(gate.get("min_fixed_multimarker_cams", 0)),
+            int(gate.get("fixed_depth_quality_cams", 0)),
+            int(gate.get("min_fixed_depth_quality_cams", 0)),
         )
     )
 
@@ -652,7 +553,27 @@ def main():
     parser = argparse.ArgumentParser(
         description="Place-and-Capture calibration: gripper camera + fixed cameras"
     )
-    parser.add_argument("--root_folder", required=True)
+    parser.add_argument(
+        "--root_folder",
+        default=None,
+        help=(
+            "Explicit capture folder for a deliberate resume/legacy run. "
+            "Omit this option for the default automatic data/sessionNN/calib_train allocation."
+        ),
+    )
+    parser.add_argument(
+        "--data_root",
+        default="data",
+        help="Parent for automatic sessionNN allocation when --root_folder is omitted (default: data)",
+    )
+    parser.add_argument(
+        "--waypoints_file",
+        default=None,
+        help=(
+            "Validated waypoint JSON to copy into a newly allocated session as "
+            "capture_waypoints.json before robot connection"
+        ),
+    )
     parser.add_argument("--intrinsics_dir", required=True)
     parser.add_argument("--cube_config_json", type=str, default=None,
                         help="Optional cube config JSON override. Leave unset to use the project's canonical cube definition.")
@@ -685,6 +606,24 @@ def main():
                         help="Min cameras with successful cube pose solve to accept capture")
     parser.add_argument("--min_fixed_cube_pnp_ok_cams", type=int, default=1,
                         help="Min fixed cameras with successful cube pose solve to accept capture")
+    parser.add_argument("--fixed_multimarker_min_markers", type=int, default=2,
+                        help="Number of cube markers that makes one fixed-camera observation multi-marker")
+    parser.add_argument("--a_min_fixed_multimarker_cams", type=int, default=1,
+                        help="A_placement: fixed cameras that must see at least --fixed_multimarker_min_markers")
+    parser.add_argument("--b_min_fixed_cams_with_cube", type=int, default=2,
+                        help="B_eyetohand: minimum fixed cameras that must see the gripped cube")
+    parser.add_argument("--b_min_fixed_cube_pnp_ok_cams", type=int, default=2,
+                        help="B_eyetohand: minimum fixed cameras with a successful cube pose")
+    parser.add_argument("--b_min_fixed_multimarker_cams", type=int, default=2,
+                        help="B_eyetohand: fixed cameras that must have a multi-marker observation")
+    parser.add_argument("--b_min_fixed_depth_quality_cams", type=int, default=1,
+                        help="B_eyetohand: fixed cameras with valid depth support (0 disables)")
+    parser.add_argument("--b_max_fixed_depth_plane_mean_mm", type=float, default=20.0,
+                        help="B_eyetohand: max depth-plane mean error for a depth-quality fixed camera")
+    parser.add_argument("--max_cube_pnp_reproj_mean_px", type=float, default=2.0,
+                        help="Count a cube PnP as gate-quality only at or below this mean reprojection error")
+    parser.add_argument("--min_depth_samples", type=int, default=20,
+                        help="Minimum valid depth samples for a depth-supported cube pose")
     parser.add_argument("--min_gripper_charuco_corners", type=int, default=8,
                         help="Min ChArUco corners required in gripper camera to accept capture")
     parser.add_argument(
@@ -720,6 +659,9 @@ def main():
                              "you want the gate to actually catch bad depth.")
     parser.add_argument("--max_capture_span_ms", type=float, default=120.0,
                         help="Skip a capture when camera timestamps span more than this many ms (<=0 disables)")
+    parser.add_argument("--allow_force_save", action="store_true",
+                        help="Diagnostic only: allow robot force_save to retain a gate-failed frame. "
+                             "Never use for Table 1 data.")
 
     # 뎁스 저장
     parser.add_argument(
@@ -755,7 +697,14 @@ def main():
 
     args = parser.parse_args()
 
-    root = ensure_dir(args.root_folder)
+    waypoint_source = None
+    waypoint_payload = None
+    if args.waypoints_file:
+        waypoint_source = os.path.abspath(os.path.expanduser(args.waypoints_file))
+        with open(waypoint_source, "r", encoding="utf-8") as waypoint_handle:
+            waypoint_payload = json.load(waypoint_handle)
+        validate_safe_joint_config(waypoint_payload)
+        validate_waypoint_semantics(waypoint_payload)
     intr_dir = args.intrinsics_dir
     print(f"[INFO] Depth capture/save: {'ON' if args.save_depth else 'OFF'}")
 
@@ -840,6 +789,27 @@ def main():
                 "--allow_intrinsics_res_mismatch 로 강행(부정확).")
         print("[WARN] --allow_intrinsics_res_mismatch: 불일치 상태로 강행합니다(pose 부정확).")
 
+    # Allocate only after device, intrinsic-resolution and waypoint validation.
+    # This avoids consuming a session number for an invalid command/config.
+    allocated_session = None
+    if args.root_folder is None:
+        allocated_session = allocate_next_capture_session(args.data_root)
+        root = allocated_session.capture_root
+        print(f"[SESSION] Allocated {allocated_session.session_id}: {allocated_session.session_root}")
+        print(f"[SESSION] Calibration capture root: {root}")
+        print(f"[SESSION] Manifest: {allocated_session.manifest_path}")
+    else:
+        root = ensure_dir(args.root_folder)
+        print(f"[SESSION] Explicit capture root: {os.path.abspath(root)}")
+        print("[SESSION] Automatic numbering bypassed because --root_folder was supplied.")
+    # The network teaching/waypoint paths below use args.root_folder directly.
+    args.root_folder = root
+    if waypoint_source is not None and waypoint_payload is not None:
+        waypoint_destination = os.path.join(root, "capture_waypoints.json")
+        if os.path.realpath(waypoint_source) != os.path.realpath(waypoint_destination):
+            shutil.copyfile(waypoint_source, waypoint_destination)
+        print(f"[SESSION] Validated waypoints: {waypoint_destination}")
+
     # ─── 카메라 시작 ───
     # 이전 실행이 비정상 종료(세그폴트 등)된 경우 디바이스가 비정상 상태로
     # 남을 수 있어 D435가 첫 pipeline.start()에서 "Frame didn't arrive"로
@@ -883,21 +853,31 @@ def main():
     if not args.save_depth and args.require_gripper_depth_valid:
         print("[WARN] Depth capture is disabled; gripper depth-valid gate will be ignored.")
         args.require_gripper_depth_valid = False
+    if not args.save_depth and args.b_min_fixed_depth_quality_cams > 0:
+        print("[WARN] Depth capture is disabled; B fixed depth-quality gate will be ignored.")
+        args.b_min_fixed_depth_quality_cams = 0
     capture_gate_cfg = make_capture_gate_config(args)
-    print("[INFO] Capture gate:")
-    print("  visible cams >= {} | fixed visible >= {} | cube_pnp ok cams >= {} | fixed cube_pnp ok cams >= {}".format(
-        capture_gate_cfg["min_cams_with_cube"],
-        capture_gate_cfg["min_fixed_cams_with_cube"],
-        capture_gate_cfg["min_cube_pnp_ok_cams"],
-        capture_gate_cfg["min_fixed_cube_pnp_ok_cams"],
-    ))
-    print("  gripper cube_pnp required={} | gripper charuco >= {} | gripper depth required={} | depth plane <= {:.1f}mm | span <= {:.1f}ms".format(
-        "yes" if capture_gate_cfg["require_gripper_cube_pnp"] else "no",
-        capture_gate_cfg["min_gripper_charuco_corners"],
-        "yes" if capture_gate_cfg["require_gripper_depth_valid"] else "no",
-        capture_gate_cfg["max_gripper_depth_plane_mean_mm"],
-        capture_gate_cfg["max_capture_span_ms"],
-    ))
+    print("[INFO] Block-aware capture gates:")
+    for block_name in ("A_placement", "B_eyetohand"):
+        p = capture_gate_cfg["profiles"][block_name]
+        print("  {}: fixed visible >= {} | fixed multi-marker >= {} | fixed PnP >= {} | fixed depth-quality >= {}".format(
+            block_name,
+            p["min_fixed_cams_with_cube"],
+            p["min_fixed_multimarker_cams"],
+            p["min_fixed_cube_pnp_ok_cams"],
+            p["min_fixed_depth_quality_cams"],
+        ))
+        print("    gripper PnP required={} | gripper markers >= {} | charuco >= {} | gripper depth required={} | span <= {:.1f}ms".format(
+            "yes" if p["require_gripper_cube_pnp"] else "no",
+            p["min_gripper_markers"],
+            p["min_gripper_charuco_corners"],
+            "yes" if p["require_gripper_depth_valid"] else "no",
+            p["max_capture_span_ms"],
+        ))
+        print("    PnP reproj mean <= {:.2f}px | depth samples >= {}".format(
+            p["max_cube_pnp_reproj_mean_px"], p["min_depth_samples"]))
+    if args.allow_force_save:
+        print("[WARN] --allow_force_save is ON. Gate-failed frames are diagnostic-only and must be excluded from Table 1.")
     print(f"  gripper board mask pad: {float(args.board_mask_pad_px):.1f}px")
 
     # (Board marker detection uses charuco.detect() directly — no separate detector needed)
@@ -915,6 +895,22 @@ def main():
 
     # ─── 메타 데이터 (기존 meta.json이 있으면 이어서 저장) ───
     meta_path = os.path.join(root, "meta.json")
+    capture_config = {
+        "schema_version": "capture_config_v1",
+        "intrinsics_dir": os.path.abspath(intr_dir),
+        "width": int(args.width),
+        "height": int(args.height),
+        "fps": int(args.fps),
+        "save_depth": bool(args.save_depth),
+        "settle_time_s": float(args.settle_time),
+        "cross_camera_timestamp_basis": "host_monotonic_receipt_v1",
+        "min_markers_for_visibility": int(args.min_markers),
+        "gripper_cube_min_aspect": float(args.gripper_cube_min_aspect),
+        "board_mask_pad_px": float(args.board_mask_pad_px),
+        "capture_gate": capture_gate_cfg,
+        "allow_force_save": bool(args.allow_force_save),
+        "allow_intrinsics_res_mismatch": bool(args.allow_intrinsics_res_mismatch),
+    }
     if os.path.exists(meta_path):
         with open(meta_path, "r") as f:
             meta = json.load(f)
@@ -928,22 +924,38 @@ def main():
                 f"Differing fields: {', '.join(mismatch_keys) if mismatch_keys else 'unknown'}\n"
                 "Use a new session folder, or run recompute_session_cube_pnp.py with the intended cube config before resuming."
             )
+        if meta.get("captures") and meta.get("capture_config") != capture_config:
+            raise RuntimeError(
+                "Existing meta.json has missing or different capture_config; refusing to mix "
+                "resolutions/gates in one session. Use a new session folder."
+            )
         event_id = max((int(c.get("event_id", -1)) for c in meta.get("captures", [])), default=-1) + 1
         print(f"[INFO] Resuming from existing meta.json ({len(meta['captures'])} captures, next event_id={event_id})")
     else:
         meta = {
             "root_folder": os.path.abspath(root),
+            "session_allocation": (
+                None if allocated_session is None else {
+                    "session_id": allocated_session.session_id,
+                    "session_index": int(allocated_session.index),
+                    "session_root": allocated_session.session_root,
+                    "manifest_path": allocated_session.manifest_path,
+                    "policy": "max_existing_index_plus_one_no_reuse",
+                }
+            ),
             "gripper_cam_idx": gripper_cam_idx,
             "n_fixed_cams": n_fixed,
             "n_gripper_cams": n_gripper,
             "cam_indices": [ci for ci, _ in idx_serial_pairs],
             "cube_config_source": cube_cfg_source,
             "cube_config": cube_config_to_dict(cfg),
+            "capture_config": capture_config,
             "captures": [],
         }
         event_id = 0
         print("[INFO] New session (meta.json created)")
     meta["cube_config_source"] = cube_cfg_source
+    meta["capture_config"] = capture_config
     if "cube_config" not in meta:
         meta["cube_config"] = cube_config_to_dict(cfg)
     else:
@@ -956,6 +968,8 @@ def main():
         color: np.ndarray,
         depth: Optional[np.ndarray],
         ts_ms: Optional[float],
+        device_ts_ms: Optional[float] = None,
+        device_timestamp_domain: Optional[str] = None,
         include_marker_poses: bool = True,
         include_charuco_pose: bool = True,
         log_pose_status: bool = False,
@@ -976,6 +990,9 @@ def main():
             "color": color,
             "depth": depth,
             "ts_ms": ts_ms,
+            "host_monotonic_ts_ms": ts_ms,
+            "device_ts_ms": device_ts_ms,
+            "device_timestamp_domain": device_timestamp_domain,
             "ok": bool(n_markers >= args.min_markers),
             "n_markers": n_markers,
             "ids": ([] if ids is None else [int(x) for x in ids]),
@@ -1094,6 +1111,7 @@ def main():
         capture_block: Optional[str] = None,
         grasp_id: Optional[int] = None,
         force_save: bool = False,
+        motion_safety: Optional[dict] = None,
     ) -> Tuple[bool, dict]:
         """모든 카메라에서 마커별 포즈 추정과 함께 촬영."""
         nonlocal event_id
@@ -1104,9 +1122,9 @@ def main():
 
         frames: Dict[int, dict] = {}
 
-        # Software-sync: 각 카메라의 latest ts 중 가장 오래된 것(=가장 느린 카메라)을
+        # Software-sync: 공통 host-monotonic clock의 latest ts 중 가장 오래된 것(=가장 느린 카메라)을
         # 기준으로 잡고, 다른 카메라들은 버퍼에서 그 시각에 가장 가까운 프레임을 고른다.
-        # 하드웨어 sync 없는 RealSense들의 timestamp span을 1프레임(~33ms) 이내로 좁힘.
+        # 독립 RealSense device timestamp는 epoch가 다를 수 있으므로 동기화에 직접 쓰지 않는다.
         latest_ts_list = []
         for ci, cam in cams.items():
             _c, _d, ts_ms = cam.get_latest()
@@ -1116,22 +1134,26 @@ def main():
         if latest_ts_list:
             target_ts = min(latest_ts_list)
             for ci, cam in cams.items():
-                color, depth, ts_ms = cam.get_at(target_ts)
+                color, depth, ts_ms, device_ts_ms, ts_domain = cam.get_at_with_timestamps(target_ts)
                 if color is None:
                     continue
                 frames[ci] = build_frame_record(
                     ci, color, depth, ts_ms,
+                    device_ts_ms=device_ts_ms,
+                    device_timestamp_domain=ts_domain,
                     include_marker_poses=True,
                     include_charuco_pose=True,
                     log_pose_status=True,
                 )
         else:
             for ci, cam in cams.items():
-                color, depth, ts_ms = cam.get_latest()
+                color, depth, ts_ms, device_ts_ms, ts_domain = cam.get_latest_with_timestamps()
                 if color is None:
                     continue
                 frames[ci] = build_frame_record(
                     ci, color, depth, ts_ms,
+                    device_ts_ms=device_ts_ms,
+                    device_timestamp_domain=ts_domain,
                     include_marker_poses=True,
                     include_charuco_pose=True,
                     log_pose_status=True,
@@ -1141,14 +1163,18 @@ def main():
             frames,
             capture_gate_cfg,
             gripper_cam_idx=gripper_cam_idx,
+            capture_block=capture_block,
+            cube_gripped=cube_gripped,
         )
         capture_span_ms = float(gate["capture_span_ms"])
         if not gate["pass"]:
-            if force_save:
+            if force_save and args.allow_force_save:
                 # c+Enter 확인 시: 마커/게이트 실패여도 프레임을 무조건 저장한다.
                 # (gate 결과는 meta 에 그대로 남아 나중에 필터 가능; Step3는 이미지에서 재검출)
                 print(f"[FORCE-SAVE] gate 실패({gate['reason']}) 이지만 강제 저장")
             else:
+                if force_save:
+                    print("[WARN] robot requested force_save, but it is disabled without --allow_force_save")
                 print(f"[SKIP] {gate['reason']}")
                 return False, gate
 
@@ -1159,6 +1185,7 @@ def main():
             "capture_index": capture_index,
             "capture_span_ms": float(capture_span_ms),
             "capture_gate": gate,
+            "force_saved": bool(not gate["pass"] and force_save and args.allow_force_save),
             "cams": {},
         }
 
@@ -1198,6 +1225,8 @@ def main():
             cap_rec["capture_block"] = str(capture_block)
         if grasp_id is not None:
             cap_rec["grasp_id"] = int(grasp_id)
+        if motion_safety is not None:
+            cap_rec["motion_safety"] = motion_safety
 
         if place_pose_6dof is not None and place_pose_6dof != robot_tcp:
             cap_rec["place_pose_6dof"] = [float(x) for x in place_pose_6dof]
@@ -1225,6 +1254,9 @@ def main():
                 "rgb_path": rgb_rel,
                 "depth_path": depth_rel,
                 "ts_ms": fr["ts_ms"],
+                "host_monotonic_ts_ms": fr.get("host_monotonic_ts_ms"),
+                "device_ts_ms": fr.get("device_ts_ms"),
+                "device_timestamp_domain": fr.get("device_timestamp_domain"),
                 "n_markers_detected": fr["n_markers"],
                 "marker_ids": fr["ids"],
                 "cube_visible": fr["ok"],
@@ -1378,6 +1410,8 @@ def main():
                             try:
                                 with open(wp_path, "r") as wf:
                                     wp_data = json.load(wf)
+                                validate_safe_joint_config(wp_data)
+                                validate_waypoint_semantics(wp_data)
                                 resp_msg = json.dumps({
                                     "action": "waypoints",
                                     "status": "ok",
@@ -1464,6 +1498,7 @@ def main():
                             m_block = msg.get("capture_block")
                             m_grasp = msg.get("grasp_id")
                             m_force = msg.get("force_save")
+                            m_motion_safety = msg.get("motion_safety")
 
                             print(f"\n[ManualRobot] Capture signal received (capture_index={pose_idx}, set_index={s_idx})")
                             if capture_tcp:
@@ -1482,6 +1517,7 @@ def main():
                                 capture_block=m_block,
                                 grasp_id=m_grasp,
                                 force_save=bool(m_force),
+                                motion_safety=m_motion_safety,
                             )
 
                             status = "success" if saved else "skipped"

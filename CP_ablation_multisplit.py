@@ -336,6 +336,12 @@ def main() -> None:
                 len(entry["runs"]) >= int(args.num_inits)
                 for entry in result.get("rows", {}).values())
             if valid_seed and valid_inits and set(result.get("rows", {})) == set(ALL_ROWS):
+                # A stored split is only reusable if it was solved at the same k;
+                # otherwise the aggregate silently averages two scale bases.
+                CP_common.assert_artifact_robot_pos_scale(
+                    result, result_path,
+                    fk_cube_path=os.path.join(split_dir, "shared_board_free_fk_cube.json"),
+                    root_folder=args.root_folder)
                 validate_result_evaluation_contract(result)
                 print(f"[REUSE] split seed {split_seed}", flush=True)
                 results.append((split_seed, result))

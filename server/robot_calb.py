@@ -12,6 +12,13 @@ import sys
 import time
 import socket
 import json
+from waypoint_safety import (
+    SAFE_EMPTY_KEY,
+    SAFE_GRIPPED_KEY,
+    shortest_joint_error_deg,
+    validate_safe_joint_config,
+    validate_waypoint_semantics,
+)
 
 HOST = '0.0.0.0'
 PORT = 12348
@@ -32,6 +39,9 @@ GRIP_APPROACH_Z_MM = 50.0
 TCP_APPROACH_Z_MM = 40.0
 # 큐브 내려놓기: 항상 place 자세 +Z 위(정자세)로 올렸다가 그대로 수직 하강하여 놓는다.
 PLACE_APPROACH_Z_MM = 50.0
+SAFE_JOINT_TOL_DEG = 2.0
+MOTION_STILL_TOL_DEG = 0.15
+MOTION_STILL_SAMPLE_SEC = 0.25
 # save gate 실패 시: 자동 지터 없이 곧바로 사람이 jog하는 manual_recover로 진입한다.
 
 TCP_AXIS_MAP = {'x': 'dx', 'y': 'dy', 'z': 'dz', 'rz': 'drz', 'ry': 'dry', 'rx': 'drx'}
@@ -153,6 +163,52 @@ def undo_one(entry):
         move_joint(maxis, -mvalue)
 
 
+def verify_robot_still(rb, tolerance_deg=MOTION_STILL_TOL_DEG,
+                       sample_sec=MOTION_STILL_SAMPLE_SEC):
+    """Confirm that joints do not keep changing after a blocking motion call."""
+    first = rb.getjnt().jnt2list()[:6]
+    time.sleep(sample_sec)
+    second = rb.getjnt().jnt2list()[:6]
+    errors = shortest_joint_error_deg(first, second)
+    max_error = max(errors)
+    if max_error > tolerance_deg:
+        raise RuntimeError(
+            'robot still moving: sampled joint delta {:.3f}deg > {:.3f}deg'.format(
+                max_error, tolerance_deg))
+    return [float(x) for x in second]
+
+
+def verify_at_joint_pose(rb, target_joints, tolerance_deg=SAFE_JOINT_TOL_DEG):
+    actual = rb.getjnt().jnt2list()[:6]
+    errors = shortest_joint_error_deg(actual, target_joints)
+    max_error = max(errors)
+    if max_error > tolerance_deg:
+        raise RuntimeError(
+            'safe pose reach error {:.3f}deg > {:.3f}deg'.format(max_error, tolerance_deg))
+    return [float(x) for x in actual]
+
+
+def move_to_validated_safe(rb, safe_joints, safe_kind, transition_label):
+    """Execute and verify the mandatory current -> safe portion of a transition."""
+    started = time.time()
+    print '[SAFE] {} -> {} safe pose'.format(transition_label, safe_kind)
+    rb.move(Joint(*safe_joints[:6]))
+    actual = verify_at_joint_pose(rb, safe_joints)
+    verify_robot_still(rb)
+    reached = time.time()
+    print '[SAFE] reached {} (max joint error <= {:.1f}deg, stopped)'.format(
+        safe_kind, SAFE_JOINT_TOL_DEG)
+    return {
+        'state_machine': 'current_to_safe_to_target_v1',
+        'safe_transition_verified': True,
+        'safe_pose_kind': safe_kind,
+        'safe_joints_commanded': [float(x) for x in safe_joints[:6]],
+        'safe_joints_actual': actual,
+        'safe_move_started_epoch_s': started,
+        'safe_reached_epoch_s': reached,
+    }
+
+
 # ── Gripper ──
 
 def check_gripper():
@@ -190,7 +246,7 @@ def gripper_close():
 def do_capture(conn, capture_index, set_cube_center=None, set_index=None,
                set_joints=None, set_tcp=None, place_joints=None,
                cube_gripped=False, capture_block="A_placement", grasp_id=0,
-               force_save=False):
+               force_save=False, motion_safety=None):
     """Returns (status, tcp, cube_tcp) or (None, None, None) on disconnect.
 
     capture_block / cube_gripped / grasp_id tag each frame so Step3 can separate:
@@ -217,6 +273,8 @@ def do_capture(conn, capture_index, set_cube_center=None, set_index=None,
         "grasp_id": int(grasp_id),
         "force_save": bool(force_save),
     }
+    if motion_safety is not None:
+        msg["motion_safety"] = motion_safety
     if set_cube_center is not None:
         msg["set_cube_center_6dof"] = set_cube_center
     if set_index is not None:
@@ -263,9 +321,7 @@ def approach_and_close_gripper(rb, place_joints, place_tcp=None,
             rb.line(Position(*place_tcp[:6]))
             time.sleep(0.2)
         except Exception as e:
-            print '[WARN] line approach failed: {} -> joint move fallback'.format(e)
-            rb.move(Joint(*place_joints[:6]))
-            time.sleep(0.3)
+            raise RuntimeError('grip line approach failed: {}'.format(e))
     else:
         rb.move(Joint(*place_joints[:6]))
         time.sleep(0.3)
@@ -404,18 +460,28 @@ def run_auto_capture(rb, conn, waypoint_file=None, speed=30):
         print '[ERROR] waypoints missing set_index (multi-set format required)'
         send_json(conn, {"command": "quit"})
         return
+    try:
+        validate_safe_joint_config(data)
+        validate_waypoint_semantics(data)
+    except ValueError as e:
+        print '[SAFETY-ABORT] {}'.format(e)
+        print '[SAFETY-ABORT] Auto capture requires explicit, physically validated '
+        print '               safe_joints_empty and safe_joints_gripped.'
+        send_json(conn, {"command": "quit"})
+        return
     _run_auto_multiset(rb, conn, data, speed, confirm=confirm)
 
 
 def _capture_at_pose(rb, conn, wp, sidx, place_j, set_cc,
-                     cube_gripped, capture_block, grasp_id, confirm, label=''):
-    """한 waypoint 로 이동 -> (확인) -> 촬영 -> 실패 시 manual recovery.
+                     cube_gripped, capture_block, grasp_id, confirm,
+                     safe_joints, safe_kind, label=''):
+    """safe pose -> waypoint -> 정지 확인 -> 촬영 -> safe pose.
 
     이동 방식: wp 에 'capture_joints' 가 있으면 관절 이동(rb.move), 없고 'capture_tcp'
     만 있으면 TCP 직교 이동(rb.line). Phase A(placement)는 관절, Phase B(grip-sweep)는
     set 위치로 평행이동된 TCP 를 쓰므로 line 으로 실행된다.
 
-    반환: 'success' | 'skip' | 'quit' | 'disconnect'
+    반환: 'success' | 'skip' | 'quit' | 'disconnect' | 'abort'
     cube_gripped/capture_block/grasp_id 는 프레임 태그로 do_capture 에 전달되어
     나중에 Step3 --capture_block 로 방법(a/b)을 분리 캘리브할 수 있게 한다.
     """
@@ -426,6 +492,9 @@ def _capture_at_pose(rb, conn, wp, sidx, place_j, set_cc,
     print '  -- {} capture (set={}, capture_index={}, block={}, move={}) --'.format(
         label, sidx, pose_idx, capture_block, 'joint' if cap_j is not None else 'tcp')
     try:
+        motion_safety = move_to_validated_safe(
+            rb, safe_joints, safe_kind, 'capture {}'.format(pose_idx))
+        target_started = time.time()
         if cap_j is not None:
             rb.move(Joint(*cap_j[:6]))
         else:
@@ -437,9 +506,14 @@ def _capture_at_pose(rb, conn, wp, sidx, place_j, set_cc,
             rb.line(Position(*above))
             time.sleep(0.2)
             rb.line(Position(*tgt))
+        target_actual = verify_robot_still(rb)
+        motion_safety['target_move_started_epoch_s'] = target_started
+        motion_safety['target_reached_epoch_s'] = time.time()
+        motion_safety['target_still_verified'] = True
+        motion_safety['target_joints_actual'] = target_actual
     except Exception as e:
-        print '  [WARN] move failed: {}. Skipping.'.format(e)
-        return 'skip'
+        print '  [SAFETY-ABORT] safe/target transition failed: {}'.format(e)
+        return 'abort'
     time.sleep(0.5)
     show_pose()
 
@@ -457,9 +531,19 @@ def _capture_at_pose(rb, conn, wp, sidx, place_j, set_cc,
                 print "  (c=촬영 / s=skip / q=quit 중 입력)"
         if action == 'skip':
             print '  -> skipped by user'
+            try:
+                move_to_validated_safe(rb, safe_joints, safe_kind, 'skip return')
+            except Exception as e:
+                print '  [SAFETY-ABORT] cannot return to safe pose: {}'.format(e)
+                return 'abort'
             return 'skip'
         if action == 'quit':
             print '  -> quit by user'
+            try:
+                move_to_validated_safe(rb, safe_joints, safe_kind, 'quit return')
+            except Exception as e:
+                print '  [SAFETY-ABORT] cannot return to safe pose: {}'.format(e)
+                return 'abort'
             return 'quit'
 
     cap_kwargs = {
@@ -471,14 +555,23 @@ def _capture_at_pose(rb, conn, wp, sidx, place_j, set_cc,
         "cube_gripped": cube_gripped,
         "capture_block": capture_block,
         "grasp_id": grasp_id,
-        "force_save": True,   # c+Enter 확인 시 마커 검출 여부와 무관하게 무조건 저장
+        # Final experiment data must satisfy the block-aware PC gate.
+        "force_save": False,
+        "motion_safety": motion_safety,
     }
     status, _, _ = do_capture(conn, pose_idx, **cap_kwargs)
+    try:
+        move_to_validated_safe(rb, safe_joints, safe_kind, 'post-capture return')
+    except Exception as e:
+        print '  [SAFETY-ABORT] cannot return to safe pose: {}'.format(e)
+        return 'abort'
     if status is None:
         print '[Auto] disconnected, stopping.'
         return 'disconnect'
-    # 마커 검출 실패해도 skip/recovery 하지 않고 무조건 촬영된 것으로 간주하고 진행.
-    print '  [Auto] -> captured (status={})'.format(status)
+    if status != 'success':
+        print '  [Auto] -> rejected by capture gate (status={})'.format(status)
+        return 'skip'
+    print '  [Auto] -> captured (gate PASS)'
     return 'success'
 
 
@@ -498,14 +591,24 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
                              set_cube_center 는 위에서 실측한 값을 사용.
       -- 다음 set이 있으면 큐브 재-그립 후 +Z transit lift 하고 이동 --
 
-    waypoint 의 capture_block == 'B_eyetohand' 이면 Phase B, 그 외/없음이면 Phase A.
-    (capture_block 없는 구버전 파일은 전부 A_placement 로 동작 = 기존과 동일.)
+    waypoint 의 capture_block 은 'B_eyetohand' 또는 'A_placement'로 명시해야 한다.
+    구버전/오타/큐브 상태 불일치는 첫 모션 전에 fail-closed 한다.
     """
     waypoints = data.get('waypoints', [])
     if not waypoints:
         print '[ERROR] no waypoints'
         send_json(conn, {"command": "quit"})
         return
+
+    try:
+        safe_cfg = validate_safe_joint_config(data)
+        validate_waypoint_semantics(data)
+    except ValueError as e:
+        print '[SAFETY-ABORT] {}'.format(e)
+        send_json(conn, {"command": "quit"})
+        return
+    safe_empty = safe_cfg[SAFE_EMPTY_KEY]
+    safe_gripped = safe_cfg[SAFE_GRIPPED_KEY]
 
     # Group by set_index, preserving first-appearance order.
     sets_order = []
@@ -535,26 +638,27 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
     print '  - speed:    {}'.format(speed)
     print '  - +Z capture clearance: {}mm'.format(z_clearance_mm)
     print '  - +Z transit lift:      {}mm'.format(z_transit_lift_mm)
+    print '  - safe(empty):          {}'.format(fmt6(safe_empty))
+    print '  - safe(gripped):        {}'.format(fmt6(safe_gripped))
     print '=========================================='
     print ''
-    print 'PRECONDITION: cube must be gripped before starting.'
+    print 'PRECONDITION: cube is gripped and robot is already at validated safe(gripped).'
     print 'Per set: Phase B grip-sweep (cube held) -> place & release -> Phase A placement.'
-    raw_input('Press ENTER to confirm cube is gripped and start...')
+    raw_input('Press ENTER to confirm payload state, guarding, E-stop, and safe start pose...')
 
     rb.override(speed)
     success = 0
     skipped = 0
 
-    # Pre-loop: cube is on the floor with the gripper around it (user just placed
-    # it there). Lift +z_transit_lift_mm before the first joint transit to make
-    # sure the cube clears the floor on the way to set 0's place_joints.
-    print '[Auto] +Z {:.0f}mm initial transit lift (cube clears floor)'.format(z_transit_lift_mm)
     try:
-        cur = Position(*rb.getpos().pos2list()[:6])
-        rb.line(cur.offset(dz=z_transit_lift_mm))
+        # Do not plan an automatic path out of an unknown initial configuration.
+        # The operator must start at the validated gripped-payload safe pose.
+        verify_at_joint_pose(rb, safe_gripped)
+        verify_robot_still(rb)
     except Exception as e:
-        print '[WARN] initial transit lift failed: {} (continuing)'.format(e)
-    time.sleep(0.3)
+        print '[SAFETY-ABORT] invalid initial safe(gripped) state: {}'.format(e)
+        send_json(conn, {"command": "quit"})
+        return
 
     for si, sidx in enumerate(sets_order):
         wps = by_set[sidx]
@@ -573,15 +677,6 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
         print '======== SET {}/{} (set_index={}: B={} grip-sweep, A={} placement) ========'.format(
             si + 1, n_sets, sidx, len(block_b), len(block_a))
 
-        # ---- 안전 전이: B 는 TCP line 이라 먼 거리/특이점에서 실패할 수 있으므로,
-        #      B 시작 전에 관절 이동으로 이 set 영역(place_joints)까지 안전하게 이동한다.
-        #      이후 각 B line 은 이 set 위에서의 국소(주로 수직) 이동이 된다.
-        #      (큐브는 그립된 상태로 잠시 바닥 근처로 내려갔다가 B 접근에서 다시 올라간다.) ----
-        if block_b:
-            print '[Auto] -> set {} region via joints (safe transit before B line moves)'.format(sidx)
-            rb.move(Joint(*place_j[:6]))
-            time.sleep(0.3)
-
         # ---- Phase B: eye-to-hand. 큐브를 그립한 채(최초 그립 또는 이전 set 재-그립)
         #      각 sweep pose 로 이동하며 촬영. 고정 카메라가 움직이는 큐브를 관측. ----
         if block_b:
@@ -591,7 +686,8 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
             r = _capture_at_pose(
                 rb, conn, wp, sidx, place_j, set_cc,
                 cube_gripped=True, capture_block='B_eyetohand', grasp_id=grasp_id,
-                confirm=confirm, label='B {}/{}'.format(wi + 1, len(block_b)))
+                confirm=confirm, safe_joints=safe_gripped, safe_kind='gripped',
+                label='B {}/{}'.format(wi + 1, len(block_b)))
             if r == 'success':
                 success += 1
             elif r == 'skip':
@@ -601,6 +697,9 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
                 return
             elif r == 'disconnect':
                 return
+            elif r == 'abort':
+                send_json(conn, {"command": "quit"})
+                return
 
         # ---- 큐브 내려놓기: 항상 place 위 +Z{PLACE_APPROACH_Z_MM}mm 정자세에서 수직으로
         #      그대로 하강해 내려놓는다 -> tool4 로 큐브중점 실측 -> 릴리즈 -> +Z clearance.
@@ -608,7 +707,14 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
         #      정자세 place 에 도달해 기준 TCP 를 읽고 -> +Z 로 올렸다가 -> 같은 자세로 수직
         #      하강한다(마지막 접근을 항상 순수 수직/정자세로 보장). ----
         print '[Auto] -> set {} place: joint move to upright place pose'.format(sidx)
-        rb.move(Joint(*place_j[:6]))
+        try:
+            move_to_validated_safe(rb, safe_gripped, 'gripped', 'set {} place'.format(sidx))
+            rb.move(Joint(*place_j[:6]))
+            verify_robot_still(rb)
+        except Exception as e:
+            print '[SAFETY-ABORT] place transition failed: {}'.format(e)
+            send_json(conn, {"command": "quit"})
+            return
         time.sleep(0.3)
         place_tcp = get_tcp()  # 정자세 place 기준 TCP (재-그립/재접근 기준으로도 사용)
         above = list(place_tcp[:6])
@@ -619,26 +725,38 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
             rb.line(Position(*above))
             time.sleep(0.2)
             rb.line(Position(*place_tcp[:6]))
+            verify_robot_still(rb)
         except Exception as e:
-            print '[WARN] upright place approach failed: {} (staying at place pose)'.format(e)
+            print '[SAFETY-ABORT] upright place approach failed: {}'.format(e)
+            send_json(conn, {"command": "quit"})
+            return
         time.sleep(0.5)
         try:
             measured_cc = get_cube_center()
             print '[Auto] measured cube center (tool4): ' + fmt6(measured_cc)
             set_cc = measured_cc
         except Exception as e:
-            print '[WARN] get_cube_center() failed ({}); keeping nominal set_cube_center'.format(e)
+            print '[SAFETY-ABORT] get_cube_center() failed: {}'.format(e)
+            send_json(conn, {"command": "quit"})
+            return
 
         print '[Auto] gripper OPEN (release cube on floor)'
         gripper_open()
+        if check_gripper() != ['0', '1', '0', '0']:
+            print '[SAFETY-ABORT] gripper did not confirm OPEN state'
+            send_json(conn, {"command": "quit"})
+            return
         time.sleep(0.3)
 
         print '[Auto] -> +Z {:.0f}mm clearance'.format(z_clearance_mm)
         try:
             cur = Position(*rb.getpos().pos2list()[:6])
             rb.line(cur.offset(dz=z_clearance_mm))
+            verify_robot_still(rb)
         except Exception as e:
-            print '[WARN] +Z clearance failed: {} (continuing)'.format(e)
+            print '[SAFETY-ABORT] +Z clearance failed: {}'.format(e)
+            send_json(conn, {"command": "quit"})
+            return
         time.sleep(0.5)
 
         # ---- Phase A: placement. 큐브는 바닥, 그리퍼 카메라가 각 뷰포인트에서 촬영. ----
@@ -648,7 +766,8 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
             r = _capture_at_pose(
                 rb, conn, wp, sidx, place_j, set_cc,
                 cube_gripped=False, capture_block='A_placement', grasp_id=grasp_id,
-                confirm=confirm, label='A {}/{}'.format(wi + 1, len(block_a)))
+                confirm=confirm, safe_joints=safe_empty, safe_kind='empty',
+                label='A {}/{}'.format(wi + 1, len(block_a)))
             if r == 'success':
                 success += 1
             elif r == 'skip':
@@ -658,12 +777,24 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
                 return
             elif r == 'disconnect':
                 return
+            elif r == 'abort':
+                send_json(conn, {"command": "quit"})
+                return
 
         # ---- 다음 set 이 있으면: 큐브 재-그립 후 +Z transit lift 하고 이동 ----
         if si < n_sets - 1:
             print '[Auto] re-grip cube (+Z {:.0f}mm approach above)'.format(
                 GRIP_APPROACH_Z_MM)
-            approach_and_close_gripper(rb, place_j, place_tcp)
+            try:
+                move_to_validated_safe(rb, safe_empty, 'empty', 're-grip approach')
+                approach_and_close_gripper(rb, place_j, place_tcp)
+                if check_gripper() != ['0', '0', '0', '1']:
+                    raise RuntimeError('gripper did not confirm CLOSED state')
+                verify_robot_still(rb)
+            except Exception as e:
+                print '[SAFETY-ABORT] re-grip transition failed: {}'.format(e)
+                send_json(conn, {"command": "quit"})
+                return
             time.sleep(0.3)
             # Lift +Z transit_lift_mm so the cube clears the floor during the
             # joint transit to the next set's place_joints.
@@ -672,10 +803,24 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
                 cur = Position(*rb.getpos().pos2list()[:6])
                 rb.line(cur.offset(dz=z_transit_lift_mm))
             except Exception as e:
-                print '[WARN] transit lift failed: {} (continuing)'.format(e)
+                print '[SAFETY-ABORT] transit lift failed: {}'.format(e)
+                send_json(conn, {"command": "quit"})
+                return
             time.sleep(0.3)
+            try:
+                move_to_validated_safe(rb, safe_gripped, 'gripped', 'post-grip return')
+            except Exception as e:
+                print '[SAFETY-ABORT] cannot return gripped payload to safe: {}'.format(e)
+                send_json(conn, {"command": "quit"})
+                return
 
-    # Final state: gripper open at last set's place_joints (cube on floor).
+    # Final state: empty gripper at its explicitly validated safe pose.
+    try:
+        move_to_validated_safe(rb, safe_empty, 'empty', 'final return')
+    except Exception as e:
+        print '[SAFETY-ABORT] final safe return failed: {}'.format(e)
+        send_json(conn, {"command": "quit"})
+        return
     send_json(conn, {"command": "quit"})
     print ''
     print '=========================================='
@@ -775,7 +920,8 @@ def main():
         print '    ( ...undo | ...list 지원 )'
         print '  start                 -> auto capture (PC sends waypoints)'
         print '  start <path> [speed]  -> auto capture (local file)'
-        print '    (cube must be gripped before start)'
+        print '    (cube gripped + robot at safe_joints_gripped before start)'
+        print '    (waypoint requires explicit safe_joints_empty/safe_joints_gripped)'
         print '    (각 pose 이동 후 c+Enter 확인 시 촬영; --noconfirm 로 전자동)'
         print '=========================================='
         print ''

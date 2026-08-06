@@ -740,7 +740,7 @@ def write_outputs(result: Mapping, out_dir: str) -> None:
         "",
         f"- split: **position (set-level) hold-out**, {result['split']['strategy']}, "
         f"{summary['n_folds_usable']}/{summary['n_folds_total']} folds usable",
-        f"- `RB_ROBOT_POS_SCALE` = **{result['robot_pos_scale']:.4f}** "
+        f"- `CP_common.ROBOT_POS_SCALE_PINNED` = **{result['robot_pos_scale']:.4f}** "
         f"({'로봇 원본 값 그대로' if result['robot_pos_scale'] == 1.0 else '병진 보정 적용'}). "
         "다른 값으로 만든 결과와는 FK 기준 자체가 달라 비교할 수 없다.",
         f"- 모든 위치 오차는 `{PROXY_LABEL}`다. 외부 GT가 아니므로 절대 정확도로 읽지 않는다.",

@@ -710,6 +710,11 @@ def main() -> None:
         "summary": aggregate_results(repetitions),
     }
     write_outputs(result, args.out_dir)
+    # The resume checkpoint is a strict subset of sensitivity.json; drop it once
+    # the final artifact is on disk so it never gets committed alongside it.
+    checkpoint = os.path.join(args.out_dir, "sensitivity_checkpoint.json")
+    if os.path.exists(checkpoint):
+        os.remove(checkpoint)
     print(f"[SAVE] {args.out_dir}/sensitivity.{{json,csv,md}}")
 
 
