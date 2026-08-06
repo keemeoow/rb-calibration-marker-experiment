@@ -71,7 +71,7 @@ class ProductionPriorParityTest(unittest.TestCase):
             base = rand_se3(rng, 0.4, 40.0)
             raw[s] = base
             visual[s] = base @ delta
-        result = align_and_blend_set_priors(raw, visual)
+        result = align_and_blend_set_priors(raw, visual, gate_mode="fixed")
         for s in raw:
             self.assertTrue(result.diagnostics["per_set"][str(s)]["prior_accepted"])
             np.testing.assert_allclose(
@@ -117,14 +117,12 @@ class AdaptiveGateTest(unittest.TestCase):
             visual[s] = base @ common @ jitter
         return raw, visual
 
-    def test_defaults_preserve_fixed_behaviour(self):
+    def test_default_mode_is_adaptive(self):
         rng = np.random.default_rng(7)
         raw, visual = self._priors(rng, 10, 3.0)
         default = align_and_blend_set_priors(raw, visual)
-        explicit = align_and_blend_set_priors(raw, visual, gate_mode="fixed")
-        self.assertEqual(default.diagnostics["gate_dt_mm"],
-                         explicit.diagnostics["gate_dt_mm"])
-        self.assertEqual(default.diagnostics["gate_mode"], "fixed")
+        self.assertEqual(default.diagnostics["gate_mode"], "adaptive")
+        self.assertLess(default.diagnostics["gate_dt_mm"], 35.0)
 
     def test_adaptive_tightens_on_clean_data(self):
         rng = np.random.default_rng(11)

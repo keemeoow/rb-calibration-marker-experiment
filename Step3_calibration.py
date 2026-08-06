@@ -1366,11 +1366,53 @@ def estimate_set_cube_prior_alignment(raw_set_priors: Dict[int, np.ndarray],
     return T_delta_avg, corrected_by_set, diag
 
 
+def _mad_cutoff(values, k: float, floor: float) -> float:
+    """median + k*1.4826*MAD, never below ``floor``."""
+    v = np.asarray(values, dtype=np.float64)
+    med = float(np.median(v))
+    mad = float(np.median(np.abs(v - med)))
+    return max(med + float(k) * 1.4826 * mad, float(floor))
+
+
+def resolve_prior_gate(prepared: Dict[int, dict],
+                       fallback_dt_mm: float,
+                       fallback_dr_deg: float,
+                       gate_mode: str = "adaptive",
+                       gate_k: float = 2.5,
+                       min_sets: int = 5):
+    """Gate thresholds for the set-prior accept test.
+
+    dt/dr measure how far one set's prior sits from the common trend, so their
+    scale belongs to the batch rather than to a fixed physical tolerance. The
+    floor is vision's own scatter: below it a prior deviation cannot be told
+    apart from the noise of the estimate it is compared against.
+    """
+    dts = [p["dt_mm"] for p in prepared.values() if p["dt_mm"] is not None]
+    drs = [p["dr_deg"] for p in prepared.values() if p["dr_deg"] is not None]
+    info = {"mode": str(gate_mode), "k": float(gate_k), "num_gated_sets": len(dts)}
+    if gate_mode != "adaptive" or len(dts) < int(min_sets):
+        info.update({"applied": "fixed", "dt_mm": float(fallback_dt_mm),
+                     "dr_deg": float(fallback_dr_deg),
+                     "floor_dt_mm": None, "floor_dr_deg": None})
+        return float(fallback_dt_mm), float(fallback_dr_deg), info
+    floor_dt = float(np.median([float(p["stability"].get("translation_std_mm", 0.0))
+                                for p in prepared.values()]))
+    floor_dr = float(np.median([float(p["stability"].get("rotation_std_deg", 0.0))
+                                for p in prepared.values()]))
+    gate_dt = _mad_cutoff(dts, gate_k, floor_dt)
+    gate_dr = _mad_cutoff(drs, gate_k, floor_dr)
+    info.update({"applied": "adaptive", "dt_mm": gate_dt, "dr_deg": gate_dr,
+                 "floor_dt_mm": floor_dt, "floor_dr_deg": floor_dr})
+    return gate_dt, gate_dr, info
+
+
 def build_setwise_cube_anchors(meta: dict,
                                event_pose_map: Dict[int, np.ndarray],
                                set_prior_by_set: Optional[Dict[int, np.ndarray]] = None,
                                max_prior_dt_mm: float = 35.0,
-                               max_prior_dr_deg: float = 8.0):
+                               max_prior_dr_deg: float = 8.0,
+                               gate_mode: str = "adaptive",
+                               gate_k: float = 2.5):
     poses_by_set: Dict[int, List[Tuple[int, np.ndarray]]] = defaultdict(list)
     events_without_set_index: List[int] = []
 
@@ -1393,22 +1435,38 @@ def build_setwise_cube_anchors(meta: dict,
         "global_average_is_compatibility_only": False,
     }
 
+    prepared: Dict[int, dict] = {}
     for set_index in sorted(poses_by_set):
         items = poses_by_set[set_index]
         if not items:
             continue
-        Ts = [T for _, T in items]
-        T_avg, st = robust_weighted_se3_average(Ts, return_stats=True)
+        T_avg, st = robust_weighted_se3_average([T for _, T in items],
+                                                return_stats=True)
+        T_prior = None
+        dt_mm = dr_deg = None
         if set_prior_by_set is not None and int(set_index) in set_prior_by_set:
             T_prior = np.asarray(set_prior_by_set[int(set_index)], dtype=np.float64)
             dt_mm = float(np.linalg.norm(T_avg[:3, 3] - T_prior[:3, 3]) * 1000.0)
             dr_deg = rotation_error_deg(T_avg[:3, :3], T_prior[:3, :3])
-            if dt_mm <= float(max_prior_dt_mm) and dr_deg <= float(max_prior_dr_deg):
+        prepared[int(set_index)] = {
+            "items": items, "T_avg": T_avg, "stability": st,
+            "T_prior": T_prior, "dt_mm": dt_mm, "dr_deg": dr_deg,
+        }
+
+    gate_dt, gate_dr, gate_info = resolve_prior_gate(
+        prepared, max_prior_dt_mm, max_prior_dr_deg, gate_mode, gate_k)
+    diag["prior_gate"] = gate_info
+
+    for set_index, p in prepared.items():
+        T_avg, st, items = p["T_avg"], p["stability"], p["items"]
+        if p["T_prior"] is not None:
+            st["prior_blend_dt_mm"] = p["dt_mm"]
+            st["prior_blend_dr_deg"] = p["dr_deg"]
+            accepted = p["dt_mm"] <= gate_dt and p["dr_deg"] <= gate_dr
+            st["prior_accepted"] = bool(accepted)
+            if accepted:
                 # A set that clears the gate is trusted fully: no partial weight.
-                T_avg = T_prior.copy()
-                st["prior_blend_dt_mm"] = dt_mm
-                st["prior_blend_dr_deg"] = dr_deg
-                st["prior_accepted"] = True
+                T_avg = p["T_prior"].copy()
         transforms_by_set[int(set_index)] = T_avg
         diag["per_set"][str(int(set_index))] = {
             "support": int(len(items)),
@@ -1427,7 +1485,9 @@ def build_hybrid_setwise_cube_anchors(meta: dict,
                                       gripper_event_pose_map: Dict[int, np.ndarray],
                                       set_prior_by_set: Optional[Dict[int, np.ndarray]] = None,
                                       max_prior_dt_mm: float = 35.0,
-                                      max_prior_dr_deg: float = 8.0):
+                                      max_prior_dr_deg: float = 8.0,
+                                      gate_mode: str = "adaptive",
+                                      gate_k: float = 2.5):
     fixed_by_set: Dict[int, Dict[int, np.ndarray]] = defaultdict(dict)
     gripper_by_set: Dict[int, Dict[int, np.ndarray]] = defaultdict(dict)
     events_without_set_index: List[int] = []
@@ -1456,6 +1516,7 @@ def build_hybrid_setwise_cube_anchors(meta: dict,
         "strategy": "fixed_translation_gripper_rotation",
     }
 
+    prepared: Dict[int, dict] = {}
     all_sets = sorted(set(fixed_by_set.keys()) | set(gripper_by_set.keys()))
     for set_index in all_sets:
         fixed_items = fixed_by_set.get(set_index, {})
@@ -1481,17 +1542,12 @@ def build_hybrid_setwise_cube_anchors(meta: dict,
 
         T_avg, st = robust_weighted_se3_average(
             [T for _, T in hybrid_events], return_stats=True)
+        T_prior = None
+        dt_mm = dr_deg = None
         if set_prior_by_set is not None and int(set_index) in set_prior_by_set:
             T_prior = np.asarray(set_prior_by_set[int(set_index)], dtype=np.float64)
             dt_mm = float(np.linalg.norm(T_avg[:3, 3] - T_prior[:3, 3]) * 1000.0)
             dr_deg = rotation_error_deg(T_avg[:3, :3], T_prior[:3, :3])
-            if dt_mm <= float(max_prior_dt_mm) and dr_deg <= float(max_prior_dr_deg):
-                # A set that clears the gate is trusted fully: no partial weight.
-                T_avg = T_prior.copy()
-                st["prior_blend_dt_mm"] = dt_mm
-                st["prior_blend_dr_deg"] = dr_deg
-                st["prior_accepted"] = True
-        transforms_by_set[int(set_index)] = T_avg
 
         fixed_st = None
         if fixed_items:
@@ -1502,15 +1558,39 @@ def build_hybrid_setwise_cube_anchors(meta: dict,
             _, gripper_st = robust_weighted_se3_average(
                 [T for T in gripper_items.values()], return_stats=True)
 
+        prepared[int(set_index)] = {
+            "T_avg": T_avg, "stability": st, "T_prior": T_prior,
+            "dt_mm": dt_mm, "dr_deg": dr_deg,
+            "hybrid_events": hybrid_events,
+            "fixed_items": fixed_items, "gripper_items": gripper_items,
+            "fixed_st": fixed_st, "gripper_st": gripper_st,
+        }
+
+    gate_dt, gate_dr, gate_info = resolve_prior_gate(
+        prepared, max_prior_dt_mm, max_prior_dr_deg, gate_mode, gate_k)
+    diag["prior_gate"] = gate_info
+
+    for set_index, p in prepared.items():
+        T_avg, st = p["T_avg"], p["stability"]
+        if p["T_prior"] is not None:
+            st["prior_blend_dt_mm"] = p["dt_mm"]
+            st["prior_blend_dr_deg"] = p["dr_deg"]
+            accepted = p["dt_mm"] <= gate_dt and p["dr_deg"] <= gate_dr
+            st["prior_accepted"] = bool(accepted)
+            if accepted:
+                # A set that clears the gate is trusted fully: no partial weight.
+                T_avg = p["T_prior"].copy()
+        transforms_by_set[int(set_index)] = T_avg
+
         diag["per_set"][str(int(set_index))] = {
-            "support": int(len(hybrid_events)),
-            "events": [int(eid) for eid, _ in hybrid_events],
+            "support": int(len(p["hybrid_events"])),
+            "events": [int(eid) for eid, _ in p["hybrid_events"]],
             "stability": st,
             "source": "fixed_translation+gripper_rotation",
-            "fixed_support": int(len(fixed_items)),
-            "gripper_support": int(len(gripper_items)),
-            "fixed_stability": fixed_st,
-            "gripper_stability": gripper_st,
+            "fixed_support": int(len(p["fixed_items"])),
+            "gripper_support": int(len(p["gripper_items"])),
+            "fixed_stability": p["fixed_st"],
+            "gripper_stability": p["gripper_st"],
         }
 
     diag["num_sets"] = int(len(transforms_by_set))

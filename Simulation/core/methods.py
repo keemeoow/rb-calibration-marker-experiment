@@ -126,7 +126,7 @@ def build_visual_cube_estimates(sc, markers, train_sets, model=None):
 
 def build_production_fk_anchors(sc, markers, train_sets,
                                 max_prior_dt_mm=35.0, max_prior_dr_deg=8.0,
-                                gate_mode="fixed", gate_k=2.5,
+                                gate_mode="adaptive", gate_k=2.5,
                                 visual_model=None):
     """Mirror Step3's FK alignment, robust averaging, gate, and prior blend."""
     visual, support, scatter = build_visual_cube_estimates(

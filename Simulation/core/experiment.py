@@ -31,10 +31,11 @@ class ExpConfig:
     # exposed here because it is a different algorithm from production corr.
     prior_max_dt_mm: float = 35.0
     prior_max_dr_deg: float = 8.0
-    # Gate threshold policy. "fixed" keeps the constant limits above; "adaptive"
-    # derives them from the spread of the per-set distances, which is what those
-    # distances actually measure (deviation from the common delta).
-    gate_mode: str = "fixed"        # fixed | adaptive
+    # Gate threshold policy. "adaptive" derives the limits from the spread of the
+    # per-set distances, which is what those distances actually measure
+    # (deviation from the common delta), floored by vision's own scatter.
+    # "fixed" keeps the legacy constants above and exists only for comparison.
+    gate_mode: str = "adaptive"     # adaptive | fixed
     gate_k: float = 2.5
     post_correction: str = "none"   # none | ridge (C1 output correction, separate axis)
     fk_degree: int = 1              # Ridge feature degree when explicitly enabled

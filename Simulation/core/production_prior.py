@@ -151,7 +151,7 @@ def align_and_blend_set_priors(
         support_by_set: Optional[Mapping[int, float]] = None,
         max_prior_dt_mm: float = 35.0,
         max_prior_dr_deg: float = 8.0,
-        gate_mode: str = "fixed",
+        gate_mode: str = "adaptive",
         gate_k: float = 2.5,
         scatter_by_set: Optional[Mapping[int, tuple]] = None,
         gate_min_sets: int = 5) -> PriorAlignmentResult:
