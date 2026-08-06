@@ -30,7 +30,7 @@ CUBE_SIZE_MM = 30.0
 CUBE_GRIP_DEPTH_MM = 2.0
 CUBE_CENTER_OFFSET_Z = CUBE_SIZE_MM / 2.0 - CUBE_GRIP_DEPTH_MM
 
-TOOL_GRIPPER_Z = 113.5 # 기존에 150.0 이였음.
+TOOL_GRIPPER_Z = 150.0 # 컨트롤러 settool 값(펜던트 Pos→TCP = 150.0mm)과 일치.
 TOOL_CUBE_CENTER_Z = TOOL_GRIPPER_Z - CUBE_CENTER_OFFSET_Z
 
 # 큐브를 잡을 때(재-그립) 항상 place 위치 +Z 위에서 접근 후 수직 하강하여 안전하게 잡는다.
