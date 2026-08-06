@@ -570,7 +570,7 @@ raw FK를 무조건 믿지 않는다. 먼저 vision으로 큐브 자세를 계�
 $$
 \{\mathbf{C}^{(0)}_i\},\mathbf{X}^{(0)},\{\mathbf{O}^{(0)}_s\}
 =
-\operatorname{SolveNoFK}(	ext{vision observations})
+\operatorname{SolveNoFK}(\text{vision observations})
 $$
 
 ### 11.3 단계 2: 세트별 vision 합의 자세
