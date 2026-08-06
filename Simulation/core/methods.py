@@ -90,12 +90,41 @@ def _bootstrap(sc, markers, train_sets):
     return cams, gTc
 
 
+def debias_fk_prior(sc, markers, train_sets):
+    """real 파이프라인(estimate_set_cube_prior_alignment) 정합: raw FK 큐브 prior 의
+       **상수 계통 오정렬**을 vision 으로 제거.
+         T_delta_avg = robust_avg_s( inv(fk_cube[s]) @ vision_cube[s] )   (모든 set 공통 상수)
+         de-biased FK[s] = fk_cube[s] @ T_delta_avg
+       vision_cube = 부트스트랩(관측만) 큐브 합의. 이게 Ours corr 의 핵심(FK 를 vision 에 맞춰
+       정렬 후 앵커로 사용). 추정 불가 시 raw 유지. (fixed-FK 는 raw 를 그대로 써 대조.)"""
+    if "cube" not in markers:
+        return sc.fk_cube
+    cams0, gTc0 = _bootstrap(sc, markers, train_sets)
+    deltas = []
+    for s in train_sets:
+        Ts = [cams0[ci] @ sc.obs_fix_cube[(ci, s)] for ci in sc.fixed_cam_ids
+              if ci in cams0 and (ci, s) in sc.obs_fix_cube]
+        Ts += [sc.bTg[e] @ gTc0 @ sc.obs_grip_cube[e]
+               for e in sc.set_events[s] if e in sc.obs_grip_cube]
+        if not Ts:
+            continue
+        deltas.append(inv_T(sc.fk_cube[s]) @ se3_avg(Ts))    # FK→vision delta (set별)
+    if len(deltas) < 2:
+        return sc.fk_cube
+    T_delta = se3_avg(deltas)                                 # robust 평균 = 상수 오정렬
+    return {s: sc.fk_cube[s] @ T_delta for s in sc.sets}      # 전 set de-bias
+
+
 # ---------------------------------------------------------------- 통합(unified) BA
-def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=200, anchor_weight=0.0):
+def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=200, anchor_weight=0.0,
+                  fk_prior=None):
     """모든 관측을 하나의 비선형 최소제곱으로 동시 최적화 (CP_C1 solve_unified_joint 정합).
        fk_mode='fixed' 면 큐브를 FK 상수로 고정(미지수 제외).
-       anchor_weight>0 이면 자유 큐브를 FK 로 약하게 당기는 soft anchor 항 추가 (gauge 안정화;
-       corr 방식에서 사용, CP_C1 anchor_weight=5.0)."""
+       anchor_weight>0 이면 자유 큐브를 FK prior 로 약하게 당기는 soft anchor 항 추가.
+       fk_prior : 큐브 FK prior dict {s: pose}. None 이면 sc.fk_cube(raw). corr 는 de-biased
+                  FK(sc.fk_cube 를 vision 으로 상수보정한 것)를 넘김 → real 파이프라인 정합."""
+    if fk_prior is None:
+        fk_prior = sc.fk_cube
     cam_ids = sc.fixed_cam_ids
     cams0, gTc0 = _bootstrap(sc, markers, train_sets)
     use_cube = "cube" in markers
@@ -146,7 +175,7 @@ def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=200, anchor_weight=
             return vec_to_se3(p[idx[("board",)]:idx[("board",)]+6])
         if cube_free:
             return vec_to_se3(p[idx[("cube", s)]:idx[("cube", s)]+6])
-        return sc.fk_cube[s]                            # fixed: 상수
+        return fk_prior[s]                              # fixed: FK 상수(raw 또는 de-biased)
 
     aw = float(anchor_weight)
 
@@ -159,11 +188,12 @@ def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=200, anchor_weight=
                 r.append(se3_residual(cams[a] @ T_obs, Cs))
             else:
                 r.append(se3_residual(sc.bTg[a] @ gTc @ T_obs, Cs))
-        # FK soft anchor (gauge 고정): 자유 큐브를 FK prior 로 약하게 당김 (CP_C1 정합)
+        # FK soft anchor (gauge 고정): 자유 큐브를 FK prior 로 약하게 당김 (CP_C1 정합).
+        #   corr 는 de-biased FK(fk_prior)를 씀 → 상수 오정렬 제거된 prior 로 당김.
         if aw > 0.0 and cube_free:
             for s in train_sets:
                 if ("cube", s) in idx:
-                    r.append(aw * se3_residual(target_pose(p, "cube", s), sc.fk_cube[s]))
+                    r.append(aw * se3_residual(target_pose(p, "cube", s), fk_prior[s]))
         # gripped: 고정카메라 @ 관측 == bTg_grip @ X (로봇 모션 기반 eye-to-hand)
         if use_grip:
             Xm = vec_to_se3(p[idx[("X",)]:idx[("X",)]+6])
@@ -182,22 +212,22 @@ def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=200, anchor_weight=
 
 
 # ---------------------------------------------------------------- 독립(independent)
-def solve_independent(sc, markers, fk_mode, train_sets):
+def solve_independent(sc, markers, fk_mode, train_sets, fk_prior=None):
     """고정 카메라와 그리퍼를 *따로* 풀고 base 에서 조합(공유 타깃 rigid 정합).
-       fk_mode='fixed' 면 큐브 FK 고정(각 카메라 독립 역산 = 통합과 동일)."""
+       fk_mode='fixed' → 큐브=raw FK 고정. corr(fk_prior 주어짐) → 큐브=de-biased FK 고정.
+       둘 다 각 카메라 FK prior 로 절대 역산 (align 불필요). none → visual only."""
     cam_ids = sc.fixed_cam_ids
     use_cube = "cube" in markers
 
-    # --- 고정 카메라 ---
-    if fk_mode == "fixed" and use_cube:
-        # 큐브=FK 고정 → 각 카메라 closed-form 역산
+    # --- FK prior 로 고정 카메라 절대 역산: fixed=raw FK, corr=de-biased FK ---
+    anchor_cube = sc.fk_cube if (fk_mode == "fixed") else fk_prior
+    if anchor_cube is not None and use_cube:
         cams = {}
         for ci in cam_ids:
-            Ts = [sc.fk_cube[s] @ inv_T(sc.obs_fix_cube[(ci, s)]) for s in train_sets if (ci,s) in sc.obs_fix_cube]
-            if not Ts: continue
-            cams[ci] = se3_avg(Ts)
-        gTc = _handeye_to_fk(sc, train_sets)            # 그리퍼도 FK 큐브에 정합
-        return {"cams": cams, "gTc": gTc, "mode": "indep/fixed", "align": None}
+            Ts = [anchor_cube[s] @ inv_T(sc.obs_fix_cube[(ci, s)]) for s in train_sets if (ci,s) in sc.obs_fix_cube]
+            if Ts: cams[ci] = se3_avg(Ts)
+        gTc = _handeye_to_fk(sc, train_sets, anchor_cube)   # 그리퍼도 같은 FK prior 에 정합
+        return {"cams": cams, "gTc": gTc, "mode": "indep/" + fk_mode, "align": None}
 
     # none/corr: 고정 카메라는 관측 합의(FK 초기화 후 카메라 합의). 그리퍼는 따로 핸드아이.
     cams0, _ = _bootstrap(sc, markers, train_sets)
@@ -222,13 +252,15 @@ def solve_independent(sc, markers, fk_mode, train_sets):
     return {"cams": cams, "gTc": gTc, "mode": "indep/" + fk_mode, "align": align}
 
 
-def _handeye_to_fk(sc, train_sets):
-    """그리퍼 gTc 를 FK 큐브 절대위치에 정합 (fixed 모드 독립 핸드아이)."""
+def _handeye_to_fk(sc, train_sets, cube_prior=None):
+    """그리퍼 gTc 를 FK 큐브 절대위치에 정합 (독립 핸드아이). cube_prior=raw 또는 de-biased FK."""
+    if cube_prior is None:
+        cube_prior = sc.fk_cube
     g = []
     for e in [e for s in train_sets for e in sc.set_events[s]]:
         if e not in sc.obs_grip_cube: continue
         s = sc.event_set[e]
-        g.append(inv_T(sc.bTg[e]) @ sc.fk_cube[s] @ inv_T(sc.obs_grip_cube[e]))
+        g.append(inv_T(sc.bTg[e]) @ cube_prior[s] @ inv_T(sc.obs_grip_cube[e]))
     return se3_avg(g) if g else np.eye(4)
 
 

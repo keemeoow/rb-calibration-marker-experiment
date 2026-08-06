@@ -119,25 +119,27 @@ class SimScene:
 
         # ---- 로봇 FK 큐브 위치 (fk_cube). 완벽=GT, 옵션 노이즈 ----
         #   두 종류:
-        #   (1) fk_sys_*  : systematic 편향 = 위치에 affine 하게 의존하는 계통오차 (씬 고정).
-        #       실측 FK 오차의 성격(자세에 매끄럽게 의존, ~6.6mm) → Ridge[1,x,y] 로 학습·제거 가능.
-        #       이게 FK 후보정(Ours)이 노리는 대상. realistic 조건에서 사용.
-        #   (2) fk_noise_*: random(제로평균) 섭동 — 학습 불가한 순수 잡음 (대조용 sweep).
+        #   (1) fk_sys_*  : systematic 편향 (실측 FK 성격) = **상수 rigid 오정렬**(모든 set 동일:
+        #       real 의 180° flip + 37mm 오프셋 대응) + **소량 per-set 잔차**. 상수부는 vision 으로
+        #       추정한 T_delta_avg 로 de-bias 하면 제거됨(=Ours corr). 잔차는 남음(실측 dt 1~6mm).
+        #   (2) fk_noise_*: random(제로평균) 섭동 — 학습·de-bias 불가한 순수 잡음 (대조 sweep).
         fk_sys = None
         if fk_sys_mm > 0 or fk_sys_deg > 0:
             rs = np.random.default_rng(5000 + seed)
-            A = rs.normal(size=(3, 3)) * ((fk_sys_mm / 1000.0) / 0.165)  # 위치 affine 계수
-            b = rs.normal(size=3) * (fk_sys_mm / 1000.0) * 0.3           # 상수 병진 오프셋
+            bvec = rs.normal(size=3); bvec /= (np.linalg.norm(bvec) + 1e-12)
+            b_const = bvec * (fk_sys_mm / 1000.0)              # 상수 오프셋 (de-bias 로 제거)
             ax_s = rs.normal(size=3); ax_s /= (np.linalg.norm(ax_s) + 1e-12)  # 상수 회전축
-            fk_sys = (A, b, ax_s)
+            res_std = (fk_sys_mm / 1000.0) * 0.4               # per-set 잔차 std (de-bias 후 남음)
+            fk_sys = (b_const, ax_s, res_std)
         self.fk_cube = {}
         for s in self.sets:
             T = self.bTo[s].copy()
-            if fk_sys is not None:                             # systematic (위치의존 smooth)
-                A, b, ax_s = fk_sys
-                T[:3, 3] = T[:3, 3] + A @ (T[:3, 3] - center) + b
-                if fk_sys_deg > 0:                             # 상수 회전 편향 (계통)
+            if fk_sys is not None:                             # systematic = 상수 + per-set 잔차
+                b_const, ax_s, res_std = fk_sys
+                T[:3, 3] = T[:3, 3] + b_const                  # 상수 오프셋 (제거 가능)
+                if fk_sys_deg > 0:                             # 상수 회전 오정렬 (제거 가능)
                     T[:3, :3] = rot_axis_angle(ax_s, np.deg2rad(fk_sys_deg)) @ T[:3, :3]
+                T[:3, 3] = T[:3, 3] + rng.normal(0, res_std, 3)   # per-set 잔차 (제거 불가)
             if fk_noise_mm > 0 or fk_noise_deg > 0:            # random (제로평균)
                 ax = rng.normal(size=3); ax /= (np.linalg.norm(ax) + 1e-12)
                 dR = rot_axis_angle(ax, np.deg2rad(rng.normal(0, fk_noise_deg)))

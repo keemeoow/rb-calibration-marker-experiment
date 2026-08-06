@@ -16,7 +16,7 @@ import numpy as np
 
 from .scene import SimScene
 from .methods import (solve_unified, solve_independent,
-                      learn_fk_correction)
+                      debias_fk_prior)
 from .metrics import eval_model
 
 
@@ -42,20 +42,23 @@ class ExpConfig:
 def calibrate(sc, cfg: ExpConfig, train_sets):
     """설정대로 캘리브.
        - none  : FK 미사용 (anchor 없음). 순수 카메라 기반.
-       - corr  : FK soft anchor(gauge 안정, weight 5.0)로 캘리브 후 잔차 Ridge 후보정.
-       - fixed : 큐브를 FK 상수로 하드 고정.
+       - corr  : **real 방식** — raw FK 를 vision 으로 상수 de-bias(debias_fk_prior) 후
+                 그 de-biased FK 를 soft anchor 로 사용. (예전의 'FK 로 예측을 당기는' 후보정
+                 Ridge 는 real 과 방향이 반대라 제거.)
+       - fixed : 큐브를 raw FK 상수로 하드 고정 (de-bias 안 함 → systematic FK 에 취약, 대조군).
     """
     cfg.validate()
     fk_solve = "none" if cfg.fk == "corr" else cfg.fk    # corr 캘리브는 큐브 자유(+anchor)
     aw = cfg.anchor_weight if cfg.fk == "corr" else 0.0  # corr 만 soft anchor (0=ours-A)
-    if cfg.solve == "unified":
-        model = solve_unified(sc, cfg.markers, fk_solve, train_sets, anchor_weight=aw)
-    else:
-        model = solve_independent(sc, cfg.markers, fk_solve, train_sets)
-    W = None
+    fk_prior = None
     if cfg.fk == "corr":
-        W = learn_fk_correction(sc, model, train_sets, degree=cfg.fk_degree)
-    return model, W
+        fk_prior = debias_fk_prior(sc, cfg.markers, train_sets)   # FK 를 vision 에 맞춰 de-bias
+    if cfg.solve == "unified":
+        model = solve_unified(sc, cfg.markers, fk_solve, train_sets,
+                              anchor_weight=aw, fk_prior=fk_prior)
+    else:
+        model = solve_independent(sc, cfg.markers, fk_solve, train_sets, fk_prior=fk_prior)
+    return model, None   # W 후보정 제거 (de-bias 가 real 방식의 보정)
 
 
 def run_config(cfg: ExpConfig, seeds=20, n_sets=10, sigma_px=0.3, train_size=8,
