@@ -747,7 +747,7 @@ $$
 
 ### 11.8 단계 7: anchor를 고정하고 최종 refinement
 
-현재 Step3형 시뮬레이션은 만들어진 $\mathbf{A}_s$를 최종 단계에서 고정 anchor로 사용한다.
+`Corrected-FK`는 만들어진 $\mathbf{A}_s$를 최종 단계에서 고정 anchor로 사용한다.
 
 $$
 \left\{
@@ -840,7 +840,7 @@ $$
 \right\|_2^2
 $$
 
-$\mathcal{E}_{\mathrm{anchor}}$는 FK 방식에 따라 없거나, hard constraint로 대체되거나, 별도의 soft anchor로 사용될 수 있다. 현재 Step3형 Corrected-FK 시뮬레이션에서는 $\mathbf{A}_s$를 고정한 refinement로 구현된다.
+$\mathcal{E}_{\mathrm{anchor}}$는 FK 방식에 따라 없거나, hard constraint로 대체되거나, 별도의 soft anchor로 사용될 수 있다. `Corrected-FK`에서는 $\mathbf{A}_s$를 고정한 refinement로 구현된다.
 
 Unified의 핵심은 한쪽 관측이 $\mathbf{Q}_s$를 움직이면, 같은 $\mathbf{Q}_s$를 공유하는 다른 쪽의 $\mathbf{C}_i$와 $\mathbf{X}$도 영향을 받는다는 것이다. 즉 두 서브시스템이 정보를 교환한다.
 
@@ -1145,7 +1145,7 @@ $$
 
 이 둘은 자주 혼동되지만 서로 다른 단계다.
 
-### 17.1 Step3형 Corrected-FK
+### 17.1 Corrected-FK
 
 캘리브레이션 입력 쪽에서 raw FK 자세를 vision으로 정렬하고, gate와 blend를 거쳐 anchor $\mathbf{A}_s$를 만든다.
 
@@ -1434,7 +1434,7 @@ $\mathbf{C}_i$, $\mathbf{Z}_{i,s}$, $\mathbf{G}_e$, $\mathbf{X}$, $\mathbf{Z}_{g
 
 ### 질문: Corrected-FK는 soft anchor인가?
 
-현재 Step3형 시뮬레이션에서는 vision과 corrected FK를 gate 후 $\alpha=0.25$로 섞어 $\mathbf{A}_s$를 만들고, 최종 refinement에서 $\mathbf{A}_s$를 고정한다. 따라서 legacy 방식의 단순 soft-anchor 벌점과 구분해야 한다.
+`Corrected-FK`는 vision과 corrected FK를 gate 후 $\alpha=0.25$로 섞어 $\mathbf{A}_s$를 만들고, 최종 refinement에서 $\mathbf{A}_s$를 고정한다. 따라서 legacy 방식의 단순 soft-anchor 벌점과 구분해야 한다.
 
 ### 질문: Independent와 Separated는 다른 방법인가?
 
