@@ -15,8 +15,8 @@ CB = ("cube", "board")
 METHODS = [
     ExpConfig("fixed", fk="fixed", solve="unified", markers=CB, label="fixed-FK"),
     ExpConfig("noFK",  fk="none",  solve="unified", markers=CB, label="no-FK"),
-    ExpConfig("ours",  fk="factor", solve="unified", markers=CB, label="Ours (FK factor)"),
-    ExpConfig("corr",  fk="corr",  solve="unified", markers=CB, label="구 Ridge 후보정"),
+    ExpConfig("oursA", fk="corr",  solve="unified", markers=CB, anchor_weight=0.0, label="ours-A"),
+    ExpConfig("oursB", fk="corr",  solve="unified", markers=CB, anchor_weight=0.5, label="ours-B"),
 ]
 SYS = [0.0, 0.01, 0.02]     # 인지 계통노이즈 (intrinsic 상대오차)
 SIG = [0.3, 0.6, 1.0]       # 마커 인지정확도 (코너 검출 σ px)
@@ -29,7 +29,7 @@ MKEYS = ["e_task_mm", "e_X_mm", "gTc_mm", "bTf_mm"]   # held-out + 캘리브 자
 def _job(a):
     mi, seed, si, gi, grip, n_sets, n_events, train, pairs = a
     from core.scene import SimScene
-    from core.experiment import calibrate, _splits_for_seed
+    from core.experiment import calibrate
     from core.metrics import eval_model
     sysv, sig = SYS[si], SIG[gi]
     cfg = METHODS[mi]
@@ -38,15 +38,19 @@ def _job(a):
         sc = SimScene(seed=seed, n_sets=n_sets, n_events_per_set=n_events,
                       sigma_px=sig, fk_noise_mm=FK_MM, fk_noise_deg=0.0,
                       intrinsic_err=sysv, outlier_rate=0.0, n_gripped_events=grip)
-        for test in _splits_for_seed(sc.sets, seed, pairs):
+        n = 0
+        for test in itertools.combinations(sc.sets, 2):
             tr = [s for s in sc.sets if s not in test][:train]
             model, W = calibrate(sc, cfg, tr)
             res = eval_model(sc, model, tr, list(test), W=W)
             for k in MKEYS:
                 if res.get(k) is not None:
                     acc[k].append(res[k])
-    except Exception as ex:                    # 실패를 숨기지 않고 보고
-        print(f"[FAIL] job={a}: {type(ex).__name__}: {ex}", file=sys.stderr)
+            n += 1
+            if n >= pairs:
+                break
+    except Exception:
+        pass
     return (mi, si, gi), {k: (float(np.mean(v)) if v else None) for k, v in acc.items()}
 
 

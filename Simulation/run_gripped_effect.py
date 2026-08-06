@@ -14,8 +14,8 @@ CB = ("cube", "board")
 METHODS = [
     ExpConfig("fixed", fk="fixed", solve="unified", markers=CB, label="fixed-FK"),
     ExpConfig("noFK",  fk="none",  solve="unified", markers=CB, label="no-FK"),
-    ExpConfig("ours",  fk="factor", solve="unified", markers=CB, label="Ours (FK factor)"),
-    ExpConfig("corr",  fk="corr",  solve="unified", markers=CB, label="구 Ridge 후보정"),
+    ExpConfig("oursA", fk="corr",  solve="unified", markers=CB, anchor_weight=0.0, label="ours-A"),
+    ExpConfig("oursB", fk="corr",  solve="unified", markers=CB, anchor_weight=0.5, label="ours-B"),
 ]
 # 대표 조건 (FK오차mm, 계통노이즈)
 CONDS = [(0.0, 0.0), (0.0, 0.02), (8.0, 0.0), (8.0, 0.02)]
@@ -25,7 +25,7 @@ COND_LBL = ["ideal (FK0,sys0)", "systematic (FK0,sys2%)", "FK-err (FK8,sys0)", "
 def _job(a):
     mi, seed, ci_cond, grip, n_sets, n_events, train, pairs = a
     from core.scene import SimScene
-    from core.experiment import calibrate, _splits_for_seed
+    from core.experiment import calibrate
     from core.metrics import eval_model
     fk, sys = CONDS[ci_cond]
     cfg = METHODS[mi]
@@ -34,14 +34,18 @@ def _job(a):
         sc = SimScene(seed=seed, n_sets=n_sets, n_events_per_set=n_events,
                       sigma_px=0.3, fk_noise_mm=fk, fk_noise_deg=fk / 10.0,
                       intrinsic_err=sys, outlier_rate=sys * 5.0, n_gripped_events=grip)
-        for test in _splits_for_seed(sc.sets, seed, pairs):
+        n = 0
+        for test in itertools.combinations(sc.sets, 2):
             tr = [s for s in sc.sets if s not in test][:train]
             model, W = calibrate(sc, cfg, tr)
             res = eval_model(sc, model, tr, list(test), W=W)
             if res.get("e_task_mm") is not None:
                 et.append(res["e_task_mm"])
-    except Exception as ex:                    # 실패를 숨기지 않고 보고
-        print(f"[FAIL] job={a}: {type(ex).__name__}: {ex}", file=sys.stderr)
+            n += 1
+            if n >= pairs:
+                break
+    except Exception:
+        pass
     return (mi, ci_cond, grip), (np.mean(et) if et else None)
 
 

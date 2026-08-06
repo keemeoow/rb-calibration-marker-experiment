@@ -19,61 +19,26 @@ DEFAULT_K = np.array([[597.5, 0, 327.3], [0, 599.7, 245.7], [0, 0, 1.0]])
 DEFAULT_DIST = np.array([0.0918, -0.2228, -0.0001, 0.0058, 0.0])   # brown k1,k2,p1,p2,k3
 IMAGE_W, IMAGE_H = 640, 480
 
-
-def _pnp(obj, img, K, dist, rvec=None, tvec=None):
-    """평범한 solvePnP 래퍼 → (rvec, tvec) 또는 None."""
-    guess = rvec is not None
-    ok, rv, tv = cv2.solvePnP(obj.reshape(-1, 1, 3), img.reshape(-1, 1, 2), K, dist,
-                              rvec=rvec, tvec=tvec, useExtrinsicGuess=guess,
-                              flags=cv2.SOLVEPNP_ITERATIVE)
-    return (rv, tv) if ok else None
-
-
-def _px_residual(obj, img, K, dist, rvec, tvec):
-    p, _ = cv2.projectPoints(obj.reshape(-1, 1, 3), rvec, tvec, K, dist)
-    return np.linalg.norm(p.reshape(-1, 2) - img, axis=1)
-
-
-def _robust_pnp(obj, img, K, dist, min_corners=4, thresh_px=3.0, robust=True,
-                iters=3):
-    """강건 PnP — **IRLS/trimming 방식**: 전체 코너로 풀고, 재투영 잔차가
-    max(thresh_px, 3·MAD) 를 넘는 코너를 버린 뒤 재추정 (최대 iters 회).
-
-    RANSAC 을 쓰지 않는 이유: solvePnPRansac 의 minimal 가설 solver 는 **평면 타깃
-    (ChArUco 보드, 큐브 단일면)에서 퇴화**해 6점짜리 엉터리 consensus 를 돌려준다
-    (실측: 보드 회전오차 median 125°). trimming 은 minimal solver 를 쓰지 않으므로
-    평면/비평면 모두에서 안전하고, 이상치가 없으면 아무 코너도 버리지 않는다.
-
-    반환 (rvec, tvec, keep_idx) 또는 None.
-    """
-    keep = np.arange(len(obj))
-    r = _pnp(obj, img, K, dist)
-    if r is None:
-        return None
-    rvec, tvec = r
-    if not robust:
-        return rvec, tvec, keep
-    for _ in range(iters):
-        res = _px_residual(obj, img, K, dist, rvec, tvec)
-        mad = 1.4826 * float(np.median(np.abs(res - np.median(res)))) + 1e-9
-        thr = max(float(thresh_px), 3.0 * mad)
-        new = np.flatnonzero(res <= thr)
-        if len(new) < max(min_corners, 4) or len(new) == len(keep):
-            break
-        keep = new
-        r = _pnp(obj[keep], img[keep], K, dist, rvec, tvec)
-        if r is None:
-            break
-        rvec, tvec = r
-    return rvec, tvec, keep
+# 실측 카메라별 개별 intrinsic (charuco_intrinsics_report.json). real 은 카메라마다 K 가 달라
+#   (cy 최대 ~22px 차) 평균 K 하나가 아니라 개별값을 써야 충실. fixed=cam0/1/3, gripper=cam2.
+#   dist 는 [k1,k2,p1,p2,k3], k3=0 고정 (dist_model=brown_conrady_fixk3).
+REAL_CAM_INTR = {
+    0: {"K": np.array([[592.785, 0, 326.205], [0, 595.882, 258.082], [0, 0, 1.0]]),
+        "dist": np.array([0.07230, -0.18836, 0.00746, 0.00613, 0.0])},
+    1: {"K": np.array([[595.188, 0, 322.448], [0, 597.633, 249.406], [0, 0, 1.0]]),
+        "dist": np.array([0.09137, -0.22003, -0.00185, 0.00808, 0.0])},
+    2: {"K": np.array([[602.506, 0, 337.486], [0, 603.523, 236.303], [0, 0, 1.0]]),
+        "dist": np.array([0.08259, -0.19207, -0.00278, 0.00881, 0.0])},   # gripper (eye-in-hand)
+    3: {"K": np.array([[599.711, 0, 323.207], [0, 601.883, 239.089], [0, 0, 1.0]]),
+        "dist": np.array([0.12098, -0.29069, -0.00310, 0.00036, 0.0])},
+}
 
 
 def observe(target, T_cam_target, sigma_px=0.5, incidence_max_deg=75.0,
             K=DEFAULT_K, dist=DEFAULT_DIST, rng=None,
             min_markers=1, min_corners=4,
-            K_pnp=None, dist_pnp=None, outlier_rate=0.0, outlier_px=15.0,
-            robust_pnp=True, ransac_px=3.0):
-    """카메라가 타깃을 관측 → 관측 dict 또는 None(미검출).
+            K_pnp=None, dist_pnp=None, outlier_rate=0.0, outlier_px=15.0):
+    """카메라가 타깃을 관측 → (T_cam_target_est, n_corners, reproj_px) 또는 None(미검출).
 
     target        : CubeTarget | BoardTarget (rig 로컬 3D 코너 제공)
     T_cam_target  : GT camera←target pose (4x4)
@@ -83,19 +48,9 @@ def observe(target, T_cam_target, sigma_px=0.5, incidence_max_deg=75.0,
     추가 관측 노이즈(실제):
       K_pnp/dist_pnp : PnP 가 쓰는 intrinsic. 참 K/dist 로 투영하되 PnP 는 이 부정확
                        K_pnp/dist_pnp 를 씀 → intrinsic 캘리브 오차 → 위치의존 systematic
-                       편향. None 이면 참값과 동일(오차 없음).
+                       편향(FK 후보정이 학습 가능). None 이면 참값과 동일(오차 없음).
       outlier_rate   : 각 코너가 이상치가 될 확률. outlier_px 크기의 큰 노이즈 주입.
-
-    robust_pnp     : solvePnPRansac + 인라이어 재정제. **프론트엔드는 씬이 한 번만 돌리므로
-                     모든 캘리브 방법이 동일한 pose·동일한 인라이어 코너 집합을 공유한다**
-                     (이상치 실험에서 특정 방법만 강건 프론트엔드를 갖는 불공정 제거).
-
-    반환 dict:
-      T        : solvePnP 로 복원한 camera←target pose (노이즈 전파됨)
-      obj/img  : 최종 pose 산출에 실제 쓰인 3D-2D 코너 대응 (인라이어). 재투영 평가용 원본.
-      mids     : 코너별 마커 id (면 가시성 추적용)
-      K/dist   : 이 관측이 쓴 intrinsic (재투영 평가도 동일 intrinsic 을 써야 공정)
-      reproj_px: 프론트엔드 PnP 자체의 재투영 잔차 (씬 품질 지표. 방법 비교용 아님)
+    반환 pose 는 solvePnP 로 복원한 추정 pose (노이즈 전파됨).
     """
     if rng is None:
         rng = np.random.default_rng()
@@ -107,7 +62,7 @@ def observe(target, T_cam_target, sigma_px=0.5, incidence_max_deg=75.0,
     t_ct = T_cam_target[:3, 3]
     cos_inc = np.cos(np.deg2rad(incidence_max_deg))
 
-    obj_pts, img_pts, mid_pts = [], [], []
+    obj_pts, img_pts = [], []
     n_markers = 0
     for mid, corners3d, normal in target.all_corners():
         # 면 법선을 카메라 좌표로; 카메라를 향하는지 입사각 판정.
@@ -119,30 +74,17 @@ def observe(target, T_cam_target, sigma_px=0.5, incidence_max_deg=75.0,
         if facing < cos_inc:
             continue                                     # 너무 비스듬 → 미검출
         # 3D 코너를 카메라 좌표로
-        pc = (R_ct @ corners3d.T).T + t_ct               # (N,3) camera 좌표
-        front = pc[:, 2] > 1e-3
-        if getattr(target, "partial_ok", False):
-            if int(front.sum()) < 4:                     # 부분 검출 타깃: 앞쪽 코너만
-                continue
-            corners3d = corners3d[front]
-        elif not np.all(front):                          # 마커 단위 타깃: 하나라도 뒤면 스킵
+        pc = (R_ct @ corners3d.T).T + t_ct               # (4,3) camera 좌표
+        if np.any(pc[:, 2] <= 1e-3):                      # 카메라 뒤 → 스킵
             continue
         # 2D 투영 (K, 왜곡)
         proj, _ = cv2.projectPoints(corners3d.reshape(-1, 1, 3),
                                     cv2.Rodrigues(R_ct)[0], t_ct.reshape(3, 1), K, dist)
         proj = proj.reshape(-1, 2)
-        # FoV 판정.
-        #   AprilTag(큐브): 태그가 온전히 보여야 디코딩됨 → 마커 단위 all-or-nothing.
-        #   ChArUco(보드) : 체스판 코너는 개별 검출 → 화면 안 코너만 부분 사용.
-        #   (부분 검출을 막으면 하향 27° 배치에서 고정 카메라 3대 중 1대만 보드를 얻어
-        #    board-only 비교군이 부당하게 무너진다.)
+        # FoV 판정
         inb = ((proj[:, 0] >= 0) & (proj[:, 0] < IMAGE_W) &
                (proj[:, 1] >= 0) & (proj[:, 1] < IMAGE_H))
-        if getattr(target, "partial_ok", False):
-            if int(inb.sum()) < 4:
-                continue
-            corners3d = corners3d[inb]; proj = proj[inb]
-        elif not np.all(inb):
+        if not np.all(inb):
             continue
         # 픽셀 노이즈 (랜덤 지터) + 이상치(outlier)
         proj_n = proj + rng.normal(0, sigma_px, proj.shape)
@@ -151,46 +93,34 @@ def observe(target, T_cam_target, sigma_px=0.5, incidence_max_deg=75.0,
             if np.any(mask):
                 proj_n[mask] += rng.normal(0, outlier_px, (int(mask.sum()), 2))
         obj_pts.append(corners3d); img_pts.append(proj_n)
-        mid_pts.append(np.full(len(corners3d), mid, dtype=int))
         n_markers += 1
 
     if n_markers < min_markers:
         return None
     obj = np.concatenate(obj_pts, 0).astype(np.float64)
     img = np.concatenate(img_pts, 0).astype(np.float64)
-    mids = np.concatenate(mid_pts, 0)
     if len(obj) < min_corners:
         return None
 
-    # solvePnP: 노이즈 낀 2D 코너 + 3D 코너 → pose 복원.
-    #   PnP 는 K_pnp/dist_pnp(부정확 intrinsic)를 씀 → 참값(K/dist)과 다르면 systematic 편향.
-    r = _robust_pnp(obj, img, K_pnp, dist_pnp, min_corners=min_corners,
-                    thresh_px=ransac_px, robust=robust_pnp)
-    if r is None:
+    # robust PnP: solvePnPRansac 로 이상치 코너 제거 (모든 방법 동일 전처리).
+    #   K_pnp/dist_pnp(부정확 intrinsic) 사용 → 참값과 다르면 systematic 편향(의도된 모델).
+    #   Ransac 출력(rvec/tvec)은 내부에서 inlier·good-init 로 이미 정제됨 → 별도 refine 생략
+    #   (coplanar 소수 inlier 를 init 없이 재-solvePnP 하면 ITERATIVE 가 degenerate/crash).
+    ok, rvec, tvec, inliers = cv2.solvePnPRansac(
+        obj.reshape(-1, 1, 3), img.reshape(-1, 1, 2), K_pnp, dist_pnp,
+        reprojectionError=3.0, iterationsCount=100, flags=cv2.SOLVEPNP_ITERATIVE)
+    if not ok or inliers is None or len(inliers) < min_corners:
         return None
-    rvec, tvec, keep = r
-    obj_in = obj[keep]; img_in = img[keep]; mids_in = mids[keep]
+    inl = inliers.reshape(-1)
+    obj, img = obj[inl], img[inl]                          # inlier 만 유지 (reproj 계산용)
+    if float(tvec.reshape(3)[2]) <= 1e-3:                  # degenerate(카메라 뒤/영점) → 미검출
+        return None
     R_est, _ = cv2.Rodrigues(rvec)
     T_est = np.eye(4); T_est[:3, :3] = R_est; T_est[:3, 3] = tvec.reshape(3)
 
-    # 재투영 오차 (px) — PnP 가 쓴 K_pnp 기준. **프론트엔드 자체 잔차**이며 캘리브 방법과 무관.
-    reproj, _ = cv2.projectPoints(obj_in.reshape(-1, 1, 3), rvec, tvec, K_pnp, dist_pnp)
+    # 재투영 오차 (px) — inlier 기준
+    reproj, _ = cv2.projectPoints(obj.reshape(-1, 1, 3), rvec, tvec, K_pnp, dist_pnp)
     reproj = reproj.reshape(-1, 2)
-    reproj_px = float(np.sqrt(np.mean(np.sum((reproj - img_in) ** 2, axis=1))))
-    return {"T": T_est, "obj": obj_in, "img": img_in, "mids": mids_in,
-            "K": K_pnp, "dist": dist_pnp, "n_corners": len(obj_in),
-            "reproj_px": reproj_px}
-
-
-def reproject_rms(obs, T_pred):
-    """관측 dict 의 원본 2D 코너 vs 예측 pose T_pred(camera←target) 재투영 → RMS px.
-    관측이 쓴 K/dist 를 그대로 사용(참 intrinsic 을 쓰면 GT 누출). 카메라 뒤면 None."""
-    R = T_pred[:3, :3]; t = T_pred[:3, 3]
-    obj = obs["obj"]
-    zc = (R @ obj.T).T[:, 2] + t[2]
-    if np.any(zc <= 1e-3):
-        return None
-    p, _ = cv2.projectPoints(obj.reshape(-1, 1, 3), cv2.Rodrigues(R)[0],
-                             t.reshape(3, 1), obs["K"], obs["dist"])
-    p = p.reshape(-1, 2)
-    return float(np.sqrt(np.mean(np.sum((p - obs["img"]) ** 2, axis=1))))
+    reproj_px = float(np.sqrt(np.mean(np.sum((reproj - img) ** 2, axis=1))))
+    # inlier raw corner 반환: obj(rig 3D), img(노이즈 낀 2D). held-out 픽셀 재투영(③)용.
+    return T_est, len(obj), reproj_px, obj.copy(), img.copy()

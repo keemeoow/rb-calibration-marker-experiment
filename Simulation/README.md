@@ -11,38 +11,25 @@
 
 ## 7개 실험 (확정 리스트)
 
-기본 = **EXP1 (Ours)** = 통합 BA + 큐브+보드 + **공분산 가중 robust FK factor**.
-여기서 하나씩 제거:
+기본 = **EXP1 (Ours)** = FK 잔차보정 + 통합 캘리브 + 큐브+보드. 여기서 하나씩 제거:
 
 | # | FK | 캘리브 | 마커 | 의미 |
 |---|---|---|---|---|
-| **EXP1★** | factor | 통합 | 큐브+보드 | **Ours (기본)** |
-| EXP2 | factor | 따로 | 큐브+보드 | −통합 |
-| EXP3 | factor | 통합 | 큐브만 | −보드 |
+| **EXP1★** | 잔차보정(corr) | 통합 | 큐브+보드 | **Ours (기본)** |
+| EXP2 | 잔차보정 | 따로 | 큐브+보드 | −통합 |
+| EXP3 | 잔차보정 | 통합 | 큐브만 | −보드 |
 | EXP4 | 안씀(none) | 통합 | 큐브+보드 | −FK |
 | EXP5 | 안씀 | 따로 | 큐브+보드 | −FK −통합 |
 | EXP6 | 안씀 | 통합 | 보드만 | −큐브 |
-| EXP7 | 고정(fixed) | 통합 | 큐브+보드 | FK 하드 고정 대조 |
-| EXP8 | corr | 통합 | 큐브+보드 | 구 방식(Ridge 후보정) 비교군 |
+| EXP7 | 고정(fixed) | 통합(=독립) | 큐브+보드 | FK 고정 대조 |
 
-제약: **보드만 + FK 는 불가**(보드는 로봇이 위치를 모름 = FK 없음).
+제약: **보드만 + FK 는 불가**(보드는 로봇이 위치를 모름 = FK 없음). **fixed 는 통합=독립**
+(큐브 상수라 카메라 분리).
 
-### FK 사용방식 4-값
-- **none**   : 큐브를 미지수로 추정 (FK 미사용)
-- **fixed**  : 큐브 = FK 상수로 하드 고정 → 카메라·gTc 만 최적화
-- **factor** : 큐브는 자유, FK 를 **BA 안의 공분산 가중 robust 잔차 블록**으로 추가 (**Ours**).
-  sigma_FK(2.0mm / 0.30°)·Huber f_scale 은 `core/methods.py` 모듈 상수로 **전 실험 동결**.
-  회전까지 함께 구속되며, FK 가 크게 틀린 set 은 Huber 가 자동으로 감쇠한다.
-- **corr**   : none 으로 캘리브 후 예측 **위치만** [1,x,y] Ridge 로 후보정 (구 방식, 비교군).
-  회전을 보정하지 않아 "3D pose calibration" 으로 설명하기 어렵다.
-
-### 공정성 규약 (모든 방법에 동일 적용)
-1. **초기화**: `_bootstrap_visual` 하나만 사용 — GT(`bTo`/`bTboard`)도 FK 도 쓰지 않고
-   모션 기반 핸드아이(Park) + 로봇 자세만으로 구성. base gauge 는 로봇 자세가 제공한다.
-2. **솔버**: 모든 잔차를 sigma 로 whitening 한 뒤 동일한 Huber loss·동일 solver(trf)로 푼다.
-3. **프론트엔드**: robust PnP(trimming)는 씬이 한 번만 돌려 모든 방법이 **같은 pose·같은
-   인라이어 코너 집합**을 공유한다. 특정 방법만 강건해지는 일이 없다.
-4. **관측이 없는 카메라는 미지수에서 제외** → N_reg 가 정직해진다.
+### FK 3-값
+- **none** : 큐브를 미지수로 추정 (FK 미사용)
+- **fixed**: 큐브 = FK 상수로 고정 → 카메라·gTc 만 최적화
+- **corr** : none 으로 캘리브 후 train 잔차를 [1,x,y] Ridge 로 후보정 (**채택**)
 
 ---
 
@@ -70,38 +57,17 @@ python run_all.py --seeds 20 --dump results/tables/table2a.json
 
 | 지표 | 뜻 | 비고 |
 |---|---|---|
-| **N_reg** | 등록된 고정 카메라 수 | 커버리지. **이 값이 다르면 bTf/e_X 직접 비교 금지** |
-| **bTf** (mm/°) | 고정 카메라 외부파라미터 GT 대비 오차 | GT 기반 |
-| **gTc** (mm/°) | 핸드아이 GT 대비 오차 | GT 기반 |
-| **e_task** (mm/°) | held-out 큐브 pose 예측 오차 | 실전 성능. p95 도 함께 봄 |
-| **e_cross** (mm) | 카메라 간 큐브위치 일관성 | GT-free |
-| **reproj_test** (px) | **held-out set 의 원본 2D 코너 재투영 RMS** | GT-free. **헤드라인** |
-| **reproj_train** (px) | train set 재투영 RMS | 과적합 진단 |
-| reproj_fail_rate | 재투영이 CAP(800px)에 걸린 비율 | 발산 은폐 방지 |
-| e_reproj_gt (px) | GT 타깃 pose 기준 재투영 | 진단용 |
+| **N_reg** | 등록된 고정 카메라 수 | |
+| **e_X** (mm/°) | 변환행렬(bTf + gTc) GT 대비 오차 | **시뮬 핵심** |
+| **e_task** (mm/°) | held-out 큐브 pose 예측 오차 | 실전 성능 |
+| **e_cross** (mm) | 카메라 간 큐브위치 일관성 | |
+| **e_reproj** (px) | 재투영 오차 | **corner-level 필요(미구현)** |
 
-`e_X`(bTf 와 gTc 의 평균)는 해석이 모호하므로 **bTf 와 gTc 를 분리해 보고**한다.
-
-#### 재투영 규약 (중요)
-- 씬이 보관한 **원본 노이즈 2D 코너**에 직접 재투영한다.
-  (구버전은 프론트엔드 PnP 자체 잔차 `reproj_seed` 를 모든 방법에 똑같이 넣어
-  **방법별 차이가 아예 없었다** — 방법 비교 지표가 아니었음.)
-- 타깃 pose 는 GT 가 아니라 **모델이 추정한 값**을 쓴다.
-- **leave-one-camera-out**: 평가 대상 카메라를 뺀 나머지 카메라+그리퍼로 타깃 pose 를
-  추정한 뒤 대상 카메라에 재투영 → 자기 관측을 자기가 맞추는 자명한 해를 배제.
-- 재투영에는 그 관측이 실제로 쓴 K/dist(부정확 intrinsic)를 사용한다. 참 K 는 GT 누출.
-
-### 절제로 검증되는 것
-- **FK factor → bTf/gTc/e_task 개선**: EXP1 vs EXP4
-- **보드 → bTf 개선**: EXP1 vs EXP3
-- **통합 → gTc/e_cross 개선**: EXP1 vs EXP2
-- **factor vs fixed**: FK 가 정확하면 비슷, FK 가 부정확해질수록 factor 가 우세 (EXP1 vs EXP7)
-- **큐브 → 커버리지**: 이 카메라 배치에서 보드만으로는 고정 카메라 일부가 등록되지 않는다 (EXP6 의 N_reg)
-
-### 통계 규약
-집계 단위는 **seed**. seed 안의 split 은 같은 씬을 공유해 독립 표본이 아니므로
-split 을 먼저 평균한 뒤 seed 간 통계를 낸다. Ours 대비 **paired bootstrap 95% CI** 를
-보고하며, **CI 전체가 0 보다 커야**(다른방법 − Ours > 0) "Ours 가 유의하게 우수"라고 말한다.
+### 절제로 검증되는 것 (스모크 확인)
+- **FK 보정 → e_task 개선**: EXP1 vs EXP4
+- **보드 → bTf/e_X 개선**: EXP1 vs EXP3
+- **통합 → gTc 개선**: EXP1 vs EXP2
+- **fixed**: FK 완벽하면 bTf 최고, 하지만 e_task 최악 (EXP7)
 
 ---
 
@@ -133,16 +99,9 @@ Simulation/
 
 ---
 
-## 알려진 한계 (논문에 명시할 것)
+## 아직 미구현 (추후)
 
-- **실물 기하 근사**: 큐브 반변을 옆면 마커 51mm 의 절반(25.5mm)으로 두지만 실물은 약
-  29.5mm 이고, 윗면 두 마커의 중심 오프셋도 반영돼 있지 않다. intrinsic 은 4대 평균
-  하나를 공유하고 카메라 하향각은 27°로 강제한다. → 현재 모델은 "실측 셋업을 그대로
-  옮긴 digital twin" 이 아니라 **실측값 일부를 반영한 합성 장면**으로 기술해야 한다.
-- **단일면 큐브 관측의 평면 모호성**: 마커 1개(4코너)만 보이는 프레임은 PnP 가 뒤집힐 수
-  있다(이상치 주입 시 p95 가 150° 근처). robust 프론트엔드가 모든 방법에 동일하게
-  적용되므로 비교는 공정하지만, 절대 성능의 상한을 제약한다.
-- **e_task 는 GT 기반**이므로 실데이터로 그대로 옮길 수 없다. 실데이터에서는
-  reproj_test / e_cross 만 대응되고, 절대 정확도는 **독립 물리 GT** 가 있어야 한다.
+- **corner-level 시뮬** → `e_reproj(px)`, Fig A(코너 노이즈 σ px). 현재는 pose-level.
+- **Fig A / Fig B / Table 2b** 러너 (scene 은 fk_noise 지원하므로 Fig B 는 바로 확장 가능).
 
 자세한 감사·계획: [PLAN_AND_AUDIT.md](PLAN_AND_AUDIT.md).

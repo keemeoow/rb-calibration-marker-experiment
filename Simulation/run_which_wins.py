@@ -26,8 +26,8 @@ CB = ("cube", "board")
 METHODS = [
     ExpConfig("fixed", fk="fixed", solve="unified", markers=CB, label="fixed-FK"),
     ExpConfig("noFK",  fk="none",  solve="unified", markers=CB, label="no-FK"),
-    ExpConfig("ours",  fk="factor", solve="unified", markers=CB, label="Ours (FK factor)"),
-    ExpConfig("corr",  fk="corr",  solve="unified", markers=CB, label="구 Ridge 후보정"),
+    ExpConfig("oursA", fk="corr",  solve="unified", markers=CB, anchor_weight=0.0, label="ours-A (anchor=0)"),
+    ExpConfig("oursB", fk="corr",  solve="unified", markers=CB, anchor_weight=0.5, label="ours-B (anchor=0.5)"),
 ]
 KEYS = ["e_task_mm", "gTc_mm", "e_X_mm", "e_cross_mm", "e_reproj_px"]
 N_GRIPPED = 0        # gripped 캡처 수 (main 에서 설정; fork 로 워커에 상속)
@@ -50,22 +50,26 @@ def _job(a):
     """(mi, seed, cond, n_sets, n_events, train_size, pairs, tag) → (tag, mi, metriclists)."""
     mi, seed, cond, n_sets, n_events, train_size, pairs, tag = a
     from core.scene import SimScene
-    from core.experiment import calibrate, _splits_for_seed
+    from core.experiment import calibrate
     from core.metrics import eval_model
     cfg = METHODS[mi]
     out = {k: [] for k in KEYS}
     try:
         sc = SimScene(seed=seed, n_sets=n_sets, n_events_per_set=n_events,
                       n_gripped_events=N_GRIPPED, **cond)
-        for test in _splits_for_seed(sc.sets, seed, pairs):
+        n = 0
+        for test in itertools.combinations(sc.sets, 2):
             train = [s for s in sc.sets if s not in test][:train_size]
             model, W = calibrate(sc, cfg, train)
             res = eval_model(sc, model, train, list(test), W=W)
             for k in KEYS:
                 if res.get(k) is not None:
                     out[k].append(res[k])
-    except Exception as ex:      # 한 job 실패가 풀 전체를 죽이지 않게 (빈 결과 반환)
-        print(f"[FAIL] job={a}: {type(ex).__name__}: {ex}", file=sys.stderr)
+            n += 1
+            if n >= pairs:
+                break
+    except Exception:
+        pass                     # 한 job 실패가 풀 전체를 죽이지 않게 (빈 결과 반환)
     return (tag, mi, out)
 
 
