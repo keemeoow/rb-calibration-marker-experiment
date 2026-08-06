@@ -20,6 +20,7 @@ from typing import Mapping, Sequence
 
 import numpy as np
 
+import CP_common
 from CP_ablation_7row import validate_result_evaluation_contract
 from CP_ablation_schema import EVALUATION_COMPARISON_CONTRACT
 
@@ -201,6 +202,10 @@ def aggregate_results(results: Sequence[tuple[int, Mapping]]) -> dict:
     return {
         "protocol": {
             "schema": "canonical_ablation_repeated_event_split_v1",
+            # Load-time robot translation scale.  Table 1 once mixed two values
+            # across its rows; recording it here makes that checkable without
+            # re-deriving the FK cube poses.
+            "robot_pos_scale": CP_common.robot_pos_scale(),
             "split_seeds_predeclared": [int(seed) for seed, _ in results],
             "minimum_initializations_per_split": 5,
             "delta_definition": "second_row_minus_first_row",

@@ -181,7 +181,23 @@ def try_parse_pose6(obj: Any) -> Optional[List[float]]:
     return None
 
 
-_ROBOT_POS_SCALE: Optional[float] = None
+# Pinned isotropic scale applied to every robot-reported TRANSLATION at load
+# time.  k is a *processing* multiplier, not robot behaviour: the controller
+# writes identical robot_pose_6dof values for every run, so two results that
+# used different k are not comparable even though the raw data is identical.
+# The shift is large (~12mm mean on the FK cube poses between 1.0 and 1.0229)
+# and no downstream metric reveals it, which is exactly how one stored table
+# ended up mixing both values.
+#
+# k is therefore pinned here instead of read per-run from the environment.  It
+# stays at 1.0 — robot values untouched — until the physical dial-gauge
+# measurement settles the true factor.  Vision and depth both put it near
+# 1.023, but the per-camera spread is 1.014-1.029, so adopting it now would
+# bake a provisional constant into every stored number.
+#
+# To adopt a measured value: change this one constant and regenerate every
+# stored result together.  Never mix.
+ROBOT_POS_SCALE_PINNED: float = 1.0
 
 
 def robot_pos_scale() -> float:
@@ -189,17 +205,27 @@ def robot_pos_scale() -> float:
 
     The robot under-reports Cartesian distances by ~2.3% on this arm (a kinematic
     scale error confirmed independently by both marker-vision and depth — see
-    fk_scale_crosscheck / estimate_robot_pos_scale). Set the env var
-    RB_ROBOT_POS_SCALE to the measured factor (e.g. 1.023) to correct all FK cube
-    priors and flange poses at load time; default 1.0 leaves data untouched.
+    fk_scale_crosscheck / estimate_robot_pos_scale).  Correcting it is a one-line
+    change to ``ROBOT_POS_SCALE_PINNED`` above, not a per-run environment knob:
+    RB_ROBOT_POS_SCALE now only survives as a guard that refuses to run when it
+    disagrees with the pin, so a stale shell cannot silently produce results at a
+    second scale.
     """
-    global _ROBOT_POS_SCALE
-    if _ROBOT_POS_SCALE is None:
+    requested = os.environ.get("RB_ROBOT_POS_SCALE")
+    if requested is not None:
         try:
-            _ROBOT_POS_SCALE = float(os.environ.get("RB_ROBOT_POS_SCALE", "1.0"))
+            value = float(requested)
         except (TypeError, ValueError):
-            _ROBOT_POS_SCALE = 1.0
-    return _ROBOT_POS_SCALE
+            raise RuntimeError(
+                f"RB_ROBOT_POS_SCALE={requested!r} is not a number") from None
+        if value != ROBOT_POS_SCALE_PINNED:
+            raise RuntimeError(
+                f"RB_ROBOT_POS_SCALE={value} conflicts with "
+                f"CP_common.ROBOT_POS_SCALE_PINNED={ROBOT_POS_SCALE_PINNED}. "
+                "Per-run overrides are refused because results produced at "
+                "different scales are silently incomparable. Change the pinned "
+                "constant and regenerate every stored result together.")
+    return ROBOT_POS_SCALE_PINNED
 
 
 def pose6_to_T_base_gripper(pose6: List[float]) -> np.ndarray:
@@ -805,8 +831,9 @@ def estimate_robot_pos_scale(
     Offset/tool/grasp-independent: uses only capture PAIRS with near-zero relative
     flange rotation (pure translation), where the gripped cube's displacement equals
     the flange's displacement. |dVis| (vision, metrically anchored by the marker and
-    confirmed by depth) over |dFlange| (robot_pose_6dof) gives k directly. Set
-    RB_ROBOT_POS_SCALE=k to correct the pipeline. Robust median over cameras whose
+    confirmed by depth) over |dFlange| (robot_pose_6dof) gives k directly. This is a
+    measurement, not a switch: adopting k means editing ROBOT_POS_SCALE_PINNED and
+    regenerating every stored result. Robust median over cameras whose
     per-camera IQR width <= max_iqr_width (noisier cameras are reported but excluded).
     """
     from itertools import combinations

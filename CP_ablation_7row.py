@@ -1128,6 +1128,10 @@ def main() -> None:
             "primary_metric": PRIMARY_METRIC,
             "split": split,
             "backend": "canonical_corner_reprojection_v1",
+            # Load-time robot translation scale.  Rows produced under different
+            # values are not comparable and nothing else in the artifact says
+            # which one was used.
+            "robot_pos_scale": cp.robot_pos_scale(),
             "solver_options": canonical_solver_options(args).to_dict(),
             "max_nfev": int(args.max_nfev), "tol": float(args.tol),
             "num_inits": int(args.num_inits),

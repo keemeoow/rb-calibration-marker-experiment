@@ -1,0 +1,80 @@
+{
+  "_comment": [
+    "Collision model of the robot cell. Base frame, meters, same convention as",
+    "calib_out/T_base_*.npy. EVERY NUMBER BELOW IS A PLACEHOLDER derived from the",
+    "existing session (table height from the cube's resting z, camera positions",
+    "from T_base_C*.npy). Measure the cell and replace them before trusting a",
+    "generated pose, then re-run:",
+    "    python tools/validate_scene.py --session data/session --scene tools/scene_cell.json",
+    "which requires all 232 already-executed poses to come out collision-free."
+  ],
+
+  "min_clearance_m": 0.03,
+  "link_radii_m": [0.11, 0.09, 0.09, 0.07, 0.06, 0.06],
+  "tool_radius_m": 0.075,
+
+  "obstacles": [
+    {
+      "type": "floor",
+      "name": "table_top",
+      "z_min": 0.014,
+      "exempt_links": [0, 1],
+      "_measured": false,
+      "_note": [
+        "cube centre rests at z=0.0436 and the cube half-height is 0.0295.",
+        "links 0-1 are exempt: both sit on the J1 axis so their distance to the",
+        "table is a pose-independent constant (35.9 mm with the default radii),",
+        "which would otherwise pin the reported clearance and hide the real arm."
+      ]
+    },
+    {
+      "type": "box",
+      "name": "cam0_body",
+      "center": [0.2475, 0.4443, 0.1548],
+      "half_extents": [0.05, 0.05, 0.05],
+      "_measured": false,
+      "_note": "centre taken from T_base_C0.npy; extents are a guess"
+    },
+    {
+      "type": "cylinder_z",
+      "name": "cam0_stand",
+      "center_xy": [0.2475, 0.4443],
+      "z_min": 0.014,
+      "z_max": 0.1548,
+      "radius": 0.04,
+      "_measured": false
+    },
+    {
+      "type": "box",
+      "name": "cam1_body",
+      "center": [-0.5835, -0.0219, 0.1281],
+      "half_extents": [0.05, 0.05, 0.05],
+      "_measured": false
+    },
+    {
+      "type": "cylinder_z",
+      "name": "cam1_stand",
+      "center_xy": [-0.5835, -0.0219],
+      "z_min": 0.014,
+      "z_max": 0.1281,
+      "radius": 0.04,
+      "_measured": false
+    },
+    {
+      "type": "box",
+      "name": "cam3_body",
+      "center": [-0.562, 1.0354, 0.1586],
+      "half_extents": [0.05, 0.05, 0.05],
+      "_measured": false
+    },
+    {
+      "type": "cylinder_z",
+      "name": "cam3_stand",
+      "center_xy": [-0.562, 1.0354],
+      "z_min": 0.014,
+      "z_max": 0.1586,
+      "radius": 0.04,
+      "_measured": false
+    }
+  ]
+}
