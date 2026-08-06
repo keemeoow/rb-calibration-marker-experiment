@@ -600,7 +600,7 @@ $$
 $$
 \mathbf{V}_s
 =
-\operatorname{RobustWeightedAverage}
+\operatorname{RobustAverage}
 \left(\mathcal{P}_s\right)
 $$
 
@@ -608,7 +608,9 @@ $$
 
 - **이상치**: 나머지와 동떨어진 값. 코너 오검출이나 큐브 면 착각으로 생긴다. $7$개 중 $6$개가 $2\,\mathrm{mm}$ 안에 모여 있는데 하나가 $100\,\mathrm{mm}$ 튀면 단순 평균은 약 $14\,\mathrm{mm}$ 밀려난다.
 - **MAD**: Median Absolute Deviation, 중앙값 절대편차. 값들이 흩어진 정도를 중앙값으로 재기 때문에 표준편차와 달리 이상치에 오염되지 않는다. 중앙값에서 MAD의 몇 배 이상 떨어진 값을 버린다.
-- **강건 평균**: MAD로 이상치를 거른 뒤 남은 값을 평균한다. 값마다 신뢰도가 다르면 가중치를 함께 줄 수 있는데, 그 사용 예는 11.4절에 나온다.
+- **강건 평균**: MAD로 이상치를 거른 뒤 남은 값을 평균한다.
+
+이 문서는 가중치를 주지 않는 경우를 $\operatorname{RobustAverage}$, 주는 경우를 $\operatorname{RobustWeightedAverage}$로 구분해서 쓴다. 구현은 같은 함수이며 가중치가 선택 인자일 뿐이다. 가중치를 실제로 사용하는 곳은 11.4절이다.
 
 ### 11.4 단계 3: raw FK와 vision 사이의 공통 차이
 
