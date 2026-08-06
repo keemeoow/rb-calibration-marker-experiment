@@ -12,7 +12,7 @@ import sys
 import time
 import socket
 import json
-from waypoint_safety import (
+from server.waypoint_safety import (
     SAFE_EMPTY_KEY,
     SAFE_GRIPPED_KEY,
     shortest_joint_error_deg,
@@ -26,12 +26,33 @@ PORT = 12348
 GRIPPER_IO_PORT = 48
 GRIPPER_TIMEOUT_SEC = 5.0
 
-CUBE_SIZE_MM = 30.0
-CUBE_GRIP_DEPTH_MM = 2.0
-CUBE_CENTER_OFFSET_Z = CUBE_SIZE_MM / 2.0 - CUBE_GRIP_DEPTH_MM
+# 이 저장소의 큐브는 59mm 다(config.py CubeConfig.cube_side_m = 0.059, 캘리퍼 확인).
+# 30.0 은 형제 프로젝트(rb-ArucoCube_Robot_multi_calibration)의 큐브 값이다.
+CUBE_SIZE_MM = 59.0
+# 그리퍼는 큐브 윗면(마커 양옆)을 잡고 윗면보다 이만큼 아래까지 물린다.
+# 2026-08-07 캘리퍼 실측 1.7mm. 바닥 접촉으로 역산한 1.79mm 와 0.09mm 차이로 일치한다.
+CUBE_GRIP_DEPTH_MM = 1.7
+# fingertip(TCP) 에서 큐브 중심까지의 거리. 윗면이 중심보다 CUBE_SIZE/2 위에 있고
+# fingertip 은 윗면보다 GRIP_DEPTH 아래이므로, 중심은 fingertip 보다 이만큼 "아래"다.
+CUBE_CENTER_OFFSET_Z = CUBE_SIZE_MM / 2.0 - CUBE_GRIP_DEPTH_MM  # 27.5mm
 
 TOOL_GRIPPER_Z = 150.0 # 컨트롤러 settool 값(펜던트 Pos→TCP = 150.0mm)과 일치.
-TOOL_CUBE_CENTER_Z = TOOL_GRIPPER_Z - CUBE_CENTER_OFFSET_Z
+# 큐브 중심은 fingertip 보다 아래 = 플랜지에서 더 먼 쪽이므로 tool 오프셋은 "더한다".
+# (뺄셈은 중심을 fingertip 위로 놓아 부호가 뒤집힌다 — 윗면을 잡는 이 그리퍼에서는
+#  큐브가 TCP 아래에 매달리므로 물리적으로 불가능한 배치였다.)
+TOOL_CUBE_CENTER_Z = TOOL_GRIPPER_Z + CUBE_CENTER_OFFSET_Z  # 177.5mm
+
+# 그립/놓기가 일어나는 TCP 높이(base frame, mm). 모든 set 에서 이 높이로 강제한다.
+#
+# 티칭 파일의 place_tcp z 를 그대로 쓰지 않는 이유: 그 값은 티칭 당시의 settool 값으로
+# 기록되어 있어 tool 오프셋을 바꾸면 통째로 어긋난다(예: TOOL_GRIPPER_Z 113.5 -> 150.0
+# 이면 같은 관절인데 기록된 z 가 ~36mm 높게 남는다). place_joints 는 tool 과 무관하므로
+# 관절 이동은 그대로 두고, 마지막 수직 접근의 목표 z 만 여기로 정규화한다.
+#
+# 값은 실제 로봇에서 큐브를 올바르게 쥔 자세의 TCP z 를 읽어 넣는다. None 이면 정규화하지
+# 않고 place_joints 도달 시 읽은 z 를 그대로 쓴다(구 동작).
+# 2026-08-07 실측: 바닥에 놓인 큐브를 쥔 자세의 TCP z.
+PLACE_TCP_Z_MM = -5.284
 
 # 큐브를 잡을 때(재-그립) 항상 place 위치 +Z 위에서 접근 후 수직 하강하여 안전하게 잡는다.
 GRIP_APPROACH_Z_MM = 50.0
@@ -326,6 +347,38 @@ def approach_and_close_gripper(rb, place_joints, place_tcp=None,
         rb.move(Joint(*place_joints[:6]))
         time.sleep(0.3)
     gripper_close()
+
+
+def approach_place_pose(rb, place_j, label):
+    """관절이동으로 정자세 place 에 도달 -> 높이 정규화 -> +Z 위로 갔다가 수직 하강.
+
+    마지막 접근을 항상 순수 수직/정자세로 보장한다. place_joints 는 관절값이라 FK 없이
+    상공 TCP 를 알 수 없으므로, 먼저 관절로 도달해 기준 TCP 를 읽은 뒤 올렸다가 내린다.
+    반환: 정규화된 place TCP (재-그립/재접근 기준으로도 쓴다).
+    """
+    rb.move(Joint(*place_j[:6]))
+    verify_robot_still(rb)
+    time.sleep(0.3)
+    place_tcp = get_tcp()
+    if PLACE_TCP_Z_MM is not None:
+        measured_z = place_tcp[2]
+        place_tcp[2] = PLACE_TCP_Z_MM
+        print '[Auto] {} place z {:.2f} -> {:.2f} (set 간 그립 높이 통일)'.format(
+            label, measured_z, PLACE_TCP_Z_MM)
+        if abs(measured_z - PLACE_TCP_Z_MM) > 20.0:
+            # 20mm 넘게 어긋나면 티칭 tool 과 현재 tool 이 다르거나 이 set 만 다른
+            # 높이에서 티칭된 것이다. 큐브를 테이블에 찍거나 공중에서 놓을 수 있다.
+            print '[WARN] 티칭 높이와 {:.1f}mm 차이. tool 설정 또는 이 set 의 ' \
+                  'place_joints 를 확인할 것.'.format(measured_z - PLACE_TCP_Z_MM)
+    above = list(place_tcp[:6])
+    above[2] += PLACE_APPROACH_Z_MM
+    print '[Auto] +Z {:.0f}mm upright, then straight down'.format(PLACE_APPROACH_Z_MM)
+    rb.line(Position(*above))
+    time.sleep(0.2)
+    rb.line(Position(*place_tcp[:6]))
+    verify_robot_still(rb)
+    time.sleep(0.5)
+    return place_tcp
 
 
 def manual_recover(rb, conn, pose_idx, capture_kwargs):
@@ -664,6 +717,11 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
         wps = by_set[sidx]
         place_j = wps[0]['place_joints']
         # set별 큐브 중점: waypoint에 저장된 값 우선, 없으면 파일 최상위로 폴백.
+        # 티칭 파일의 set_cube_center_6dof 는 폴백일 뿐이다. 그 값은 티칭 당시의 tool4
+        # 설정으로 기록되므로 tool 을 고치면 통째로 어긋나고, 그것을 Phase B 에 쓰고
+        # 실측값을 Phase A 에 쓰면 한 세션 안에 두 규약이 섞인다. Step3 는
+        # set_cube_center 와 cube object frame 사이의 "상수" delta 를 학습하므로 그
+        # 혼재는 prior 자체를 망가뜨린다. 아래에서 현재 tool 로 한 번 실측해 덮는다.
         set_cc = wps[0].get('set_cube_center_6dof') or data.get('set_cube_center')
         # 이 set 의 그립(Phase B 스윕) 하나 = 하나의 grasp. 재-그립 시 gripper->cube
         # 변환이 조금 달라지므로 set 마다 grasp_id 를 달리해 Step3 가 구분하게 한다.
@@ -672,6 +730,25 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
         # capture_block 으로 두 방법을 분리: B(그립 스윕) 먼저, A(placement) 나중.
         block_b = [wp for wp in wps if wp.get('capture_block') == 'B_eyetohand']
         block_a = [wp for wp in wps if wp.get('capture_block') != 'B_eyetohand']
+
+        # ---- Phase B 전 실측: place 자세에 큐브를 쥔 채 내려놓아 tool4 로 중심을 읽고
+        #      다시 들어올린다. B 와 A 가 같은 값을 쓰게 하려면 B 보다 먼저여야 한다. ----
+        print '[Auto] set {} pre-measure cube center at place pose'.format(sidx)
+        try:
+            move_to_validated_safe(rb, safe_gripped, 'gripped',
+                                   'set {} pre-measure'.format(sidx))
+            approach_place_pose(rb, place_j, 'set {} pre-measure'.format(sidx))
+            set_cc = get_cube_center()
+            print '[Auto] set {} cube center (tool4, measured): '.format(sidx) + fmt6(set_cc)
+            cur = Position(*rb.getpos().pos2list()[:6])
+            rb.line(cur.offset(dz=z_clearance_mm))
+            verify_robot_still(rb)
+            move_to_validated_safe(rb, safe_gripped, 'gripped',
+                                   'set {} pre-measure return'.format(sidx))
+        except Exception as e:
+            print '[SAFETY-ABORT] set {} pre-measure failed: {}'.format(sidx, e)
+            send_json(conn, {"command": "quit"})
+            return
 
         print ''
         print '======== SET {}/{} (set_index={}: B={} grip-sweep, A={} placement) ========'.format(
@@ -709,31 +786,22 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True,
         print '[Auto] -> set {} place: joint move to upright place pose'.format(sidx)
         try:
             move_to_validated_safe(rb, safe_gripped, 'gripped', 'set {} place'.format(sidx))
-            rb.move(Joint(*place_j[:6]))
-            verify_robot_still(rb)
+            place_tcp = approach_place_pose(rb, place_j, 'set {} place'.format(sidx))
         except Exception as e:
             print '[SAFETY-ABORT] place transition failed: {}'.format(e)
             send_json(conn, {"command": "quit"})
             return
-        time.sleep(0.3)
-        place_tcp = get_tcp()  # 정자세 place 기준 TCP (재-그립/재접근 기준으로도 사용)
-        above = list(place_tcp[:6])
-        above[2] += PLACE_APPROACH_Z_MM
         try:
-            print '[Auto] +Z {:.0f}mm upright, then straight down to place'.format(
-                PLACE_APPROACH_Z_MM)
-            rb.line(Position(*above))
-            time.sleep(0.2)
-            rb.line(Position(*place_tcp[:6]))
-            verify_robot_still(rb)
-        except Exception as e:
-            print '[SAFETY-ABORT] upright place approach failed: {}'.format(e)
-            send_json(conn, {"command": "quit"})
-            return
-        time.sleep(0.5)
-        try:
+            # 같은 자세를 두 번째로 방문한 것이므로 pre-measure 값과 일치해야 한다.
+            # 어긋나면 Phase B 중에 큐브가 그리퍼 안에서 미끄러진 것이다 — 그 경우
+            # set 전체의 앵커가 무효이므로 조용히 지나가지 않는다.
             measured_cc = get_cube_center()
-            print '[Auto] measured cube center (tool4): ' + fmt6(measured_cc)
+            drift = max(abs(measured_cc[k] - set_cc[k]) for k in range(3))
+            print '[Auto] measured cube center (tool4): ' + fmt6(measured_cc) + \
+                  '  (pre-measure 대비 {:.2f}mm)'.format(drift)
+            if drift > 2.0:
+                print '[WARN] set {} 큐브 중심이 Phase B 중 {:.2f}mm 이동했다. ' \
+                      '그립 미끄러짐 의심 — 이 set 의 B 프레임을 재검토할 것.'.format(sidx, drift)
             set_cc = measured_cc
         except Exception as e:
             print '[SAFETY-ABORT] get_cube_center() failed: {}'.format(e)

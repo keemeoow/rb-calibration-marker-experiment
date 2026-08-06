@@ -53,6 +53,15 @@ def evaluate_capture_gate(frames_dict: Dict[int, dict],
     max_fixed_depth_plane_mean_mm = float(profile.get("max_fixed_depth_plane_mean_mm", 0.0))
     max_cube_pnp_reproj_mean_px = float(profile.get("max_cube_pnp_reproj_mean_px", 0.0))
     min_depth_samples = int(profile.get("min_depth_samples", 0))
+    # Photometric quality of the marker regions. Clipping is scale-free so it
+    # gates from day one; sharpness is Laplacian variance, which is not
+    # comparable across cameras, so it stays off (0) until pilot data fixes a
+    # per-camera threshold. Both ignore cameras that saw no marker — that case
+    # is already covered by the visibility rules below.
+    max_roi_clip_frac = float(profile.get("max_roi_clip_frac", 0.0))
+    min_roi_sharpness = float(profile.get("min_roi_sharpness", 0.0))
+    roi_clip_reject_cams = []
+    roi_sharp_reject_cams = []
 
     for ci, fr in frames_dict.items():
         is_gripper = gripper_cam_idx is not None and int(ci) == int(gripper_cam_idx)
@@ -119,6 +128,16 @@ def evaluate_capture_gate(frames_dict: Dict[int, dict],
             gripper_depth_valid = depth_valid
             if depth_plane_mean_mm is not None:
                 gripper_depth_plane_mean_mm = float(depth_plane_mean_mm)
+        roi = fr.get("roi_quality") or {}
+        roi_clip_frac = roi.get("clip_frac_median")
+        roi_sharpness = roi.get("sharpness_min")
+        if max_roi_clip_frac > 0 and roi_clip_frac is not None \
+                and float(roi_clip_frac) > max_roi_clip_frac:
+            roi_clip_reject_cams.append(int(ci))
+        if min_roi_sharpness > 0 and roi_sharpness is not None \
+                and float(roi_sharpness) < min_roi_sharpness:
+            roi_sharp_reject_cams.append(int(ci))
+
         per_camera[int(ci)] = {
             "n_markers": n_markers,
             "cube_visible": cube_visible,
@@ -128,6 +147,10 @@ def evaluate_capture_gate(frames_dict: Dict[int, dict],
             "depth_valid": depth_valid,
             "depth_num_samples": depth_num_samples,
             "fixed_depth_quality": fixed_depth_quality,
+            "roi_clip_frac_median": roi_clip_frac,
+            "roi_clip_frac_max": roi.get("clip_frac_max"),
+            "roi_sharpness_min": roi_sharpness,
+            "roi_px_min": roi.get("roi_px_min"),
         }
 
     capture_span_ms = (max(capture_ts) - min(capture_ts)) if len(capture_ts) >= 2 else 0.0
@@ -166,6 +189,18 @@ def evaluate_capture_gate(frames_dict: Dict[int, dict],
         reasons.append(
             "fixed multi-marker cams {} < required {} (markers/cam >= {})".format(
                 fixed_multimarker_cams, min_fixed_multimarker_cams, fixed_multimarker_min_markers
+            )
+        )
+    if roi_clip_reject_cams:
+        reasons.append(
+            "marker ROI clipped on cams {} (> {:.3f} of pixels at black/white)".format(
+                roi_clip_reject_cams, max_roi_clip_frac
+            )
+        )
+    if roi_sharp_reject_cams:
+        reasons.append(
+            "marker ROI too blurred on cams {} (Laplacian var < {:g})".format(
+                roi_sharp_reject_cams, min_roi_sharpness
             )
         )
     if cube_pnp_ok_cams < min_cube_pnp_ok_cams:

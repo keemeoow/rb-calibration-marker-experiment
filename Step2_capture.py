@@ -42,7 +42,7 @@ from apriltag_cube import AprilTagCubeTarget, depth_metrics_to_fields, rodrigues
 from charuco_utils import CharucoTarget
 from config import CubeConfig, CharucoBoardConfig, get_default_cube_config
 from calibration_runtime_utils import resolve_cube_config_for_run
-from capture_detection_utils import detect_cube_markers_in_frame
+from capture_detection_utils import detect_cube_markers_in_frame, marker_roi_quality
 from capture_gate import evaluate_capture_gate
 from capture_session import allocate_next_capture_session
 from cube_config_utils import (
@@ -52,7 +52,7 @@ from cube_config_utils import (
     load_cube_config_from_meta,
 )
 from robot_comm import euler_deg_to_matrix
-from waypoint_safety import validate_safe_joint_config, validate_waypoint_semantics
+from server.waypoint_safety import validate_safe_joint_config, validate_waypoint_semantics
 
 
 def ensure_dir(p: str) -> str:
@@ -331,6 +331,8 @@ def make_capture_gate_config(args) -> dict:
                 "max_fixed_depth_plane_mean_mm": 0.0,
                 "max_capture_span_ms": common_span,
                 "require_all_frame_timestamps": True,
+                "max_roi_clip_frac": float(args.max_roi_clip_frac),
+                "min_roi_sharpness": float(args.min_roi_sharpness),
             },
             "B_eyetohand": {
                 "expected_cube_gripped": True,
@@ -352,6 +354,8 @@ def make_capture_gate_config(args) -> dict:
                 "max_fixed_depth_plane_mean_mm": float(args.b_max_fixed_depth_plane_mean_mm),
                 "max_capture_span_ms": common_span,
                 "require_all_frame_timestamps": True,
+                "max_roi_clip_frac": float(args.max_roi_clip_frac),
+                "min_roi_sharpness": float(args.min_roi_sharpness),
             },
         },
     }
@@ -606,6 +610,26 @@ def main():
                         help="캡처 해상도가 인트린식(color_w/h)과 달라도 강행. "
                              "PnP/ChArUco pose 가 부정확해지므로 디버깅용에만 사용.")
 
+    # 측광 고정 — 캘리브레이션 프레임은 세션 내내 동일 노출이어야 한다. auto-exposure 는
+    # 로봇이 자세를 바꿀 때마다 재수렴해 코너 서브픽셀 정확도를 프레임마다 바꾸고,
+    # 어두운 뷰에서 노출을 늘려 모션 블러를 만든다. 기본은 warmup 수렴값을 읽어 잠근다.
+    parser.add_argument("--no-lock-exposure", dest="no_lock_exposure", action="store_true",
+                        help="측광 고정을 끄고 auto-exposure 로 촬영(비권장, 진단용).")
+    parser.add_argument("--color_exposure_us", type=float, default=None,
+                        help="색상 노출을 이 값(us)으로 명시 고정. 생략 시 warmup 수렴값 사용.")
+    parser.add_argument("--color_gain", type=float, default=None,
+                        help="색상 gain 명시 고정. 생략 시 warmup 수렴값 사용.")
+    parser.add_argument("--color_white_balance", type=float, default=None,
+                        help="화이트밸런스(K) 명시 고정. 생략 시 warmup 수렴값 사용.")
+
+    # 마커 ROI 품질 게이트. clip 은 스케일 무관이라 기본 활성, sharpness 는 카메라마다
+    # 절대값이 달라 0(비활성)으로 두고 pilot 첫 set 의 측정값으로 카메라별 확정한다.
+    parser.add_argument("--max_roi_clip_frac", type=float, default=0.05,
+                        help="마커 ROI 에서 흑/백 포화 픽셀 비율 상한. 0 이면 비활성.")
+    parser.add_argument("--min_roi_sharpness", type=float, default=0.0,
+                        help="마커 ROI Laplacian 분산 하한. 0 이면 비활성(기본). "
+                             "pilot 측정 후 카메라별로 설정.")
+
     # 검출 설정
     parser.add_argument("--min_markers", type=int, default=1,
                         help="Min markers per camera to count as 'cube visible'")
@@ -846,6 +870,10 @@ def main():
             use_depth=args.save_depth,
             align_depth_to_color=True,
             warmup_frames=10,
+            lock_color_exposure=not args.no_lock_exposure,
+            color_exposure_us=args.color_exposure_us,
+            color_gain=args.color_gain,
+            color_white_balance=args.color_white_balance,
         )
         cam.start()
         cams[ci] = cam
@@ -927,7 +955,19 @@ def main():
         "capture_gate": capture_gate_cfg,
         "allow_force_save": bool(args.allow_force_save),
         "allow_intrinsics_res_mismatch": bool(args.allow_intrinsics_res_mismatch),
+        # Per-camera exposure/gain/white balance actually in force. Recorded so a
+        # later session can reproduce the same photometry, and so a session shot
+        # with auto-exposure is identifiable after the fact rather than silently
+        # mixed in with locked ones.
+        "color_photometry": {
+            str(ci): cams[ci].color_photometry for ci, _ in idx_serial_pairs
+        },
     }
+    _unlocked = [ci for ci, _ in idx_serial_pairs
+                 if not cams[ci].color_photometry.get("locked")]
+    if _unlocked:
+        print(f"[WARN] cam {_unlocked}: color photometry NOT locked — exposure will "
+              f"drift between captures. Corner accuracy varies frame to frame.")
     if os.path.exists(meta_path):
         with open(meta_path, "r") as f:
             meta = json.load(f)
@@ -1027,6 +1067,14 @@ def main():
         fr["ch_corners"] = detect_info["ch_corners"]
         fr["ch_ids"] = detect_info["ch_ids"]
         fr["charuco_detect_n"] = int(detect_info["charuco_detect_n"])
+
+        # Photometric quality of the regions the solver will actually use. Both
+        # cube and board quads count: a board-only row (A0/B3) is gated on the
+        # same evidence as a cube row.
+        _quads = list(corners or [])
+        _board_quads = detect_info.get("board_mkr_corners") or []
+        _quads.extend(_board_quads)
+        fr["roi_quality"] = marker_roi_quality(color, _quads)
 
         intr = cam_intrinsics.get(ci)
         if intr is not None and ids is not None and len(ids) > 0:
@@ -1281,6 +1329,10 @@ def main():
                 "cube_detect_raw_ids": fr.get("cube_detect_raw_ids", []),
                 "cube_detect_filtered_ids": fr.get("cube_detect_filtered_ids", []),
                 "board_mask_applied": bool(fr.get("board_mask_applied", False)),
+                # Saved on every frame, including ones the sharpness gate is not
+                # yet enforcing — this is the pilot evidence the per-camera
+                # threshold gets fixed from.
+                "roi_quality": fr.get("roi_quality"),
             }
             # ChArUco 검출/pose 는 모든 카메라에 기록 (고정캠 보드-전용 비교실험).
             cam_rec["charuco_detect_n"] = int(fr.get("charuco_detect_n", 0))

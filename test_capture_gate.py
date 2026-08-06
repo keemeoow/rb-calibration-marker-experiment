@@ -136,5 +136,68 @@ class CaptureGateTests(unittest.TestCase):
         self.assertEqual(result["fixed_depth_quality_cams"], 0)
 
 
+
+
+class MarkerRoiQualityGateTests(unittest.TestCase):
+    """The photometric gate: blown-out or smeared marker regions must not save."""
+
+    def _frames(self, roi0=None, roi1=None):
+        frames = {
+            0: {"ok": True, "n_markers": 2, "cube_pnp": _pnp(),
+                "ch_ids": list(range(8)), "ts_ms": 1000.0},
+            1: {"ok": True, "n_markers": 2, "cube_pnp": _pnp(),
+                "ch_ids": None, "ts_ms": 1030.0},
+        }
+        if roi0 is not None:
+            frames[0]["roi_quality"] = roi0
+        if roi1 is not None:
+            frames[1]["roi_quality"] = roi1
+        return frames
+
+    def _run(self, frames, **overrides):
+        cfg = {"profiles": {"A_placement": dict(GATE_CONFIG["profiles"]["A_placement"],
+                                                **overrides)}}
+        return evaluate_capture_gate(
+            frames, cfg, gripper_cam_idx=0,
+            capture_block="A_placement", cube_gripped=False)
+
+    def test_clipped_marker_regions_reject_the_capture(self):
+        roi = {"clip_frac_median": 0.30, "clip_frac_max": 0.40,
+               "sharpness_min": 5000.0, "roi_px_min": 40.0, "n_rois": 2}
+        result = self._run(self._frames(roi1=roi), max_roi_clip_frac=0.05)
+        self.assertFalse(result["pass"])
+        self.assertIn("clipped", result["reason"])
+        self.assertIn("1", result["reason"])
+
+    def test_one_specular_marker_does_not_reject_a_clean_camera(self):
+        # median clean, max blown: a single highlight is diagnosed, not rejected.
+        roi = {"clip_frac_median": 0.0, "clip_frac_max": 0.40,
+               "sharpness_min": 5000.0, "roi_px_min": 40.0, "n_rois": 4}
+        result = self._run(self._frames(roi1=roi), max_roi_clip_frac=0.05)
+        self.assertTrue(result["pass"], result["reason"])
+        self.assertEqual(result["per_camera"][1]["roi_clip_frac_max"], 0.40)
+
+    def test_blurred_marker_regions_reject_when_threshold_is_set(self):
+        roi = {"clip_frac_median": 0.0, "clip_frac_max": 0.0,
+               "sharpness_min": 120.0, "roi_px_min": 40.0, "n_rois": 2}
+        result = self._run(self._frames(roi1=roi), min_roi_sharpness=1000.0)
+        self.assertFalse(result["pass"])
+        self.assertIn("blurred", result["reason"])
+
+    def test_thresholds_at_zero_disable_the_rules(self):
+        roi = {"clip_frac_median": 0.9, "clip_frac_max": 0.9,
+               "sharpness_min": 1.0, "roi_px_min": 40.0, "n_rois": 2}
+        result = self._run(self._frames(roi1=roi),
+                           max_roi_clip_frac=0.0, min_roi_sharpness=0.0)
+        self.assertTrue(result["pass"], result["reason"])
+
+    def test_missing_roi_quality_is_unknown_not_a_rejection(self):
+        # Legacy frames carry no roi_quality; the gate must not invent a verdict.
+        result = self._run(self._frames(), max_roi_clip_frac=0.05,
+                           min_roi_sharpness=1000.0)
+        self.assertTrue(result["pass"], result["reason"])
+        self.assertIsNone(result["per_camera"][1]["roi_clip_frac_median"])
+
+
 if __name__ == "__main__":
     unittest.main()
