@@ -16,3 +16,8 @@ CP_result/sensitivity_7row_resolution_seed33_recheck/
 # Local rollback/duplicate captures already recoverable from Git.
 data/session/meta.pre_depth_backup.json
 data/session(1)/
+
+# Raw ChArUco captures for intrinsic calibration (61MB of PNGs).
+# The calibration results themselves are tracked: intrinsics/*.npz,
+# intrinsics/intrinsics_by_serial/, intrinsics/charuco_intrinsics_report.json
+intrinsics/charuco_capture/
