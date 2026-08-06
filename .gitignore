@@ -17,7 +17,8 @@ CP_result/sensitivity_7row_resolution_seed33_recheck/
 data/session/meta.pre_depth_backup.json
 data/session(1)/
 
-# Raw ChArUco captures for intrinsic calibration (61MB of PNGs).
-# The calibration results themselves are tracked: intrinsics/*.npz,
+# Raw ChArUco captures for intrinsic calibration (~90MB of PNGs, re-shootable).
+# The calibration results themselves stay tracked: intrinsics/*.npz,
 # intrinsics/intrinsics_by_serial/, intrinsics/charuco_intrinsics_report.json
-intrinsics/charuco_capture/
+# Covers both intrinsics/ and data/session*/intrinsics/.
+**/intrinsics/charuco_capture/
