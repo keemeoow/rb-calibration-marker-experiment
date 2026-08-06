@@ -16,7 +16,7 @@ import numpy as np
 
 from .scene import SimScene
 from .methods import (solve_unified, solve_independent,
-                      debias_fk_prior)
+                      build_production_fk_anchors, learn_fk_correction)
 from .metrics import eval_model
 
 
@@ -27,8 +27,20 @@ class ExpConfig:
     solve: str                   # unified | independent
     markers: Tuple[str, ...]     # ("cube","board") 등
     label: str = ""
-    fk_degree: int = 1           # corr 후보정 특징 차수: 1=[1,x,y](CP_C1), 2=2차(강화)
-    anchor_weight: float = 5.0   # corr 1차 soft anchor 세기 (0=ours-A, >0=ours-B)
+    # Step3 production defaults. Legacy soft-anchor weight is deliberately not
+    # exposed here because it is a different algorithm from production corr.
+    prior_blend_alpha: float = 0.25
+    prior_max_dt_mm: float = 35.0
+    prior_max_dr_deg: float = 8.0
+    # Gate threshold policy. "fixed" keeps the constant limits above; "adaptive"
+    # derives them from the spread of the per-set distances, which is what those
+    # distances actually measure (deviation from the common delta).
+    gate_mode: str = "fixed"        # fixed | adaptive
+    gate_k: float = 2.5
+    gate_floor_dt_mm: float = 5.0
+    gate_floor_dr_deg: float = 1.0
+    post_correction: str = "none"   # none | ridge (C1 output correction, separate axis)
+    fk_degree: int = 1              # Ridge feature degree when explicitly enabled
 
     def validate(self):
         if set(self.markers) == {"board"} and self.fk in ("fixed", "corr"):
@@ -37,33 +49,68 @@ class ExpConfig:
             raise ValueError(f"bad fk={self.fk}")
         if self.solve not in ("unified", "independent"):
             raise ValueError(f"bad solve={self.solve}")
+        if self.post_correction not in ("none", "ridge"):
+            raise ValueError(f"bad post_correction={self.post_correction}")
+        if self.gate_mode not in ("fixed", "adaptive"):
+            raise ValueError(f"bad gate_mode={self.gate_mode}")
+        if not 0.0 <= self.prior_blend_alpha <= 1.0:
+            raise ValueError("prior_blend_alpha must be in [0,1]")
 
 
 def calibrate(sc, cfg: ExpConfig, train_sets):
     """설정대로 캘리브.
        - none  : FK 미사용 (anchor 없음). 순수 카메라 기반.
-       - corr  : **real 방식** — raw FK 를 vision 으로 상수 de-bias(debias_fk_prior) 후
-                 그 de-biased FK 를 soft anchor 로 사용. (예전의 'FK 로 예측을 당기는' 후보정
-                 Ridge 는 real 과 방향이 반대라 제거.)
+       - corr  : **Step3 production 방식** — raw FK 를 vision 으로 상수 de-bias한 뒤
+                 35mm/8deg gate를 통과한 set만 alpha=0.25로 vision anchor와 blend.
+                 이 set anchor를 고정한 refinement는 Step3 D-2와 같은 역할이다.
        - fixed : 큐브를 raw FK 상수로 하드 고정 (de-bias 안 함 → systematic FK 에 취약, 대조군).
+       - post_correction='ridge': 위 solve와 독립인 C1 [1,x,y] 출력 후보정.
     """
     cfg.validate()
-    fk_solve = "none" if cfg.fk == "corr" else cfg.fk    # corr 캘리브는 큐브 자유(+anchor)
-    aw = cfg.anchor_weight if cfg.fk == "corr" else 0.0  # corr 만 soft anchor (0=ours-A)
+    fk_solve = cfg.fk
+    aw = 0.0
     fk_prior = None
+    prior_diag = None
     if cfg.fk == "corr":
-        fk_prior = debias_fk_prior(sc, cfg.markers, train_sets)   # FK 를 vision 에 맞춰 de-bias
+        # Step3 ordering: obtain a vision solution first, then align the nominal
+        # set priors to its set-wise cube consensus before the refinement pass.
+        visual_model = solve_unified(
+            sc, cfg.markers, "none", train_sets,
+            anchor_weight=0.0, fk_prior=None)
+        aligned = build_production_fk_anchors(
+            sc, cfg.markers, train_sets,
+            blend_alpha=cfg.prior_blend_alpha,
+            max_prior_dt_mm=cfg.prior_max_dt_mm,
+            max_prior_dr_deg=cfg.prior_max_dr_deg,
+            gate_mode=cfg.gate_mode,
+            gate_k=cfg.gate_k,
+            gate_floor_dt_mm=cfg.gate_floor_dt_mm,
+            gate_floor_dr_deg=cfg.gate_floor_dr_deg,
+            visual_model=visual_model)
+        prior_diag = aligned.diagnostics
+        if aligned.anchors:
+            fk_prior = aligned.anchors
+            fk_solve = "fixed"  # Step3 D-2: accepted set anchors are fixed during refinement
+        else:
+            fk_solve = "none"   # no reliable visual alignment: do not trust raw FK silently
     if cfg.solve == "unified":
         model = solve_unified(sc, cfg.markers, fk_solve, train_sets,
                               anchor_weight=aw, fk_prior=fk_prior)
     else:
         model = solve_independent(sc, cfg.markers, fk_solve, train_sets, fk_prior=fk_prior)
-    return model, None   # W 후보정 제거 (de-bias 가 real 방식의 보정)
+    model["requested_fk_mode"] = cfg.fk
+    model["prior_diagnostics"] = prior_diag
+    W = (learn_fk_correction(sc, model, train_sets, degree=cfg.fk_degree)
+         if cfg.post_correction == "ridge" else None)
+    return model, W
 
 
 def run_config(cfg: ExpConfig, seeds=20, n_sets=10, sigma_px=0.3, train_size=8,
                fk_noise_mm=0.0, fk_noise_deg=0.0, n_fixed_cams=3,
-               n_events_per_set=6, n_splits=3):
+               n_events_per_set=6, n_splits=3,
+               fk_sys_mm=0.0, fk_sys_deg=0.0,
+               intrinsic_err=0.0, outlier_rate=0.0,
+               n_gripped_events=0):
     """한 설정을 여러 seed × (seed당 n_splits 개의 train/test holdout)로 평가.
        코너 수준(실물 마커 투영→PnP). sigma_px = 코너 픽셀 노이즈.
        n_splits: seed 당 평가할 holdout 조합 수 (전체는 느려 제한; 통계는 seed 수로 확보)."""
@@ -75,7 +122,10 @@ def run_config(cfg: ExpConfig, seeds=20, n_sets=10, sigma_px=0.3, train_size=8,
     for seed in range(seeds):
         sc = SimScene(seed=seed, n_fixed_cams=n_fixed_cams, n_sets=n_sets,
                       n_events_per_set=n_events_per_set, sigma_px=sigma_px,
-                      fk_noise_mm=fk_noise_mm, fk_noise_deg=fk_noise_deg)
+                      fk_noise_mm=fk_noise_mm, fk_noise_deg=fk_noise_deg,
+                      fk_sys_mm=fk_sys_mm, fk_sys_deg=fk_sys_deg,
+                      intrinsic_err=intrinsic_err, outlier_rate=outlier_rate,
+                      n_gripped_events=n_gripped_events)
         reproj_seed = float(_np.mean(list(sc.reproj.values()))) if getattr(sc, "reproj", None) else None
         sets = sc.sets
         splits = 0

@@ -9,8 +9,9 @@ base gauge 는 로봇 자세 bTg(그리퍼 체인)가 제공 → FK 큐브 prior
 
 FK 3-값:
   none  : 타깃(큐브)을 미지수로 추정. FK 미사용.
-  fixed : 큐브 = FK 상수로 고정 → 카메라·gTc 만 최적화 (통합=독립: 카메라 분리).
-  corr  : none 으로 캘리브 후, 최종 큐브예측에 train 잔차 Ridge 후보정 (채택).
+  fixed : 큐브 = raw FK 상수로 고정 → 카메라·gTc 만 최적화.
+  corr  : vision-only 1차 해로 raw FK 공통 delta를 보정하고 Step3와 같은 gate/blend를
+          거친 set anchor로 refinement. Ridge 출력 후보정은 별도 옵션이다.
 
 마커: markers ⊆ {"cube","board"}. "board" 는 FK 없음(테이블 고정) → fixed/corr 은
       큐브가 있어야 성립 (board only + FK 는 불가; 상위에서 차단).
@@ -18,6 +19,8 @@ FK 3-값:
 import numpy as np
 from scipy.optimize import least_squares
 from .se3 import (inv_T, se3_to_vec, vec_to_se3, se3_residual, se3_avg, fit_rigid)
+from .production_prior import (align_and_blend_set_priors,
+                               robust_weighted_se3_average)
 
 
 # ---------------------------------------------------------------- 관측 수집
@@ -90,29 +93,100 @@ def _bootstrap(sc, markers, train_sets):
     return cams, gTc
 
 
-def debias_fk_prior(sc, markers, train_sets):
-    """real 파이프라인(estimate_set_cube_prior_alignment) 정합: raw FK 큐브 prior 의
-       **상수 계통 오정렬**을 vision 으로 제거.
-         T_delta_avg = robust_avg_s( inv(fk_cube[s]) @ vision_cube[s] )   (모든 set 공통 상수)
-         de-biased FK[s] = fk_cube[s] @ T_delta_avg
-       vision_cube = 부트스트랩(관측만) 큐브 합의. 이게 Ours corr 의 핵심(FK 를 vision 에 맞춰
-       정렬 후 앵커로 사용). 추정 불가 시 raw 유지. (fixed-FK 는 raw 를 그대로 써 대조.)"""
+def build_visual_cube_estimates(sc, markers, train_sets, model=None):
+    """Return Step3-like per-set visual cube consensus and observation support."""
     if "cube" not in markers:
-        return sc.fk_cube
-    cams0, gTc0 = _bootstrap(sc, markers, train_sets)
-    deltas = []
+        return {}, {}
+    if model is None:
+        cams0, gTc0 = _bootstrap(sc, markers, train_sets)
+    else:
+        cams0 = model.get("cams", {})
+        gTc0 = model.get("gTc")
+    visual, support = {}, {}
     for s in train_sets:
         Ts = [cams0[ci] @ sc.obs_fix_cube[(ci, s)] for ci in sc.fixed_cam_ids
               if ci in cams0 and (ci, s) in sc.obs_fix_cube]
-        Ts += [sc.bTg[e] @ gTc0 @ sc.obs_grip_cube[e]
-               for e in sc.set_events[s] if e in sc.obs_grip_cube]
+        if gTc0 is not None:
+            Ts += [sc.bTg[e] @ gTc0 @ sc.obs_grip_cube[e]
+                   for e in sc.set_events[s] if e in sc.obs_grip_cube]
         if not Ts:
             continue
-        deltas.append(inv_T(sc.fk_cube[s]) @ se3_avg(Ts))    # FK→vision delta (set별)
-    if len(deltas) < 2:
-        return sc.fk_cube
-    T_delta = se3_avg(deltas)                                 # robust 평균 = 상수 오정렬
-    return {s: sc.fk_cube[s] @ T_delta for s in sc.sets}      # 전 set de-bias
+        visual[int(s)] = robust_weighted_se3_average(Ts)
+        support[int(s)] = len(Ts)
+    return visual, support
+
+
+def build_production_fk_anchors(sc, markers, train_sets, blend_alpha=0.25,
+                                max_prior_dt_mm=35.0, max_prior_dr_deg=8.0,
+                                gate_mode="fixed", gate_k=2.5,
+                                gate_floor_dt_mm=5.0, gate_floor_dr_deg=1.0,
+                                visual_model=None):
+    """Mirror Step3's FK alignment, robust averaging, gate, and prior blend."""
+    visual, support = build_visual_cube_estimates(
+        sc, markers, train_sets, model=visual_model)
+    return align_and_blend_set_priors(
+        sc.fk_cube, visual, support,
+        blend_alpha=blend_alpha,
+        max_prior_dt_mm=max_prior_dt_mm,
+        max_prior_dr_deg=max_prior_dr_deg,
+        gate_mode=gate_mode,
+        gate_k=gate_k,
+        gate_floor_dt_mm=gate_floor_dt_mm,
+        gate_floor_dr_deg=gate_floor_dr_deg)
+
+
+def debias_fk_prior(sc, markers, train_sets):
+    """Compatibility wrapper returning Step3-aligned (not yet blended) priors."""
+    result = build_production_fk_anchors(sc, markers, train_sets)
+    return result.corrected or sc.fk_cube
+
+
+def _refine_fixed_subsystem(sc, cams0, markers, train_sets, cube_anchors=None,
+                            n_iters=2):
+    """Refine fixed cameras using every selected target without gripper coupling.
+
+    This fixes the former independent path where ``cube+board`` silently used
+    only cube observations. Cube anchors may be supplied by fixed/corr modes;
+    otherwise cube and board targets are re-estimated from the fixed subsystem.
+    """
+    cams = dict(cams0)
+    if not cams:
+        return cams
+    for _ in range(max(int(n_iters), 1)):
+        targets = {}
+        if "cube" in markers:
+            for s in train_sets:
+                if cube_anchors is not None and s in cube_anchors:
+                    targets[("cube", s)] = cube_anchors[s]
+                else:
+                    Ts = [cams[ci] @ sc.obs_fix_cube[(ci, s)]
+                          for ci in sc.fixed_cam_ids
+                          if ci in cams and (ci, s) in sc.obs_fix_cube]
+                    if Ts:
+                        targets[("cube", s)] = robust_weighted_se3_average(Ts)
+        if "board" in markers:
+            Ts = [cams[ci] @ sc.obs_fix_board[(ci, s)]
+                  for ci in sc.fixed_cam_ids if ci in cams
+                  for s in train_sets if (ci, s) in sc.obs_fix_board]
+            if Ts:
+                targets[("board", None)] = robust_weighted_se3_average(Ts)
+
+        refined = {}
+        for ci in sc.fixed_cam_ids:
+            cands = []
+            for s in train_sets:
+                key = ("cube", s)
+                if key in targets and (ci, s) in sc.obs_fix_cube:
+                    cands.append(targets[key] @ inv_T(sc.obs_fix_cube[(ci, s)]))
+                key = ("board", None)
+                if key in targets and (ci, s) in sc.obs_fix_board:
+                    cands.append(targets[key] @ inv_T(sc.obs_fix_board[(ci, s)]))
+            if cands:
+                refined[ci] = robust_weighted_se3_average(cands)
+            elif ci in cams:
+                refined[ci] = cams[ci]
+        cams = refined
+    return cams
 
 
 # ---------------------------------------------------------------- 통합(unified) BA
@@ -205,7 +279,8 @@ def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=200, anchor_weight=
     sol = least_squares(resid, p0, method="trf", loss="huber", f_scale=0.02,
                         max_nfev=max_nfev)   # robust loss (모든 방법 동일)
     cams, gTc = unpack(sol.x)
-    model = {"cams": cams, "gTc": gTc, "mode": f"unified/{fk_mode}"}
+    model = {"cams": cams, "gTc": gTc, "mode": f"unified/{fk_mode}",
+             "markers": tuple(markers)}
     if use_grip:
         model["X"] = vec_to_se3(sol.x[idx[("X",)]:idx[("X",)]+6])
     return model
@@ -225,31 +300,25 @@ def solve_independent(sc, markers, fk_mode, train_sets, fk_prior=None):
         cams = {}
         for ci in cam_ids:
             Ts = [anchor_cube[s] @ inv_T(sc.obs_fix_cube[(ci, s)]) for s in train_sets if (ci,s) in sc.obs_fix_cube]
-            if Ts: cams[ci] = se3_avg(Ts)
+            if Ts: cams[ci] = robust_weighted_se3_average(Ts)
+        # Board observations now refine the fixed-camera subsystem when selected.
+        cams = _refine_fixed_subsystem(
+            sc, cams, markers, train_sets, cube_anchors=anchor_cube)
         gTc = _handeye_to_fk(sc, train_sets, anchor_cube)   # 그리퍼도 같은 FK prior 에 정합
-        return {"cams": cams, "gTc": gTc, "mode": "indep/" + fk_mode, "align": None}
+        return {"cams": cams, "gTc": gTc, "mode": "indep/" + fk_mode,
+                "markers": tuple(markers), "align": None}
 
     # none/corr: 고정 카메라는 관측 합의(FK 초기화 후 카메라 합의). 그리퍼는 따로 핸드아이.
     cams0, _ = _bootstrap(sc, markers, train_sets)
     # 큐브 합의(고정 카메라만)로 카메라 정제
-    cams = cams0
-    if use_cube:
-        cube_c = {}
-        for s in train_sets:
-            Ts = [cams0[ci] @ sc.obs_fix_cube[(ci, s)] for ci in cam_ids if ci in cams0 and (ci,s) in sc.obs_fix_cube]
-            if Ts:
-                cube_c[s] = se3_avg(Ts)
-        cams = {}
-        for ci in cam_ids:
-            Ts = [cube_c[s] @ inv_T(sc.obs_fix_cube[(ci, s)])
-                  for s in train_sets if s in cube_c and (ci,s) in sc.obs_fix_cube]
-            cams[ci] = se3_avg(Ts) if Ts else cams0[ci]
+    cams = _refine_fixed_subsystem(sc, cams0, markers, train_sets)
     # 그리퍼 핸드아이 (독립: 고정 정보 미사용). none/corr 은 FK/GT 미사용(visual free-target).
     obs_g = sc.obs_grip_cube if use_cube else sc.obs_grip_board
     gTc = _handeye_freetarget(sc, train_sets, obs_g)
     # 조합: 그리퍼가 본 큐브 vs 고정이 본 큐브를 base 에서 rigid 정합
     align = _rigid_align(sc, cams, gTc, markers, train_sets)
-    return {"cams": cams, "gTc": gTc, "mode": "indep/" + fk_mode, "align": align}
+    return {"cams": cams, "gTc": gTc, "mode": "indep/" + fk_mode,
+            "markers": tuple(markers), "align": align}
 
 
 def _handeye_to_fk(sc, train_sets, cube_prior=None):
