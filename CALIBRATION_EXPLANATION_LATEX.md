@@ -685,13 +685,38 @@ d_R(s)
 \right)
 $$
 
-현재 기본 gate 조건은 다음과 같다.
+세트 $s$는 두 조건을 모두 만족할 때만 통과한다.
 
 $$
-d_t(s)\leq 35\,\mathrm{mm},
+d_t(s)\leq \tau_t,
 \qquad
-d_R(s)\leq 8^{\circ}
+d_R(s)\leq \tau_R
 $$
+
+기준선 $\tau_t$와 $\tau_R$은 상수가 아니라, $d_t(s)$와 $d_R(s)$ 값들이 실제로 어떻게 분포하는지를 보고 정한다.
+
+$$
+\tau
+=
+\max\left(
+\operatorname{median}_s(d)
++
+k \cdot 1.4826 \cdot \operatorname{MAD}_s(d),
+\;
+\tau^{\min}
+\right),
+\qquad
+k=2.5
+$$
+
+상수 $1.4826$은 MAD를 표준편차와 같은 척도로 환산하는 값이다. 정규분포에서 MAD에 이 값을 곱하면 표준편차가 된다.
+
+기준선을 이렇게 잡는 이유는 $d_t(s)$가 무엇을 재는 값인지에 있다. 11.5절에서 본 것처럼 어떤 세트의 $\boldsymbol{\Delta}_s$가 공통 보정량 $\overline{\boldsymbol{\Delta}}$와 정확히 같다면 $\mathbf{F}^{\mathrm{corr}}_s=\mathbf{V}_s$가 되어 $d_t(s)=0$이다. 즉 $d_t(s)$는 FK가 절대적으로 얼마나 틀렸는지가 아니라, 그 세트가 다른 세트들의 공통 경향에서 얼마나 벗어났는지를 재는 값이다. 이런 양의 크기는 물리적 허용오차가 아니라 데이터의 산포에 속하므로, 고정 상수보다 분포 기준이 맞다. 실제로 $\overline{\boldsymbol{\Delta}}$를 구하는 강건 평균이 같은 잔차에 이미 같은 기준을 쓰고 있다.
+
+여기에는 보호 장치가 두 개 필요하다.
+
+- **하한 $\tau^{\min}$**: 세트들이 우연히 거의 같은 값이면 MAD가 $0$에 붕괴하여 멀쩡한 세트까지 전부 걸러낸다. 기본값은 $5\,\mathrm{mm}$와 $1^{\circ}$다.
+- **세트 수 조건**: 세트가 $5$개 미만이면 중앙값과 MAD 자체가 불안정하므로 이 방식을 쓰지 않는다.
 
 ### 11.7 단계 6: vision과 corrected FK를 조건부 혼합
 
@@ -708,9 +733,9 @@ $$
 \alpha
 \right),
 &
-d_t(s)\leq35\,\mathrm{mm}
+d_t(s)\leq\tau_t
 \ \land\ 
-d_R(s)\leq8^{\circ},
+d_R(s)\leq\tau_R,
 \\[4pt]
 \mathbf{V}_s,
 &
@@ -1327,8 +1352,9 @@ elif fk_mode == "corr":
         visual_by_set,
         corrected_fk,
         alpha=0.25,
-        max_translation_mm=35.0,
-        max_rotation_deg=8.0,
+        gate_k=2.5,             # median + k*1.4826*MAD
+        gate_floor_mm=5.0,
+        gate_floor_deg=1.0,
     )
     target_mode = "fixed"
 
@@ -1407,7 +1433,7 @@ else:
 =
 \begin{cases}
 \operatorname{Blend}(\mathbf{V}_s,\mathbf{F}^{\mathrm{corr}}_s,0.25),
-& d_t(s)\leq35\,\mathrm{mm}\ \land\ d_R(s)\leq8^{\circ},\\
+& d_t(s)\leq\tau_t\ \land\ d_R(s)\leq\tau_R,\\
 \mathbf{V}_s, & \text{otherwise}.
 \end{cases}
 ```
