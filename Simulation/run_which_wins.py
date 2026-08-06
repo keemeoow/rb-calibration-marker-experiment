@@ -26,8 +26,8 @@ CB = ("cube", "board")
 METHODS = [
     ExpConfig("fixed", fk="fixed", solve="unified", markers=CB, label="fixed-FK"),
     ExpConfig("noFK",  fk="none",  solve="unified", markers=CB, label="no-FK"),
-    ExpConfig("oursA", fk="corr",  solve="unified", markers=CB, anchor_weight=0.0, label="ours-A (anchor=0)"),
-    ExpConfig("oursB", fk="corr",  solve="unified", markers=CB, anchor_weight=0.5, label="ours-B (anchor=0.5)"),
+    ExpConfig("ours", fk="corr", solve="unified", markers=CB,
+              label="ours-B (Step3 production, blend=0.25)"),
 ]
 KEYS = ["e_task_mm", "gTc_mm", "e_X_mm", "e_cross_mm", "e_reproj_px"]
 N_GRIPPED = 0        # gripped 캡처 수 (main 에서 설정; fork 로 워커에 상속)

@@ -1369,7 +1369,6 @@ def estimate_set_cube_prior_alignment(raw_set_priors: Dict[int, np.ndarray],
 def build_setwise_cube_anchors(meta: dict,
                                event_pose_map: Dict[int, np.ndarray],
                                set_prior_by_set: Optional[Dict[int, np.ndarray]] = None,
-                               prior_blend_alpha: float = 0.25,
                                max_prior_dt_mm: float = 35.0,
                                max_prior_dr_deg: float = 8.0):
     poses_by_set: Dict[int, List[Tuple[int, np.ndarray]]] = defaultdict(list)
@@ -1405,10 +1404,11 @@ def build_setwise_cube_anchors(meta: dict,
             dt_mm = float(np.linalg.norm(T_avg[:3, 3] - T_prior[:3, 3]) * 1000.0)
             dr_deg = rotation_error_deg(T_avg[:3, :3], T_prior[:3, :3])
             if dt_mm <= float(max_prior_dt_mm) and dr_deg <= float(max_prior_dr_deg):
-                T_avg = blend_rigid_transforms(T_avg, T_prior, float(prior_blend_alpha))
+                # A set that clears the gate is trusted fully: no partial weight.
+                T_avg = T_prior.copy()
                 st["prior_blend_dt_mm"] = dt_mm
                 st["prior_blend_dr_deg"] = dr_deg
-                st["prior_blend_alpha"] = float(prior_blend_alpha)
+                st["prior_accepted"] = True
         transforms_by_set[int(set_index)] = T_avg
         diag["per_set"][str(int(set_index))] = {
             "support": int(len(items)),
@@ -1426,7 +1426,6 @@ def build_hybrid_setwise_cube_anchors(meta: dict,
                                       fixed_event_pose_map: Dict[int, np.ndarray],
                                       gripper_event_pose_map: Dict[int, np.ndarray],
                                       set_prior_by_set: Optional[Dict[int, np.ndarray]] = None,
-                                      prior_blend_alpha: float = 0.25,
                                       max_prior_dt_mm: float = 35.0,
                                       max_prior_dr_deg: float = 8.0):
     fixed_by_set: Dict[int, Dict[int, np.ndarray]] = defaultdict(dict)
@@ -1487,10 +1486,11 @@ def build_hybrid_setwise_cube_anchors(meta: dict,
             dt_mm = float(np.linalg.norm(T_avg[:3, 3] - T_prior[:3, 3]) * 1000.0)
             dr_deg = rotation_error_deg(T_avg[:3, :3], T_prior[:3, :3])
             if dt_mm <= float(max_prior_dt_mm) and dr_deg <= float(max_prior_dr_deg):
-                T_avg = blend_rigid_transforms(T_avg, T_prior, float(prior_blend_alpha))
+                # A set that clears the gate is trusted fully: no partial weight.
+                T_avg = T_prior.copy()
                 st["prior_blend_dt_mm"] = dt_mm
                 st["prior_blend_dr_deg"] = dr_deg
-                st["prior_blend_alpha"] = float(prior_blend_alpha)
+                st["prior_accepted"] = True
         transforms_by_set[int(set_index)] = T_avg
 
         fixed_st = None

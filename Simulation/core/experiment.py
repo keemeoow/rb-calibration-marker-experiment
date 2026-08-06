@@ -29,7 +29,6 @@ class ExpConfig:
     label: str = ""
     # Step3 production defaults. Legacy soft-anchor weight is deliberately not
     # exposed here because it is a different algorithm from production corr.
-    prior_blend_alpha: float = 0.25
     prior_max_dt_mm: float = 35.0
     prior_max_dr_deg: float = 8.0
     # Gate threshold policy. "fixed" keeps the constant limits above; "adaptive"
@@ -53,8 +52,6 @@ class ExpConfig:
             raise ValueError(f"bad post_correction={self.post_correction}")
         if self.gate_mode not in ("fixed", "adaptive"):
             raise ValueError(f"bad gate_mode={self.gate_mode}")
-        if not 0.0 <= self.prior_blend_alpha <= 1.0:
-            raise ValueError("prior_blend_alpha must be in [0,1]")
 
 
 def calibrate(sc, cfg: ExpConfig, train_sets):
@@ -79,7 +76,6 @@ def calibrate(sc, cfg: ExpConfig, train_sets):
             anchor_weight=0.0, fk_prior=None)
         aligned = build_production_fk_anchors(
             sc, cfg.markers, train_sets,
-            blend_alpha=cfg.prior_blend_alpha,
             max_prior_dt_mm=cfg.prior_max_dt_mm,
             max_prior_dr_deg=cfg.prior_max_dr_deg,
             gate_mode=cfg.gate_mode,

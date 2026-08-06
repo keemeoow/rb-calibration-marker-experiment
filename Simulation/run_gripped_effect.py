@@ -14,8 +14,8 @@ CB = ("cube", "board")
 METHODS = [
     ExpConfig("fixed", fk="fixed", solve="unified", markers=CB, label="fixed-FK"),
     ExpConfig("noFK",  fk="none",  solve="unified", markers=CB, label="no-FK"),
-    ExpConfig("oursA", fk="corr",  solve="unified", markers=CB, anchor_weight=0.0, label="ours-A"),
-    ExpConfig("oursB", fk="corr",  solve="unified", markers=CB, anchor_weight=0.5, label="ours-B"),
+    ExpConfig("ours", fk="corr", solve="unified", markers=CB,
+              label="ours-B (Step3)"),
 ]
 # 대표 조건 (FK오차mm, 계통노이즈)
 CONDS = [(0.0, 0.0), (0.0, 0.02), (8.0, 0.0), (8.0, 0.02)]

@@ -143,7 +143,6 @@ def align_and_blend_set_priors(
         raw_priors: Mapping[int, np.ndarray],
         visual_by_set: Mapping[int, np.ndarray],
         support_by_set: Optional[Mapping[int, float]] = None,
-        blend_alpha: float = 0.25,
         max_prior_dt_mm: float = 35.0,
         max_prior_dr_deg: float = 8.0,
         gate_mode: str = "fixed",
@@ -154,8 +153,9 @@ def align_and_blend_set_priors(
     """Apply the complete Step3 set-prior alignment and guarded blend policy.
 
     ``corrected`` is raw FK right-multiplied by the robust common delta.
-    ``anchors`` is the visual estimate blended toward that corrected prior only
-    when the gate accepts it.
+    ``anchors`` is the corrected prior for every set the gate accepts, and the
+    visual estimate for the rest. A set that clears the gate is trusted fully;
+    there is no partial-trust weight.
 
     ``gate_mode`` selects how the accept threshold is chosen:
       * ``"fixed"``    - the original constant 35 mm / 8 deg limits.
@@ -209,12 +209,11 @@ def align_and_blend_set_priors(
             dt_mm, dr_deg = dist[int(s)]
             accepted = dt_mm <= gate_dt and dr_deg <= gate_dr
             if accepted:
-                anchor = blend_rigid_transforms(visual, prior, blend_alpha)
+                anchor = prior.copy()
         anchors[int(s)] = anchor
         per_set[str(int(s))] = {
             "support": int(support_by_set.get(s, 1)),
             "prior_accepted": bool(accepted),
-            "prior_blend_alpha": float(blend_alpha) if accepted else 0.0,
             "prior_blend_dt_mm": dt_mm,
             "prior_blend_dr_deg": dr_deg,
         }
@@ -222,7 +221,6 @@ def align_and_blend_set_priors(
     return PriorAlignmentResult(corrected, anchors, delta, {
         "support": int(len(common)),
         "stability": stability,
-        "blend_alpha": float(blend_alpha),
         "gate_mode": str(gate_mode),
         "gate_dt_mm": float(gate_dt),
         "gate_dr_deg": float(gate_dr),

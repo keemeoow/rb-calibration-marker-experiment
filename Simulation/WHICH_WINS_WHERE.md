@@ -1,5 +1,8 @@
 # 어떤 조건에서 어떤 방법이 이기나 — 4방법 시뮬레이션 비교
 
+> **역사적 결과 / 재실행 필요:** 아래 수치는 legacy soft-anchor 실험에서 생성됐다. 현재 기본
+> `corr`는 Step3형 de-bias + guarded blend이며 `anchor_weight`를 사용하지 않는다.
+
 **FK 사용 방식 4가지**(fixed-FK / no-FK / ours-A / ours-B)를 **FK 오차 × 카메라 노이즈(랜덤·계통)** 조건에서
 전수 비교하여, "각 조건에서 held-out 큐브 예측(e_task)이 가장 낮은 방법"을 구했다.
 

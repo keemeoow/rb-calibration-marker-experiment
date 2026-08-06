@@ -15,8 +15,8 @@ CB = ("cube", "board")
 METHODS = [
     ExpConfig("fixed", fk="fixed", solve="unified", markers=CB, label="fixed-FK"),
     ExpConfig("noFK",  fk="none",  solve="unified", markers=CB, label="no-FK"),
-    ExpConfig("oursA", fk="corr",  solve="unified", markers=CB, anchor_weight=0.0, label="ours-A"),
-    ExpConfig("oursB", fk="corr",  solve="unified", markers=CB, anchor_weight=0.5, label="ours-B"),
+    ExpConfig("ours", fk="corr", solve="unified", markers=CB,
+              label="ours (de-bias + gate)"),
 ]
 SYS = [0.0, 0.01, 0.02]     # 인지 계통노이즈 (intrinsic 상대오차)
 SIG = [0.3, 0.6, 1.0]       # 마커 인지정확도 (코너 검출 σ px)

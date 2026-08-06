@@ -11,25 +11,45 @@
 
 ## 7개 실험 (확정 리스트)
 
-기본 = **EXP1 (Ours)** = FK 잔차보정 + 통합 캘리브 + 큐브+보드. 여기서 하나씩 제거:
+기본 = **EXP1 (Ours)** = Step3형 FK prior 보정 + 통합 캘리브 + 큐브+보드. 여기서 하나씩 제거:
 
 | # | FK | 캘리브 | 마커 | 의미 |
 |---|---|---|---|---|
-| **EXP1★** | 잔차보정(corr) | 통합 | 큐브+보드 | **Ours (기본)** |
-| EXP2 | 잔차보정 | 따로 | 큐브+보드 | −통합 |
-| EXP3 | 잔차보정 | 통합 | 큐브만 | −보드 |
+| **EXP1★** | Step3 보정(corr) | 통합 | 큐브+보드 | **Ours (기본)** |
+| EXP2 | Step3 보정 | 따로 | 큐브+보드 | −통합 |
+| EXP3 | Step3 보정 | 통합 | 큐브만 | −보드 |
 | EXP4 | 안씀(none) | 통합 | 큐브+보드 | −FK |
 | EXP5 | 안씀 | 따로 | 큐브+보드 | −FK −통합 |
 | EXP6 | 안씀 | 통합 | 보드만 | −큐브 |
 | EXP7 | 고정(fixed) | 통합(=독립) | 큐브+보드 | FK 고정 대조 |
 
-제약: **보드만 + FK 는 불가**(보드는 로봇이 위치를 모름 = FK 없음). **fixed 는 통합=독립**
-(큐브 상수라 카메라 분리).
+제약: **보드만 + FK 는 불가**(보드는 로봇이 위치를 모름 = FK 없음).
 
 ### FK 3-값
 - **none** : 큐브를 미지수로 추정 (FK 미사용)
 - **fixed**: 큐브 = FK 상수로 고정 → 카메라·gTc 만 최적화
-- **corr** : none 으로 캘리브 후 train 잔차를 [1,x,y] Ridge 로 후보정 (**채택**)
+- **corr** : vision-only 1차 해 → `delta=robust_avg(inv(raw_FK)@vision)` →
+  `corrected_FK=raw_FK@delta` → 35 mm/8° gate → alpha 0.25 조건부 blend → refinement.
+  평균·gate·blend 기본값과 연산은 실제 `Step3_calibration.py`와 parity test로 검증한다.
+
+`[1,x,y]` Ridge는 corr의 일부가 아니다. C1 실데이터의 **출력 post-correction**을 재현할 때만
+`ExpConfig(post_correction="ridge")`로 별도 활성화한다. 실데이터에서 이 지표는 외부 물리 GT가
+아닌 FK proxy 일치도이며, 절대 물리 정확도를 뜻하지 않는다.
+
+### 전체 조건 실행
+
+유효한 `통합/독립 × 보드/큐브/둘 다 × no-FK/fixed-FK/corr` 14개 조합은 다음으로 실행한다.
+
+```bash
+python run_factorial.py --seeds 20 --splits 3 \
+  --dump results/tables/factorial.json
+
+# 실제형 systematic FK 오차와 관측 이상치를 함께 주는 예
+python run_factorial.py --seeds 20 --splits 3 \
+  --fk_sys_mm 10 --fk_sys_deg 5 --outlier_rate 0.02
+```
+
+보드만 조건에는 큐브 FK prior가 존재하지 않으므로 `fixed/corr` 조합을 만들지 않는다.
 
 ---
 

@@ -50,7 +50,9 @@ class ProductionPriorParityTest(unittest.TestCase):
             np.testing.assert_allclose(actual.corrected[s], expected_corrected[s], atol=1e-12)
             np.testing.assert_allclose(inv_T(actual.corrected[s]) @ visual[s], np.eye(4), atol=1e-10)
 
-    def test_guarded_blend_matches_step3(self):
+    def test_blend_helper_matches_step3(self):
+        """Step3 still blends elsewhere (gripper board alignment), so the
+        helper must stay in parity even though set priors no longer use it."""
         import Step3_calibration as step3
 
         A = np.eye(4)
@@ -59,6 +61,21 @@ class ProductionPriorParityTest(unittest.TestCase):
         np.testing.assert_allclose(
             blend_rigid_transforms(A, B, 0.25),
             step3.blend_rigid_transforms(A, B, 0.25), atol=1e-12)
+
+    def test_accepted_set_takes_corrected_prior_unchanged(self):
+        """A set that clears the gate is trusted fully."""
+        rng = np.random.default_rng(21)
+        delta = rand_se3(rng, 0.01, 2.0)
+        raw, visual = {}, {}
+        for s in range(8):
+            base = rand_se3(rng, 0.4, 40.0)
+            raw[s] = base
+            visual[s] = base @ delta
+        result = align_and_blend_set_priors(raw, visual)
+        for s in raw:
+            self.assertTrue(result.diagnostics["per_set"][str(s)]["prior_accepted"])
+            np.testing.assert_allclose(
+                result.anchors[s], result.corrected[s], atol=1e-12)
 
     def test_factorial_contains_all_14_valid_cells(self):
         self.assertEqual(len(ALL_FACTORIAL), 14)

@@ -116,7 +116,7 @@ def build_visual_cube_estimates(sc, markers, train_sets, model=None):
     return visual, support
 
 
-def build_production_fk_anchors(sc, markers, train_sets, blend_alpha=0.25,
+def build_production_fk_anchors(sc, markers, train_sets,
                                 max_prior_dt_mm=35.0, max_prior_dr_deg=8.0,
                                 gate_mode="fixed", gate_k=2.5,
                                 gate_floor_dt_mm=5.0, gate_floor_dr_deg=1.0,
@@ -126,7 +126,6 @@ def build_production_fk_anchors(sc, markers, train_sets, blend_alpha=0.25,
         sc, markers, train_sets, model=visual_model)
     return align_and_blend_set_priors(
         sc.fk_cube, visual, support,
-        blend_alpha=blend_alpha,
         max_prior_dt_mm=max_prior_dt_mm,
         max_prior_dr_deg=max_prior_dr_deg,
         gate_mode=gate_mode,

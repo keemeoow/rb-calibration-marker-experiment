@@ -1,5 +1,9 @@
 # 시뮬레이션 결과 — 7방법 ablation (GT 기준, real 충실 재판정)
 
+> **재실행 필요:** 이 문서의 수치는 2026-08 Step3 parity 개편 전 산출물이다. 현재 코드는
+> Step3형 weighted robust alignment + guarded blend를 사용하므로, 새 논문 수치로 인용하기 전에
+> `run_paper_sim.py`를 다시 실행해야 한다.
+
 > 리뷰어(real 코드 작성자)의 6개 지적을 모두 고치고, **시뮬을 실측(real) 구성에 맞춘 뒤**
 > 다시 돌린 결과다. 특히 **FK 보정을 real 파이프라인 방식(de-bias)으로 재구현**했다.
 > 대조·반영 내역은 [SIM_VS_REAL_CHECKLIST.md](SIM_VS_REAL_CHECKLIST.md), 리뷰 수정은

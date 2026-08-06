@@ -127,18 +127,20 @@ class SimScene:
         if fk_sys_mm > 0 or fk_sys_deg > 0:
             rs = np.random.default_rng(5000 + seed)
             bvec = rs.normal(size=3); bvec /= (np.linalg.norm(bvec) + 1e-12)
-            b_const = bvec * (fk_sys_mm / 1000.0)              # 상수 오프셋 (de-bias 로 제거)
-            ax_s = rs.normal(size=3); ax_s /= (np.linalg.norm(ax_s) + 1e-12)  # 상수 회전축
+            ax_s = rs.normal(size=3); ax_s /= (np.linalg.norm(ax_s) + 1e-12)
+            # Step3 assumes raw_fk @ T_delta == visual for every set. Generate
+            # systematic error in exactly that right-multiplied local-frame form.
+            T_delta = np.eye(4)
+            T_delta[:3, 3] = bvec * (fk_sys_mm / 1000.0)
+            T_delta[:3, :3] = rot_axis_angle(ax_s, np.deg2rad(fk_sys_deg))
             res_std = (fk_sys_mm / 1000.0) * 0.4               # per-set 잔차 std (de-bias 후 남음)
-            fk_sys = (b_const, ax_s, res_std)
+            fk_sys = (T_delta, res_std)
         self.fk_cube = {}
         for s in self.sets:
             T = self.bTo[s].copy()
             if fk_sys is not None:                             # systematic = 상수 + per-set 잔차
-                b_const, ax_s, res_std = fk_sys
-                T[:3, 3] = T[:3, 3] + b_const                  # 상수 오프셋 (제거 가능)
-                if fk_sys_deg > 0:                             # 상수 회전 오정렬 (제거 가능)
-                    T[:3, :3] = rot_axis_angle(ax_s, np.deg2rad(fk_sys_deg)) @ T[:3, :3]
+                T_delta, res_std = fk_sys
+                T = T @ inv_T(T_delta)                         # raw @ delta = true
                 T[:3, 3] = T[:3, 3] + rng.normal(0, res_std, 3)   # per-set 잔차 (제거 불가)
             if fk_noise_mm > 0 or fk_noise_deg > 0:            # random (제로평균)
                 ax = rng.normal(size=3); ax /= (np.linalg.norm(ax) + 1e-12)

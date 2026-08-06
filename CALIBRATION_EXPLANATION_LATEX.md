@@ -561,7 +561,7 @@ Fixed-FK는 FK가 정확할 때 미지수가 적고 안정적이지만, FK에 �
 
 ### 11.1 가장 쉬운 설명
 
-raw FK를 무조건 믿지 않는다. 먼저 vision으로 큐브 자세를 계산하고, raw FK가 vision과 어떤 공통 차이를 갖는지 학습한다. 그 차이로 FK를 보정한 뒤, vision과 충분히 가까운 경우에만 일부를 섞는다.
+raw FK를 무조건 믿지 않는다. 먼저 vision으로 큐브 자세를 계산하고, raw FK가 vision과 어떤 공통 차이를 갖는지 학습한다. 그 차이로 FK를 보정한 뒤, vision과 충분히 가까운 세트에서만 그 보정된 FK를 사용한다.
 
 ### 11.2 단계 1: vision-only 초기 해
 
@@ -713,25 +713,25 @@ $$
 
 기준선을 이렇게 잡는 이유는 $d_t(s)$가 무엇을 재는 값인지에 있다. 11.5절에서 본 것처럼 어떤 세트의 $\boldsymbol{\Delta}_s$가 공통 보정량 $\overline{\boldsymbol{\Delta}}$와 정확히 같다면 $\mathbf{F}^{\mathrm{corr}}_s=\mathbf{V}_s$가 되어 $d_t(s)=0$이다. 즉 $d_t(s)$는 FK가 절대적으로 얼마나 틀렸는지가 아니라, 그 세트가 다른 세트들의 공통 경향에서 얼마나 벗어났는지를 재는 값이다. 그렇다면 얼마부터 유별난 값인지는 나머지 세트들이 얼마나 모여 있느냐에 따라 달라진다. 세트들이 모두 $2\,\mathrm{mm}$ 안에 모여 있다면 $10\,\mathrm{mm}$짜리 세트는 명백히 이상하지만, 원래부터 $30\,\mathrm{mm}$씩 흩어져 있었다면 같은 $10\,\mathrm{mm}$도 평범하다. 고정 상수는 이 두 경우를 구분하지 못한다. 
 
-여기에는 보호 장치가 두 개 필요하다.
+여기에는 보호 장치가 필요하다.
 
-- **하한 $\tau^{\min}$**: 세트들이 우연히 거의 같은 값이면 MAD가 $0$에 붕괴하여 멀쩡한 세트까지 전부 걸러낸다. 기본값은 $5\,\mathrm{mm}$와 $1^{\circ}$다.
-- **세트 수 조건**: 세트가 $5$개 미만이면 중앙값과 MAD 자체가 불안정하다. 이때는 분포에서 기준선을 만들지 못하므로 상수 $35\,\mathrm{mm}$와 $8^{\circ}$로 되돌아간다. 이 경우에도 바뀌는 것은 기준선을 정하는 방법뿐이며, de-bias와 혼합과 anchor 고정 refinement는 그대로 수행한다.
+**하한 $\tau^{\min}$이 필요한 이유.** 기준선을 중앙값 근처로만 잡으면 문제가 생긴다. 중앙값이란 절반은 그보다 작고 절반은 그보다 크다는 뜻이다. 따라서 세트들이 모두 잘 맞아서 흩어짐이 거의 없으면, 기준선이 중앙값에 딱 붙어버리고 **멀쩡한 세트의 절반이 탈락한다.**
 
-### 11.7 단계 6: vision과 corrected FK를 조건부 혼합
+세트들이 전부 $1\sim2\,\mathrm{mm}$ 안에서 잘 맞고 있는 상황을 생각해 보자. 걸러낼 이상치가 없는데도 절반이 탈락하고, 그 세트들은 FK를 못 쓰게 된다.
 
-gate를 통과하면 $\alpha=0.25$만큼 corrected FK를 섞는다.
+하한은 이를 막는 바닥선이다. 기본값 $5\,\mathrm{mm}$와 $1^{\circ}$는 "이 정도 차이는 애초에 문제 삼지 않는다"는 선언이다. 모든 세트의 차이가 이 안에 들어오면 아무도 탈락하지 않는다. 걸러낼 것이 없을 때는 걸러내지 않는 것이 옳기 때문이다.
+
+즉 하한의 역할은 무언가를 더 걸러내는 것이 아니라, **불필요하게 걸러내지 않도록 보장하는 것**이다.
+
+### 11.7 단계 6: gate 결과에 따라 anchor 확정
+
+세트 $s$의 anchor는 gate 통과 여부로 결정된다.
 
 $$
 \mathbf{A}_s
 =
 \begin{cases}
-\operatorname{Blend}
-\left(
-\mathbf{V}_s,
 \mathbf{F}^{\mathrm{corr}}_s,
-\alpha
-\right),
 &
 d_t(s)\leq\tau_t
 \ \land\ 
@@ -743,49 +743,16 @@ d_R(s)\leq\tau_R,
 \end{cases}
 $$
 
-현재 기본 혼합계수는 다음과 같다.
+통과한 세트는 보정된 FK를 **그대로** anchor로 삼는다. 몇 퍼센트만 반영하는 식의 부분 신뢰는 두지 않는다. gate가 이미 그 세트를 믿을지 말지 판정했으므로, 통과한 뒤에 다시 비중을 깎을 근거가 없기 때문이다.
 
-$$
-\alpha=0.25
-$$
+탈락한 세트는 FK를 쓰지 않고 vision 합의 $\mathbf{V}_s$를 anchor로 삼는다.
 
-이동벡터는 선형으로 섞는다.
+정리하면 판단은 세트마다 전부 아니면 전무다.
 
-$$
-\mathbf{t}(\mathbf{A}_s)
-=
-(1-\alpha)\mathbf{t}(\mathbf{V}_s)
-+
-\alpha\mathbf{t}(\mathbf{F}^{\mathrm{corr}}_s)
-$$
-
-회전행렬은 가중합을 만든 뒤 SVD로 $\mathrm{SO}(3)$에 다시 투영한다.
-
-$$
-\mathbf{M}_s
-=
-(1-\alpha)\mathbf{R}(\mathbf{V}_s)
-+
-\alpha\mathbf{R}(\mathbf{F}^{\mathrm{corr}}_s)
-$$
-
-$$
-\mathbf{M}_s
-=
-\mathbf{U}_s\boldsymbol{\Sigma}_s\mathbf{W}_s^{\mathsf T}
-$$
-
-$$
-\mathbf{R}(\mathbf{A}_s)
-=
-\mathbf{U}_s
-\operatorname{diag}
-\left(
-1,1,
-\det(\mathbf{U}_s\mathbf{W}_s^{\mathsf T})
-\right)
-\mathbf{W}_s^{\mathsf T}
-$$
+| gate | anchor | FK 사용 |
+|---|---|---|
+| 통과 | $\mathbf{F}^{\mathrm{corr}}_s$ | 그대로 사용 |
+| 탈락 | $\mathbf{V}_s$ | 사용하지 않음 |
 
 ### 11.8 단계 7: anchor를 고정하고 최종 refinement
 
@@ -808,7 +775,7 @@ $$
 \right)
 $$
 
-즉, 현재 구현의 Corrected-FK는 단순히 목적함수에 약한 벌점 하나를 더하는 것과 정확히 같지 않다. vision 초기 해, FK 공통 정렬, gate, 조건부 혼합, 고정 anchor refinement의 순서로 동작한다.
+즉, Corrected-FK는 단순히 목적함수에 약한 벌점 하나를 더하는 것과 다르다. vision 초기 해, FK 공통 정렬, gate 판정, anchor 확정, 고정 anchor refinement의 순서로 동작한다.
 
 ---
 
@@ -818,13 +785,13 @@ $$
 |---|---:|---|---|
 | `No-FK` | $\mathbf{Q}_s=\mathbf{O}_s$ | 자유변수 | FK를 사용하지 않고 vision 합의로 직접 찾음 |
 | `Fixed-FK` | $\mathbf{Q}_s=\mathbf{F}_s$ | raw FK에 고정 | FK를 정답으로 간주 |
-| `Corrected-FK` | $\mathbf{Q}_s=\mathbf{A}_s$ | 보정된 anchor에 고정 | vision으로 FK를 검증하고 일부만 혼합 |
+| `Corrected-FK` | $\mathbf{Q}_s=\mathbf{A}_s$ | 보정된 anchor에 고정 | vision으로 FK를 검증하고 통과한 세트만 사용 |
 
 한 문장으로 요약하면 다음과 같다.
 
 - `No-FK`: 큐브 자세도 직접 찾는다.
 - `Fixed-FK`: 큐브 자세를 raw FK에 못 박는다.
-- `Corrected-FK`: raw FK를 vision으로 보정하고 gate를 통과한 정보만 섞는다.
+- `Corrected-FK`: raw FK를 vision으로 보정하고 gate를 통과한 세트에서만 사용한다.
 
 ---
 
@@ -1348,10 +1315,9 @@ elif fk_mode == "corr":
     visual_by_set = build_visual_consensus(visual_model)
     delta = robust_average(inv(raw_fk[s]) @ visual_by_set[s])
     corrected_fk = {s: raw_fk[s] @ delta for s in sets}
-    set_anchors = guarded_blend(
-        visual_by_set,
-        corrected_fk,
-        alpha=0.25,
+    set_anchors = gate_select(
+        visual_by_set,          # gate 탈락 시 사용
+        corrected_fk,           # gate 통과 시 그대로 사용
         gate_k=2.5,             # median + k*1.4826*MAD
         gate_floor_mm=5.0,
         gate_floor_deg=1.0,
@@ -1432,7 +1398,7 @@ else:
 \mathbf{A}_s
 =
 \begin{cases}
-\operatorname{Blend}(\mathbf{V}_s,\mathbf{F}^{\mathrm{corr}}_s,0.25),
+\mathbf{F}^{\mathrm{corr}}_s,
 & d_t(s)\leq\tau_t\ \land\ d_R(s)\leq\tau_R,\\
 \mathbf{V}_s, & \text{otherwise}.
 \end{cases}
@@ -1477,7 +1443,7 @@ $\mathbf{C}_i$, $\mathbf{Z}_{i,s}$, $\mathbf{G}_e$, $\mathbf{X}$, $\mathbf{Z}_{g
 
 ### 질문: Corrected-FK는 soft anchor인가?
 
-`Corrected-FK`는 vision과 corrected FK를 gate 후 $\alpha=0.25$로 섞어 $\mathbf{A}_s$를 만들고, 최종 refinement에서 $\mathbf{A}_s$를 고정한다. 따라서 legacy 방식의 단순 soft-anchor 벌점과 구분해야 한다.
+아니다. gate를 통과한 세트는 corrected FK를 그대로 anchor로 삼고, 탈락한 세트는 vision 합의를 쓴다. 세트마다 전부 아니면 전무로 결정하며, 그렇게 만든 $\mathbf{A}_s$를 최종 refinement에서 고정한다. 목적함수에 벌점 항을 더하는 legacy soft-anchor 방식과는 다르다.
 
 ### 질문: Independent와 Separated는 다른 방법인가?
 
