@@ -9,6 +9,10 @@
 \documentclass[aspectratio=169,11pt]{beamer}
 
 \usepackage{kotex}
+% 한글 글꼴: 나눔바른고딕 (Regular + Bold 보유). 발표 화면에서 읽기 좋다.
+\setmainhangulfont{NanumBarunGothic}
+\setsanshangulfont{NanumBarunGothic}
+\setmonohangulfont{NanumGothicCoding}
 \usepackage{amsmath}
 \usepackage{amssymb}
 \usepackage{booktabs}
@@ -955,28 +959,6 @@
   통과한 세트는 보정된 FK를 \textbf{그대로} anchor로 삼고,
   탈락한 세트는 FK를 쓰지 않고 vision 합의 $\mathbf{V}_s$를 anchor로 삼는다.
   판단은 세트마다 전부 아니면 전무다.
-\end{frame}
-
-\begin{frame}{11.7 탈락한 세트는 \texttt{No-FK}와 같은가?}
-  값의 출처가 vision이라는 점은 같지만, 같지는 않다.
-  \vfill
-  \begin{center}
-    \begin{tabular}{cll}
-      \toprule
-       & 큐브 자세의 값 & 최적화 중 상태 \\
-      \midrule
-      \texttt{No-FK} & vision으로 찾는다 & 자유변수. 계속 움직인다 \\
-      gate 탈락 세트 & vision 합의 $\mathbf{V}_s$ & 고정. 더 움직이지 않는다 \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
-  \vfill
-  \begin{block}{정리}
-    \texttt{Corrected-FK}는 세트마다 anchor의 \textbf{출처}가 갈릴 뿐,
-    어느 쪽이든 값을 하나로 못 박고 시작한다는 성격은 같다.
-    통과한 세트는 보정된 FK에, 탈락한 세트는 vision 합의에 고정된다.
-    그 고정된 anchor로 다음 단계의 refinement를 수행한다.
-  \end{block}
 \end{frame}
 
 \begin{frame}{11.8 단계 7: anchor를 고정하고 최종 refinement}
