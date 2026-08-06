@@ -94,15 +94,20 @@ def _bootstrap(sc, markers, train_sets):
 
 
 def build_visual_cube_estimates(sc, markers, train_sets, model=None):
-    """Return Step3-like per-set visual cube consensus and observation support."""
+    """Per-set visual cube consensus, observation support, and its own scatter.
+
+    The scatter is how much the individual camera predictions disagree inside a
+    set. It is the resolution of the visual estimate: a FK deviation smaller
+    than this cannot be told apart from vision's own noise.
+    """
     if "cube" not in markers:
-        return {}, {}
+        return {}, {}, {}
     if model is None:
         cams0, gTc0 = _bootstrap(sc, markers, train_sets)
     else:
         cams0 = model.get("cams", {})
         gTc0 = model.get("gTc")
-    visual, support = {}, {}
+    visual, support, scatter = {}, {}, {}
     for s in train_sets:
         Ts = [cams0[ci] @ sc.obs_fix_cube[(ci, s)] for ci in sc.fixed_cam_ids
               if ci in cams0 and (ci, s) in sc.obs_fix_cube]
@@ -111,18 +116,20 @@ def build_visual_cube_estimates(sc, markers, train_sets, model=None):
                    for e in sc.set_events[s] if e in sc.obs_grip_cube]
         if not Ts:
             continue
-        visual[int(s)] = robust_weighted_se3_average(Ts)
+        T_avg, st = robust_weighted_se3_average(Ts, return_stats=True)
+        visual[int(s)] = T_avg
         support[int(s)] = len(Ts)
-    return visual, support
+        scatter[int(s)] = (float(st["translation_std_mm"]),
+                           float(st["rotation_std_deg"]))
+    return visual, support, scatter
 
 
 def build_production_fk_anchors(sc, markers, train_sets,
                                 max_prior_dt_mm=35.0, max_prior_dr_deg=8.0,
                                 gate_mode="fixed", gate_k=2.5,
-                                gate_floor_dt_mm=5.0, gate_floor_dr_deg=1.0,
                                 visual_model=None):
     """Mirror Step3's FK alignment, robust averaging, gate, and prior blend."""
-    visual, support = build_visual_cube_estimates(
+    visual, support, scatter = build_visual_cube_estimates(
         sc, markers, train_sets, model=visual_model)
     return align_and_blend_set_priors(
         sc.fk_cube, visual, support,
@@ -130,8 +137,7 @@ def build_production_fk_anchors(sc, markers, train_sets,
         max_prior_dr_deg=max_prior_dr_deg,
         gate_mode=gate_mode,
         gate_k=gate_k,
-        gate_floor_dt_mm=gate_floor_dt_mm,
-        gate_floor_dr_deg=gate_floor_dr_deg)
+        scatter_by_set=scatter)
 
 
 def debias_fk_prior(sc, markers, train_sets):

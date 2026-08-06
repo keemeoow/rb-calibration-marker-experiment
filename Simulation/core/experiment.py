@@ -36,8 +36,6 @@ class ExpConfig:
     # distances actually measure (deviation from the common delta).
     gate_mode: str = "fixed"        # fixed | adaptive
     gate_k: float = 2.5
-    gate_floor_dt_mm: float = 5.0
-    gate_floor_dr_deg: float = 1.0
     post_correction: str = "none"   # none | ridge (C1 output correction, separate axis)
     fk_degree: int = 1              # Ridge feature degree when explicitly enabled
 
@@ -80,8 +78,6 @@ def calibrate(sc, cfg: ExpConfig, train_sets):
             max_prior_dr_deg=cfg.prior_max_dr_deg,
             gate_mode=cfg.gate_mode,
             gate_k=cfg.gate_k,
-            gate_floor_dt_mm=cfg.gate_floor_dt_mm,
-            gate_floor_dr_deg=cfg.gate_floor_dr_deg,
             visual_model=visual_model)
         prior_diag = aligned.diagnostics
         if aligned.anchors:

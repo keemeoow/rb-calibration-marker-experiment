@@ -122,12 +122,18 @@ class PriorAlignmentResult:
     diagnostics: dict
 
 
-def adaptive_gate_threshold(values, k: float, floor: float,
+def adaptive_gate_threshold(values, k: float, floor: float = 0.0,
                             min_sets: int = 5) -> Optional[float]:
     """Median + k*1.4826*MAD cutoff over per-set gate distances.
 
     d_t and d_R measure how far one set's delta sits from the common delta, so
     their scale is a property of the data, not a fixed physical tolerance.
+
+    ``floor`` guards the degenerate case where the sets happen to agree so
+    closely that MAD collapses to zero and the cutoff lands on the median,
+    which would reject half of a perfectly healthy batch. Callers pass vision's
+    own scatter, below which a FK deviation is indistinguishable from noise.
+
     Returns None when there are too few sets for the median/MAD to mean
     anything; callers then fall back to the fixed thresholds.
     """
@@ -136,7 +142,7 @@ def adaptive_gate_threshold(values, k: float, floor: float,
         return None
     med = float(np.median(vals))
     mad = float(np.median(np.abs(vals - med)))
-    return max(med + k * 1.4826 * mad, floor)
+    return max(med + k * 1.4826 * mad, float(floor))
 
 
 def align_and_blend_set_priors(
@@ -147,8 +153,7 @@ def align_and_blend_set_priors(
         max_prior_dr_deg: float = 8.0,
         gate_mode: str = "fixed",
         gate_k: float = 2.5,
-        gate_floor_dt_mm: float = 5.0,
-        gate_floor_dr_deg: float = 1.0,
+        scatter_by_set: Optional[Mapping[int, tuple]] = None,
         gate_min_sets: int = 5) -> PriorAlignmentResult:
     """Apply the complete Step3 set-prior alignment and guarded blend policy.
 
@@ -160,7 +165,9 @@ def align_and_blend_set_priors(
     ``gate_mode`` selects how the accept threshold is chosen:
       * ``"fixed"``    - the original constant 35 mm / 8 deg limits.
       * ``"adaptive"`` - median + k*1.4826*MAD over the per-set distances,
-        floored so a near-zero MAD cannot reject every set.
+        floored by vision's own scatter (``scatter_by_set``) so a near-zero MAD
+        cannot reject sets whose FK deviation is smaller than the resolution of
+        the estimate it is compared against.
     """
     support_by_set = support_by_set or {}
     common = sorted(set(raw_priors) & set(visual_by_set))
@@ -186,12 +193,17 @@ def align_and_blend_set_priors(
             rot_deg(np.asarray(visual), prior),
         )
 
+    floor_dt = floor_dr = 0.0
+    if scatter_by_set:
+        floor_dt = float(np.median([v[0] for v in scatter_by_set.values()]))
+        floor_dr = float(np.median([v[1] for v in scatter_by_set.values()]))
+
     gate_dt, gate_dr = float(max_prior_dt_mm), float(max_prior_dr_deg)
     if gate_mode == "adaptive" and dist:
         adaptive_dt = adaptive_gate_threshold(
-            [v[0] for v in dist.values()], gate_k, gate_floor_dt_mm, gate_min_sets)
+            [v[0] for v in dist.values()], gate_k, floor_dt, gate_min_sets)
         adaptive_dr = adaptive_gate_threshold(
-            [v[1] for v in dist.values()], gate_k, gate_floor_dr_deg, gate_min_sets)
+            [v[1] for v in dist.values()], gate_k, floor_dr, gate_min_sets)
         if adaptive_dt is not None:
             gate_dt = adaptive_dt
         if adaptive_dr is not None:
@@ -224,6 +236,8 @@ def align_and_blend_set_priors(
         "gate_mode": str(gate_mode),
         "gate_dt_mm": float(gate_dt),
         "gate_dr_deg": float(gate_dr),
+        "gate_floor_dt_mm": float(floor_dt),
+        "gate_floor_dr_deg": float(floor_dr),
         "max_prior_dt_mm": float(max_prior_dt_mm),
         "max_prior_dr_deg": float(max_prior_dr_deg),
         "per_set": per_set,

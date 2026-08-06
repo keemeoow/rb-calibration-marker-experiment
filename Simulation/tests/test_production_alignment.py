@@ -131,7 +131,6 @@ class AdaptiveGateTest(unittest.TestCase):
         raw, visual = self._priors(rng, 12, 2.0)
         result = align_and_blend_set_priors(raw, visual, gate_mode="adaptive")
         self.assertLess(result.diagnostics["gate_dt_mm"], 35.0)
-        self.assertGreaterEqual(result.diagnostics["gate_dt_mm"], 5.0)
 
     def test_adaptive_rejects_set_the_fixed_gate_accepts(self):
         rng = np.random.default_rng(5)
@@ -141,13 +140,19 @@ class AdaptiveGateTest(unittest.TestCase):
         self.assertTrue(fixed.diagnostics["per_set"]["0"]["prior_accepted"])
         self.assertFalse(adaptive.diagnostics["per_set"]["0"]["prior_accepted"])
 
-    def test_floor_prevents_collapse_when_mad_is_zero(self):
+    def test_vision_scatter_floors_the_threshold(self):
+        """A FK deviation below vision's own scatter must not reject a set."""
         rng = np.random.default_rng(13)
-        raw, visual = self._priors(rng, 8, 0.0)
-        result = align_and_blend_set_priors(raw, visual, gate_mode="adaptive")
-        self.assertGreaterEqual(result.diagnostics["gate_dt_mm"], 5.0)
+        raw, visual = self._priors(rng, 8, 2.0)
+        scatter = {s: (4.0, 0.8) for s in raw}
+        bare = align_and_blend_set_priors(raw, visual, gate_mode="adaptive")
+        floored = align_and_blend_set_priors(
+            raw, visual, gate_mode="adaptive", scatter_by_set=scatter)
+        self.assertLess(bare.diagnostics["gate_dt_mm"], 4.0)
+        self.assertGreaterEqual(floored.diagnostics["gate_dt_mm"], 4.0)
+        self.assertEqual(floored.diagnostics["gate_floor_dt_mm"], 4.0)
         accepted = [v["prior_accepted"]
-                    for v in result.diagnostics["per_set"].values()]
+                    for v in floored.diagnostics["per_set"].values()]
         self.assertTrue(all(accepted))
 
     def test_too_few_sets_falls_back_to_fixed(self):
