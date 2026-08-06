@@ -37,8 +37,8 @@ class RealSenseCamera:
     def __init__(
         self,
         serial: str,
-        width: int = 640,
-        height: int = 480,
+        width: int = 1280,
+        height: int = 720,
         fps: int = 15,
         use_color: bool = True,
         use_depth: bool = False,

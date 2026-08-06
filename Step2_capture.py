@@ -184,7 +184,9 @@ def wait_for_start_command_capture(cams, cam_order, gripper_cam_idx,
                 cv2.putText(quad, "no frames", (20, 240),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
         else:
+            # make_quad_image 와 같은 이유로 빈 타일은 나중에 채운다.
             tiles = []
+            missing = []
             tile_h = tile_w = None
             for ci in cam_order:
                 cam = cams.get(ci)
@@ -201,14 +203,17 @@ def wait_for_start_command_capture(cams, cam_order, gripper_cam_idx,
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, col, 2)
                     tiles.append(disp)
                 else:
-                    if tile_h is None:
-                        tile_h, tile_w = 480, 640
-                    blank = np.zeros((tile_h, tile_w, 3), dtype=np.uint8)
-                    cv2.putText(blank, f"cam{ci} N/A", (20, tile_h // 2),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
-                    tiles.append(blank)
+                    missing.append((len(tiles), ci))
+                    tiles.append(None)
+            if tile_h is None:
+                tile_h, tile_w = 720, 1280
+            for idx, ci in missing:
+                blank = np.zeros((tile_h, tile_w, 3), dtype=np.uint8)
+                cv2.putText(blank, f"cam{ci} N/A", (20, tile_h // 2),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+                tiles[idx] = blank
             while len(tiles) < 4:
-                tiles.append(np.zeros((tile_h or 480, tile_w or 640, 3), dtype=np.uint8))
+                tiles.append(np.zeros((tile_h, tile_w, 3), dtype=np.uint8))
             tiles = tiles[:4]
             top = cv2.hconcat([tiles[0], tiles[1]])
             bot = cv2.hconcat([tiles[2], tiles[3]])
@@ -255,7 +260,11 @@ def wait_for_start_command_capture(cams, cam_order, gripper_cam_idx,
 
 def make_quad_image(frames_dict, cam_order, cube, gripper_cam_idx):
     """4개 카메라로부터 마커 오버레이가 포함된 2x2 분할 이미지를 생성."""
-    tiles = []
+    # 빈 타일은 실제 타일 크기를 안 뒤에 채운다. 먼저 채우면 cam_order 앞쪽
+    # 카메라가 프레임을 못 준 순간 그 크기가 고정돼, 뒤따르는 실제 타일과
+    # hconcat 에서 크기가 어긋난다.
+    tiles: List[Optional[np.ndarray]] = []
+    missing: List[Tuple[int, int]] = []
     tile_h, tile_w = None, None
 
     for ci in cam_order:
@@ -277,12 +286,17 @@ def make_quad_image(frames_dict, cam_order, cube, gripper_cam_idx):
             )
             tiles.append(annotated)
         else:
-            if tile_h is None:
-                tile_h, tile_w = 480, 640
-            blank = np.zeros((tile_h, tile_w, 3), dtype=np.uint8)
-            cv2.putText(blank, f"cam{ci} N/A", (20, tile_h // 2),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
-            tiles.append(blank)
+            missing.append((len(tiles), ci))
+            tiles.append(None)
+
+    # 어느 카메라도 프레임을 못 준 경우에만 기본 크기를 쓴다 (표준 촬영 해상도).
+    if tile_h is None:
+        tile_h, tile_w = 720, 1280
+    for idx, ci in missing:
+        blank = np.zeros((tile_h, tile_w, 3), dtype=np.uint8)
+        cv2.putText(blank, f"cam{ci} N/A", (20, tile_h // 2),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+        tiles[idx] = blank
 
     while len(tiles) < 4:
         tiles.append(np.zeros((tile_h, tile_w, 3), dtype=np.uint8))
@@ -579,12 +593,15 @@ def main():
                         help="Optional cube config JSON override. Leave unset to use the project's canonical cube definition.")
 
     # 스트림 설정
-    # 해상도 기본값 640x480 — 기존 인트린식(color_w/color_h)이 이 해상도로 캘리브됨.
-    # 더 높은 해상도로 촬영하려면 먼저 Step1/Step1b 로 그 해상도에서 재캘리브해야 하며,
+    # 해상도 기본값 1280x720 — 프로젝트 표준 촬영 해상도(color/depth 동일).
+    # 640x480 에서는 18mm ChArUco 마커가 한 변 중앙값 21px 로 검출 하한(~18px)에 걸쳐
+    # 고정 카메라 3대의 코너 수율이 60개 중 4~8개까지 떨어졌다. 720p 는 4대 동시
+    # color+depth 로 드롭 0, 카메라 간 span p50 46ms 로 통과 확인됨
+    # (tools/smoke_test_resolution.py). 인트린식도 반드시 이 해상도로 캘리브되어야 하며,
     # 아래 정합성 검사가 --intrinsics_dir 의 color_w/color_h 와 불일치를 잡아 중단시킨다.
     parser.add_argument("--fps", type=int, default=15)
-    parser.add_argument("--width", type=int, default=640)
-    parser.add_argument("--height", type=int, default=480)
+    parser.add_argument("--width", type=int, default=1280)
+    parser.add_argument("--height", type=int, default=720)
     parser.add_argument("--allow_intrinsics_res_mismatch", action="store_true",
                         help="캡처 해상도가 인트린식(color_w/h)과 달라도 강행. "
                              "PnP/ChArUco pose 가 부정확해지므로 디버깅용에만 사용.")

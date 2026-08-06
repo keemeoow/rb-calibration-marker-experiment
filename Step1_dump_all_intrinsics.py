@@ -9,8 +9,8 @@ Step 1: 연결된 모든 RealSense 카메라 intrinsics 저장
 명령어:
 python Step1_dump_all_intrinsics.py \
 --out_dir ./intrinsics \
---color_w 640 \
---color_h 480 \
+--color_w 1280 \
+--color_h 720 \
 --fps 15 \
 --gripper_serial 752112070297
 
@@ -40,8 +40,11 @@ def _intr_to_KD(intr: rs.intrinsics):
 def main():
     parser = argparse.ArgumentParser(description="Dump intrinsics for all RealSense cameras")
     parser.add_argument("--out_dir", type=str, default="intrinsics")
-    parser.add_argument("--color_w", type=int, default=640)
-    parser.add_argument("--color_h", type=int, default=480)
+    # 프로젝트 표준: color/depth 모두 1280x720@15. depth 는 camera.py 와 동일하게
+    # color 해상도를 따라가므로 별도 인자가 없다. 변경 시 Step2 촬영 해상도도 같이
+    # 맞춰야 한다 (Step2_capture.py 가 npz 의 color_w/color_h 와 대조해 중단시킴).
+    parser.add_argument("--color_w", type=int, default=1280)
+    parser.add_argument("--color_h", type=int, default=720)
     parser.add_argument("--fps", type=int, default=15)
     parser.add_argument("--gripper_serial", type=str, default=None,
                         help="Serial number of the gripper camera (optional, for labeling)")
