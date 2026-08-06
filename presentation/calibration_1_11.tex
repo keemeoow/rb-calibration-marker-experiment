@@ -436,6 +436,27 @@
 \end{frame}
 
 \begin{frame}{8.1 식을 읽는 순서}
+  \vspace{-2mm}
+  {\small
+  \[
+    \begin{aligned}
+      \mathcal{E}_{\mathrm{vis}}
+      \left(\{\mathbf{C}_i\},\mathbf{X},\{\mathbf{Q}_s\}\right)
+      ={}&
+      \sum_{i,s}
+      \left\|
+        \mathbf{r}\left(\mathbf{C}_i\mathbf{Z}_{i,s},\ \mathbf{Q}_s\right)
+      \right\|_2^2
+      +
+      \sum_e
+      \left\|
+        \mathbf{r}\left(\mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e},\ \mathbf{Q}_{s(e)}\right)
+      \right\|_2^2
+    \end{aligned}
+  \]
+  }
+  \vspace{-2mm}
+
   안쪽부터 밖으로 나간다.
   \begin{enumerate}
     \item $\mathbf{C}_i\mathbf{Z}_{i,s}$로 고정 카메라들이 예측한 큐브 자세를 만든다.
