@@ -11,6 +11,7 @@ sys.path.insert(0, REPO_DIR)
 
 from configs import ALL_FACTORIAL
 from core.production_prior import (
+    adaptive_gate_threshold,
     align_and_blend_set_priors,
     blend_rigid_transforms,
     robust_weighted_se3_average,
@@ -159,3 +160,54 @@ class AdaptiveGateTest(unittest.TestCase):
         result = align_and_blend_set_priors(raw, visual, gate_mode="adaptive")
         self.assertEqual(result.diagnostics["gate_dt_mm"], 35.0)
         self.assertEqual(result.diagnostics["gate_dr_deg"], 8.0)
+
+
+class GateParityWithStep3Test(unittest.TestCase):
+    """적응형 gate 기준선이 실제 파이프라인과 같은 값을 내는지 확인."""
+
+    def _prepared(self, dts, drs, scatter_t, scatter_r):
+        return {
+            i: {
+                "dt_mm": dt, "dr_deg": dr,
+                "stability": {"translation_std_mm": st, "rotation_std_deg": sr},
+            }
+            for i, (dt, dr, st, sr) in enumerate(zip(dts, drs, scatter_t, scatter_r))
+        }
+
+    def test_threshold_matches_step3(self):
+        import Step3_calibration as step3
+
+        rng = np.random.default_rng(31)
+        for trial in range(5):
+            n = int(rng.integers(6, 15))
+            dts = list(rng.gamma(2.0, 1.5, n))
+            drs = list(rng.gamma(2.0, 0.4, n))
+            st = list(rng.gamma(2.0, 0.6, n))
+            sr = list(rng.gamma(2.0, 0.15, n))
+            prepared = self._prepared(dts, drs, st, sr)
+
+            gate_dt, gate_dr, info = step3.resolve_prior_gate(
+                prepared, 35.0, 8.0, gate_mode="adaptive", gate_k=2.5)
+
+            floor_t = float(np.median(st))
+            floor_r = float(np.median(sr))
+            mine_dt = adaptive_gate_threshold(dts, 2.5, floor_t, 5)
+            mine_dr = adaptive_gate_threshold(drs, 2.5, floor_r, 5)
+
+            self.assertAlmostEqual(gate_dt, mine_dt, places=12, msg=f"trial {trial}")
+            self.assertAlmostEqual(gate_dr, mine_dr, places=12, msg=f"trial {trial}")
+            self.assertEqual(info["applied"], "adaptive")
+
+    def test_few_sets_fall_back_in_both(self):
+        import Step3_calibration as step3
+
+        prepared = self._prepared([1.0, 2.0, 3.0], [0.1, 0.2, 0.3],
+                                  [0.5] * 3, [0.1] * 3)
+        gate_dt, gate_dr, info = step3.resolve_prior_gate(prepared, 35.0, 8.0)
+        self.assertEqual((gate_dt, gate_dr), (35.0, 8.0))
+        self.assertEqual(info["applied"], "fixed")
+        self.assertIsNone(adaptive_gate_threshold([1.0, 2.0, 3.0], 2.5, 0.5, 5))
+
+
+if __name__ == "__main__":
+    unittest.main()

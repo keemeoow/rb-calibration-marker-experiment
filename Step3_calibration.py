@@ -1386,6 +1386,13 @@ def resolve_prior_gate(prepared: Dict[int, dict],
     scale belongs to the batch rather than to a fixed physical tolerance. The
     floor is vision's own scatter: below it a prior deviation cannot be told
     apart from the noise of the estimate it is compared against.
+
+    Floor definition, shared with ``Simulation/core/production_prior.py``:
+    the scatter of the observations that formed each set's consensus, taken
+    at its median across sets. The two pipelines aggregate at different
+    stages, so the underlying list differs (events here, raw predictions in
+    the simulation), but the rule is the same and the threshold arithmetic is
+    verified identical by ``Simulation/tests/test_production_alignment.py``.
     """
     dts = [p["dt_mm"] for p in prepared.values() if p["dt_mm"] is not None]
     drs = [p["dr_deg"] for p in prepared.values() if p["dr_deg"] is not None]

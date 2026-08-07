@@ -136,6 +136,11 @@ def adaptive_gate_threshold(values, k: float, floor: float = 0.0,
 
     Returns None when there are too few sets for the median/MAD to mean
     anything; callers then fall back to the fixed thresholds.
+
+    Floor definition, shared with ``Step3_calibration.resolve_prior_gate``:
+    the scatter of the observations that formed each set's consensus, taken
+    at its median across sets. Threshold arithmetic parity with Step3 is
+    covered by ``tests/test_production_alignment.py``.
     """
     vals = np.asarray([v for v in values if v is not None], dtype=np.float64)
     if vals.size < min_sets:
