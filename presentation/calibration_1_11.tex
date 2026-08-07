@@ -1004,6 +1004,32 @@
   \end{block}
 \end{frame}
 
+\begin{frame}{11.5 이 보정은 무엇을 누구에게서 빌리는가}
+  $\mathbf{F}^{\mathrm{corr}}_s = \mathbf{F}_s\,\overline{\boldsymbol{\Delta}}$
+  에서 $\mathbf{F}_s$는 그대로 남고, 모든 세트에 같은 $\overline{\boldsymbol{\Delta}}$만 곱해짐
+  \vfill
+  \begin{center}
+    \begin{tabular}{lll}
+      \toprule
+      성분 & 누구를 믿는가 & 이유 \\
+      \midrule
+      전체 기준점 (공통 치우침) & vision & 실제로 물체를 보므로 절대 기준을 제공 \\
+      세트 간 상대 구조 & FK & 반복성이 좋아 세트 사이 거리가 정확 \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \vfill
+  \begin{itemize}
+    \item FK: 영점이 어긋나 절대 위치가 통째로 밀릴 수 있음
+    \item vision: 매번 노이즈가 끼어 세트별로 들쭉날쭉
+    \item $\rightarrow$ vision에서 \textbf{기준점}을, FK에서 \textbf{세밀한 구조}를 빌림
+  \end{itemize}
+  \vfill
+  \begin{alertblock}{한계}
+    vision을 기준으로 삼음 = vision의 계통오차도 함께 물려받음 (10.4절)
+  \end{alertblock}
+\end{frame}
+
 \begin{frame}{11.6 단계 5: gate로 보정 FK를 검사}
   \begin{itemize}
     \item $\overline{\boldsymbol{\Delta}}$는 모든 세트에 적용되는 \textbf{하나의} 보정량
@@ -1095,11 +1121,22 @@
 \end{frame}
 
 \begin{frame}{11.6 왜 분포 기준으로 정하는가}
-  $\boldsymbol{\Delta}_s = \overline{\boldsymbol{\Delta}}$이면
-  $\mathbf{F}^{\mathrm{corr}}_s=\mathbf{V}_s$ $\rightarrow$ $d_t(s)=0$
+  \begin{block}{어떤 세트의 어긋남이 공통 치우침과 정확히 같다면}
+    \begin{enumerate}
+      \item $\boldsymbol{\Delta}_s = \overline{\boldsymbol{\Delta}}$
+        (이 세트의 어긋남 = 전체 평균 어긋남)
+      \item $\rightarrow$ 평균만큼 보정하면 정확히 vision 자리에 도착:
+        $\mathbf{F}^{\mathrm{corr}}_s=\mathbf{V}_s$
+      \item $\rightarrow$ vision과의 거리가 $0$: $d_t(s)=0$
+    \end{enumerate}
+    \vspace{1mm}
+    (시계 비유: $5$분 빠른 시계에서 $5$분을 빼면 정확히 맞음)
+  \end{block}
   \vfill
-  $\Rightarrow$ $d_t(s)$는 FK가 절대적으로 얼마나 틀렸는지가 아니라,\\
-  \textbf{그 세트가 다른 세트들의 공통 경향에서 얼마나 벗어났는지}를 재는 값
+  $\Rightarrow$ $d_t(s)=0$은 FK가 정확했다는 뜻이 아님.
+  \textbf{남들만큼만 틀렸다}는 뜻\\
+  $\Rightarrow$ $d_t(s)$가 재는 것 =
+  \textbf{그 세트가 공통 경향에서 얼마나 벗어났는가}
   \vfill
   \begin{block}{그렇다면 얼마부터 유별난 값인가}
     나머지 세트들이 얼마나 모여 있느냐에 따라 달라짐
