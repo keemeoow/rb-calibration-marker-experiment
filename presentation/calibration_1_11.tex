@@ -1053,7 +1053,7 @@
     \item 회전각은 라디안 $\rightarrow$ $180/\pi$를 곱해 도
   \end{itemize}
   \vfill
-  두 조건을 모두 만족할 때만 통과
+  두 조건을 모두 만족할 때만 Corrected-FK를 사용
   \[
     d_t(s)\leq \tau_t,
     \qquad
@@ -1061,7 +1061,7 @@
   \]
 \end{frame}
 
-\begin{frame}{11.6 기준선은 상수가 아님}
+\begin{frame}{11.6 기준선은 결정하는 방식}
   $d_t(s)$, $d_R(s)$ 값들의 실제 분포를 보고 결정
   \[
     \tau
@@ -1083,9 +1083,15 @@
     \item 이 환산 덕분에 $k$를 표준편차의 배수로 읽을 수 있음
     \item $k=2.5$ = 중앙값에서 표준편차 $2.5$배까지 정상으로 인정
       \begin{itemize}
-        \item $\overline{\boldsymbol{\Delta}}$를 구하는 강건 평균이 이미 쓰는 값과 동일
+        \item 정규분포라면 상위 약 $1\%$만 이상치로 판정
+        \item 크게 잡으면 관대해지고, 작게 잡으면 엄격해짐
       \end{itemize}
   \end{itemize}
+  \vfill
+  \begin{alertblock}{주의}
+    $k=2.5$는 아직 실험으로 검증된 값이 아님
+    $\rightarrow$ 이후 결과에 따라 변경 가능 (11.9절)
+  \end{alertblock}
 \end{frame}
 
 \begin{frame}{11.6 왜 분포 기준으로 정하는가}
