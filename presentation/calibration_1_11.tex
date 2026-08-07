@@ -478,32 +478,14 @@
     \item 회전 부분 = 상대 회전
     \item 이동 부분 = $\mathbf{A}$ 좌표계에서 본 상대 이동
   \end{itemize}
-\end{frame}
-
-\begin{frame}{7.1 이론식}
-  \[
-    \boldsymbol{\varepsilon}(\mathbf{A},\mathbf{B})
-    =
-    \log\!\left(\mathbf{A}^{-1}\mathbf{B}\right)
-  \]
-  \begin{itemize}
-    \item 여기서 $\log$는 일반 숫자의 자연로그가 아님
-    \item $\mathrm{SE}(3)$ 행렬 $\rightarrow$ 작은 회전 $3$개 + 작은 이동 $3$개,
-      총 $6$개 숫자로 바꾸는 Lie logarithm
-  \end{itemize}
   \vfill
-  \[
-    \log:\mathrm{SE}(3)\rightarrow\mathfrak{se}(3),
-    \qquad
-    \boldsymbol{\varepsilon}
-    =
-    \begin{bmatrix} \boldsymbol{\omega} \\ \mathbf{v} \end{bmatrix}
-    \in\mathbb{R}^{6}
-  \]
-  \begin{itemize}
-    \item $\boldsymbol{\omega}\in\mathbb{R}^{3}$: 회전오차
-    \item $\mathbf{v}\in\mathbb{R}^{3}$: 이동오차
-  \end{itemize}
+  \begin{block}{이 차이를 $6$개 숫자로 만든 것이 잔차 $\mathbf{r}(\mathbf{A},\mathbf{B})$}
+    \begin{itemize}
+      \item 앞 $3$개: 회전 차이 (라디안), 뒤 $3$개: 이동 차이 (미터)
+      \item 행렬끼리는 크기를 잴 수 없지만, 벡터가 되면 제곱해서 더할 수 있음
+      \item $\rightarrow$ 8장부터 모든 목적함수가 이 $\mathbf{r}$ 를 사용
+    \end{itemize}
+  \end{block}
 \end{frame}
 
 %==================================================================
@@ -529,9 +511,6 @@
       \right\|_2^2 .
     \end{aligned}
   \]
-  \vfill
-  아래첨자 vis = vision. 카메라로 본 정보에서 나온 오차\\
-  로봇 관절값에서 나온 FK 정보와 구분하려는 이름
 \end{frame}
 
 \begin{frame}{8.1 식에 나오는 기호}
@@ -547,7 +526,7 @@
       $\mathbf{Z}_{i,s}$ & 고정 카메라 $i$가 세트 $s$에서 본 큐브 자세 & 사진에서 PnP를 풀어 얻음 \\
       $\mathbf{Z}_{g,e}$ & 그리퍼 카메라가 이벤트 $e$에서 본 큐브 자세 & 사진에서 PnP를 풀어 얻음 \\
       $\mathbf{G}_e$ & 이벤트 $e$의 그리퍼 자세 (베이스 기준) & 관절각으로 FK를 계산해 얻음 \\
-      $\mathbf{r}(\cdot,\cdot)$ & 두 자세의 차이를 $6$개 숫자로 만드는 잔차 함수 & 7장에서 정의한 함수 \\
+      $\mathbf{r}(\cdot,\cdot)$ & 두 자세의 차이를 $6$개 숫자로 만드는 잔차 함수 &  \\
       $\|\cdot\|_2^2$ & 그 $6$개 숫자를 제곱해서 더한 값 & 잔차로부터 계산 \\
       $\sum_{i,s}$ & 모든 고정 카메라와 모든 세트에 대해 더한다 & 합 기호 \\
       $\sum_e$ & 모든 그리퍼 카메라 촬영 이벤트에 대해 더한다 & 합 기호 \\

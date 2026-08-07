@@ -37,6 +37,7 @@ class ExpConfig:
     # "fixed" keeps the legacy constants above and exists only for comparison.
     gate_mode: str = "adaptive"     # adaptive | fixed
     gate_k: float = 2.5
+    gate_use_floor: bool = True
     post_correction: str = "none"   # none | ridge (C1 output correction, separate axis)
     fk_degree: int = 1              # Ridge feature degree when explicitly enabled
 
@@ -79,6 +80,7 @@ def calibrate(sc, cfg: ExpConfig, train_sets):
             max_prior_dr_deg=cfg.prior_max_dr_deg,
             gate_mode=cfg.gate_mode,
             gate_k=cfg.gate_k,
+            gate_use_floor=cfg.gate_use_floor,
             visual_model=visual_model)
         prior_diag = aligned.diagnostics
         if aligned.anchors:
