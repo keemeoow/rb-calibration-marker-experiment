@@ -1,6 +1,6 @@
 # Cube-in-Hand Calibration
 
-> 로봇이 큐브를 잡고 옮기며 여러 카메라로 관측하는 캘리브레이션
+> 마커 큐브와 로봇 FK를 함께 쓰는 멀티카메라 캘리브레이션
 
 > 대상: 캘리브레이션을 처음 배우는 사람  
 > 목표: 이 문서만 읽고 `No-FK`, `Fixed-FK`, `Corrected-FK`, `Unified`, `Independent/Separated`, `Board-only`, `Cube-only`, `Both`를 수식으로 설명하기  
