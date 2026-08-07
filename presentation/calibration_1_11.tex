@@ -1,10 +1,11 @@
-% 멀티카메라 캘리브레이션 설명서 1~11장 발표자료
+% Cube-in-Hand Calibration 발표자료 (1~11장)
 %
 % 컴파일: XeLaTeX 또는 LuaLaTeX 로 컴파일해야 한글이 나온다.
 %   Overleaf: 왼쪽 위 Menu > Compiler > XeLaTeX 선택
 %   로컬:     xelatex calibration_1_11.tex   (두 번 실행)
 %
 % 원문: CALIBRATION_EXPLANATION_LATEX.md 의 1장부터 11장까지
+% 문체: 슬라이드는 개조식, 원문 문서는 구어체
 
 \documentclass[aspectratio=169,11pt]{beamer}
 
@@ -76,22 +77,21 @@
     \begin{column}{0.48\textwidth}
       \begin{block}{로봇이 아는 것}
         \begin{minipage}[t][26mm][t]{\linewidth}
-          관절이 몇 도 꺾여 있는지 안다.\\
-          그래서 \textbf{자기 손끝이 어디 있는지} 계산할 수 있다.
-          \vspace{2mm}
-
-          그러나 주변에 무엇이 어디 있는지는 전혀 모른다.
+          \begin{itemize}
+            \item 관절 각도 $\rightarrow$ \textbf{자기 손끝 위치} 계산 가능
+            \item 주변에 무엇이 어디 있는지는 모름
+          \end{itemize}
         \end{minipage}
       \end{block}
     \end{column}
     \begin{column}{0.48\textwidth}
       \begin{block}{카메라가 아는 것}
         \begin{minipage}[t][26mm][t]{\linewidth}
-          \textbf{물체가 어디 있는지} 볼 수 있다.
-          \vspace{2mm}
-
-          그러나 자기 렌즈 앞을 기준으로만 말한다.\\
-          ``내 앞 $60\,\mathrm{cm}$, 오른쪽으로 $10\,\mathrm{cm}$''
+          \begin{itemize}
+            \item \textbf{물체의 위치}를 볼 수 있음
+            \item 단, 자기 렌즈 앞을 기준으로만 말함
+            \item ``내 앞 $60\,\mathrm{cm}$, 오른쪽 $10\,\mathrm{cm}$''
+          \end{itemize}
         \end{minipage}
       \end{block}
     \end{column}
@@ -99,56 +99,61 @@
   \vfill
   \begin{alertblock}{캘리브레이션이란?}
     둘 사이의 번역기를 만드는 일\\
-    카메라가 말한 위치를 로봇이 움직일 수 있는 좌표로 바꾸는 규칙을 찾는다.
+    카메라가 말한 위치 $\rightarrow$ 로봇이 움직일 수 있는 좌표
   \end{alertblock}
 \end{frame}
 
 \begin{frame}{1.2 왜 중요한가}
-  인식이 아무리 정확해도 이 번역기가 틀어져 있으면 로봇은 엉뚱한 곳으로 간다.
+  \begin{itemize}
+    \item 인식이 정확해도 번역기가 틀어지면 로봇은 엉뚱한 곳으로 감
+  \end{itemize}
   \vfill
   \begin{block}{예시}
-    카메라가 물체를 $1\,\mathrm{mm}$ 오차로 찾아냈다.
-    그런데 카메라와 로봇 사이의 관계가 $10\,\mathrm{mm}$ 틀어져 있다.
-    \vspace{2mm}
-
-    $\Rightarrow$ 로봇이 실제로 가는 곳은 $10\,\mathrm{mm}$ 빗나간다.
-    인식 성능을 아무리 올려도 이 오차는 줄지 않는다.
+    \begin{itemize}
+      \item 카메라의 물체 인식 오차: $1\,\mathrm{mm}$
+      \item 카메라와 로봇 사이 관계의 오차: $10\,\mathrm{mm}$
+      \item $\Rightarrow$ 로봇이 실제 가는 곳은 $10\,\mathrm{mm}$ 빗나감
+      \item $\Rightarrow$ 인식 성능을 올려도 이 오차는 그대로
+    \end{itemize}
   \end{block}
   \vfill
   \begin{alertblock}{}
-    캘리브레이션 정확도가 전체 시스템 정확도의 \textbf{상한}을 정한다.
+    캘리브레이션 정확도 = 전체 시스템 정확도의 \textbf{상한}
   \end{alertblock}
 \end{frame}
 
-\begin{frame}{1.3 카메라가 여러 대면 문제가 하나 더 생긴다}
-  카메라마다 자기 자신을 원점으로 사용하기 때문이다.
+\begin{frame}{1.3 카메라가 여러 대면 문제가 하나 더}
+  카메라마다 자기 자신을 원점으로 사용
   \begin{itemize}
-    \item 카메라 $0$은 큐브가 자기 앞에 있다고 말한다.
-    \item 카메라 $1$은 같은 큐브가 자기 오른쪽에 있다고 말한다.
-    \item 그리퍼 카메라는 같은 큐브가 자기 아래에 있다고 말할 수 있다.
+    \item 카메라 $0$: 큐브가 자기 \textbf{앞}에 있다
+    \item 카메라 $1$: 같은 큐브가 자기 \textbf{오른쪽}에 있다
+    \item 그리퍼 카메라: 같은 큐브가 자기 \textbf{아래}에 있다
   \end{itemize}
   \vfill
-  세 답은 서로 모순이 아니다. 기준 좌표계가 다를 뿐이다.
+  세 답은 모순이 아님. 기준 좌표계가 다를 뿐
   \vfill
-  \begin{block}{그래서 해야 할 일}
-    모든 관측을 공통 기준인 로봇 베이스 좌표계 $B$로 옮긴다.\\
-    그래야 여러 카메라가 같은 물체에 대해 같은 좌표를 말할 수 있다.
+  \begin{block}{해야 할 일}
+    모든 관측을 공통 기준인 로봇 베이스 좌표계 $B$로 옮기기\\
+    $\rightarrow$ 여러 카메라가 같은 물체에 같은 좌표를 말하게 됨
   \end{block}
 \end{frame}
 
 \begin{frame}{1.4 이 프로젝트의 설정}
-  로봇 그리퍼가 큐브를 잡고 여러 위치에 옮겨 놓으면서 관측을 모은다.\\
-  큐브를 한 번 놓은 상태를 \textbf{세트}라고 부른다.
-  \vfill
-  관측하는 카메라는 두 종류다.
   \begin{itemize}
-    \item \textbf{고정 카메라}: 작업 공간 주변에 고정되어 있다. 여러 대를 쓴다.
-    \item \textbf{그리퍼 카메라}: 로봇 손목에 붙어 로봇과 함께 움직인다.
+    \item 로봇 그리퍼가 큐브를 잡고 여러 위치로 옮김
+    \item 큐브를 한 번 놓은 상태 = \textbf{세트}
   \end{itemize}
   \vfill
-  \begin{alertblock}{이 문서 후반부의 핵심 주제}
-    로봇이 큐브를 잡고 있으므로 로봇의 관절값으로부터 큐브가 어디 있는지 짐작할 수 있다.\\
-    이 정보를 \textbf{얼마나 믿을지}가 9장부터 11장까지의 주제다.
+  \begin{block}{카메라 두 종류}
+    \begin{itemize}
+      \item \textbf{고정 카메라}: 작업 공간 주변에 고정. 여러 대
+      \item \textbf{그리퍼 카메라}: 로봇 손목에 부착. 로봇과 함께 이동
+    \end{itemize}
+  \end{block}
+  \vfill
+  \begin{alertblock}{9\,--\,11장의 핵심 주제}
+    로봇이 큐브를 잡고 있음 $\rightarrow$ 관절값으로 큐브 위치를 짐작 가능\\
+    이 정보를 \textbf{얼마나 믿을 것인가}
   \end{alertblock}
 \end{frame}
 
@@ -156,7 +161,7 @@
 \section{2. 좌표계 기호}
 %==================================================================
 
-\begin{frame}{2. 먼저 좌표계 기호를 정리한다}
+\begin{frame}{2. 먼저 좌표계 기호를 정리}
   \begin{center}
     \begin{tabular}{cl}
       \toprule
@@ -175,24 +180,26 @@
   \end{center}
 \end{frame}
 
-\begin{frame}{2. 변환 표기를 읽는 방법}
-  이 문서에서는 다음과 같은 변환 표기를 사용한다.
+\begin{frame}{2. 변환 표기를 읽는 법}
   \[
     {}^{A}\mathbf{T}_{B}
   \]
-  \begin{block}{읽는 방법}
-    좌표계 $B$에서 표현된 값을 좌표계 $A$에서 표현하도록 바꾸는 변환이다.
+  \begin{block}{읽는 법}
+    좌표계 $B$에서 표현된 값 $\rightarrow$ 좌표계 $A$에서 표현하도록 바꾸는 변환
   \end{block}
   \vfill
-  위 첨자 $A$는 \textbf{도착} 좌표계이고, 아래 첨자 $B$는 \textbf{출발} 좌표계다.
+  \begin{itemize}
+    \item 위 첨자 $A$ = \textbf{도착} 좌표계
+    \item 아래 첨자 $B$ = \textbf{출발} 좌표계
+  \end{itemize}
 \end{frame}
 
 %==================================================================
 \section{3. 변환행렬}
 %==================================================================
 
-\begin{frame}{3. 변환행렬은 무엇인가?}
-  하나의 강체 자세는 회전과 이동으로 이루어진 $4 \times 4$ 동차변환행렬로 표현한다.
+\begin{frame}{3. 변환행렬은 무엇인가}
+  강체 자세 = 회전 + 이동 $\rightarrow$ $4 \times 4$ 동차변환행렬
   \[
     \mathbf{T}
     =
@@ -206,11 +213,11 @@
     \mathbf{t}\in\mathbb{R}^{3}
   \]
   \begin{itemize}
-    \item $\mathbf{R}$은 물체가 어느 방향을 보는지 나타내는 $3 \times 3$ 회전행렬이다.
-    \item $\mathbf{t}$는 물체가 어디에 있는지 나타내는 $3 \times 1$ 이동벡터다.
+    \item $\mathbf{R}$: 물체가 어느 방향을 보는지. $3 \times 3$ 회전행렬
+    \item $\mathbf{t}$: 물체가 어디에 있는지. $3 \times 1$ 이동벡터
   \end{itemize}
   \vfill
-  좌표점 $\mathbf{p}_B$를 좌표계 $A$로 옮기는 식은 다음과 같다.
+  좌표점 $\mathbf{p}_B$를 좌표계 $A$로 옮기기
   \[
     \begin{bmatrix} \mathbf{p}_A \\ 1 \end{bmatrix}
     =
@@ -219,23 +226,31 @@
   \]
 \end{frame}
 
-\begin{frame}{3. 변환행렬이라는 형식을 쓰는 이유}
+\begin{frame}{3. 이 형식을 쓰는 이유}
   \begin{enumerate}
-    \item \textbf{위치와 방향을 하나의 값으로 묶어서 다룬다.}\\
-      따로 관리하면 계산할 때마다 둘을 맞춰줘야 하지만,\\
-      하나로 묶으면 자세 전체를 변수 하나로 취급할 수 있다.
-    \item \textbf{좌표계를 갈아타는 일을 곱셈 한 번으로 처리한다.}\\
-      회전만이면 $3 \times 3$ 행렬로 충분하지만, 이동은 곱셈이 아니라 덧셈이라서
-      그대로는 섞이지 않는다. 마지막 행에 $1$을 덧붙여 $4 \times 4$로 만들면
-      이동까지 곱셈 안으로 들어온다. \\그 덕분에 여러 좌표계를 거치는 경로를
-      행렬 곱만으로 이어붙일 수 있다.
-    \item \textbf{되돌리기가 쉽다.}\\
-      어떤 변환이든 역행렬 하나로 방향을 반대로 뒤집을 수 있다.
+    \item \textbf{위치와 방향을 한 값으로 묶음}
+      \begin{itemize}
+        \item 따로 관리하면 계산할 때마다 둘을 맞춰야 함
+        \item 묶으면 자세 전체가 변수 하나
+      \end{itemize}
+      \vspace{2mm}
+    \item \textbf{좌표계 갈아타기를 곱셈 한 번으로}
+      \begin{itemize}
+        \item 회전만이면 $3 \times 3$으로 충분
+        \item 이동은 곱셈이 아니라 덧셈 $\rightarrow$ 그대로는 안 섞임
+        \item 마지막 행에 $1$을 붙여 $4 \times 4$로 $\rightarrow$ 이동도 곱셈 안으로
+        \item $\rightarrow$ 여러 좌표계를 거치는 경로를 행렬 곱만으로 연결 (3.1절)
+      \end{itemize}
+      \vspace{2mm}
+    \item \textbf{되돌리기가 쉬움}
+      \begin{itemize}
+        \item 역행렬 하나로 방향을 반대로 (3.2절)
+      \end{itemize}
   \end{enumerate}
 \end{frame}
 
 \begin{frame}{3.1 변환행렬을 곱한다는 뜻}
-  경로를 차례대로 연결한다는 뜻이다.
+  경로를 차례대로 연결
   \[
     {}^{A}\mathbf{T}_{C}
     =
@@ -243,7 +258,7 @@
     {}^{B}\mathbf{T}_{C}
   \]
   \vfill
-  이를 행렬 내부까지 펼치면 다음과 같다.
+  행렬 내부까지 펼치면
   \[
     \begin{bmatrix}
       \mathbf{R}_1 & \mathbf{t}_1 \\
@@ -262,7 +277,7 @@
 \end{frame}
 
 \begin{frame}{3.2 역행렬의 뜻}
-  변환의 방향을 반대로 돌린다.
+  변환의 방향을 반대로
   \[
     \mathbf{T}^{-1}
     =
@@ -271,16 +286,16 @@
       \mathbf{0}^{\mathsf T} & 1
     \end{bmatrix}
   \]
-  즉, 회전은 전치행렬 $\mathbf{R}^{\mathsf T}$로 되돌리고,
-  이동도 그 회전 좌표계에 맞추어 반대로 적용한다.
+  \begin{itemize}
+    \item 회전은 전치행렬 $\mathbf{R}^{\mathsf T}$로 되돌림
+    \item 이동도 그 회전 좌표계에 맞추어 반대로 적용
+  \end{itemize}
   \vfill
-  \begin{block}{역행렬을 쓰는 이유}
+  \begin{block}{역행렬을 쓰는 곳}
     \begin{enumerate}
-      \item 알고 있는 변환이 필요한 방향과 반대일 때 뒤집어서 쓴다.
-      \item 두 자세가 얼마나 다른지 잰다. 자세끼리는 뺄셈이 성립하지 않으므로,
-        한쪽에서 다른 쪽까지 얼마나 더 움직여야 하는지를 대신 구한다.
-      \item 여러 변환이 곱해진 식에서 이미 아는 항을 걷어내고 미지수만 남긴다.\\
-        방정식에서 이항하는 것과 같다.
+      \item 아는 변환의 방향이 필요한 방향과 반대일 때
+      \item 두 자세의 차이를 잴 때 (자세끼리는 뺄셈이 성립하지 않음, 7장)
+      \item 곱해진 식에서 아는 항을 걷어내고 미지수만 남길 때 (이항과 같음)
     \end{enumerate}
   \end{block}
 \end{frame}
@@ -289,36 +304,44 @@
 \section{4. 카메라가 측정하는 것}
 %==================================================================
 
-\begin{frame}{4. 카메라가 실제로 측정하는 것은 무엇인가?}
-  카메라는 이미지에서 보드나 큐브의 코너를 검출하고 \textbf{PnP}를 풀어서 자세를 얻는다.
+\begin{frame}{4. 카메라가 실제로 측정하는 것}
+  \begin{itemize}
+    \item 이미지에서 보드나 큐브의 코너를 검출
+    \item \textbf{PnP}를 풀어서 자세를 얻음
+  \end{itemize}
   \vfill
-  PnP(Perspective-$n$-Point). \\한 장의 사진만 가지고 물체가
-  카메라 기준으로 어디에 어떤 방향으로 놓여 있는지를 알아내는 방법이다.
+  PnP = Perspective-$n$-Point\\
+  사진 한 장으로 물체가 카메라 기준 어디에 어떤 방향인지 알아내는 방법
   \vfill
-  \begin{block}{PnP를 풀려면 필요한 두 가지 정보}
+  \begin{block}{PnP에 필요한 두 가지}
     \begin{enumerate}
-      \item \textbf{물체 위 점들의 3차원 좌표.} 물체 자신의 좌표계에서 잰 값이다.
-        한 변이 $50\,\mathrm{mm}$인 체커보드 격자라면 코너들이
-        $(0,0,0)$, $(50,0,0)$, $(0,50,0)$처럼 놓여 있다는 사실을
-        설계 도면에서 이미 알고 있다.
-      \item \textbf{같은 점들이 사진에서 찍힌 2차원 픽셀 좌표.}
-        코너 검출 알고리즘이 찾아준다.
+      \item \textbf{물체 위 점들의 3차원 좌표} (물체 자신의 좌표계 기준)
+        \begin{itemize}
+          \item 한 변 $50\,\mathrm{mm}$ 체커보드 $\rightarrow$
+            코너가 $(0,0,0)$, $(50,0,0)$, $(0,50,0)$
+          \item 설계 도면에서 이미 아는 값
+        \end{itemize}
+      \item \textbf{같은 점들의 2차원 픽셀 좌표} (코너 검출 알고리즘이 제공)
     \end{enumerate}
   \end{block}
 \end{frame}
 
 \begin{frame}{4. PnP의 전제와 출력}
-  같은 점이 3차원에서는 어디이고 사진에서는 몇 번째 픽셀인지, 그 짝을 여러 개 모으면
-  물체의 자세를 역으로 풀 수 있다. 이름의 $n$은 그 짝의 개수를 뜻하며,
-  원리상 최소 $3$개, 안정적으로 풀려면 보통 그보다 많이 쓴다.
+  \begin{itemize}
+    \item 3차원 좌표와 픽셀 좌표의 짝을 여러 개 모으면 자세를 역으로 풀 수 있음
+    \item 이름의 $n$ = 그 짝의 개수. 원리상 최소 $3$개, 실제로는 더 많이 사용
+  \end{itemize}
   \vfill
-  단, \textbf{카메라 내부파라미터}를 미리 알고 있어야 한다.
-  내부파라미터란 초점거리와 이미지 중심처럼 3차원 점이 이미지의 어느 픽셀에
-  맺히는지를 정하는 카메라 자체의 값이다. 이 값은 캘리브레이션 이전에 따로 구해 둔다.
+  \begin{block}{전제: 카메라 내부파라미터를 미리 알아야 함}
+    \begin{itemize}
+      \item 초점거리, 이미지 중심 등
+      \item 3차원 점이 이미지의 어느 픽셀에 맺히는지를 정하는 값
+      \item 캘리브레이션 이전에 따로 구해 둠
+    \end{itemize}
+  \end{block}
   \vfill
   \begin{alertblock}{정리}
-    PnP의 출력이 곧 관측값 $\mathbf{Z}$이다.
-    즉 \textbf{카메라 좌표계에서 본} 물체의 자세다.
+    PnP의 출력 = 관측값 $\mathbf{Z}$ = \textbf{카메라 좌표계에서 본} 물체의 자세
   \end{alertblock}
 \end{frame}
 
@@ -327,29 +350,31 @@
   \[
     \mathbf{Z}_{i,s} \equiv {}^{C_i}\mathbf{T}_{O,s}
   \]
-  세트 $s$의 큐브가 고정 카메라 $i$에서 어떻게 보였는지를 뜻한다.
+  세트 $s$의 큐브가 고정 카메라 $i$에서 어떻게 보였는가
   \vfill
   \textbf{4.2 그리퍼 카메라 관측}
   \[
     \mathbf{Z}_{g,e} \equiv {}^{C_g}\mathbf{T}_{O,e}
   \]
-  이벤트 $e$에서 큐브가 그리퍼 카메라에 어떻게 보였는지를 뜻한다.
+  이벤트 $e$에서 큐브가 그리퍼 카메라에 어떻게 보였는가
   \vfill
-  \textbf{4.3 로봇 FK로 알고 있는 그리퍼 자세}
+  \textbf{4.3 로봇 FK로 아는 그리퍼 자세}
   \[
     \mathbf{G}_e \equiv {}^{B}\mathbf{T}_{G,e}
   \]
-  촬영 순간 그리퍼의 위치와 방향이다. 로봇 관절각으로부터 FK를 계산하여 얻는다.
+  촬영 순간 그리퍼의 위치와 방향. 관절각으로부터 FK로 계산
 \end{frame}
 
-\begin{frame}{4.3 FK란 무엇인가}
-  FK는 Forward Kinematics, 우리말로 \textbf{순기구학}의 줄임말이다.
+\begin{frame}{4.3 FK란}
+  FK = Forward Kinematics = \textbf{순기구학}
   \vfill
-  로봇의 각 관절이 몇 도 꺾여 있는지를 알 때, 링크 길이 같은 로봇의 설계값을 이용해
-  손끝이 베이스 기준으로 어디에 어떤 방향으로 있는지를 계산하는 것이다.
+  \begin{itemize}
+    \item 입력: 각 관절이 몇 도 꺾여 있는지 + 링크 길이 등 설계값
+    \item 출력: 손끝이 베이스 기준 어디에 어떤 방향으로 있는지
+  \end{itemize}
   \vfill
   \begin{block}{중요한 점}
-    카메라를 쓰지 않고 \textbf{로봇 자신의 관절 센서만으로} 얻는 값이다.
+    카메라 없이 \textbf{로봇 자신의 관절 센서만으로} 얻는 값
   \end{block}
 \end{frame}
 
@@ -373,8 +398,8 @@
     \mathbf{O}_s \equiv {}^{B}\mathbf{T}_{O,s}
   \]
   \vfill
-  세 FK 방식의 가장 큰 차이는 $\mathbf{O}_s$를 자유롭게 찾는지,
-  FK 값에 고정하는지, 보정된 anchor에 고정하는지다.
+  세 FK 방식의 차이 = $\mathbf{O}_s$를 자유롭게 찾는가 / FK 값에 고정하는가 /
+  보정된 anchor에 고정하는가
 \end{frame}
 
 %==================================================================
@@ -382,18 +407,18 @@
 %==================================================================
 
 \begin{frame}{6.1 고정 카메라 경로}
-  베이스에서 고정 카메라로 가고, 고정 카메라에서 큐브로 간다.
+  베이스 $\rightarrow$ 고정 카메라 $\rightarrow$ 큐브
   \[
     {}^{B}\mathbf{T}_{C_i}\,
     {}^{C_i}\mathbf{T}_{O,s}
     =
     {}^{B}\mathbf{T}_{O,s}
   \]
-  앞에서 정의한 짧은 기호를 사용하면 다음과 같다.
+  짧은 기호로
   \[
     \mathbf{C}_i\mathbf{Z}_{i,s}=\mathbf{O}_s
   \]
-  따라서 고정 카메라가 예측한 큐브 자세는 다음과 같다.
+  고정 카메라가 예측한 큐브 자세
   \[
     \widehat{\mathbf{O}}^{\mathrm{fix}}_{i,s}
     =
@@ -402,7 +427,7 @@
 \end{frame}
 
 \begin{frame}{6.2 그리퍼 카메라 경로}
-  베이스에서 그리퍼로 가고, 그리퍼에서 카메라로 가고, 카메라에서 큐브로 간다.
+  베이스 $\rightarrow$ 그리퍼 $\rightarrow$ 카메라 $\rightarrow$ 큐브
   \[
     {}^{B}\mathbf{T}_{G,e}\,
     {}^{G}\mathbf{T}_{C_g}\,
@@ -410,21 +435,21 @@
     =
     {}^{B}\mathbf{T}_{O,s(e)}
   \]
-  짧은 기호로 쓰면 다음과 같다.
+  짧은 기호로
   \[
     \mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e}
     =
     \mathbf{O}_{s(e)}
   \]
-  따라서 그리퍼 카메라가 예측한 큐브 자세는 다음과 같다.
+  그리퍼 카메라가 예측한 큐브 자세
   \[
     \widehat{\mathbf{O}}^{\mathrm{grip}}_e
     =
     \mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e}
   \]
   \vfill
-  \begin{alertblock}{캘리브레이션의 목표}
-    같은 세트의 모든 예측은 같은 큐브 자세로 모여야 한다.
+  \begin{alertblock}{목표}
+    같은 세트의 모든 예측이 같은 큐브 자세로 모이게 하기
   \end{alertblock}
 \end{frame}
 
@@ -432,14 +457,14 @@
 \section{7. 두 자세의 차이 재기}
 %==================================================================
 
-\begin{frame}{7. 두 자세가 얼마나 다른지 계산하는 방법}
-  두 자세 $\mathbf{A}$와 $\mathbf{B}$의 상대변환은 다음과 같다.
+\begin{frame}{7. 두 자세가 얼마나 다른지}
+  두 자세 $\mathbf{A}$, $\mathbf{B}$의 상대변환
   \[
     \mathbf{E} = \mathbf{A}^{-1}\mathbf{B}
   \]
-  $\mathbf{A}=\mathbf{B}$라면 $\mathbf{E}=\mathbf{I}$가 된다.
+  $\mathbf{A}=\mathbf{B}$이면 $\mathbf{E}=\mathbf{I}$
   \vfill
-  행렬 내부까지 펼치면 다음과 같다.
+  행렬 내부까지 펼치면
   \[
     \mathbf{A}^{-1}\mathbf{B}
     =
@@ -449,20 +474,24 @@
       \mathbf{0}^{\mathsf T} & 1
     \end{bmatrix}
   \]
-  여기서 회전 부분은 상대 회전이고, 이동 부분은 $\mathbf{A}$ 좌표계에서 본 상대 이동이다.
+  \begin{itemize}
+    \item 회전 부분 = 상대 회전
+    \item 이동 부분 = $\mathbf{A}$ 좌표계에서 본 상대 이동
+  \end{itemize}
 \end{frame}
 
-\begin{frame}{7.1 이해하기 쉬운 이론식}
+\begin{frame}{7.1 이론식}
   \[
     \boldsymbol{\varepsilon}(\mathbf{A},\mathbf{B})
     =
     \log\!\left(\mathbf{A}^{-1}\mathbf{B}\right)
   \]
-  여기서 $\log(\cdot)$는 일반 숫자의 자연로그가 아니다.
-  $\mathrm{SE}(3)$ 행렬을 작은 회전 $3$개와 작은 이동 $3$개,
-  총 $6$개의 오차 숫자로 바꾸는 Lie logarithm이다.
+  \begin{itemize}
+    \item 여기서 $\log$는 일반 숫자의 자연로그가 아님
+    \item $\mathrm{SE}(3)$ 행렬 $\rightarrow$ 작은 회전 $3$개 + 작은 이동 $3$개,
+      총 $6$개 숫자로 바꾸는 Lie logarithm
+  \end{itemize}
   \vfill
-  개념적으로는 다음과 같이 생각할 수 있다.
   \[
     \log:\mathrm{SE}(3)\rightarrow\mathfrak{se}(3),
     \qquad
@@ -471,17 +500,18 @@
     \begin{bmatrix} \boldsymbol{\omega} \\ \mathbf{v} \end{bmatrix}
     \in\mathbb{R}^{6}
   \]
-  $\boldsymbol{\omega}\in\mathbb{R}^{3}$은 회전오차이고,
-  $\mathbf{v}\in\mathbb{R}^{3}$은 이동오차다.
+  \begin{itemize}
+    \item $\boldsymbol{\omega}\in\mathbb{R}^{3}$: 회전오차
+    \item $\mathbf{v}\in\mathbb{R}^{3}$: 이동오차
+  \end{itemize}
 \end{frame}
 
 %==================================================================
 \section{8. 공통 목적함수}
 %==================================================================
 
-\begin{frame}{8. 모든 방법이 공유하는 기본 목적함수}
-  세트 $s$의 공통 큐브 자세를 $\mathbf{Q}_s$라고 하자.
-  그러면 vision 관측의 전체 오차는 다음과 같다.
+\begin{frame}{8. 모든 방법이 공유하는 목적함수}
+  세트 $s$의 공통 큐브 자세를 $\mathbf{Q}_s$라 하면
   \[
     \begin{aligned}
       \mathcal{E}_{\mathrm{vis}}
@@ -500,8 +530,8 @@
     \end{aligned}
   \]
   \vfill
-  아래첨자 vis는 vision, 즉 카메라로 본 정보에서 나온 오차라는 뜻이다.
-  로봇 관절값에서 나온 FK 정보와 구분하려고 붙인 이름이다.
+  아래첨자 vis = vision. 카메라로 본 정보에서 나온 오차\\
+  로봇 관절값에서 나온 FK 정보와 구분하려는 이름
 \end{frame}
 
 \begin{frame}{8.1 식에 나오는 기호}
@@ -549,33 +579,37 @@
   }
   \vspace{-2mm}
 
-  안쪽부터 밖으로 나간다.
+  안쪽부터 밖으로
   \begin{enumerate}
-    \item $\mathbf{C}_i\mathbf{Z}_{i,s}$로 고정 카메라들이 예측한 큐브 자세를 만든다.
-    \item 그 예측을 공통 큐브 자세 $\mathbf{Q}_s$와 비교하여 잔차 $6$개 숫자를 얻는다.
-    \item 제곱해서 더해 오차 하나의 숫자로 만든다.
-    \item 모든 카메라와 모든 세트에 대해 이 값을 전부 합친다.
-    \item 그리퍼 카메라 쪽도 $\mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e}$로 같은 과정을 거쳐 합친다.
+    \item $\mathbf{C}_i\mathbf{Z}_{i,s}$ $\rightarrow$ 고정 카메라들이 예측한 큐브 자세
+    \item 그 예측을 $\mathbf{Q}_s$와 비교 $\rightarrow$ 잔차 $6$개 숫자
+    \item 제곱해서 더함 $\rightarrow$ 오차 하나의 숫자
+    \item 모든 카메라 $\times$ 모든 세트에 대해 합산
+    \item 그리퍼 카메라 쪽도 $\mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e}$로 동일하게 합산
   \end{enumerate}
 \end{frame}
 
 \begin{frame}{8.2 이 식이 뜻하는 것}
-  첫 번째 합은 고정 카메라 예측을 공통 큐브 자세에 맞춘다.
-  두 번째 합은 그리퍼 카메라 예측을 같은 공통 큐브 자세에 맞춘다.
+  \begin{itemize}
+    \item 첫 번째 합: 고정 카메라 예측을 공통 큐브 자세에 맞춤
+    \item 두 번째 합: 그리퍼 카메라 예측을 같은 공통 큐브 자세에 맞춤
+  \end{itemize}
   \vfill
   \begin{block}{캘리브레이션이란}
-    $\mathcal{E}_{\mathrm{vis}}$를 최소로 만드는 $\mathbf{C}_i$와 $\mathbf{X}$를 찾는 것이다.
-    측정값 $\mathbf{Z}$와 $\mathbf{G}$는 이미 정해져 있으므로 움직일 수 없고,
-    오직 미지수만 움직여서 모든 예측이 한 점에 모이게 만든다.
+    \begin{itemize}
+      \item $\mathcal{E}_{\mathrm{vis}}$를 최소로 만드는 $\mathbf{C}_i$와 $\mathbf{X}$를 찾는 것
+      \item 측정값 $\mathbf{Z}$, $\mathbf{G}$는 고정 $\rightarrow$ 움직일 수 없음
+      \item 미지수만 움직여서 모든 예측이 한 점에 모이게 만듦
+    \end{itemize}
   \end{block}
   \vfill
   \begin{alertblock}{세 FK 방식의 차이}
-    관측식 자체는 다르지 않다. $\mathbf{Q}_s$를 무엇으로 정의하느냐가 다르다.
+    관측식은 동일. $\mathbf{Q}_s$를 무엇으로 정의하느냐가 다름
   \end{alertblock}
 \end{frame}
 
 \begin{frame}{앞으로 볼 세 가지 방식}
-  모든 방법은 같은 관측식을 쓴다. $\mathbf{Q}_s$를 무엇으로 채우는지가 다를 뿐이다.
+  같은 관측식. $\mathbf{Q}_s$를 무엇으로 채우는지가 다름
   \[
     \mathbf{Q}_s=
     \begin{cases}
@@ -586,14 +620,14 @@
   \]
   \vfill
   \begin{itemize}
-    \item \texttt{No-FK}: 큐브 자세도 직접 찾는다. \hfill (9장)
-    \item \texttt{Fixed-FK}: 큐브 자세를 raw FK에 못 박는다. \hfill (10장)
-    \item \texttt{Corrected-FK}: raw FK를 vision으로 보정하고
-      gate를 통과한 세트에서만 사용한다. \hfill (11장)
+    \item \texttt{No-FK}: 큐브 자세도 직접 찾음 \hfill (9장)
+    \item \texttt{Fixed-FK}: 큐브 자세를 raw FK에 못 박음 \hfill (10장)
+    \item \texttt{Corrected-FK}: raw FK를 vision으로 보정,
+      gate 통과 세트에서만 사용 \hfill (11장)
   \end{itemize}
   \vfill
-  {\small $\mathbf{F}_s$는 10.1절, $\mathbf{A}_s$는 11.7절에서 정의한다.
-  여기서는 세 방식이 같은 자리를 서로 다른 값으로 채운다는 점만 보면 된다.}
+  {\small $\mathbf{F}_s$는 10.1절, $\mathbf{A}_s$는 11.7절에서 정의.
+  여기서는 세 방식이 같은 자리를 서로 다른 값으로 채운다는 점만 확인}
 \end{frame}
 
 %==================================================================
@@ -601,12 +635,14 @@
 %==================================================================
 
 \begin{frame}{9. 방법 1: No-FK}
-  \begin{block}{9.1 쉬운 설명}
-    로봇이 알려주는 큐브 자세를 사용하지 않는다.
-    카메라 위치, hand-eye, 세트별 큐브 자세를 vision 관측만으로 함께 찾는다.
+  \begin{block}{9.1 개요}
+    \begin{itemize}
+      \item 로봇이 알려주는 큐브 자세를 사용하지 않음
+      \item 카메라 위치, hand-eye, 세트별 큐브 자세를 vision 관측만으로 함께 찾음
+    \end{itemize}
   \end{block}
   \vfill
-  \textbf{9.2 정확한 목적함수}
+  \textbf{9.2 목적함수}
   \[
     \left\{
       \{\widehat{\mathbf{C}}_i\},\ \widehat{\mathbf{X}},\ \{\widehat{\mathbf{O}}_s\}
@@ -616,13 +652,13 @@
     \ \mathcal{E}_{\mathrm{vis}}
     \left(\{\mathbf{C}_i\},\ \mathbf{X},\ \{\mathbf{O}_s\}\right)
   \]
-  이때 공통 자세는 자유변수다.
+  공통 자세는 자유변수
   \[
     \mathbf{Q}_s=\mathbf{O}_s
   \]
 \end{frame}
 
-\begin{frame}{9.2 비슷해 보이는 세 기호의 구분}
+\begin{frame}{9.2 비슷해 보이는 세 기호}
   \begin{center}
     \begin{tabular}{cl}
       \toprule
@@ -635,23 +671,30 @@
     \end{tabular}
   \end{center}
   \vfill
-  따라서 $\mathbf{Q}_s=\mathbf{O}_s$는 두 값이 같다는 뜻이 아니라,
-  기준 자리를 고정값이 아니라 \textbf{자유변수로 채운다}는 선언이다.
-  \texttt{Fixed-FK}는 같은 자리를 FK 값으로 채운다.
+  \begin{itemize}
+    \item $\mathbf{Q}_s=\mathbf{O}_s$ = 두 값이 같다는 뜻이 아님
+    \item 기준 자리를 고정값이 아니라 \textbf{자유변수로 채운다}는 선언
+    \item \texttt{Fixed-FK}는 같은 자리를 FK 값으로 채움
+  \end{itemize}
   \vfill
-  셋 중 어느 것도 큐브의 진짜 자세는 아니다.
-  진짜 자세는 10.3절에서 $\mathbf{O}^{\mathrm{true}}_s$로 따로 표기한다.
+  셋 중 어느 것도 큐브의 진짜 자세가 아님\\
+  진짜 자세는 10.3절에서 $\mathbf{O}^{\mathrm{true}}_s$로 따로 표기
 \end{frame}
 
 \begin{frame}{9.3 장점과 주의점}
-  \begin{itemize}
-    \item raw FK의 계통오차가 캘리브레이션에 직접 들어오지 않는다.
-    \item 대신 세트마다 $6$자유도인 $\mathbf{O}_s$가 추가되어 미지수가 많아진다.
-    \item 카메라 연결이나 로봇 움직임이 충분하지 않으면 전체 좌표계의
-      gauge가 흔들릴 수 있다.
-    \item \texttt{No-FK}도 $\mathbf{G}_e$는 사용한다.
-      큐브 FK prior $\mathbf{F}_s$만 사용하지 않는다.
-  \end{itemize}
+  \begin{block}{장점}
+    \begin{itemize}
+      \item raw FK의 계통오차가 캘리브레이션에 직접 들어오지 않음
+    \end{itemize}
+  \end{block}
+  \vfill
+  \begin{block}{주의점}
+    \begin{itemize}
+      \item 세트마다 $6$자유도인 $\mathbf{O}_s$가 추가 $\rightarrow$ 미지수 증가
+      \item 카메라 연결이나 로봇 움직임이 부족하면 전체 좌표계의 gauge가 흔들릴 수 있음
+      \item $\mathbf{G}_e$는 사용함. 큐브 FK prior $\mathbf{F}_s$만 사용하지 않음
+    \end{itemize}
+  \end{block}
 \end{frame}
 
 %==================================================================
@@ -659,21 +702,21 @@
 %==================================================================
 
 \begin{frame}{10. 방법 2: Fixed-FK}
-  \begin{block}{10.1 쉬운 설명}
-    로봇 FK가 알려준 큐브 자세를 정답으로 간주하고 움직이지 못하게 고정한다.
+  \begin{block}{10.1 개요}
+    로봇 FK가 알려준 큐브 자세를 정답으로 간주 $\rightarrow$ 움직이지 못하게 고정
   \end{block}
   \vfill
-  raw FK 큐브 prior를 다음과 같이 정의한다.
+  raw FK 큐브 prior
   \[
     \mathbf{F}_s \equiv {}^{B}\mathbf{T}^{\mathrm{FK}}_{O,s}
   \]
-  큐브 자세는 다음 제약을 만족해야 한다.
+  큐브 자세가 만족해야 하는 제약
   \[
     \mathbf{O}_s=\mathbf{F}_s
   \]
 \end{frame}
 
-\begin{frame}{10.2 정확한 목적함수}
+\begin{frame}{10.2 목적함수}
   \[
     \left\{\{\widehat{\mathbf{C}}_i\},\ \widehat{\mathbf{X}}\right\}
     =
@@ -682,7 +725,7 @@
     \left(\{\mathbf{C}_i\},\ \mathbf{X},\ \{\mathbf{F}_s\}\right)
   \]
   \vfill
-  이를 완전히 펼치면 다음과 같다.
+  완전히 펼치면
   \[
     \begin{aligned}
       \min_{\{\mathbf{C}_i\},\,\mathbf{X}}\ {}&
@@ -696,101 +739,114 @@
   \]
 \end{frame}
 
-\begin{frame}{10.3 왜 FK 오차가 카메라로 전파되는가?}
-  실제 큐브 자세를 $\mathbf{O}^{\mathrm{true}}_s$라고 하자.
-  raw FK에 계통오차 $\mathbf{D}$가 있으면 다음처럼 쓸 수 있다.
+\begin{frame}{10.3 왜 FK 오차가 카메라로 전파되는가}
+  실제 큐브 자세를 $\mathbf{O}^{\mathrm{true}}_s$, raw FK의 계통오차를 $\mathbf{D}$라 하면
   \[
     \mathbf{F}_s = \mathbf{O}^{\mathrm{true}}_s\mathbf{D}
   \]
   \vfill
-  그런데 최적화는 $\mathbf{F}_s$를 움직일 수 없다.
-  따라서 남은 오차를 줄이기 위해 $\mathbf{C}_i$나 $\mathbf{X}$가 잘못 움직일 수 있다.
+  \begin{itemize}
+    \item 최적화는 $\mathbf{F}_s$를 움직일 수 없음
+    \item 남은 오차를 줄이려면 $\mathbf{C}_i$나 $\mathbf{X}$가 잘못 움직이게 됨
+  \end{itemize}
   \vfill
   \begin{alertblock}{맞교환}
-    Fixed-FK는 FK가 정확할 때 미지수가 적고 안정적이지만,
-    FK에 공통적인 오정렬이 있으면 그 오차를 캘리브레이션 결과에
-    흡수시킬 위험이 있다.
+    \begin{itemize}
+      \item FK가 정확할 때: 미지수가 적고 안정적
+      \item FK에 공통 오정렬이 있을 때: 그 오차를 캘리브레이션 결과가 흡수
+    \end{itemize}
   \end{alertblock}
 \end{frame}
 
 \begin{frame}{10.4 카메라에도 계통오차가 있으면 (1) 설정}
-  카메라도 내부파라미터나 왜곡 보정이 조금 틀리면 항상 같은 방향으로 치우친
-  $\mathbf{Z}$를 내놓는다. 예를 들어 큐브를 늘 $3\,\mathrm{mm}$ 멀리 있다고 보고하는 식이다.
-  \vfill
-  무슨 일이 벌어지는지 숫자로 따라가 보자. 설명을 위해 $1$차원으로 단순화한다.
+  카메라의 내부파라미터나 왜곡 보정이 조금 틀리면
+  항상 같은 방향으로 치우친 $\mathbf{Z}$를 내놓음\\
+  (예: 큐브를 늘 $3\,\mathrm{mm}$ 멀리 있다고 보고)
   \vfill
   \begin{columns}[T]
     \begin{column}{0.48\textwidth}
       \begin{block}{참값}
-        \begin{itemize}
-          \item 큐브의 진짜 위치: $100\,\mathrm{mm}$
-          \item 카메라의 진짜 위치: $0\,\mathrm{mm}$
-        \end{itemize}
-        카메라가 정직하다면 $\mathbf{Z}=100$이라고 보고해야 한다.
+        \begin{minipage}[t][22mm][t]{\linewidth}
+          \begin{itemize}
+            \item 큐브의 진짜 위치: $100\,\mathrm{mm}$
+            \item 카메라의 진짜 위치: $0\,\mathrm{mm}$
+            \item 정직하다면 $\mathbf{Z}=100$
+          \end{itemize}
+        \end{minipage}
       \end{block}
     \end{column}
     \begin{column}{0.48\textwidth}
       \begin{block}{두 가지 계통오차}
-        \begin{itemize}
-          \item FK 오차: 로봇은 큐브가 $105$에 있다고 말한다. $5\,\mathrm{mm}$ 초과.
-          \item 카메라 오차: 카메라는 큐브가 $103$ 거리에 있다고 본다. $3\,\mathrm{mm}$ 초과.
-        \end{itemize}
+        \begin{minipage}[t][22mm][t]{\linewidth}
+          \begin{itemize}
+            \item FK 오차: 큐브가 $105$에 있다고 말함 ($5\,\mathrm{mm}$ 초과)
+            \item 카메라 오차: 큐브가 $103$ 거리라고 봄 ($3\,\mathrm{mm}$ 초과)
+          \end{itemize}
+        \end{minipage}
       \end{block}
     \end{column}
   \end{columns}
+  \vfill
+  \centering 설명을 위해 $1$차원으로 단순화
 \end{frame}
 
 \begin{frame}{10.4 카메라에도 계통오차가 있으면 (2) 계산}
-  $\mathbf{Q}_s$는 FK 값 $105$에 못 박혀 움직이지 않는다.
-  따라서 $\mathbf{C}\mathbf{Z}=\mathbf{Q}_s$를 만족하도록 카메라 위치를 정한다.
+  $\mathbf{Q}_s$는 FK 값 $105$에 고정 $\rightarrow$
+  $\mathbf{C}\mathbf{Z}=\mathbf{Q}_s$를 만족하도록 카메라 위치 결정
   \[
     \mathbf{C}+103=105
     \quad\Longrightarrow\quad
     \mathbf{C}=2
   \]
-  카메라의 진짜 위치는 $0$이었으므로 결과는 $2\,\mathrm{mm}$ 틀렸다.
+  카메라의 진짜 위치는 $0$ $\rightarrow$ 결과는 $2\,\mathrm{mm}$ 틀림
   \vfill
-  \begin{alertblock}{핵심: 최적화가 본 정보의 양}
-    최적화가 아는 것은 $105$와 $103$의 차이인 $2$라는 숫자 하나뿐이다.
-    그런데 그 $2$의 정체는 다음과 같다.
+  \begin{alertblock}{최적화가 본 정보의 양}
+    아는 것은 $105$와 $103$의 차이인 $2$라는 숫자 하나뿐.
+    그러나 그 $2$의 정체는
     \[
       2 = \underbrace{5}_{\text{FK가 초과한 몫}} - \underbrace{3}_{\text{카메라가 초과한 몫}}
     \]
   \end{alertblock}
 \end{frame}
 
-\begin{frame}{10.4 카메라에도 계통오차가 있으면 (3) 분리 불가능}
-  최적화는 이 분해를 볼 수 없다. $5$와 $3$이든 $7$과 $5$든 $2$와 $0$이든
-  모두 같은 $2$를 만들고, 목적함수 안에는 셋을 구별할 정보가 없다.
-  만약 카메라 오차가 반대 방향이었다면 $\mathbf{C}=8$이 되어 훨씬 나빠졌을 것이다.
+\begin{frame}{10.4 카메라에도 계통오차가 있으면 (3) 분리 불가}
+  \begin{itemize}
+    \item $5$와 $3$이든, $7$과 $5$든, $2$와 $0$이든 모두 같은 $2$를 만듦
+    \item 목적함수 안에 셋을 구별할 정보가 없음
+    \item 카메라 오차가 반대 방향이었다면 $\mathbf{C}=8$ $\rightarrow$ 훨씬 악화
+  \end{itemize}
   \vfill
   \begin{block}{구조적으로 분리가 불가능한 이유}
-    카메라의 계통오차가 카메라 좌표계에서의 일정한 어긋남이라면,
-    그것은 카메라가 다른 곳에 있다고 말하는 것과 수학적으로 같다.
-    즉 $\mathbf{C}_i$를 바꾸는 것과 구별되지 않는다.
+    카메라 좌표계에서의 일정한 어긋남 = 카메라가 다른 곳에 있다고 말하는 것\\
+    $\rightarrow$ $\mathbf{C}_i$를 바꾸는 것과 수학적으로 구별되지 않음
   \end{block}
   \vfill
-  \begin{block}{\texttt{No-FK}와 비교하면}
-    \texttt{No-FK}는 큐브 FK 자세를 쓰지 않으므로 오염원이 카메라 하나뿐이다.
-    반면 \texttt{Fixed-FK}는 FK 오차와 카메라 오차가 모두 같은 자리인
-    $\mathbf{C}_i$와 $\mathbf{X}$로 들어온다.
+  \begin{block}{\texttt{No-FK}와 비교}
+    \begin{itemize}
+      \item \texttt{No-FK}: 오염원이 카메라 하나뿐
+      \item \texttt{Fixed-FK}: FK 오차와 카메라 오차가 모두 $\mathbf{C}_i$, $\mathbf{X}$로 유입
+    \end{itemize}
   \end{block}
 \end{frame}
 
 \begin{frame}{10.4 카메라에도 계통오차가 있으면 (4) 잔차의 함정}
-  위 계산에서 $\mathbf{C}=2$를 넣으면 $2+103=105$로 정확히 맞아떨어져
-  \alert{잔차가 $0$이 된다.}
-  수렴은 완벽해 보이지만 카메라 위치는 $2\,\mathrm{mm}$ 틀려 있다.
+  $\mathbf{C}=2$를 넣으면 $2+103=105$로 정확히 일치
+  $\rightarrow$ \alert{잔차 $0$}\\
+  수렴은 완벽해 보이지만 카메라 위치는 $2\,\mathrm{mm}$ 틀림
+  \vfill
+  \begin{block}{지표가 잡지 못하는 이유}
+    \begin{itemize}
+      \item 재투영오차: 카메라 자기 자신과의 일치도 $\rightarrow$ 이 편향에 둔감
+      \item 카메라 간 consistency: 같은 모델, 같은 절차로 캘리브레이션되면
+        비슷한 방향으로 치우쳐 함께 통과
+    \end{itemize}
+  \end{block}
   \vfill
   \begin{itemize}
-    \item 재투영오차는 카메라 자기 자신과의 일치도이므로 이 편향에 둔감하다.
-    \item 여러 카메라가 같은 모델과 같은 절차로 캘리브레이션되었다면
-      비슷한 방향으로 치우쳐 카메라 간 consistency도 통과한다.
+    \item 예외: 거리나 각도에 따라 달라지는 오차는 강체 어긋남이 아님
+      $\rightarrow$ 잔차가 조금 남음
+    \item 다만 그 잔차만으로 카메라 탓인지 FK 탓인지 가려내기는 어려움
   \end{itemize}
-  \vfill
-  다만 카메라 오차가 거리나 각도에 따라 달라지는 종류라면 강체 어긋남이 아니므로
-  $\mathbf{C}_i$ 하나로 완전히 흡수되지 않고 잔차가 조금 남는다.
-  그러나 그 잔차만으로 카메라 탓인지 FK 탓인지 가려내기는 여전히 어렵다.
 \end{frame}
 
 %==================================================================
@@ -798,40 +854,43 @@
 %==================================================================
 
 \begin{frame}{11. 방법 3: Corrected-FK}
-  \begin{block}{11.1 가장 쉬운 설명}
-    raw FK를 무조건 믿지 않는다. 먼저 vision으로 큐브 자세를 계산하고,
-    raw FK가 vision과 어떤 공통 차이를 갖는지 학습한다.
-    그 차이로 FK를 보정한 뒤, vision과 충분히 가까운 세트에서만
-    그 보정된 FK를 사용한다.
+  \begin{block}{11.1 개요}
+    \begin{itemize}
+      \item raw FK를 무조건 믿지 않음
+      \item vision으로 큐브 자세를 먼저 계산
+      \item raw FK와 vision의 공통 차이를 학습 $\rightarrow$ FK 보정
+      \item vision과 충분히 가까운 세트에서만 보정된 FK를 사용
+    \end{itemize}
   \end{block}
   \vfill
-  \begin{block}{전체 흐름}
-    \begin{enumerate}
-      \item vision-only 초기 해 $\rightarrow$
-      \item 세트별 vision 합의 자세 $\mathbf{V}_s$ $\rightarrow$
-      \item raw FK와 vision의 공통 차이 $\overline{\boldsymbol{\Delta}}$ $\rightarrow$
-      \item FK 보정 $\mathbf{F}^{\mathrm{corr}}_s$ $\rightarrow$
-      \item gate 검사 $\rightarrow$
-      \item anchor 확정 $\mathbf{A}_s$ $\rightarrow$
-      \item anchor 고정 refinement
-    \end{enumerate}
+  \begin{block}{전체 흐름 (11.2 -- 11.8절)}
+    \centering\small
+    vision-only 초기 해
+    $\rightarrow$ 세트별 합의 $\mathbf{V}_s$
+    $\rightarrow$ 공통 차이 $\overline{\boldsymbol{\Delta}}$
+    $\rightarrow$ FK 보정 $\mathbf{F}^{\mathrm{corr}}_s$\\[1mm]
+    $\rightarrow$ gate 검사
+    $\rightarrow$ anchor 확정 $\mathbf{A}_s$
+    $\rightarrow$ anchor 고정 refinement
   \end{block}
 \end{frame}
 
 \begin{frame}{11.2 단계 1: vision-only 초기 해}
-  먼저 No-FK 문제를 풀어 초기 카메라와 hand-eye를 구한다.
+  No-FK 문제를 먼저 풀어 초기 카메라와 hand-eye 확보
   \[
     \{\mathbf{C}^{(0)}_i\},\ \mathbf{X}^{(0)},\ \{\mathbf{O}^{(0)}_s\}
     =
     \operatorname{SolveNoFK}(\text{vision observations})
   \]
   \vfill
-  위첨자 $(0)$은 초기 추정값이라는 표시다.
-  최종 결과가 아니라 중간 단계 값이므로 햇 기호와 구분한다.
+  \begin{itemize}
+    \item 위첨자 $(0)$ = 초기 추정값 표시
+    \item 최종 결과가 아닌 중간 단계 값 $\rightarrow$ 햇 기호와 구분
+  \end{itemize}
 \end{frame}
 
 \begin{frame}{11.3 단계 2: 세트별 vision 합의 자세}
-  각 세트에서 고정 카메라와 그리퍼 카메라가 예측한 큐브 자세를 모은다.
+  각 세트에서 고정 카메라와 그리퍼 카메라의 예측을 전부 수집
   \[
     \mathcal{P}_s
     =
@@ -840,34 +899,38 @@
     \left\{\mathbf{G}_e\mathbf{X}^{(0)}\mathbf{Z}_{g,e}\right\}_{e:\,s(e)=s}
   \]
   \begin{itemize}
-    \item $\mathcal{P}_s$는 세트 $s$의 큐브 자세 예측을 출처 구분 없이 전부 담은 주머니다.
-      카메라가 $3$대이고 그 세트에서 그리퍼 촬영이 $4$번 있었다면 자세 $7$개가 들어 있다.
-    \item $\cup$는 합집합이다. 고정 카메라 예측과 그리퍼 카메라 예측을
-      한 통에 담아 동등하게 취급하겠다는 뜻이다.
+    \item $\mathcal{P}_s$ = 출처 구분 없이 예측을 전부 담은 주머니
+      \begin{itemize}
+        \item 카메라 $3$대 + 그리퍼 촬영 $4$번 $\rightarrow$ 자세 $7$개
+      \end{itemize}
+    \item $\cup$ = 합집합. 두 출처를 한 통에 담아 동등하게 취급
   \end{itemize}
   \vfill
-  이 예측들을 강건 평균하여 vision 합의 자세 $\mathbf{V}_s$를 만든다.
+  강건 평균으로 vision 합의 자세 $\mathbf{V}_s$ 생성
   \[
     \mathbf{V}_s = \operatorname{RobustAverage}\left(\mathcal{P}_s\right)
   \]
-  이 단계에서는 예측들을 모두 동등하게 다루고, MAD 기준으로 이상치만 제거한다.
+  이 단계에서는 예측을 모두 동등하게 다루고 MAD로 이상치만 제거
 \end{frame}
 
 \begin{frame}{11.3 용어 정리}
   \begin{description}
-    \item[이상치] 나머지와 동떨어진 값. 코너 오검출이나 큐브 면 착각으로 생긴다.
-      $7$개 중 $6$개가 $2\,\mathrm{mm}$ 안에 모여 있는데 하나가 $100\,\mathrm{mm}$ 튀면
-      단순 평균은 약 $14\,\mathrm{mm}$ 밀려난다.
-    \item[MAD] Median Absolute Deviation, 중앙값 절대편차.
-      값들이 흩어진 정도를 중앙값으로 재기 때문에 표준편차와 달리
-      이상치에 오염되지 않는다.
-    \item[강건 평균] MAD로 이상치를 거른 뒤 남은 값을 평균한다.
+    \item[이상치] 나머지와 동떨어진 값. 코너 오검출이나 큐브 면 착각으로 발생
+      \begin{itemize}
+        \item $7$개 중 $6$개가 $2\,\mathrm{mm}$ 안에 모였는데 하나가 $100\,\mathrm{mm}$ 이탈
+        \item $\rightarrow$ 단순 평균은 약 $14\,\mathrm{mm}$ 밀려남
+      \end{itemize}
+    \item[MAD] Median Absolute Deviation, 중앙값 절대편차
+      \begin{itemize}
+        \item 흩어진 정도를 중앙값으로 측정
+        \item 표준편차와 달리 이상치에 오염되지 않음
+      \end{itemize}
+    \item[강건 평균] MAD로 이상치를 거른 뒤 남은 값을 평균
   \end{description}
 \end{frame}
 
 \begin{frame}{11.3 강건 평균이 이상치를 거르는 기준}
-  현재 평균을 기준으로 각 예측이 얼마나 떨어져 있는지를 재고,
-  그 거리들의 분포에서 잘라낼 선을 정한다.
+  현재 평균에서 각 예측까지의 거리를 재고, 그 분포에서 자를 선을 결정
   \[
     \text{버린다}
     \quad\Longleftrightarrow\quad
@@ -877,12 +940,12 @@
     + k\cdot 1.4826\cdot\operatorname{MAD}(\text{거리}),
     \qquad k=2.5
   \]
-  걸러낸 뒤 남은 값으로 평균을 다시 내고,
-  더 걸러낼 것이 없을 때까지 최대 세 번 반복한다.
-  이상치를 한 번 제거하면 평균이 조금 옮겨가고,
-  그 새 평균을 기준으로 다시 재면 처음에 놓쳤던 이상치가 드러나기 때문이다.
+  \begin{itemize}
+    \item 걸러낸 뒤 남은 값으로 평균을 다시 계산 $\rightarrow$ 최대 세 번 반복
+    \item 이상치를 제거하면 평균이 이동 $\rightarrow$ 처음 놓친 이상치가 드러남
+  \end{itemize}
   \vfill
-  \begin{block}{11.6절의 gate도 같은 형태의 식을 쓴다}
+  \begin{block}{11.6절의 gate도 같은 형태의 식}
     \begin{center}
       \begin{tabular}{ll}
         \toprule
@@ -896,14 +959,14 @@
   \end{block}
 \end{frame}
 
-\begin{frame}{11.4 단계 3: raw FK와 vision 사이의 공통 차이}
-  각 세트의 차이는 다음과 같다.
+\begin{frame}{11.4 단계 3: raw FK와 vision의 공통 차이}
+  세트별 차이
   \[
     \boldsymbol{\Delta}_s = \mathbf{F}_s^{-1}\mathbf{V}_s
   \]
-  즉, raw FK에서 vision 결과로 가려면 얼마나 더 움직여야 하는지를 뜻한다.
+  = raw FK에서 vision 결과로 가려면 얼마나 더 움직여야 하는가
   \vfill
-  세트별 차이를 강건 가중 평균하여 공통 보정량을 구한다.
+  강건 가중 평균으로 공통 보정량 산출
   \[
     \overline{\boldsymbol{\Delta}}
     =
@@ -911,14 +974,17 @@
     \left(\boldsymbol{\Delta}_s;\ w_s\right)
   \]
   \vfill
-  $w_s$는 세트 $s$를 얼마나 믿을지 나타내는 가중치이며,
-  그 세트를 뒷받침한 \textbf{관측의 개수}를 쓴다.
-  고정 카메라 $3$대가 보고 그리퍼 촬영이 $4$번 있었던 세트라면 $w_s=7$이다.
-  카메라 종류는 구분하지 않고 개수만 센다.
+  \begin{block}{가중치 $w_s$}
+    \begin{itemize}
+      \item 그 세트를 뒷받침한 \textbf{관측의 개수}
+      \item 고정 카메라 $3$대 + 그리퍼 촬영 $4$번 $\rightarrow$ $w_s=7$
+      \item 카메라 종류는 구분하지 않고 개수만 셈
+    \end{itemize}
+  \end{block}
 \end{frame}
 
 \begin{frame}{11.5 단계 4: FK에 공통 보정량 적용}
-  보정량을 오른쪽에 곱한다.
+  보정량을 오른쪽에 곱함
   \[
     \mathbf{F}^{\mathrm{corr}}_s = \mathbf{F}_s\,\overline{\boldsymbol{\Delta}}
   \]
@@ -938,20 +1004,26 @@
   \end{block}
 \end{frame}
 
-\begin{frame}{11.6 단계 5: gate로 보정 FK를 믿어도 되는지 검사}
-  $\overline{\boldsymbol{\Delta}}$는 모든 세트에 공통으로 적용되는 하나의 보정량이다.
-  따라서 세트마다 사정이 다르면 잘 맞지 않을 수 있다.
-  큐브가 그리퍼 안에서 미끄러진 세트, 그 세트에서만 관절 오차가 유난히 컸던 경우가 그렇다.
-  반대로 그 세트의 관측이 부족해서 vision 쪽이 틀렸을 수도 있다.
+\begin{frame}{11.6 단계 5: gate로 보정 FK를 검사}
+  \begin{itemize}
+    \item $\overline{\boldsymbol{\Delta}}$는 모든 세트에 적용되는 \textbf{하나의} 보정량
+    \item 세트마다 사정이 다르면 잘 맞지 않을 수 있음
+      \begin{itemize}
+        \item 큐브가 그리퍼 안에서 미끄러진 세트
+        \item 그 세트에서만 관절 오차가 유난히 컸던 경우
+        \item 반대로 관측이 부족해 vision 쪽이 틀렸을 수도 있음
+      \end{itemize}
+  \end{itemize}
   \vfill
-  어느 쪽이 틀렸는지는 알 수 없지만, 둘이 크게 어긋났다는 사실은 확인할 수 있다.
-  그래서 세트마다 보정된 FK와 vision 합의를 나란히 놓고 차이를 재고,
-  그 차이가 기준을 넘으면 해당 세트에서는 FK를 사용하지 않는다.
-  이 검사를 \textbf{gate}라고 부른다.
+  \begin{alertblock}{gate}
+    어느 쪽이 틀렸는지는 알 수 없음. 그러나 크게 어긋났다는 사실은 확인 가능\\
+    $\rightarrow$ 세트마다 보정된 FK와 vision 합의의 차이를 재고,
+    기준을 넘으면 그 세트에서 FK를 사용하지 않음
+  \end{alertblock}
 \end{frame}
 
 \begin{frame}{11.6 두 가지 차이를 재는 식}
-  이동 차이는 다음과 같다.
+  이동 차이
   \[
     d_t(s)
     =
@@ -960,8 +1032,7 @@
       \mathbf{t}(\mathbf{V}_s) - \mathbf{t}(\mathbf{F}^{\mathrm{corr}}_s)
     \right\|_2
   \]
-  \vfill
-  회전 차이는 다음과 같다.
+  회전 차이
   \[
     d_R(s)
     =
@@ -977,13 +1048,12 @@
       }{2}
     \right)
   \]
+  \begin{itemize}
+    \item 앞의 계수는 단위 환산. 위치는 미터 $\rightarrow$ $1000$을 곱해 밀리미터
+    \item 회전각은 라디안 $\rightarrow$ $180/\pi$를 곱해 도
+  \end{itemize}
   \vfill
-  \vfill
-  이동 차이 앞의 $1000$은 단위 환산이다. 자세의 위치는 미터로 다루므로
-  $1000$을 곱해 밀리미터로 바꾼다. 회전 차이 앞의 $180/\pi$도 같은 이유로
-  라디안을 도로 바꾼다.
-  \vfill
-  세트 $s$는 두 조건을 모두 만족할 때만 통과한다.
+  두 조건을 모두 만족할 때만 통과
   \[
     d_t(s)\leq \tau_t,
     \qquad
@@ -991,9 +1061,8 @@
   \]
 \end{frame}
 
-\begin{frame}{11.6 기준선은 상수가 아니다}
-  기준선 $\tau_t$와 $\tau_R$은 $d_t(s)$와 $d_R(s)$ 값들이
-  실제로 어떻게 분포하는지를 보고 정한다.
+\begin{frame}{11.6 기준선은 상수가 아님}
+  $d_t(s)$, $d_R(s)$ 값들의 실제 분포를 보고 결정
   \[
     \tau
     =
@@ -1007,50 +1076,53 @@
   \]
   \vfill
   \begin{itemize}
-    \item 상수 $1.4826$은 MAD를 표준편차와 같은 척도로 환산하는 값이다.
-      정규분포에서 MAD에 이 값을 곱하면 표준편차가 된다.
-    \item 이 환산 덕분에 $k$를 표준편차의 배수로 읽을 수 있다.
-      $k=2.5$는 중앙값에서 표준편차 $2.5$배까지 정상으로 인정한다는 뜻이며,
-      $\overline{\boldsymbol{\Delta}}$를 구하는 강건 평균이 이미 쓰고 있는 값과 같다.
+    \item $1.4826$: MAD를 표준편차 척도로 환산하는 상수
+      \begin{itemize}
+        \item 정규분포에서 MAD $\times$ $1.4826$ = 표준편차
+      \end{itemize}
+    \item 이 환산 덕분에 $k$를 표준편차의 배수로 읽을 수 있음
+    \item $k=2.5$ = 중앙값에서 표준편차 $2.5$배까지 정상으로 인정
+      \begin{itemize}
+        \item $\overline{\boldsymbol{\Delta}}$를 구하는 강건 평균이 이미 쓰는 값과 동일
+      \end{itemize}
   \end{itemize}
 \end{frame}
 
 \begin{frame}{11.6 왜 분포 기준으로 정하는가}
-  어떤 세트의 $\boldsymbol{\Delta}_s$가 공통 보정량 $\overline{\boldsymbol{\Delta}}$와
-  정확히 같다면 $\mathbf{F}^{\mathrm{corr}}_s=\mathbf{V}_s$가 되어 $d_t(s)=0$이다.
+  $\boldsymbol{\Delta}_s = \overline{\boldsymbol{\Delta}}$이면
+  $\mathbf{F}^{\mathrm{corr}}_s=\mathbf{V}_s$ $\rightarrow$ $d_t(s)=0$
   \vfill
-  즉 $d_t(s)$는 FK가 절대적으로 얼마나 틀렸는지가 아니라,
-  \textbf{그 세트가 다른 세트들의 공통 경향에서 얼마나 벗어났는지}를 재는 값이다.
+  $\Rightarrow$ $d_t(s)$는 FK가 절대적으로 얼마나 틀렸는지가 아니라,\\
+  \textbf{그 세트가 다른 세트들의 공통 경향에서 얼마나 벗어났는지}를 재는 값
   \vfill
   \begin{block}{그렇다면 얼마부터 유별난 값인가}
-    나머지 세트들이 얼마나 모여 있느냐에 따라 달라진다.
+    나머지 세트들이 얼마나 모여 있느냐에 따라 달라짐
     \begin{itemize}
-      \item 세트들이 모두 $2\,\mathrm{mm}$ 안에 모여 있다면
-        $10\,\mathrm{mm}$짜리 세트는 명백히 이상하다.
-      \item 원래부터 $30\,\mathrm{mm}$씩 흩어져 있었다면
-        같은 $10\,\mathrm{mm}$도 평범하다.
+      \item 세트들이 모두 $2\,\mathrm{mm}$ 안에 모임
+        $\rightarrow$ $10\,\mathrm{mm}$짜리 세트는 명백히 이상
+      \item 원래부터 $30\,\mathrm{mm}$씩 흩어짐
+        $\rightarrow$ 같은 $10\,\mathrm{mm}$도 평범
     \end{itemize}
-    고정 상수는 이 두 경우를 구분하지 못한다.
+    고정 상수는 이 두 경우를 구분하지 못함
   \end{block}
 \end{frame}
 
 \begin{frame}{11.6 하한 $\tau^{\min}$이 필요한 이유}
-  기준선을 중앙값 근처로만 잡으면 문제가 생긴다.
-  중앙값이란 절반은 그보다 작고 절반은 그보다 크다는 뜻이다.
-  \vfill
-  따라서 세트들이 모두 잘 맞아서 흩어짐이 거의 없으면,
-  기준선이 중앙값에 딱 붙어버리고 \alert{멀쩡한 세트의 절반이 탈락한다.}
-  걸러낼 이상치가 없는데도 절반이 FK를 못 쓰게 되는 것이다.
+  \begin{itemize}
+    \item 중앙값 = 절반은 그보다 작고 절반은 그보다 큼
+    \item 세트들이 모두 잘 맞아 흩어짐이 거의 없으면 기준선이 중앙값에 밀착
+    \item $\rightarrow$ \alert{멀쩡한 세트의 절반이 탈락}
+    \item $\rightarrow$ 걸러낼 이상치가 없는데도 절반이 FK를 못 쓰게 됨
+  \end{itemize}
   \vfill
   \begin{alertblock}{하한의 역할}
-    무언가를 더 걸러내는 것이 아니라,
-    \textbf{구별할 수 없는 차이로 걸러내지 않도록 보장하는 것}이다.
+    무언가를 더 걸러내는 것이 아니라,\\
+    \textbf{구별할 수 없는 차이로 걸러내지 않도록 보장하는 것}
   \end{alertblock}
 \end{frame}
 
 \begin{frame}{11.6 하한을 무엇으로 정하는가}
-  여기에 다시 상수를 쓰면 처음 문제로 돌아간다.
-  대신 \textbf{vision 합의 자신의 흔들림}을 쓴다.
+  상수를 다시 쓰면 처음 문제로 회귀 $\rightarrow$ \textbf{vision 합의 자신의 흔들림}을 사용
   \[
     \tau^{\min}_t
     =
@@ -1063,19 +1135,19 @@
     \left(\operatorname{scatter}_R(\mathcal{P}_s)\right)
   \]
   \vfill
-  이렇게 두는 이유는 \textbf{분해능} 때문이다.
-  어떤 세트에서 카메라들끼리 $1.5\,\mathrm{mm}$씩 어긋나 있다면,
-  $\mathbf{V}_s$ 자체가 그만큼 불확실하다.
-  이때 FK가 $\mathbf{V}_s$에서 $1\,\mathrm{mm}$ 벗어나 있다고 해도
-  그것이 FK의 잘못인지 vision의 잘못인지 구별할 방법이 없다.
-  자의 눈금보다 작은 차이를 재려는 것과 같다.
-  \vfill
-  구별할 수 없는 차이로 세트를 탈락시키는 것은 근거가 없으므로,
-  그 아래는 문제 삼지 않는다.
+  \begin{block}{이유: 분해능}
+    \begin{itemize}
+      \item 카메라들끼리 $1.5\,\mathrm{mm}$씩 어긋남
+        $\rightarrow$ $\mathbf{V}_s$ 자체가 그만큼 불확실
+      \item 이때 FK가 $1\,\mathrm{mm}$ 벗어남
+        $\rightarrow$ FK 탓인지 vision 탓인지 구별 불가
+      \item 자의 눈금보다 작은 차이를 재려는 것과 같음
+      \item $\rightarrow$ 구별할 수 없는 차이로 탈락시키는 것은 근거 없음
+    \end{itemize}
+  \end{block}
 \end{frame}
 
 \begin{frame}{11.7 단계 6: gate 결과에 따라 anchor 확정}
-  세트 $s$의 anchor는 gate 통과 여부로 결정된다.
   \[
     \mathbf{A}_s
     =
@@ -1097,13 +1169,15 @@
     \end{tabular}
   \end{center}
   \vfill
-  통과한 세트는 보정된 FK를 \textbf{그대로} anchor로 삼고,
-  탈락한 세트는 FK를 쓰지 않고 vision 합의 $\mathbf{V}_s$를 anchor로 삼는다.
-  판단은 세트마다 전부 아니면 전무다.
+  \begin{itemize}
+    \item 통과한 세트: 보정된 FK를 \textbf{그대로} anchor로 사용
+    \item 탈락한 세트: FK를 쓰지 않고 vision 합의 $\mathbf{V}_s$를 anchor로 사용
+    \item 판단은 세트마다 전부 아니면 전무
+  \end{itemize}
 \end{frame}
 
-\begin{frame}{11.8 단계 7: anchor를 고정하고 최종 refinement}
-  \texttt{Corrected-FK}는 만들어진 $\mathbf{A}_s$를 최종 단계에서 고정 anchor로 사용한다.
+\begin{frame}{11.8 단계 7: anchor 고정 후 최종 refinement}
+  확정된 $\mathbf{A}_s$를 고정 anchor로 사용
   \[
     \left\{\{\widehat{\mathbf{C}}_i\},\ \widehat{\mathbf{X}}\right\}
     =
@@ -1113,30 +1187,37 @@
   \]
   \vfill
   \begin{alertblock}{정리}
-    Corrected-FK는 단순히 목적함수에 약한 벌점 하나를 더하는 것과 다르다.
-    vision 초기 해, FK 공통 정렬, gate 판정, anchor 확정,
-    고정 anchor refinement의 순서로 동작한다.
+    목적함수에 약한 벌점 하나를 더하는 것과는 다름\\
+    vision 초기 해 $\rightarrow$ FK 공통 정렬 $\rightarrow$ gate 판정
+    $\rightarrow$ anchor 확정 $\rightarrow$ 고정 refinement
   \end{alertblock}
 \end{frame}
 
 \begin{frame}{11.9 아직 검증이 남은 부분}
-  이 장의 절차는 확정된 것이 아니라 검증과 보완이 진행 중이다.
-  특히 다음 항목들은 실험으로 근거를 마련해야 한다.
+  이 장의 절차는 확정된 것이 아니라 검증과 보완이 진행 중
   \begin{itemize}
-    \item \textbf{$k=2.5$의 타당성.} 현재는 강건 평균이 쓰는 값과 통일했을 뿐이다.
-      $k$를 바꿔가며 결과가 얼마나 달라지는지 확인해야 한다.
-    \item \textbf{gate가 실제로 도움이 되는가.} 세트를 탈락시키는 것이 결과를
-      개선하는지, 아니면 정보를 버리는 손해가 더 큰지는 gate를 끈 조건과
-      비교해야 알 수 있다.
-    \item \textbf{하한을 vision 산포로 두는 방식의 적절성.}
-      산포의 중앙값을 쓰는 것이 맞는지, 세트별 산포를 각각 쓰는 편이 나은지는
-      아직 비교하지 않았다.
-    \item \textbf{실데이터에서의 확인.} 적응형 기준선은 시뮬레이션과 실제
-      캘리브레이션 코드 양쪽에 반영되어 있으나, 실제 촬영 데이터에서
-      세트가 어떻게 걸러지는지는 아직 확인하지 않았다.
+    \item \textbf{$k=2.5$의 타당성}
+      \begin{itemize}
+        \item 현재는 강건 평균이 쓰는 값과 통일했을 뿐
+        \item $k$를 바꿔가며 결과 변화를 확인해야 함
+      \end{itemize}
+    \item \textbf{gate가 실제로 도움이 되는가}
+      \begin{itemize}
+        \item 세트를 탈락시키는 이득 vs 정보를 버리는 손해
+        \item gate를 끈 조건과 비교 필요
+      \end{itemize}
+    \item \textbf{하한을 vision 산포로 두는 방식의 적절성}
+      \begin{itemize}
+        \item 산포의 중앙값 vs 세트별 산포 각각 사용 $\rightarrow$ 미비교
+      \end{itemize}
+    \item \textbf{실데이터에서의 확인}
+      \begin{itemize}
+        \item 적응형 기준선은 시뮬레이션과 실제 코드 양쪽에 반영 완료
+        \item 실제 촬영 데이터에서 세트가 어떻게 걸러지는지는 미확인
+      \end{itemize}
   \end{itemize}
   \vfill
-  따라서 이 장의 수치와 정책은 이후 실험 결과에 따라 바뀔 수 있다.
+  \centering 이 장의 수치와 정책은 이후 실험 결과에 따라 변경 가능
 \end{frame}
 
 \end{document}
