@@ -11,7 +11,18 @@ Step 2: 멀티카메라 캘리브레이션용 캡처 수집.
 """
 
 """
-python Step2_capture.py --data_root ./data \
+<< 서버 >> 
+python c1.py
+[set 0 z+100]
+gotoj 37.96, -9.45, -136.81, 0.25, -33.05, -117.92
+p z,-100
+gc
+[자동화 촬영시] start
+[티칭시] rs(set) / rp(pose) -A / rg(grip) -B
+
+<< session 파일 번호 변경 필요 >>
+python Step2_capture.py \
+    --root_folder data/session02/calib_train \
     --intrinsics_dir ./intrinsics --use_robot --manual_robot \
     --robot_ip 192.168.0.23 --robot_port 12348 --show --save_depth
 

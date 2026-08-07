@@ -54,7 +54,10 @@ TOOL_CUBE_CENTER_Z = TOOL_GRIPPER_Z + CUBE_CENTER_OFFSET_Z  # 177.5mm
 # 값은 실제 로봇에서 큐브를 올바르게 쥔 자세의 TCP z 를 읽어 넣는다. None 이면 정규화하지
 # 않고 place_joints 도달 시 읽은 z 를 그대로 쓴다(구 동작).
 # 2026-08-07 실측: 바닥에 놓인 큐브를 쥔 자세의 TCP z.
-PLACE_TCP_Z_MM = -5.284
+PLACE_TCP_Z_MM = -4.9
+# 그리퍼가 큐브를 "잡을" 때의 TCP 높이. 놓기와 집기의 적정 높이가 다를 수 있어 상수를
+# 분리해 두었지만, 현재는 같은 실측값을 쓴다. 한쪽만 바꾸고 싶을 때 여기만 고치면 된다.
+GRIP_TCP_Z_MM = -4.9
 
 # 큐브를 잡을 때(재-그립) 항상 place 위치 +Z 위에서 접근 후 수직 하강하여 안전하게 잡는다.
 GRIP_APPROACH_Z_MM = 100.0
@@ -65,6 +68,8 @@ PLACE_APPROACH_Z_MM = 50.0
 # set 사이 이동: 잡은 뒤 이만큼 올려 수평으로 옮기고, 도착해서 같은 만큼 내린다.
 # 큐브가 이 높이로 워크스페이스를 가로지르므로 테이블 위 장애물보다 높아야 한다.
 TRANSIT_LIFT_Z_MM = 50.0
+# 촬영 종료 후 큐브를 set0 에 반납하고 물러나는 높이.
+FINAL_LIFT_Z_MM = 100.0
 # safe_pose_mode=z_lift_only 일 때 매 전이에서 물러나는 높이. 티칭된 안전자세가
 # 없으므로 "현재 위치에서 수직으로 물러난다"가 유일한 공통 후퇴 동작이다.
 RETRACT_Z_MM = 100.0
@@ -445,18 +450,23 @@ def approach_and_close_gripper(rb, place_joints, place_tcp=None,
                                 approach_z_mm=GRIP_APPROACH_Z_MM):
     """그리퍼 닫기 전 항상 +Z 위에서 접근 후 하강하여 닫는다.
 
-    place_tcp이 주어지면 (place_tcp + +Z) -> place_tcp 라인 모션으로 접근.
-    주어지지 않으면 place_joints로 직접 이동 후 닫는다(폴백).
+    place_tcp 의 XY/자세는 그대로 쓰되 하강 목표 z 는 GRIP_TCP_Z_MM 으로 바꾼다.
+    놓을 때(PLACE_TCP_Z_MM)와 집을 때의 적정 높이가 다르기 때문이다.
+    place_tcp 가 없으면 place_joints 로 직접 이동 후 닫는다(폴백).
     """
     if place_tcp is not None:
-        above = list(place_tcp[:6])
+        target = list(place_tcp[:6])
+        if GRIP_TCP_Z_MM is not None:
+            target[2] = GRIP_TCP_Z_MM
+        above = list(target)
         above[2] += approach_z_mm
         try:
-            print '[Auto] +Z {:.0f}mm approach above grip pose'.format(approach_z_mm)
+            print '[Auto] +Z {:.0f}mm approach above grip pose (grip z {:.2f})'.format(
+                approach_z_mm, target[2])
             rb.line(Position(*above))
             time.sleep(0.3)
             print '[Auto] descend to grip pose'
-            rb.line(Position(*place_tcp[:6]))
+            rb.line(Position(*target))
             time.sleep(0.2)
         except Exception as e:
             raise RuntimeError('grip line approach failed: {}'.format(e))
@@ -1038,13 +1048,57 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True):
                 send_json(conn, {"command": "quit"})
                 return
 
-    # Final state: empty gripper at its explicitly validated safe pose.
+    # ---- 마무리: 마지막 set 에 놓인 큐브를 집어 set0 으로 되돌리고 놓은 뒤 물러난다.
+    #      다음 실행이 항상 set0 에서 시작할 수 있게 하려는 것이다. place_tcp 는 직전
+    #      반복이 남긴 "마지막 set 의 place TCP" 이고, 목표는 sets_order[0] 의 것이다. ----
+    first_tcp = by_set[sets_order[0]][0].get('place_tcp')
     try:
-        move_to_validated_safe(rb, safe_empty, 'empty', 'final return')
+        print ''
+        print '[Auto] --- 마무리: 큐브를 set {} 으로 되돌린다 ---'.format(sets_order[0])
+        move_to_validated_safe(rb, safe_empty, 'empty', 'final re-grip approach')
+        approach_and_close_gripper(rb, place_j, place_tcp)
+        if check_gripper() != ['0', '0', '0', '1']:
+            raise RuntimeError('gripper did not confirm CLOSED state')
+        verify_robot_still(rb)
+        time.sleep(0.3)
+
+        cur = Position(*rb.getpos().pos2list()[:6])
+        rb.line(cur.offset(dz=TRANSIT_LIFT_Z_MM))
+        verify_robot_still(rb)
+        time.sleep(0.2)
+
+        if first_tcp is None:
+            # place_tcp 가 없는 구버전 waypoint: 관절로 set0 place 에 접근한다.
+            print '[WARN] set {} has no place_tcp; joint approach instead'.format(sets_order[0])
+            approach_place_pose(rb, by_set[sets_order[0]][0]['place_joints'],
+                                'final set {}'.format(sets_order[0]))
+        else:
+            tgt = [float(x) for x in first_tcp[:6]]
+            if PLACE_TCP_Z_MM is not None:
+                tgt[2] = PLACE_TCP_Z_MM
+            above = list(tgt)
+            above[2] += TRANSIT_LIFT_Z_MM
+            print '[Auto] transit to set {} at +Z {:.0f}mm, then straight down'.format(
+                sets_order[0], TRANSIT_LIFT_Z_MM)
+            rb.line(Position(*above))
+            time.sleep(0.2)
+            rb.line(Position(*tgt))
+            verify_robot_still(rb)
+
+        print '[Auto] gripper OPEN (큐브를 set {} 에 반납)'.format(sets_order[0])
+        gripper_open()
+        if check_gripper() != ['0', '1', '0', '0']:
+            raise RuntimeError('gripper did not confirm OPEN state')
+        time.sleep(0.3)
+
+        print '[Auto] -> +Z {:.0f}mm 물러나고 종료'.format(FINAL_LIFT_Z_MM)
+        retract_z(rb, FINAL_LIFT_Z_MM, 'final')
+        verify_robot_still(rb)
     except Exception as e:
-        print '[SAFETY-ABORT] final safe return failed: {}'.format(e)
-        send_json(conn, {"command": "quit"})
-        return
+        # 마무리는 데이터에 영향이 없다. 여기서 죽어도 촬영 결과는 이미 저장돼 있으므로
+        # 경고만 남기고 정상 종료 경로를 그대로 탄다.
+        print '[WARN] 마무리(큐브 반납) 실패: {}'.format(e)
+        print '       촬영 데이터는 이미 저장되었다. 큐브 위치를 눈으로 확인할 것.'
     send_json(conn, {"command": "quit"})
     print ''
     print '=========================================='
