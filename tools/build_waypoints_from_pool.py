@@ -36,6 +36,8 @@ _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)
 from waypoint_safety import (
+    SAFE_MODE_KEY,
+    SAFE_MODE_Z_LIFT,
     validate_joint_vector,
     validate_safe_joint_config,
     validate_waypoint_semantics,
@@ -87,9 +89,13 @@ def main():
                     help="큐브 set 배치 (recset 출력)")
     ap.add_argument("--output", default="./data/session/capture_waypoints.json",
                     help="출력 waypoint JSON (서버 소비 포맷)")
-    ap.add_argument("--safe_joints_empty", type=_joint_csv, required=True,
+    ap.add_argument("--no_safe_joints", action="store_true",
+                    help="안전자세 없이 촬영한다. 로봇은 매 전이에서 안전자세 대신 +Z 로 "
+                         "리트랙트한다. 생성 파일에 safe_pose_mode=z_lift_only 로 남아 "
+                         "나중에 이 세션이 안전자세 없이 찍혔음을 추적할 수 있다.")
+    ap.add_argument("--safe_joints_empty", type=_joint_csv, default=None,
                     help="물리 검증한 empty-gripper safe joint 6개(쉼표 구분)")
-    ap.add_argument("--safe_joints_gripped", type=_joint_csv, required=True,
+    ap.add_argument("--safe_joints_gripped", type=_joint_csv, default=None,
                     help="물리 검증한 gripped-cube safe joint 6개(쉼표 구분)")
     ap.add_argument("--n_per_set", type=int, default=5,
                     help="set 당 A placement 포즈 수 (기본 5)")
@@ -148,6 +154,9 @@ def main():
     for si, s in enumerate(sets):
         set_index = int(s.get("set_index", si))
         place_joints = [float(x) for x in s["place_joints"]]
+        # 로봇이 set 사이를 수평 이동할 때 목표 XY/자세로 쓴다. z 는 서버가
+        # PLACE_TCP_Z_MM 으로 정규화하므로 티칭 당시 tool 값이어도 무방하다.
+        place_tcp = [float(x) for x in s["place_tcp"]] if "place_tcp" in s else None
         set_cc = [float(x) for x in s["set_cube_center_6dof"]]
 
         b_sel = _pick(rng, grip, args.n_grip_per_set, args.allow_repeat) if use_grip else []
@@ -171,6 +180,7 @@ def main():
                 "capture_index": capture_index,
                 "set_index": set_index,
                 "place_joints": place_joints,
+                "place_tcp": place_tcp,
                 "set_cube_center_6dof": set_cc,
                 "capture_block": "B_eyetohand",
                 "cube_gripped": True,
@@ -187,6 +197,7 @@ def main():
                 "set_index": set_index,
                 "capture_joints": [float(x) for x in p["capture_joints"]],
                 "place_joints": place_joints,
+                "place_tcp": place_tcp,
                 "set_cube_center_6dof": set_cc,
                 "capture_block": "A_placement",
                 "cube_gripped": False,
@@ -199,7 +210,18 @@ def main():
 
     n_b = sum(1 for w in waypoints if w["capture_block"] == "B_eyetohand")
     n_a = sum(1 for w in waypoints if w["capture_block"] == "A_placement")
+    if args.no_safe_joints:
+        if args.safe_joints_empty or args.safe_joints_gripped:
+            sys.exit("[ERROR] --no_safe_joints 와 --safe_joints_* 를 함께 줄 수 없다")
+        print("[WARN] 안전자세 없이 생성한다 (safe_pose_mode=z_lift_only).")
+        print("       로봇은 매 전이에서 안전자세 대신 +Z 로 리트랙트한다. "
+              "저속 dry-run 으로 전 경로를 반드시 확인할 것.")
+    elif not (args.safe_joints_empty and args.safe_joints_gripped):
+        sys.exit("[ERROR] --safe_joints_empty 와 --safe_joints_gripped 가 모두 필요하다.\n"
+                 "        안전자세 없이 진행하려면 --no_safe_joints 를 명시할 것.")
+
     out = {
+        SAFE_MODE_KEY: (SAFE_MODE_Z_LIFT if args.no_safe_joints else "taught_safe_pose"),
         "safe_joints_empty": args.safe_joints_empty,
         "safe_joints_gripped": args.safe_joints_gripped,
         "set_joints": [float(x) for x in sets[0]["place_joints"]],

@@ -51,7 +51,7 @@ class RealSenseCamera:
         use_depth: bool = False,
         align_depth_to_color: bool = True,
         warmup_frames: int = 10,
-        buffer_size: int = 8,
+        buffer_size: int = 45,
         lock_color_exposure: bool = True,
         color_exposure_us: Optional[float] = None,
         color_gain: Optional[float] = None,
@@ -66,6 +66,8 @@ class RealSenseCamera:
         self.use_depth = bool(use_depth)
         self.align_depth_to_color = bool(align_depth_to_color)
         self.warmup_frames = int(warmup_frames)
+        # 45프레임 = 15fps 기준 3초. 8프레임(0.53초)이면 카메라 한 대가 잠깐만
+        # 뒤처져도 get_at() 이 맞는 시각의 프레임을 못 찾아 span 이 폭발한다.
         self.buffer_size = max(1, int(buffer_size))
 
         self.lock_color_exposure = bool(lock_color_exposure)
