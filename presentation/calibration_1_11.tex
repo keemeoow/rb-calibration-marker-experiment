@@ -1121,32 +1121,44 @@
 \end{frame}
 
 \begin{frame}{11.6 왜 분포 기준으로 정하는가}
-  \begin{block}{어떤 세트의 어긋남이 공통 치우침과 정확히 같다면}
+  \begin{block}{어떤 세트의 어긋남이 공통 치우침과 같다면}
     \begin{enumerate}
       \item $\boldsymbol{\Delta}_s = \overline{\boldsymbol{\Delta}}$
         (이 세트의 어긋남 = 전체 평균 어긋남)
-      \item $\rightarrow$ 평균만큼 보정하면 정확히 vision 자리에 도착:
-        $\mathbf{F}^{\mathrm{corr}}_s=\mathbf{V}_s$
-      \item $\rightarrow$ vision과의 거리가 $0$: $d_t(s)=0$
+      \item 보정은 $\overline{\boldsymbol{\Delta}}$만큼 해줌
+        $\rightarrow$ 어긋난 만큼 정확히 상쇄됨
+      \item $\rightarrow$ 두 값이 겹침:
+        $\mathbf{F}^{\mathrm{corr}}_s=\mathbf{V}_s$, 따라서 $d_t(s)=0$
     \end{enumerate}
     \vspace{1mm}
-    (시계 비유: $5$분 빠른 시계에서 $5$분을 빼면 정확히 맞음)
+    (시계 비유: $5$분 빠른 시계에서 $5$분을 빼면 남는 오차가 없음)
   \end{block}
   \vfill
-  $\Rightarrow$ $d_t(s)=0$은 FK가 정확했다는 뜻이 아님.
-  \textbf{남들만큼만 틀렸다}는 뜻\\
-  $\Rightarrow$ $d_t(s)$가 재는 것 =
-  \textbf{그 세트가 공통 경향에서 얼마나 벗어났는가}
-  \vfill
-  \begin{block}{그렇다면 얼마부터 유별난 값인가}
-    나머지 세트들이 얼마나 모여 있느냐에 따라 달라짐
+  \begin{alertblock}{$d_t(s)=0$이 뜻하지 않는 것}
     \begin{itemize}
-      \item 세트들이 모두 $2\,\mathrm{mm}$ 안에 모임
-        $\rightarrow$ $10\,\mathrm{mm}$짜리 세트는 명백히 이상
-      \item 원래부터 $30\,\mathrm{mm}$씩 흩어짐
-        $\rightarrow$ 같은 $10\,\mathrm{mm}$도 평범
+      \item FK가 정확했다는 뜻이 아님 $\rightarrow$ \textbf{남들만큼만 틀렸다}는 뜻
+      \item 그 자리가 참값이라는 뜻도 아님 $\rightarrow$ 두 값이 겹쳤을 뿐
+      \item $\Rightarrow$ $d_t(s)$가 재는 것 =
+        \textbf{그 세트가 공통 경향에서 얼마나 벗어났는가}
     \end{itemize}
-  \end{block}
+  \end{alertblock}
+\end{frame}
+
+\begin{frame}{11.6 그렇다면 얼마부터 유별난 값인가}
+  나머지 세트들이 얼마나 모여 있느냐에 따라 달라짐
+  \vfill
+  \begin{itemize}
+    \item 세트들이 모두 $2\,\mathrm{mm}$ 안에 모여 있다면\\
+      $\rightarrow$ $10\,\mathrm{mm}$짜리 세트는 명백히 이상
+      \vspace{2mm}
+    \item 원래부터 $30\,\mathrm{mm}$씩 흩어져 있었다면\\
+      $\rightarrow$ 같은 $10\,\mathrm{mm}$도 평범
+  \end{itemize}
+  \vfill
+  \begin{alertblock}{}
+    고정 상수는 이 두 경우를 구분하지 못함
+    $\rightarrow$ 기준선을 데이터의 산포에서 가져오는 이유
+  \end{alertblock}
 \end{frame}
 
 \begin{frame}{11.6 하한 $\tau^{\min}$이 필요한 이유}
