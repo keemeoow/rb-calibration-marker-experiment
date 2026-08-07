@@ -24,10 +24,23 @@ def validate_joint_vector(value, label):
     return out
 
 
+SAFE_MODE_KEY = "safe_pose_mode"
+SAFE_MODE_Z_LIFT = "z_lift_only"
+
+
 def validate_safe_joint_config(data):
-    """Fail closed: empty and gripped payload safe poses are both mandatory."""
+    """Fail closed: empty and gripped payload safe poses are both mandatory.
+
+    The single exception is an explicit ``safe_pose_mode: "z_lift_only"`` in the
+    payload, which returns None so the executor retracts along +Z instead of
+    routing through a taught safe pose. That opt-out has to be written into the
+    waypoint file on purpose — a missing key still aborts — so a session shot
+    without safe poses is identifiable from its own artifacts afterwards.
+    """
     if not isinstance(data, dict):
         raise ValueError("waypoint payload must be an object")
+    if data.get(SAFE_MODE_KEY) == SAFE_MODE_Z_LIFT:
+        return None
     empty = validate_joint_vector(data.get(SAFE_EMPTY_KEY), SAFE_EMPTY_KEY)
     gripped = validate_joint_vector(data.get(SAFE_GRIPPED_KEY), SAFE_GRIPPED_KEY)
     return {SAFE_EMPTY_KEY: empty, SAFE_GRIPPED_KEY: gripped}
