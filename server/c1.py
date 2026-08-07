@@ -123,6 +123,36 @@ def recv_json(conn):
 
 # ── Robot helpers ──
 
+def read_key(prompt):
+    """Enter 없이 한 글자를 읽는다. tty 가 아니면 raw_input 으로 폴백한다.
+
+    raw 모드에서는 커널이 Ctrl-C 를 SIGINT 로 바꾸지 않으므로 \x03 을 직접 잡아
+    KeyboardInterrupt 로 올린다. 로봇 앞에서 Ctrl-C 가 먹지 않는 상태를 만들면 안 된다.
+    """
+    sys.stdout.write(prompt)
+    sys.stdout.flush()
+    try:
+        import termios
+        import tty
+        fd = sys.stdin.fileno()
+        old = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
+            ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        sys.stdout.write('\n')
+        sys.stdout.flush()
+        if ch == '\x03':
+            raise KeyboardInterrupt
+        return ch
+    except Exception:
+        # tty 가 아니거나 termios 를 못 쓰는 환경. KeyboardInterrupt 는
+        # Exception 을 상속하지 않으므로 여기서 삼켜지지 않는다.
+        line = raw_input()
+        return line[:1] if line else ' '
+
+
 def fmt6(v):
     return '[{:.1f}, {:.1f}, {:.1f}, {:.1f}, {:.1f}, {:.1f}]'.format(
         v[0], v[1], v[2], v[3], v[4], v[5])
@@ -192,6 +222,64 @@ def undo_one(entry):
         move_joint(maxis, -mvalue)
 
 
+def nearest_joint_target(rb, target_joints):
+    """목표 관절을 현재 자세 기준 +-360 등가값 중 가장 가까운 것으로 바꾼다.
+
+    티칭 파일의 d6 는 -351.8 처럼 한 바퀴 감긴 값으로 기록돼 있다. 그대로 명령하면
+    같은 자세인데도 컨트롤러가 300도 넘게 되돌아 도는 경로를 만든다(시간도, 케이블도,
+    간섭 위험도 커진다). 각 축을 현재값에 가장 가까운 등가각으로 옮기면 동일한 자세를
+    최소 회전으로 만든다.
+
+    회전 자유도가 제한된 축에서 등가각이 관절 한계를 넘을 수 있으므로, 원래 값이
+    한계 안이고 새 값이 벗어나는지는 컨트롤러의 move 가 판정한다(실패 시 호출부에서
+    원본으로 재시도).
+    """
+    cur = rb.getjnt().jnt2list()[:6]
+    out = []
+    for i in range(6):
+        t = float(target_joints[i])
+        c = float(cur[i])
+        k = round((c - t) / 360.0)
+        out.append(t + 360.0 * k)
+    return out
+
+
+def move_joint_shortest(rb, target_joints, label=''):
+    """최단 등가각으로 관절 이동. 도달 불가면 원본 값으로 한 번 재시도한다."""
+    shortest = nearest_joint_target(rb, target_joints)
+    turned = max(abs(shortest[i] - float(target_joints[i])) for i in range(6))
+    if turned > 1.0:
+        print '[Auto] {}관절 목표를 최단 등가각으로 보정 (최대 {:.0f}deg 단축)'.format(
+            (label + ' ') if label else '', turned)
+    try:
+        rb.move(Joint(*shortest[:6]))
+        return shortest
+    except Exception as e:
+        print '[WARN] 최단 등가각 이동 실패({}); 원본 관절값으로 재시도'.format(e)
+        rb.move(Joint(*[float(x) for x in target_joints[:6]]))
+        return [float(x) for x in target_joints[:6]]
+
+
+def retract_z(rb, dz_mm, label):
+    """+Z 로 물러난다. 도달 불가면 절반씩 줄여 가능한 만큼만 물러난다.
+
+    높은 자세에서 무조건 +100mm 를 명령하면 작업영역을 벗어나 Unreachable 로 죽는다.
+    후퇴는 안전을 위한 동작이므로, 전부 실패할 때만 예외를 올린다.
+    """
+    dz = float(dz_mm)
+    while dz >= 5.0:
+        try:
+            cur = Position(*rb.getpos().pos2list()[:6])
+            rb.line(cur.offset(dz=dz))
+            if dz < float(dz_mm):
+                print '[SAFE] {} 리트랙트 {:.0f}mm 로 축소(작업영역 한계)'.format(label, dz)
+            return dz
+        except Exception:
+            dz = dz / 2.0
+    print '[SAFE] {} 리트랙트 불가(이미 상한). 그대로 진행'.format(label)
+    return 0.0
+
+
 def verify_robot_still(rb, tolerance_deg=MOTION_STILL_TOL_DEG,
                        sample_sec=MOTION_STILL_SAMPLE_SEC):
     """Confirm that joints do not keep changing after a blocking motion call."""
@@ -229,8 +317,7 @@ def move_to_validated_safe(rb, safe_joints, safe_kind, transition_label):
     if safe_joints is None:
         print '[SAFE] {} -> +Z {:.0f}mm retract (no taught safe pose)'.format(
             transition_label, RETRACT_Z_MM)
-        cur = Position(*rb.getpos().pos2list()[:6])
-        rb.line(cur.offset(dz=RETRACT_Z_MM))
+        retract_z(rb, RETRACT_Z_MM, transition_label)
         actual = verify_robot_still(rb)
         return {
             'state_machine': 'z_retract_then_target_v1',
@@ -386,7 +473,7 @@ def approach_place_pose(rb, place_j, label, approach_z_mm=PLACE_APPROACH_Z_MM):
     상공 TCP 를 알 수 없으므로, 먼저 관절로 도달해 기준 TCP 를 읽은 뒤 올렸다가 내린다.
     반환: 정규화된 place TCP (재-그립/재접근 기준으로도 쓴다).
     """
-    rb.move(Joint(*place_j[:6]))
+    move_joint_shortest(rb, place_j, 'place')
     verify_robot_still(rb)
     time.sleep(0.3)
     place_tcp = get_tcp()
@@ -579,7 +666,7 @@ def _capture_at_pose(rb, conn, wp, sidx, place_j, set_cc,
             rb, safe_joints, safe_kind, 'capture {}'.format(pose_idx))
         target_started = time.time()
         if cap_j is not None:
-            rb.move(Joint(*cap_j[:6]))
+            move_joint_shortest(rb, cap_j, 'capture')
         else:
             # 안전 접근: 목표 TCP 의 +Z {approach}mm 위로 먼저 line 이동한 뒤 하강.
             tgt = [float(x) for x in cap_tcp[:6]]
@@ -603,15 +690,15 @@ def _capture_at_pose(rb, conn, wp, sidx, place_j, set_cc,
     if confirm:
         action = None
         while action is None:
-            ans = raw_input("  Capture? ('c'+Enter=촬영 / s=skip / q=quit): ").strip().lower()
-            if ans in ('c', ''):
+            ans = read_key("  [SPACE]=촬영  [s]=skip  [q]=quit > ")
+            if ans in (' ', '\r', '\n', 'c', 'C'):
                 action = 'capture'
-            elif ans == 's':
+            elif ans in ('s', 'S'):
                 action = 'skip'
-            elif ans == 'q':
+            elif ans in ('q', 'Q'):
                 action = 'quit'
             else:
-                print "  (c=촬영 / s=skip / q=quit 중 입력)"
+                print "  (SPACE=촬영 / s=skip / q=quit)"
         if action == 'skip':
             print '  -> skipped by user'
             try:

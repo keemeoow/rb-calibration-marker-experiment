@@ -112,7 +112,8 @@ def annotate_image(bgr, cube, cam_idx, is_gripper, n_markers, ids, corners,
 
 def wait_for_start_command_capture(cams, cam_order, gripper_cam_idx,
                                      extra_lines: Optional[List[str]] = None,
-                                     frame_builder=None, cube=None) -> bool:
+                                     frame_builder=None, cube=None,
+                                     preview_frac: float = 0.6) -> bool:
     """캘리브레이션 캡처 시작 전 cv2 프리뷰 + 'start' 입력 대기.
 
     `frame_builder`가 주어지면 각 카메라에서 인식되는 AprilTag 큐브/보드/ChArUco
@@ -234,8 +235,7 @@ def wait_for_start_command_capture(cams, cam_order, gripper_cam_idx,
                             cv2.FONT_HERSHEY_SIMPLEX, 0.55, (220, 220, 220), 1)
                 y += 24
         quad = cv2.vconcat([quad, foot])
-        h2 = int(quad.shape[0] * 0.6); w2 = int(quad.shape[1] * 0.6)
-        cv2.imshow(win, cv2.resize(quad, (w2, h2)))
+        cv2.imshow(win, fit_to_screen(quad, preview_frac))
 
         key = cv2.waitKey(50) & 0xFF
         if key == 27 or key == ord('q'):
@@ -256,6 +256,63 @@ def wait_for_start_command_capture(cams, cam_order, gripper_cam_idx,
         pass
     print("[abort] user cancelled before start.")
     return False
+
+
+_SCREEN_SIZE: Optional[Tuple[int, int]] = None
+
+
+def get_screen_size() -> Tuple[int, int]:
+    """(width, height) of the primary display, cached.
+
+    720p x 4 타일이면 원본이 2560x1440 이라 그대로 띄우면 화면을 덮는다. 화면 크기를
+    알아야 "모니터의 몇 %" 로 맞출 수 있는데, OpenCV 는 이를 알려주지 않는다.
+    tkinter(표준 라이브러리) -> xrandr 순으로 시도하고, 둘 다 실패하면 1920x1080 으로
+    가정한다. 실패해도 프리뷰는 떠야 하므로 예외를 올리지 않는다.
+    """
+    global _SCREEN_SIZE
+    if _SCREEN_SIZE is not None:
+        return _SCREEN_SIZE
+    size = None
+    try:
+        import tkinter
+        _root = tkinter.Tk()
+        _root.withdraw()
+        size = (_root.winfo_screenwidth(), _root.winfo_screenheight())
+        _root.destroy()
+    except Exception:
+        try:
+            import subprocess
+            out = subprocess.check_output(["xrandr"], stderr=subprocess.DEVNULL).decode()
+            for line in out.splitlines():
+                if " connected" in line and "x" in line:
+                    for tok in line.split():
+                        if "x" in tok and tok.split("x")[0].isdigit():
+                            w, h = tok.split("+")[0].split("x")
+                            size = (int(w), int(h))
+                            break
+                if size:
+                    break
+        except Exception:
+            size = None
+    _SCREEN_SIZE = size or (1920, 1080)
+    return _SCREEN_SIZE
+
+
+def fit_to_screen(img, frac: float):
+    """Scale ``img`` so it occupies at most ``frac`` of the screen in both axes.
+
+    Aspect ratio is preserved and the image is never upscaled — a small panel
+    should stay small rather than being blown up to fill the budget.
+    """
+    if img is None or frac <= 0:
+        return img
+    sw, sh = get_screen_size()
+    h, w = img.shape[:2]
+    scale = min(frac * sw / float(w), frac * sh / float(h), 1.0)
+    if scale >= 0.999:
+        return img
+    return cv2.resize(img, (max(1, int(w * scale)), max(1, int(h * scale))),
+                      interpolation=cv2.INTER_AREA)
 
 
 def make_quad_image(frames_dict, cam_order, cube, gripper_cam_idx):
@@ -728,6 +785,13 @@ def main():
     parser.add_argument("--robot_port", type=int, default=12348)
     parser.add_argument("--manual_robot", action="store_true",
                         help="Manual robot mode: server sends capture commands interactively (use with robot_calb.py)")
+    parser.add_argument("--preview_frac", type=float, default=0.6,
+                        help="프리뷰 창이 차지할 화면 비율(0~1). 종횡비는 유지하고 "
+                             "원본보다 키우지는 않는다. 기본 0.6 = 모니터의 60%%.")
+    parser.add_argument("--frame_sync_timeout_s", type=float, default=3.0,
+                        help="촬영 직전 네 카메라의 최신 프레임이 max_capture_span_ms 안으로 "
+                             "모일 때까지 기다리는 최대 시간. 초과하면 어느 카메라가 "
+                             "뒤처졌는지 출력하고 그대로 진행한다.")
     parser.add_argument("--settle_time", type=float, default=1.5,
                         help="Wait time (s) after robot signals capture before taking images")
     # start gate — 기본은 대기 없이 즉시 시작. --start_gate 를 줘야 프리뷰 + 'start' 대기.
@@ -845,8 +909,19 @@ def main():
         print("[SESSION] Automatic numbering bypassed because --root_folder was supplied.")
     # The network teaching/waypoint paths below use args.root_folder directly.
     args.root_folder = root
+    # 캡처 프레임은 <session>/calib_train 에, 티칭 풀과 최종 웨이포인트는 그 위
+    # <session>/ 에 둔다. 티칭은 여러 번 이어붙이고 웨이포인트는 그것들을 조합한
+    # 산출물이라, 프레임과 섞이면 어느 티칭이 어느 촬영을 만들었는지가 흐려진다.
+    session_root = (os.path.dirname(os.path.abspath(root))
+                    if os.path.basename(os.path.normpath(root)) == "calib_train"
+                    else os.path.abspath(root))
+    teach_dir = ensure_dir(os.path.join(session_root, "teaching"))
+    waypoints_path = os.path.join(session_root, "capture_waypoints.json")
+    print(f"[SESSION] frames    -> {root}")
+    print(f"[SESSION] teaching  -> {teach_dir}")
+    print(f"[SESSION] waypoints -> {waypoints_path}")
     if waypoint_source is not None and waypoint_payload is not None:
-        waypoint_destination = os.path.join(root, "capture_waypoints.json")
+        waypoint_destination = waypoints_path
         if os.path.realpath(waypoint_source) != os.path.realpath(waypoint_destination):
             shutil.copyfile(waypoint_source, waypoint_destination)
         print(f"[SESSION] Validated waypoints: {waypoint_destination}")
@@ -1154,7 +1229,8 @@ def main():
             extra.append(f"robot {args.robot_ip}:{args.robot_port}"
                          + (" (manual)" if args.manual_robot else ""))
         if not wait_for_start_command_capture(cams, cam_order, gripper_cam_idx, extra,
-                                               frame_builder=build_frame_record, cube=cube):
+                                               frame_builder=build_frame_record, cube=cube,
+                                               preview_frac=float(args.preview_frac)):
             for cam in cams.values():
                 cam.stop()
             cv2.destroyAllWindows()
@@ -1190,11 +1266,35 @@ def main():
         # Software-sync: 공통 host-monotonic clock의 latest ts 중 가장 오래된 것(=가장 느린 카메라)을
         # 기준으로 잡고, 다른 카메라들은 버퍼에서 그 시각에 가장 가까운 프레임을 고른다.
         # 독립 RealSense device timestamp는 epoch가 다를 수 있으므로 동기화에 직접 쓰지 않는다.
-        latest_ts_list = []
-        for ci, cam in cams.items():
-            _c, _d, ts_ms = cam.get_latest()
-            if ts_ms is not None:
-                latest_ts_list.append(ts_ms)
+        # 먼저 네 카메라의 최신 프레임이 서로 가까워질 때까지 기다린다. 한 대라도
+        # 뒤처져 있으면 target_ts 가 그만큼 과거로 잡히고, 나머지 카메라 버퍼
+        # (buffer_size 프레임 = 1초 미만)는 그 시각을 담고 있지 않아 수 초짜리 span 이
+        # 만들어진다. 그러면 게이트가 전 프레임을 버린다 — 실제로 그렇게 되었다.
+        _sync_deadline = time.time() + float(args.frame_sync_timeout_s)
+        _lag = None
+        while True:
+            _ts = {ci: cam.get_latest()[2] for ci, cam in cams.items()}
+            _have = {ci: t for ci, t in _ts.items() if t is not None}
+            if len(_have) == len(cams):
+                _lag = max(_have.values()) - min(_have.values())
+                if _lag <= float(args.max_capture_span_ms):
+                    break
+            if time.time() >= _sync_deadline:
+                if len(_have) < len(cams):
+                    _missing = sorted(set(cams) - set(_have))
+                    print(f"[SYNC] cam {_missing}: 프레임 없음 — 스트림이 끊겼는지 확인")
+                else:
+                    _newest = max(_have.values())
+                    _behind = {ci: round(_newest - t, 1) for ci, t in _have.items()}
+                    _worst = max(_behind, key=lambda k: _behind[k])
+                    print(f"[SYNC] {float(args.frame_sync_timeout_s):.1f}s 안에 동기화 실패 "
+                          f"(span {_lag:.0f}ms). 카메라별 지연(ms): {_behind}  "
+                          f"-> cam{_worst} 가 가장 뒤처짐")
+                break
+            time.sleep(0.02)
+
+        latest_ts_list = [t for t in
+                          (cam.get_latest()[2] for cam in cams.values()) if t is not None]
 
         if latest_ts_list:
             target_ts = min(latest_ts_list)
@@ -1454,17 +1554,19 @@ def main():
                                 print(f"[Teach] invalid teach_save (kind={kind})")
                                 continue
                             if teach["session"] is None:
+                                # 세션은 그대로 두고 티칭 회차만 올린다. 로봇 서버를
+                                # 다시 붙일 때마다 새 번호가 붙으므로 이전 회차 파일은
+                                # 덮이지 않고 남는다.
                                 n = 1
                                 while any(os.path.exists(os.path.join(
-                                        args.root_folder, f"{b}_{n:03d}.json"))
+                                        teach_dir, f"{b}_{n:03d}.json"))
                                         for b in ("grip_poses", "capture_poses", "capture_sets")):
                                     n += 1
                                 teach["session"] = n
-                                os.makedirs(args.root_folder, exist_ok=True)
-                                print(f"[Teach] recording session #{n:03d} "
-                                      f"-> {args.root_folder}/*_{n:03d}.json")
+                                print(f"[Teach] recording round #{n:03d} "
+                                      f"-> {teach_dir}/*_{n:03d}.json")
                             path = os.path.join(
-                                args.root_folder, f"{name}_{teach['session']:03d}.json")
+                                teach_dir, f"{name}_{teach['session']:03d}.json")
                             try:
                                 with open(path, "w") as tf:
                                     json.dump({name: entries}, tf, indent=2)
@@ -1474,7 +1576,7 @@ def main():
                             continue
 
                         if cmd == "request_waypoints":
-                            wp_path = os.path.join(args.root_folder, "capture_waypoints.json")
+                            wp_path = waypoints_path
                             print(f"[ManualRobot] Robot requested waypoints. Sending {wp_path}")
                             try:
                                 with open(wp_path, "r") as wf:
@@ -1509,7 +1611,7 @@ def main():
                         if cmd == "save_waypoints":
                             # teach_extend.py가 머지된 전체 waypoint 데이터를 통째로 보내며
                             # PC에 영구 저장을 요청. 기존 파일은 .bak으로 백업한 뒤 덮어씀.
-                            wp_path = os.path.join(args.root_folder, "capture_waypoints.json")
+                            wp_path = waypoints_path
                             wp_data = msg.get("waypoints_data")
                             if not isinstance(wp_data, dict):
                                 err = json.dumps({
@@ -1667,7 +1769,8 @@ def main():
                             ph = int(quad.shape[0] * 0.6)
                             pw = int(quad.shape[1] * 0.6)
                             preview = cv2.resize(quad, (pw, ph))
-                            cv2.imshow("Capture Preview", preview)
+                            cv2.imshow("Capture Preview",
+                                       fit_to_screen(preview, float(args.preview_frac)))
 
                         key = cv2.waitKey(50) & 0xFF
                         if key == 27 or key == ord('q'):
@@ -1737,7 +1840,7 @@ def main():
                         )
                         cv2.putText(panel, gate_line, (12, 28 + line_idx * 28),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.58, color, 2)
-                    cv2.imshow("Capture Gate", panel)
+                    cv2.imshow("Capture Gate", fit_to_screen(panel, float(args.preview_frac)))
                     for ci in sorted(frames_view.keys()):
                         img = frames_view[ci]["color"].copy()
                         ids_np = frames_view[ci]["ids_np"]
@@ -1753,7 +1856,7 @@ def main():
                         txt = f"cam{ci}({tag}) markers={n} ok={frames_view[ci]['ok']}"
                         cv2.putText(img, txt, (10, 30),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                        cv2.imshow(f"cam{ci}", img)
+                        cv2.imshow(f"cam{ci}", fit_to_screen(img, float(args.preview_frac) / 2.0))
 
                 key = cv2.waitKey(1) & 0xFF
                 if key == 27 or key == ord('q'):
