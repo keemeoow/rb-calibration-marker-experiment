@@ -1103,7 +1103,6 @@
       \item 원래부터 $30\,\mathrm{mm}$씩 흩어짐
         $\rightarrow$ 같은 $10\,\mathrm{mm}$도 평범
     \end{itemize}
-    고정 상수는 이 두 경우를 구분하지 못함
   \end{block}
 \end{frame}
 
@@ -1121,30 +1120,54 @@
   \end{alertblock}
 \end{frame}
 
-\begin{frame}{11.6 하한을 무엇으로 정하는가}
-  상수를 다시 쓰면 처음 문제로 회귀 $\rightarrow$ \textbf{vision 합의 자신의 흔들림}을 사용
-  \[
-    \tau^{\min}_t
-    =
-    \operatorname{median}_s
-    \left(\operatorname{scatter}_t(\mathcal{P}_s)\right),
-    \qquad
-    \tau^{\min}_R
-    =
-    \operatorname{median}_s
-    \left(\operatorname{scatter}_R(\mathcal{P}_s)\right)
-  \]
+\begin{frame}{11.6 하한을 무엇으로 정하는가 (1) 상황}
+  상수를 다시 쓰면 처음 문제로 회귀. 그렇다면 무엇을 기준으로?
   \vfill
-  \begin{block}{이유: 분해능}
+  \begin{block}{어떤 세트에서 카메라 3대가 큐브 위치를 이렇게 말함}
+    \centering
+    카메라 0: $100.0\,\mathrm{mm}$ \qquad
+    카메라 1: $101.5\,\mathrm{mm}$ \qquad
+    카메라 2: $98.5\,\mathrm{mm}$
+  \end{block}
+  \vfill
+  \begin{itemize}
+    \item 셋이 $1.5\,\mathrm{mm}$씩 어긋남
+    \item $\rightarrow$ 이들을 평균한 $\mathbf{V}_s$도 그만큼 불확실
+  \end{itemize}
+  \vfill
+  \begin{alertblock}{이때 FK가 $\mathbf{V}_s$에서 $1\,\mathrm{mm}$ 벗어났다면?}
+    이 세트를 탈락시켜야 하는가 $\rightarrow$ \textbf{판단 불가}\\
+    그 $1\,\mathrm{mm}$가 FK 탓인지 vision 탓인지 알 수 없음
+  \end{alertblock}
+\end{frame}
+
+\begin{frame}{11.6 하한을 무엇으로 정하는가 (2) 분해능}
+  \begin{block}{자 비유}
     \begin{itemize}
-      \item 카메라들끼리 $1.5\,\mathrm{mm}$씩 어긋남
-        $\rightarrow$ $\mathbf{V}_s$ 자체가 그만큼 불확실
-      \item 이때 FK가 $1\,\mathrm{mm}$ 벗어남
-        $\rightarrow$ FK 탓인지 vision 탓인지 구별 불가
-      \item 자의 눈금보다 작은 차이를 재려는 것과 같음
-      \item $\rightarrow$ 구별할 수 없는 차이로 탈락시키는 것은 근거 없음
+      \item 눈금이 $1\,\mathrm{mm}$인 자로 두 물건을 재니 $0.3\,\mathrm{mm}$ 차이
+      \item 진짜 차이인가, 자를 읽은 오차인가 $\rightarrow$ 알 수 없음
+      \item 자의 분해능보다 작은 차이는 의미 없음
     \end{itemize}
   \end{block}
+  \vfill
+  카메라들이 서로 어긋난 정도 = \textbf{vision의 눈금}\\
+  그보다 작은 차이로는 세트를 탈락시키지 않음
+  \vfill
+  \begin{block}{그래서 하한 = 세트별 산포의 중앙값}
+    \[
+      \tau^{\min}_t
+      =
+      \operatorname{median}_s
+      \left(\operatorname{scatter}_t(\mathcal{P}_s)\right),
+      \qquad
+      \tau^{\min}_R
+      =
+      \operatorname{median}_s
+      \left(\operatorname{scatter}_R(\mathcal{P}_s)\right)
+    \]
+  \end{block}
+  \vfill
+  \centering 11.3절 강건 평균에서 이미 계산되는 값 $\rightarrow$ 추가 비용 없음
 \end{frame}
 
 \begin{frame}{11.7 단계 6: gate 결과에 따라 anchor 확정}
