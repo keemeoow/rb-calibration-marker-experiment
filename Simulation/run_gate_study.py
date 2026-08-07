@@ -234,8 +234,14 @@ def experiment_g(seeds, workers, outdir, cached=None):
             rej[f"{name}|{k}"] = float(np.mean(rates)) if rates else 0.0
 
     fig, axes = plt.subplots(1, 2, figsize=(13, 4.6))
+    # 왼쪽은 seed 표준오차 밴드를 함께 그린다. 밴드를 빼면 y축이 확대되어
+    # 변동이 실제보다 크게 보이고, 결론("둔감하다")과 반대로 읽힌다.
     for name, label, color, _ in K_SCENARIOS:
-        ys = [out[f"G|{name}|{k}"][0] for k in K_VALUES]
+        ys = np.array([out[f"G|{name}|{k}"][0] for k in K_VALUES])
+        sd = np.array([out[f"G|{name}|{k}"][1] for k in K_VALUES])
+        se = sd / np.sqrt(max(out[f"G|{name}|{K_VALUES[0]}"][2], 1))
+        axes[0].fill_between(K_VALUES, ys - se, ys + se, color=color,
+                             alpha=0.15, linewidth=0, zorder=2)
         axes[0].plot(K_VALUES, ys, color=color, linewidth=2.0, marker="o",
                      markersize=8, markeredgecolor=SURFACE, markeredgewidth=2,
                      label=label, zorder=3)
@@ -243,9 +249,12 @@ def experiment_g(seeds, workers, outdir, cached=None):
         axes[1].plot(K_VALUES, rs, color=color, linewidth=2.0, marker="o",
                      markersize=8, markeredgecolor=SURFACE, markeredgewidth=2,
                      label=label, zorder=3)
+    axes[0].annotate("음영 = seed 표준오차\n선의 오르내림이 이 안에 들어감",
+                     (0.03, 0.06), xycoords="axes fraction",
+                     fontsize=8.5, color=MUTED)
     for ax, ylabel, title in [
-        (axes[0], "held-out 작업 오차 (mm)", "k 를 바꾸면 정확도가 달라지는가"),
-        (axes[1], "세트 탈락 비율 (%)", "k 가 커질수록 관대해진다"),
+        (axes[0], "held-out 작업 오차 (mm)", "k 를 바꿔도 정확도는 변하지 않는다"),
+        (axes[1], "세트 탈락 비율 (%)", "반면 몇 개를 버리는지는 크게 달라진다"),
     ]:
         _style(ax, "k  (기준선 = 중앙값 + k × 1.4826 × MAD)", ylabel, title)
         ax.set_xticks(K_VALUES)
@@ -253,10 +262,10 @@ def experiment_g(seeds, workers, outdir, cached=None):
         ax.annotate("현재 값 2.5", (2.5, ax.get_ylim()[1]),
                     textcoords="offset points", xytext=(4, -12),
                     color=MUTED, fontsize=8.5)
-        ax.legend(loc="best", frameon=False, fontsize=9)
+        ax.legend(loc="center right", frameon=False, fontsize=9)
     # 미끄러짐 3/11 = 27.3% 기준선
     axes[1].axhline(3 / 11 * 100, color=INK, linewidth=1.4, linestyle="--", zorder=4)
-    axes[1].annotate("주입한 미끄러짐 비율 27.3%", (K_VALUES[-1], 3 / 11 * 100),
+    axes[1].annotate("실제 주입한 미끄러짐 27.3%", (K_VALUES[-1], 3 / 11 * 100),
                      textcoords="offset points", xytext=(-4, 6),
                      ha="right", fontsize=8.5, color=INK)
     fig.tight_layout()
