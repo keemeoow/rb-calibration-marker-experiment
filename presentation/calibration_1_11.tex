@@ -582,12 +582,12 @@
     \end{itemize}
   \end{block}
   \vfill
-  \begin{alertblock}{세 FK 방식의 차이}
+  \begin{alertblock}{앞으로 비교할 Calibration 방식의 차이}
     관측식은 동일. $\mathbf{Q}_s$를 무엇으로 정의하느냐가 다름
   \end{alertblock}
 \end{frame}
 
-\begin{frame}{앞으로 볼 세 가지 방식}
+\begin{frame}{9. 앞으로 볼 세 가지 방식}
   같은 관측식. $\mathbf{Q}_s$를 무엇으로 채우는지가 다름
   \[
     \mathbf{Q}_s=
@@ -610,11 +610,11 @@
 \end{frame}
 
 %==================================================================
-\section{9. 방법 1: No-FK}
+\section{9.1 방법 1: No-FK}
 %==================================================================
 
-\begin{frame}{9. 방법 1: No-FK}
-  \begin{block}{9.1 개요}
+\begin{frame}{9.1 방법 1: No-FK}
+  \begin{block}{개요}
     \begin{itemize}
       \item 로봇이 알려주는 큐브 자세를 사용하지 않음
       \item 카메라 위치, hand-eye, 세트별 큐브 자세를 vision 관측만으로 함께 찾음
@@ -637,30 +637,7 @@
   \]
 \end{frame}
 
-\begin{frame}{9.2 비슷해 보이는 세 기호}
-  \begin{center}
-    \begin{tabular}{cl}
-      \toprule
-      기호 & 무엇인가 \\
-      \midrule
-      $\mathbf{Q}_s$ & 카메라 예측을 맞출 기준 자리 \\
-      $\mathbf{O}_s$ & 그 자리를 채우는 자유변수 \\
-      $\widehat{\mathbf{O}}_s$ & 최적화가 끝난 뒤 나온 추정 결과 \\
-      \bottomrule
-    \end{tabular}
-  \end{center}
-  \vfill
-  \begin{itemize}
-    \item $\mathbf{Q}_s=\mathbf{O}_s$ = 두 값이 같다는 뜻이 아님
-    \item 기준 자리를 고정값이 아니라 \textbf{자유변수로 채운다}는 선언
-    \item \texttt{Fixed-FK}는 같은 자리를 FK 값으로 채움
-  \end{itemize}
-  \vfill
-  셋 중 어느 것도 큐브의 진짜 자세가 아님\\
-  진짜 자세는 10.3절에서 $\mathbf{O}^{\mathrm{true}}_s$로 따로 표기
-\end{frame}
-
-\begin{frame}{9.3 장점과 주의점}
+\begin{frame}{9.2 장점과 주의점}
   \begin{block}{장점}
     \begin{itemize}
       \item raw FK의 계통오차가 캘리브레이션에 직접 들어오지 않음
@@ -862,10 +839,6 @@
     \operatorname{SolveNoFK}(\text{vision observations})
   \]
   \vfill
-  \begin{itemize}
-    \item 위첨자 $(0)$ = 초기 추정값 표시
-    \item 최종 결과가 아닌 중간 단계 값 $\rightarrow$ 햇 기호와 구분
-  \end{itemize}
 \end{frame}
 
 \begin{frame}{11.3 단계 2: 세트별 vision 합의 자세}
@@ -909,20 +882,23 @@
 \end{frame}
 
 \begin{frame}{11.3 강건 평균이 이상치를 거르는 기준}
-  현재 평균에서 각 예측까지의 거리를 재고, 그 분포에서 자를 선을 결정
-  \[
-    \text{버린다}
-    \quad\Longleftrightarrow\quad
-    \text{거리}
-    >
-    \operatorname{median}(\text{거리})
-    + k\cdot 1.4826\cdot\operatorname{MAD}(\text{거리}),
-    \qquad k=2.5
-  \]
-  \begin{itemize}
-    \item 걸러낸 뒤 남은 값으로 평균을 다시 계산 $\rightarrow$ 최대 세 번 반복
-    \item 이상치를 제거하면 평균이 이동 $\rightarrow$ 처음 놓친 이상치가 드러남
-  \end{itemize}
+  \begin{enumerate}
+    \item 현재 평균에서 각 예측까지의 거리를 잰다
+      $\rightarrow$ $d_1,\ d_2,\ \dots,\ d_n$
+      \vspace{1mm}
+    \item 그 거리들로 자를 선을 정한다
+      \[
+        \tau = \operatorname{median}(d) + k \cdot 1.4826 \cdot \operatorname{MAD}(d),
+        \qquad k = 2.5
+      \]
+    \item $d_i > \tau$ 인 예측은 버린다
+      \vspace{1mm}
+    \item 남은 값으로 평균을 다시 내고 1\,--\,3을 최대 세 번 반복
+      \begin{itemize}
+        \item 이상치를 제거하면 평균이 이동
+          $\rightarrow$ 처음 놓친 이상치가 드러나기 때문
+      \end{itemize}
+  \end{enumerate}
   \vfill
   \begin{block}{11.6절의 gate도 같은 형태의 식}
     \begin{center}
