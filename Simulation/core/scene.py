@@ -39,6 +39,7 @@ class SimScene:
                  sigma_px=0.3, fk_noise_mm=0.0, fk_noise_deg=0.0,
                  fk_sys_mm=0.0, fk_sys_deg=0.0,
                  intrinsic_err=0.0, outlier_rate=0.0, outlier_px=15.0,
+                 fk_slip_sets=0, fk_slip_mm=0.0, fk_slip_deg=0.0,
                  cam_radius_m=0.35, cam_height_m=0.35,
                  incidence_max_deg=75.0, use_real_cameras=True,
                  cam_downtilt_deg=27.0, n_gripped_events=0):
@@ -148,6 +149,23 @@ class SimScene:
                 T[:3, :3] = dR @ T[:3, :3]
                 T[:3, 3] = T[:3, 3] + rng.normal(0, fk_noise_mm / 1000, 3)
             self.fk_cube[s] = T
+
+        # ---- 특정 세트만 크게 어긋나는 경우 (큐브가 그리퍼 안에서 미끄러짐) ----
+        #   상수 de-bias 로는 제거되지 않고 그 세트에만 남는 오차. gate 가 잡아내야 하는 대상.
+        self.fk_slip_sets = []
+        if fk_slip_sets > 0 and (fk_slip_mm > 0 or fk_slip_deg > 0):
+            rslip = np.random.default_rng(9000 + seed)
+            pick = rslip.choice(len(self.sets),
+                                size=min(int(fk_slip_sets), len(self.sets)),
+                                replace=False)
+            self.fk_slip_sets = sorted(int(self.sets[i]) for i in pick)
+            for s in self.fk_slip_sets:
+                ax = rslip.normal(size=3); ax /= (np.linalg.norm(ax) + 1e-12)
+                d = rslip.normal(size=3); d /= (np.linalg.norm(d) + 1e-12)
+                T = self.fk_cube[s].copy()
+                T[:3, :3] = rot_axis_angle(ax, np.deg2rad(fk_slip_deg)) @ T[:3, :3]
+                T[:3, 3] = T[:3, 3] + d * (fk_slip_mm / 1000.0)
+                self.fk_cube[s] = T
 
         # ---- 카메라별 개별 실측 intrinsic ----
         #   real 은 카메라마다 K 가 다름(평균 하나 아님). sim 고정캠 0/1/2 → real cam 0/1/3,
