@@ -1127,18 +1127,19 @@
         (이 세트의 어긋남 = 전체 평균 어긋남)
       \item 보정은 $\overline{\boldsymbol{\Delta}}$만큼 해줌
         $\rightarrow$ 어긋난 만큼 정확히 상쇄됨
-      \item $\rightarrow$ 두 값이 겹침:
-        $\mathbf{F}^{\mathrm{corr}}_s=\mathbf{V}_s$, 따라서 $d_t(s)=0$
+      \item $\rightarrow$ 두 자세가 통째로 겹침:
+        $\mathbf{F}^{\mathrm{corr}}_s=\mathbf{V}_s$\\
+        위치도 방향도 같아짐 $\rightarrow$ $d_t(s)=0$이고 $d_R(s)=0$
     \end{enumerate}
     \vspace{1mm}
     (시계 비유: $5$분 빠른 시계에서 $5$분을 빼면 남는 오차가 없음)
   \end{block}
   \vfill
-  \begin{alertblock}{$d_t(s)=0$이 뜻하지 않는 것}
+  \begin{alertblock}{두 값이 $0$이라는 것이 뜻하지 않는 것}
     \begin{itemize}
       \item FK가 정확했다는 뜻이 아님 $\rightarrow$ \textbf{남들만큼만 틀렸다}는 뜻
-      \item 그 자리가 참값이라는 뜻도 아님 $\rightarrow$ 두 값이 겹쳤을 뿐
-      \item $\Rightarrow$ $d_t(s)$가 재는 것 =
+      \item 그 자세가 참값이라는 뜻도 아님 $\rightarrow$ 두 값이 겹쳤을 뿐
+      \item $\Rightarrow$ $d_t(s)$와 $d_R(s)$가 재는 것 =
         \textbf{그 세트가 공통 경향에서 얼마나 벗어났는가}
     \end{itemize}
   \end{alertblock}
