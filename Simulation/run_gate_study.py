@@ -168,9 +168,9 @@ def experiment_f(seeds, workers, outdir, cached=None):
 
     for ax, (getter, ylabel, title, fmt) in zip(axes, [
         (lambda n, uf: rates[f"{n}|{int(uf)}"] * 100,
-         "세트 탈락 비율 (%)", "하한이 없으면 멀쩡한 세트가 탈락한다", "%.0f%%"),
+         "세트 탈락 비율 (%)", "하한을 꺼도 탈락 세트가 그대로다", "%.0f%%"),
         (lambda n, uf: out[f"F|{n}|{int(uf)}"][0],
-         "held-out 작업 오차 (mm)", "그 결과 정확도도 나빠진다", "%.2f"),
+         "held-out 작업 오차 (mm)", "정확도도 완전히 동일하다", "%.2f"),
     ]):
         for i, (uf, color, lab) in enumerate([(True, STATUS_GOOD, "하한 사용"),
                                               (False, STATUS_CRIT, "하한 없음")]):
