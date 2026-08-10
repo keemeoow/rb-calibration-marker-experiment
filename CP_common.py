@@ -161,6 +161,10 @@ class CornerObs:
     object_points: np.ndarray  # Nx3, cube/object frame
     image_points: np.ndarray   # Nx2
     err_hint_px: float
+    # Grasp this observation was taken under, or None when the cube was resting
+    # on the table.  A gripped cube is not at a per-set pose: it is at
+    # FK(q_event) @ T_gripper_cube[grasp], so the two cases cannot share a target.
+    grasp_idx: Optional[int] = None
 
 
 def try_parse_pose6(obj: Any) -> Optional[List[float]]:
@@ -518,6 +522,16 @@ def detect_corner_observations(
         if exclude_gripped and cap.get("cube_gripped"):
             continue
         sidx = get_capture_set_index(cap)
+        gripped = bool(cap.get("cube_gripped"))
+        grasp = cap.get("grasp_id")
+        if gripped and grasp is None:
+            # Without a grasp id there is no way to say which constant offset
+            # this frame shares.  Failing here beats silently demoting it to a
+            # placement observation, which would pin the cube to the wrong pose.
+            raise ValueError(
+                f"capture event {eid} is cube_gripped but carries no grasp_id; "
+                "repair the meta before feeding gripped frames to the solver")
+        grasp = int(grasp) if gripped else None
         for ci_str, cinfo in cap.get("cams", {}).items():
             ci = int(ci_str)
             if ci not in all_cam_ids or not cinfo.get("saved"):
@@ -578,6 +592,7 @@ def detect_corner_observations(
                     object_points=np.concatenate(obj_all, axis=0),
                     image_points=np.concatenate(img_all, axis=0),
                     err_hint_px=max_err_gripper if ci == gripper_cam_idx else max_err_fixed,
+                    grasp_idx=grasp,
                 ))
 
     reason = ""

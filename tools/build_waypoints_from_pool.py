@@ -69,6 +69,15 @@ MIN_TRAIN_EIH_CUBE_EVENTS = 3  # CP_ablation_7row split contract
 # distance on a comparable footing.
 CLUSTER_MM_PER_DEG = 10.0
 
+# Wrist-camera working distance validated on session01: every A frame sat
+# 418-826 mm from its set's cube centre and the gripper camera detected cube
+# markers on 95-97% of them, with no falloff inside the band.  Outside it there
+# is no evidence either way, and a pose too close cannot hold the cube in frame
+# at all.  Assigning a pose to a placement it cannot see spends one of the few
+# A views per set for nothing, so the assignment respects the band.
+A_WORKING_DIST_MIN_MM = 400.0
+A_WORKING_DIST_MAX_MM = 830.0
+
 
 def _load(path, key):
     if not os.path.exists(path):
@@ -144,6 +153,33 @@ def _viewpoint_clusters(poses, k):
     return clusters
 
 
+def _tcp_mm(pose):
+    T = euler_deg_to_matrix(*[float(v) for v in pose["capture_tcp"]])
+    return np.asarray(T[:3, 3], dtype=np.float64) * 1000.0
+
+
+def _eligible_for_set(poses, set_cc, dist_min, dist_max):
+    """Indices of A poses whose wrist sits a usable distance from this cube.
+
+    A poses replay as joint values at every placement, so the same pose is a
+    different viewpoint at each one — usable at some placements and useless at
+    others.  Filtering per set is what keeps a scarce A budget from being spent
+    on a placement the camera cannot frame.
+    """
+    if dist_min <= 0 and dist_max <= 0:
+        return list(range(len(poses)))
+    centre = np.asarray([float(v) for v in set_cc[:3]], dtype=np.float64)
+    keep = []
+    for i, p in enumerate(poses):
+        if not isinstance(p.get("capture_tcp"), list):
+            keep.append(i)  # 거리 판단 불가 -> 배제하지 않는다
+            continue
+        d = float(np.linalg.norm(_tcp_mm(p) - centre))
+        if (dist_min <= 0 or d >= dist_min) and (dist_max <= 0 or d <= dist_max):
+            keep.append(i)
+    return keep
+
+
 def _balanced_pick(poses, clusters, n, set_ordinal):
     """One pose from each of n clusters, rotating members across sets.
 
@@ -199,6 +235,11 @@ def main():
     ap.add_argument("--n_grip_at_station", type=int, default=0,
                     help="B 스테이션에서 찍을 grip 포즈 수. 0 이면 풀 전체를 티칭 순서대로 "
                          "모두 사용한다(권장: 티칭 자체를 촬영 계획으로 삼는다)")
+    ap.add_argument("--a_dist_min_mm", type=float, default=A_WORKING_DIST_MIN_MM,
+                    help="A 포즈 TCP 와 그 배치 큐브중심 사이 최소 거리. 이 밴드 밖인 "
+                         "(포즈, 배치) 조합은 배정하지 않는다. 0 이면 검사 안 함")
+    ap.add_argument("--a_dist_max_mm", type=float, default=A_WORKING_DIST_MAX_MM,
+                    help="같은 밴드의 최대 거리. 0 이면 검사 안 함")
     ap.add_argument("--a_assign", choices=("balanced", "random"), default="balanced",
                     help="set 별 A 포즈 배정 방식. balanced(기본)는 풀을 n_per_set 개 "
                          "viewpoint 클러스터로 나눠 set 마다 각 클러스터에서 하나씩 뽑는다. "
@@ -267,18 +308,10 @@ def main():
           f"sets={len(sets)}  n_per_set(A)={args.n_per_set}  "
           f"a_assign={args.a_assign}  seed={'random' if args.seed < 0 else args.seed}")
 
-    clusters = None
-    if args.a_assign == "balanced":
-        clusters = _viewpoint_clusters(poses, args.n_per_set)
-        if clusters is None:
-            why = (f"n_per_set {args.n_per_set} > A 포즈 수 {len(poses)} (복원 추출)"
-                   if args.n_per_set > len(poses)
-                   else "A 풀에 capture_tcp 가 없다")
-            print(f"[WARN] viewpoint 클러스터를 만들 수 없다: {why}. 랜덤 배정으로 폴백한다.")
-        else:
-            spread = [len(c) for c in clusters]
-            print(f"[INFO] viewpoint 클러스터 {args.n_per_set}개 크기: {spread} "
-                  f"(set 마다 각 클러스터에서 1개)")
+    if args.a_dist_min_mm > 0 or args.a_dist_max_mm > 0:
+        print(f"[INFO] A 포즈-배치 거리 밴드 {args.a_dist_min_mm:.0f}~"
+              f"{args.a_dist_max_mm:.0f}mm (밴드 밖 포즈는 그 배치에 배정하지 않는다)")
+    eligible_by_set: Dict[int, int] = {}
 
     # A 뷰 수가 split 계약을 만족하는지 촬영 전에 알린다. 사후에 set 이 탈락하면
     # position holdout 에서 위치 하나가 통째로 사라진다.
@@ -318,13 +351,31 @@ def main():
             is_station = False
             b_sel = _pick(rng, grip, args.n_grip_per_set, args.allow_repeat)
             a_sel = None
+        eligible = None
         if a_sel is None:
-            a_sel = (_balanced_pick(poses, clusters, args.n_per_set, ordinal)
+            # 이 배치에서 쓸 수 있는 포즈만 남긴 뒤, 그 부분집합 안에서 viewpoint
+            # 를 고르게 뽑는다. 전역으로 한 번 클러스터링하면 배치마다 다른
+            # 가용 집합을 무시하게 된다.
+            keep = _eligible_for_set(poses, set_cc,
+                                     args.a_dist_min_mm, args.a_dist_max_mm)
+            eligible = len(keep)
+            eligible_by_set[set_index] = eligible
+            if eligible < args.n_per_set:
+                sys.exit(
+                    f"[ERROR] set_index {set_index}: 거리 밴드 안에 드는 A 포즈가 "
+                    f"{eligible}개뿐이라 {args.n_per_set}개를 배정할 수 없다. "
+                    f"이 배치를 볼 수 있는 A 포즈를 더 티칭하거나 "
+                    f"--a_dist_min_mm/--a_dist_max_mm 를 조정할 것")
+            pool = [poses[i] for i in keep]
+            clusters = (_viewpoint_clusters(pool, args.n_per_set)
+                        if args.a_assign == "balanced" else None)
+            a_sel = (_balanced_pick(pool, clusters, args.n_per_set, ordinal)
                      if clusters is not None
-                     else _pick(rng, poses, args.n_per_set, args.allow_repeat))
+                     else _pick(rng, pool, args.n_per_set, args.allow_repeat))
 
         print(f"  set_index={set_index}{' [B station]' if is_station else ''}: "
-              f"B={[p.get('pose_index') for p in b_sel]}  "
+              + (f"가용 {eligible}/{len(poses)}  " if eligible is not None else "")
+              + f"B={[p.get('pose_index') for p in b_sel]}  "
               f"A={[p.get('pose_index') for p in a_sel]}")
 
         # --- Phase B (먼저): TCP 앵커. 기준 set 대비 (set_cc - c_ref) 만큼 x,y,z 평행이동.
@@ -404,8 +455,9 @@ def main():
             "b_ref_set": b_ref_set,
             "n_per_set_A": args.n_per_set,
             "n_grip_per_set_B": None if use_station else args.n_grip_per_set,
-            "a_assign": args.a_assign if clusters is not None else "random",
-            "a_cluster_sizes": [len(c) for c in clusters] if clusters is not None else None,
+            "a_assign": args.a_assign,
+            "a_dist_band_mm": [args.a_dist_min_mm, args.a_dist_max_mm],
+            "a_eligible_poses_by_set": eligible_by_set,
             "seed": None if args.seed < 0 else args.seed,
             "allow_repeat": args.allow_repeat,
             "projected_train_eih_cube_per_set": {

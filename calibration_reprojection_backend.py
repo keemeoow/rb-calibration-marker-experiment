@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 
 import cv2
@@ -30,6 +30,15 @@ from apriltag_cube import inv_T
 
 TransformKey = Tuple[str, int]
 
+# How a gripped-cube observation gets its target pose.  This is the FK axis in
+# its sharpest form: the cube is bolted to the gripper, so either FK carries it
+# (one constant per grasp) or it does not (six free DoF per event).  A placement
+# cannot pose the question this cleanly — its only FK link is a single contact
+# measurement taken once per set.
+GRIPPED_TARGET_GRASP = "grasp"        # T_base_cube[e] = FK(q_e) @ T_gripper_cube[g]
+GRIPPED_TARGET_EVENT = "event_free"   # T_base_cube[e] free, FK unused
+GRIPPED_TARGET_MODELS = frozenset({GRIPPED_TARGET_GRASP, GRIPPED_TARGET_EVENT})
+
 
 @dataclass(frozen=True)
 class PixelObs:
@@ -39,6 +48,11 @@ class PixelObs:
     set_idx: Optional[int]
     object_points: np.ndarray
     image_points: np.ndarray
+    # Set only while the robot HOLDS the cube.  Then the target is not a static
+    # per-set pose but ``FK(q_event) @ T_gripper_cube[grasp_idx]``: the cube rides
+    # the gripper, so one constant per grasp replaces one pose per placement.
+    # ``None`` keeps the placement model and the legacy behaviour untouched.
+    grasp_idx: Optional[int] = None
 
 
 @dataclass
@@ -47,6 +61,13 @@ class PoseState:
     gtc: np.ndarray
     board: Optional[np.ndarray]
     cubes: Dict[int, np.ndarray]
+    # T_gripper_cube per grasp.  Empty unless gripped observations are in play.
+    grasps: Dict[int, np.ndarray] = field(default_factory=dict)
+    # T_base_cube per gripped event, for the arm that refuses to let FK carry the
+    # cube.  This is the other half of the FK-on/off contrast: with the grasp
+    # model FK fully determines the cube's motion from one constant per grasp;
+    # here every gripped event pays its own 6 DoF and FK says nothing.
+    event_cubes: Dict[int, np.ndarray] = field(default_factory=dict)
 
     def clone(self) -> "PoseState":
         return PoseState(
@@ -57,6 +78,10 @@ class PoseState:
                    np.asarray(self.board, dtype=np.float64).copy()),
             cubes={int(k): np.asarray(v, dtype=np.float64).copy()
                    for k, v in self.cubes.items()},
+            grasps={int(k): np.asarray(v, dtype=np.float64).copy()
+                    for k, v in self.grasps.items()},
+            event_cubes={int(k): np.asarray(v, dtype=np.float64).copy()
+                         for k, v in self.event_cubes.items()},
         )
 
 
@@ -147,6 +172,10 @@ def state_transform(state: PoseState, key: TransformKey) -> np.ndarray:
         return state.board
     if kind == "cube":
         return state.cubes[int(idx)]
+    if kind == "grasp":
+        return state.grasps[int(idx)]
+    if kind == "cube_event":
+        return state.event_cubes[int(idx)]
     raise KeyError(key)
 
 
@@ -161,6 +190,10 @@ def set_state_transform(state: PoseState, key: TransformKey, value: np.ndarray) 
         state.board = value
     elif kind == "cube":
         state.cubes[int(idx)] = value
+    elif kind == "grasp":
+        state.grasps[int(idx)] = value
+    elif kind == "cube_event":
+        state.event_cubes[int(idx)] = value
     else:
         raise KeyError(key)
 
@@ -189,6 +222,18 @@ def variable_keys(names: Sequence[str], state: PoseState) -> List[TransformKey]:
             keys.append(("board", -1))
         elif name == "T_base_cube_by_set":
             keys.extend(("cube", int(s)) for s in sorted(state.cubes))
+        elif name == "T_gripper_cube_by_grasp":
+            if not state.grasps:
+                raise RuntimeError(
+                    "schema requested T_gripper_cube_by_grasp but the state holds "
+                    "no grasps — the observations carry no gripped frames")
+            keys.extend(("grasp", int(g)) for g in sorted(state.grasps))
+        elif name == "T_base_cube_by_event":
+            if not state.event_cubes:
+                raise RuntimeError(
+                    "schema requested T_base_cube_by_event but the state holds no "
+                    "per-event cube poses — the observations carry no gripped frames")
+            keys.extend(("cube_event", int(e)) for e in sorted(state.event_cubes))
         else:
             raise ValueError(f"unknown variable family {name!r}")
     return keys
@@ -200,6 +245,8 @@ def freeze_manifest(state: PoseState, free_keys: Sequence[TransformKey]) -> dict
         + [("gtc", -1)]
         + ([] if state.board is None else [("board", -1)])
         + [("cube", int(s)) for s in sorted(state.cubes)]
+        + [("grasp", int(g)) for g in sorted(state.grasps)]
+        + [("cube_event", int(e)) for e in sorted(state.event_cubes)]
     )
     free = set(free_keys)
     return {
@@ -215,8 +262,13 @@ class CornerReprojectionProblem:
                  variable_keys_: Sequence[TransformKey], reference_state: PoseState,
                  robot_T: Mapping[int, np.ndarray], K_map: Mapping[int, np.ndarray],
                  D_map: Mapping[int, np.ndarray], gripper_cam_idx: int,
-                 scaling: SE3Scaling = SE3Scaling()):
+                 scaling: SE3Scaling = SE3Scaling(),
+                 gripped_target: str = GRIPPED_TARGET_GRASP):
         scaling.validate()
+        if gripped_target not in GRIPPED_TARGET_MODELS:
+            raise ValueError(
+                f"gripped_target must be one of {sorted(GRIPPED_TARGET_MODELS)}")
+        self.gripped_target = str(gripped_target)
         self.obs = list(observations)
         self.variable_keys = list(variable_keys_)
         if len(self.variable_keys) != len(set(self.variable_keys)):
@@ -261,6 +313,23 @@ class CornerReprojectionProblem:
                 if state.board is None:
                     raise RuntimeError("board observation with no board pose")
                 target = state.board
+            elif obs.grasp_idx is not None:
+                if self.gripped_target == GRIPPED_TARGET_GRASP:
+                    # FK carries the cube; only the constant grasp offset is free.
+                    grasp = int(obs.grasp_idx)
+                    if grasp not in state.grasps:
+                        raise RuntimeError(
+                            f"grasp transform unavailable for grasp {grasp}")
+                    if int(obs.event) not in self.robot_T:
+                        raise RuntimeError(f"robot FK missing for event {obs.event}")
+                    target = (np.asarray(self.robot_T[int(obs.event)], dtype=np.float64)
+                              @ state.grasps[grasp])
+                else:
+                    # FK withheld: this event's cube pose is its own free variable.
+                    eid = int(obs.event)
+                    if eid not in state.event_cubes:
+                        raise RuntimeError(f"per-event cube pose unavailable for {eid}")
+                    target = state.event_cubes[eid]
             else:
                 if obs.set_idx is None or int(obs.set_idx) not in state.cubes:
                     raise RuntimeError(f"cube pose unavailable for set {obs.set_idx}")
@@ -288,8 +357,14 @@ class CornerReprojectionProblem:
         for obs, (r0, r1) in zip(self.obs, self.row_offsets):
             camera_key = (("gtc", -1) if int(obs.cam) == self.gripper
                           else ("cam", int(obs.cam)))
-            target_key = (("board", -1) if obs.marker == "board"
-                          else ("cube", int(obs.set_idx)))
+            if obs.marker == "board":
+                target_key = ("board", -1)
+            elif obs.grasp_idx is not None:
+                target_key = (("grasp", int(obs.grasp_idx))
+                              if self.gripped_target == GRIPPED_TARGET_GRASP
+                              else ("cube_event", int(obs.event)))
+            else:
+                target_key = ("cube", int(obs.set_idx))
             if camera_key in self.slices:
                 matrix[r0:r1, self.slices[camera_key]] = 1
             if target_key in self.slices:

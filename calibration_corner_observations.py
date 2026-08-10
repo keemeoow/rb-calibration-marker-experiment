@@ -98,6 +98,7 @@ def load_cube_pixel_observations(root: str, meta: dict, cube,
         set_idx=None if obs.set_idx is None else int(obs.set_idx),
         object_points=np.asarray(obs.object_points, dtype=np.float64).reshape(-1, 3),
         image_points=np.asarray(obs.image_points, dtype=np.float64).reshape(-1, 2),
+        grasp_idx=None if getattr(obs, "grasp_idx", None) is None else int(obs.grasp_idx),
     ) for obs in detected
         if (int(obs.cam) == int(gripper_cam_idx)
             or len(np.asarray(obs.object_points).reshape(-1, 3)) >= int(fixed_min_corners))]
