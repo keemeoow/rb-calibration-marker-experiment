@@ -32,8 +32,9 @@ GRIPPER_TIMEOUT_SEC = 5.0
 # 30.0 은 형제 프로젝트(rb-ArucoCube_Robot_multi_calibration)의 큐브 값이다.
 CUBE_SIZE_MM = 59.0
 # 그리퍼는 큐브 윗면(마커 양옆)을 잡고 윗면보다 이만큼 아래까지 물린다.
-# 2026-08-07 캘리퍼 실측 1.7mm. 바닥 접촉으로 역산한 1.79mm 와 0.09mm 차이로 일치한다.
-CUBE_GRIP_DEPTH_MM = 1.7
+# 2026-08-10: 1.7mm 로는 살짝만 걸쳐 잡혀 옮기다 놓쳤다. 실제로 확실히 물리는 TCP
+# 높이(-5.2)에서 역산한 2.0mm 로 올린다(캘리퍼 1.7mm 와 0.3mm 차이는 측정 오차 범위).
+CUBE_GRIP_DEPTH_MM = 2.0
 # fingertip(TCP) 에서 큐브 중심까지의 거리. 윗면이 중심보다 CUBE_SIZE/2 위에 있고
 # fingertip 은 윗면보다 GRIP_DEPTH 아래이므로, 중심은 fingertip 보다 이만큼 "아래"다.
 CUBE_CENTER_OFFSET_Z = CUBE_SIZE_MM / 2.0 - CUBE_GRIP_DEPTH_MM  # 27.5mm
@@ -53,11 +54,11 @@ TOOL_CUBE_CENTER_Z = TOOL_GRIPPER_Z + CUBE_CENTER_OFFSET_Z  # 177.5mm
 #
 # 값은 실제 로봇에서 큐브를 올바르게 쥔 자세의 TCP z 를 읽어 넣는다. None 이면 정규화하지
 # 않고 place_joints 도달 시 읽은 z 를 그대로 쓴다(구 동작).
-# 2026-08-07 실측: 바닥에 놓인 큐브를 쥔 자세의 TCP z.
-PLACE_TCP_Z_MM = -4.9
+# 2026-08-10 실측: 큐브가 확실히 물리는 TCP z.
+PLACE_TCP_Z_MM = -5.2
 # 그리퍼가 큐브를 "잡을" 때의 TCP 높이. 놓기와 집기의 적정 높이가 다를 수 있어 상수를
 # 분리해 두었지만, 현재는 같은 실측값을 쓴다. 한쪽만 바꾸고 싶을 때 여기만 고치면 된다.
-GRIP_TCP_Z_MM = -4.9
+GRIP_TCP_Z_MM = -5.2
 
 # 큐브를 잡을 때(재-그립) 항상 place 위치 +Z 위에서 접근 후 수직 하강하여 안전하게 잡는다.
 GRIP_APPROACH_Z_MM = 100.0
@@ -227,25 +228,67 @@ def undo_one(entry):
         move_joint(maxis, -mvalue)
 
 
+# 등가각을 고를 때 벗어나면 안 되는 축별 범위. 티칭된 값들은 실제로 도달한 자세이므로
+# 그 범위(+여유)를 넘지 않으면 안전하다. _run_auto_multiset 이 웨이포인트에서 채운다.
+JOINT_BAND_PAD_DEG = 30.0
+_JOINT_BAND = {'lo': None, 'hi': None}
+
+
+def set_joint_band_from_waypoints(waypoints):
+    """웨이포인트의 모든 관절값에서 축별 허용 범위를 만든다.
+
+    한계표를 로봇에서 못 읽으므로, "이미 티칭으로 도달한 각도"를 도달 가능성의 근거로
+    쓴다. 이 범위를 벗어나는 등가각은 같은 자세라도 명령하지 않는다 — 그렇지 않으면
+    순차 정규화가 d6 를 한 바퀴씩 감아 -690 처럼 한계 밖 값으로 걸어나간다.
+    """
+    lo = [None] * 6
+    hi = [None] * 6
+    for wp in waypoints:
+        for key in ('capture_joints', 'place_joints'):
+            j = wp.get(key)
+            if not j:
+                continue
+            for i in range(6):
+                v = float(j[i])
+                lo[i] = v if lo[i] is None else min(lo[i], v)
+                hi[i] = v if hi[i] is None else max(hi[i], v)
+    if any(v is None for v in lo):
+        return None
+    _JOINT_BAND['lo'] = [v - JOINT_BAND_PAD_DEG for v in lo]
+    _JOINT_BAND['hi'] = [v + JOINT_BAND_PAD_DEG for v in hi]
+    print '[Auto] 등가각 허용 범위(티칭 실측 +-{:.0f}deg):'.format(JOINT_BAND_PAD_DEG)
+    print '       ' + '  '.join('d{}[{:.0f},{:.0f}]'.format(
+        i + 1, _JOINT_BAND['lo'][i], _JOINT_BAND['hi'][i]) for i in range(6))
+    return _JOINT_BAND
+
+
 def nearest_joint_target(rb, target_joints):
-    """목표 관절을 현재 자세 기준 +-360 등가값 중 가장 가까운 것으로 바꾼다.
+    """목표 관절을 현재 자세에 가장 가까운 +-360 등가각으로 바꾼다.
 
     티칭 파일의 d6 는 -351.8 처럼 한 바퀴 감긴 값으로 기록돼 있다. 그대로 명령하면
     같은 자세인데도 컨트롤러가 300도 넘게 되돌아 도는 경로를 만든다(시간도, 케이블도,
-    간섭 위험도 커진다). 각 축을 현재값에 가장 가까운 등가각으로 옮기면 동일한 자세를
-    최소 회전으로 만든다.
+    간섭 위험도 커진다).
 
-    회전 자유도가 제한된 축에서 등가각이 관절 한계를 넘을 수 있으므로, 원래 값이
-    한계 안이고 새 값이 벗어나는지는 컨트롤러의 move 가 판정한다(실패 시 호출부에서
-    원본으로 재시도).
+    단, 후보는 티칭 범위(set_joint_band_from_waypoints) 안에 있어야 한다. 범위를 두지
+    않으면 자세가 이어질수록 d6 가 한 바퀴씩 더 감겨 관절 한계 밖으로 걸어나간다.
+    범위 안에 아무 등가각도 없으면 원본 값을 그대로 쓴다(티칭된 값은 도달 가능하다).
     """
     cur = rb.getjnt().jnt2list()[:6]
+    lo, hi = _JOINT_BAND['lo'], _JOINT_BAND['hi']
     out = []
     for i in range(6):
         t = float(target_joints[i])
         c = float(cur[i])
-        k = round((c - t) / 360.0)
-        out.append(t + 360.0 * k)
+        k0 = int(round((c - t) / 360.0))
+        best = None
+        # 가까운 쪽부터 훑어 범위 안에 드는 첫 후보를 쓴다.
+        for dk in (0, -1, 1, -2, 2, -3, 3):
+            cand = t + 360.0 * (k0 + dk)
+            if lo is not None and not (lo[i] <= cand <= hi[i]):
+                continue
+            if best is None or abs(cand - c) < abs(best - c):
+                best = cand
+        out.append(best if best is not None else t)
     return out
 
 
@@ -810,6 +853,8 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True):
             by_set[sidx] = []
             sets_order.append(sidx)
         by_set[sidx].append(wp)
+
+    set_joint_band_from_waypoints(waypoints)
 
     total_caps = len(waypoints)
     n_sets = len(sets_order)

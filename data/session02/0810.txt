@@ -1,0 +1,903 @@
+[INFO] Depth capture/save: ON
+[INFO] Cameras:
+  cam0: 314522062542 (FIXED)
+  cam1: 319522062138 (FIXED)
+  cam2: 752112070297 (GRIPPER)
+  cam3: 912322060991 (FIXED)
+[INFO] Gripper camera: cam2
+[INFO] Fixed cameras: 3, Gripper cameras: 1
+[INFO] Loaded intrinsics for cam0
+[INFO] Loaded intrinsics for cam1
+[INFO] Loaded intrinsics for cam2
+[INFO] Loaded intrinsics for cam3
+[SESSION] Explicit capture root: /home/sprout/Desktop/**jiwoo/rb-calibration-marker-experiment/data/session02/calib_train
+[SESSION] Automatic numbering bypassed because --root_folder was supplied.
+[SESSION] frames    -> data/session02/calib_train
+[SESSION] teaching  -> /home/sprout/Desktop/**jiwoo/rb-calibration-marker-experiment/data/session02/teaching
+[SESSION] waypoints -> /home/sprout/Desktop/**jiwoo/rb-calibration-marker-experiment/data/session02/capture_waypoints.json
+[INFO] Hardware-reset 4 RealSense device(s); waiting for re-enumeration...
+[INFO] All 4 device(s) re-enumerated.
+[INFO] cam 314522062542: color locked  exposure_us=166  gain=64  white_balance=4600
+[INFO] cam 319522062138: color locked  exposure_us=166  gain=64  white_balance=4600
+[INFO] cam 752112070297: color locked  exposure_us=166  gain=64  white_balance=4600
+[INFO] cam 912322060991: color locked  exposure_us=166  gain=64  white_balance=4600
+[INFO] Cube config source: config_py:CubeConfig
+[INFO] Cube id_to_face: {0: '+Z', 1: '+Z', 2: '+X', 3: '+Y', 4: '-X', 5: '-Y'}
+[INFO] ChArUco board: 11x7, marker_id_start=5
+[INFO] Block-aware capture gates:
+  A_placement: fixed visible >= 1 | fixed multi-marker >= 1 | fixed PnP >= 1 | fixed depth-quality >= 0
+    gripper PnP required=yes | gripper markers >= 1 | charuco >= 8 | gripper depth required=yes | span <= 120.0ms
+    PnP reproj mean <= 2.00px | depth samples >= 20
+  B_eyetohand: fixed visible >= 2 | fixed multi-marker >= 2 | fixed PnP >= 2 | fixed depth-quality >= 1
+    gripper PnP required=no | gripper markers >= 0 | charuco >= 0 | gripper depth required=no | span <= 120.0ms
+    PnP reproj mean <= 2.00px | depth samples >= 20
+  gripper board mask pad: 6.0px
+[ManualRobot] Connecting to 192.168.0.23:12348 ...
+[ManualRobot] Connected to 192.168.0.23:12348
+[INFO] Resuming from existing meta.json (4 captures, next event_id=4)
+
+Controls:
+  SPACE : manual capture (if in manual mode)
+  ESC/q : quit
+
+[MODE] Manual Robot - waiting for server capture commands
+[INFO] Move robot on server side, press 'c' to capture
+
+[INFO] Live preview started (4-camera quad view)
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+QObject::moveToThread: Current thread (0x326f8290) is not the object's thread (0x3374ed60).
+Cannot move to target thread (0x326f8290)
+
+[ManualRobot] Robot requested waypoints. Sending /home/sprout/Desktop/**jiwoo/rb-calibration-marker-experiment/data/session02/capture_waypoints
+.json                                                                                                                                          [ManualRobot]   sent 103 waypoints
+
+[ManualRobot] Capture signal received (capture_index=0, set_index=0)
+  TCP: [95.932, 589.167, 254.065, -51.36658306595051, 16.582372619337747, 140.3314014935193]
+  Joints: [-13.450340346534652, -39.93262685643564, -56.38459158415841, 36.16290222772277, -106.57008044554455, -234.69175433168317]
+  [PnP] cam0(F): OK ids=[4, 3, 1, 0] reproj=1.30px
+  [ChArUco] OK: 50 corners, reproj=0.295px
+  [PnP] cam1(F): OK ids=[2, 5] reproj=1.27px
+  [ChArUco] OK: 30 corners, reproj=0.465px
+  [PnP] cam2(G): OK ids=[4, 3, 1, 0] reproj=1.03px
+  [ChArUco] OK: 53 corners, reproj=0.355px
+  [PnP] cam3(F): OK ids=[5, 4] reproj=0.88px
+  [ChArUco] OK: 24 corners, reproj=0.501px
+[SKIP] timestamp span 2894.4ms > 120.0ms
+[SKIP] Capture 0 skipped
+
+[ManualRobot] Capture signal received (capture_index=1, set_index=0)
+  TCP: [-338.93800000000005, 225.032, 364.13800000000003, 4.5272260182262, 8.856896188691291, -149.47065128365108]
+  Joints: [83.9582301980198, 6.476639851485148, -116.55329517326732, -33.31930693069307, -59.859375, -173.6185024752475]
+  [PnP] cam0(F): OK ids=[4, 3, 1, 0] reproj=1.28px
+  [ChArUco] OK: 52 corners, reproj=0.281px
+  [PnP] cam1(F): OK ids=[2, 5, 0] reproj=0.95px
+  [ChArUco] OK: 23 corners, reproj=0.422px
+  [PnP] cam2(G): OK ids=[0] reproj=0.20px
+  [ChArUco] OK: 56 corners, reproj=0.373px
+  [PnP] cam3(F): OK ids=[5, 4] reproj=0.99px
+  [ChArUco] OK: 28 corners, reproj=0.505px
+[SKIP] gripper depth plane 66.0mm > 40.0mm
+[SKIP] Capture 1 skipped
+
+[ManualRobot] Capture signal received (capture_index=2, set_index=0)
+  TCP: [-215.04000000000002, 649.1, 344.084, 86.9909215275636, 28.593917132239838, -165.73772522832834]
+  Joints: [18.072633044554454, -55.0542233910891, -9.485225866336632, 32.59854579207921, -132.57711943069307, -316.47888304455444]
+  [PnP] cam0(F): OK ids=[4, 3, 1, 0] reproj=1.36px
+  [ChArUco] OK: 51 corners, reproj=0.305px
+  [PnP] cam1(F): OK ids=[2, 5] reproj=1.06px
+  [ChArUco] OK: 32 corners, reproj=0.448px
+  [PnP] cam2(G): OK ids=[5, 0] reproj=0.85px
+  [ChArUco] OK: 60 corners, reproj=0.301px
+  [PnP] cam3(F): OK ids=[5, 4] reproj=0.88px
+  [ChArUco] OK: 15 corners, reproj=0.412px
+[SAVE] event=4 | cam0(F):4mkr cam1(F):2mkr cam2(G):2mkr cam3(F):2mkr span=40.7ms charuco[cam0(F):51cor cam1(F):32cor cam2(G):60cor/pose60 cam3(
+F):15cor]                                                                                                                                      [OK] Capture 2 saved
+
+[ManualRobot] Capture signal received (capture_index=3, set_index=0)
+  TCP: [-449.004, 545.055, 214.116, -102.68371987418122, -7.10805711061348, -141.58852819181584]
+  Joints: [50.77560334158416, -70.35357363861387, -11.291537747524751, -15.63072400990099, -134.89232673267327, -126.43162128712872]
+  [PnP] cam0(F): OK ids=[4, 3, 1, 0] reproj=1.33px
+  [ChArUco] OK: 52 corners, reproj=0.306px
+  [PnP] cam1(F): OK ids=[2, 5, 1, 0] reproj=1.26px
+  [ChArUco] OK: 29 corners, reproj=0.508px
+  [ChArUco] OK: 60 corners, reproj=0.446px
+  [PnP] cam3(F): OK ids=[5, 4] reproj=0.88px
+  [ChArUco] OK: 31 corners, reproj=0.512px
+[SKIP] gripper cube markers 0 < required 1 | gripper cube_pnp missing
+[SKIP] Capture 3 skipped
+
+[ManualRobot] Capture signal received (capture_index=4, set_index=0)
+  TCP: [-518.962, 255.02399999999997, 364.13, -68.29909019389271, 27.438089372122427, -141.8987848378792]
+  Joints: [85.25077351485147, -30.839573019801982, -75.08725247524752, -37.58539603960396, -100.61997215346534, -104.95823019801979]
+  [PnP] cam0(F): OK ids=[4, 3, 1, 0] reproj=1.30px
+  [ChArUco] OK: 50 corners, reproj=0.304px
+  [PnP] cam1(F): OK ids=[2, 5, 1, 0] reproj=0.92px
+  [ChArUco] OK: 27 corners, reproj=0.435px
+  [PnP] cam2(G): OK ids=[5] reproj=0.68px
+  [ChArUco] OK: 60 corners, reproj=0.327px
+  [PnP] cam3(F): OK ids=[5, 4] reproj=1.18px
+  [ChArUco] OK: 24 corners, reproj=0.696px
+[SKIP] timestamp span 4678.5ms > 120.0ms
+[SKIP] Capture 4 skipped
+
+[ManualRobot] Capture signal received (capture_index=5, set_index=0)
+  TCP: [-518.968, 425.031, 364.13, -90.686900376614, 1.682146790724584, -148.72723854446883]
+  Joints: [63.47176670792079, -57.515625, -14.268796410891088, -20.406868811881186, -134.46418626237624, -126.35202660891088]
+  [PnP] cam0(F): OK ids=[4, 3, 1, 0] reproj=1.16px
+  [ChArUco] OK: 49 corners, reproj=0.311px
+  [PnP] cam1(F): OK ids=[2, 5, 0, 1] reproj=1.04px
+  [ChArUco] OK: 31 corners, reproj=0.470px
+  [PnP] cam2(G): OK ids=[5] reproj=0.66px
+  [ChArUco] OK: 60 corners, reproj=0.312px
+  [PnP] cam3(F): OK ids=[5, 4] reproj=0.82px
+  [ChArUco] OK: 22 corners, reproj=0.571px
+[SAVE] event=5 | cam0(F):4mkr cam1(F):4mkr cam2(G):1mkr cam3(F):2mkr span=22.1ms charuco[cam0(F):49cor cam1(F):31cor cam2(G):60cor/pose60 cam3(
+F):22cor]                                                                                                                                      [OK] Capture 5 saved
+
+[ManualRobot] Capture signal received (capture_index=6, set_index=1)
+  TCP: [35.932, 609.154, 374.07, -21.366111842444017, 16.582086140440182, 160.3319257270485]
+  Joints: [-2.2894492574257423, -36.26918316831683, -41.80043316831683, 23.542620668316832, -114.32093131188118, -246.35527537128712]
+  [PnP] cam0(F): OK ids=[3, 1, 0] reproj=0.92px
+  [ChArUco] OK: 42 corners, reproj=0.345px
+  [PnP] cam1(F): OK ids=[5, 2] reproj=0.79px
+  [ChArUco] OK: 19 corners, reproj=0.369px
+  [PnP] cam2(G): OK ids=[3, 1, 0] reproj=0.98px
+  [ChArUco] OK: 60 corners, reproj=0.312px
+  [PnP] cam3(F): OK ids=[4, 5] reproj=1.35px
+  [ChArUco] OK: 23 corners, reproj=0.494px
+[SKIP] timestamp span 3581.9ms > 120.0ms
+[SKIP] Capture 6 skipped
+
+[ManualRobot] Capture signal received (capture_index=7, set_index=1)
+  TCP: [-518.968, 425.031, 364.13, -90.686900376614, 1.682146790724584, -148.72723854446883]
+  Joints: [63.47176670792079, -57.515625, -14.268796410891088, -20.406868811881186, -134.46418626237624, -126.35202660891088]
+  [PnP] cam0(F): OK ids=[3, 1, 0] reproj=0.82px
+  [ChArUco] OK: 44 corners, reproj=0.319px
+  [PnP] cam1(F): OK ids=[5, 2] reproj=1.21px
+  [ChArUco] OK: 25 corners, reproj=0.428px
+  [PnP] cam2(G): OK ids=[5] reproj=0.57px
+  [ChArUco] OK: 60 corners, reproj=0.310px
+  [PnP] cam3(F): OK ids=[4, 5] reproj=0.82px
+  [ChArUco] OK: 25 corners, reproj=0.472px
+[SAVE] event=6 | cam0(F):3mkr cam1(F):2mkr cam2(G):1mkr cam3(F):2mkr span=29.8ms charuco[cam0(F):44cor cam1(F):25cor cam2(G):60cor/pose60 cam3(
+F):25cor]                                                                                                                                      [OK] Capture 7 saved
+
+[ManualRobot] Capture signal received (capture_index=8, set_index=1)
+  TCP: [-488.948, 195.029, 264.14, -15.472782553287393, -1.1429935055064793, -134.4706162071261]
+  Joints: [92.97609839108911, -23.449334777227723, -104.18479269801979, -43.82580445544554, -76.21132425742573, -141.80453279702968]
+  [PnP] cam0(F): OK ids=[3, 1, 0] reproj=0.84px
+  [ChArUco] OK: 46 corners, reproj=0.313px
+  [PnP] cam1(F): OK ids=[5, 2] reproj=1.21px
+  [ChArUco] OK: 26 corners, reproj=0.487px
+  [PnP] cam2(G): OK ids=[5, 0, 1] reproj=1.25px
+  [ChArUco] OK: 56 corners, reproj=0.422px
+  [PnP] cam3(F): OK ids=[4, 5] reproj=1.51px
+  [ChArUco] OK: 26 corners, reproj=0.525px
+[SKIP] timestamp span 493.3ms > 120.0ms
+[SKIP] Capture 8 skipped
+
+[ManualRobot] Capture signal received (capture_index=9, set_index=1)
+  TCP: [-518.962, 255.02399999999997, 364.13, -68.29909019389271, 27.438089372122427, -141.8987848378792]
+  Joints: [85.25077351485147, -30.839573019801982, -75.08725247524752, -37.58539603960396, -100.61997215346534, -104.95823019801979]
+  [PnP] cam0(F): OK ids=[3, 1, 0] reproj=0.80px
+  [ChArUco] OK: 43 corners, reproj=0.327px
+  [PnP] cam1(F): OK ids=[5, 2] reproj=1.09px
+  [ChArUco] OK: 24 corners, reproj=0.423px
+  [PnP] cam2(G): OK ids=[5, 0] reproj=0.55px
+  [ChArUco] OK: 60 corners, reproj=0.328px
+  [PnP] cam3(F): OK ids=[4, 5] reproj=1.05px
+  [ChArUco] OK: 22 corners, reproj=0.614px
+[SKIP] timestamp span 2962.9ms > 120.0ms
+[SKIP] Capture 9 skipped
+
+[ManualRobot] Capture signal received (capture_index=10, set_index=1)
+  TCP: [-528.985, 425.044, 214.122, -72.68405079158792, 2.8916034004662388, -134.5887028087026]
+  Joints: [67.67984220297029, -54.12206064356435, -52.68726794554455, -30.32650061881188, -107.49551361386138, -128.6205909653465]
+  [PnP] cam0(F): OK ids=[3, 1, 0] reproj=0.76px
+  [ChArUco] OK: 44 corners, reproj=0.330px
+  [PnP] cam1(F): OK ids=[5, 2] reproj=1.23px
+  [ChArUco] OK: 15 corners, reproj=0.343px
+  [PnP] cam2(G): OK ids=[5] reproj=0.14px
+  [ChArUco] OK: 60 corners, reproj=0.463px
+  [PnP] cam3(F): OK ids=[4, 5] reproj=2.01px
+  [ChArUco] OK: 27 corners, reproj=0.602px
+[SAVE] event=7 | cam0(F):3mkr cam1(F):2mkr cam2(G):1mkr cam3(F):2mkr span=17.6ms charuco[cam0(F):44cor cam1(F):15cor cam2(G):60cor/pose60 cam3(
+F):27cor]                                                                                                                                      [OK] Capture 10 saved
+
+[ManualRobot] Capture signal received (capture_index=11, set_index=1)
+  TCP: [-338.93800000000005, 225.032, 364.13800000000003, 4.5272260182262, 8.856896188691291, -149.47065128365108]
+  Joints: [83.9582301980198, 6.476639851485148, -116.55329517326732, -33.31930693069307, -59.859375, -173.6185024752475]
+  [PnP] cam0(F): OK ids=[3, 1, 0] reproj=0.80px
+  [ChArUco] OK: 48 corners, reproj=0.318px
+  [PnP] cam1(F): OK ids=[5, 2] reproj=0.79px
+  [ChArUco] OK: 24 corners, reproj=0.482px
+  [PnP] cam2(G): OK ids=[2, 5, 1, 0] reproj=4.08px
+  [ChArUco] OK: 58 corners, reproj=0.398px
+  [PnP] cam3(F): OK ids=[4, 5] reproj=0.85px
+  [ChArUco] OK: 21 corners, reproj=0.473px
+[SKIP] gripper cube_pnp missing | timestamp span 2876.4ms > 120.0ms
+[SKIP] Capture 11 skipped
+
+[ManualRobot] Capture signal received (capture_index=12, set_index=2)
+  TCP: [135.216, 317.69, 351.267, -115.36253103529269, 5.396231106101119, 138.88806351180526]
+  Joints: [-34.805383663366335, 1.448019801980198, -98.90508972772277, 41.40872524752475, -86.578125, -195.57410272277227]
+  [PnP] cam0(F): OK ids=[4, 0, 1] reproj=0.73px
+  [ChArUco] OK: 46 corners, reproj=0.335px
+  [PnP] cam1(F): OK ids=[3, 2] reproj=0.69px
+  [ChArUco] OK: 29 corners, reproj=0.518px
+  [PnP] cam2(G): OK ids=[4, 3, 1, 0] reproj=0.96px
+  [ChArUco] OK: 58 corners, reproj=0.294px
+  [PnP] cam3(F): OK ids=[2, 5] reproj=1.18px
+  [ChArUco] OK: 23 corners, reproj=0.645px
+[SKIP] timestamp span 3691.0ms > 120.0ms
+[SKIP] Capture 12 skipped
+
+[ManualRobot] Capture signal received (capture_index=13, set_index=2)
+  TCP: [-488.948, 195.029, 264.14, -15.472782553287393, -1.1429935055064793, -134.4706162071261]
+  Joints: [92.97609839108911, -23.449334777227723, -104.18479269801979, -43.82580445544554, -76.21132425742573, -141.80453279702968]
+  [PnP] cam0(F): OK ids=[4, 0, 1] reproj=0.75px
+  [ChArUco] OK: 45 corners, reproj=0.338px
+  [PnP] cam1(F): OK ids=[3, 2] reproj=0.59px
+  [ChArUco] OK: 24 corners, reproj=0.490px
+  [PnP] cam2(G): OK ids=[3, 2, 1] reproj=1.46px
+  [ChArUco] OK: 60 corners, reproj=0.409px
+  [PnP] cam3(F): OK ids=[2, 5] reproj=1.05px
+  [ChArUco] OK: 23 corners, reproj=0.545px
+[SKIP] timestamp span 349.4ms > 120.0ms
+[SKIP] Capture 13 skipped
+
+[ManualRobot] Capture signal received (capture_index=14, set_index=2)
+  TCP: [-385.015, 549.0749999999999, 344.10200000000003, -93.82676638971043, -13.833206526741032, -161.20408208279667]
+  Joints: [44.46302599009901, -53.95126856435643, -18.40725556930693, -3.4306930693069306, -130.640625, -135.7158879950495]
+  [PnP] cam0(F): OK ids=[4, 0, 1] reproj=0.89px
+  [ChArUco] OK: 38 corners, reproj=0.309px
+  [PnP] cam1(F): OK ids=[3, 2] reproj=0.59px
+  [ChArUco] OK: 25 corners, reproj=0.500px
+  [ChArUco] OK: 60 corners, reproj=0.245px
+  [PnP] cam3(F): OK ids=[2, 5] reproj=0.97px
+  [ChArUco] OK: 23 corners, reproj=0.633px
+[SKIP] gripper cube markers 0 < required 1 | gripper cube_pnp missing | timestamp span 1917.3ms > 120.0ms
+[SKIP] Capture 14 skipped
+
+[ManualRobot] Capture signal received (capture_index=15, set_index=2)
+  TCP: [-338.93800000000005, 225.032, 364.13800000000003, 4.5272260182262, 8.856896188691291, -149.47065128365108]
+  Joints: [83.9582301980198, 6.476639851485148, -116.55329517326732, -33.31930693069307, -59.859375, -173.6185024752475]
+  [PnP] cam0(F): OK ids=[4, 0, 1] reproj=0.74px
+  [ChArUco] OK: 41 corners, reproj=0.346px
+  [PnP] cam1(F): OK ids=[3, 2] reproj=0.71px
+  [ChArUco] OK: 25 corners, reproj=0.465px
+  [PnP] cam2(G): OK ids=[3, 1, 0] reproj=8.06px
+  [ChArUco] OK: 58 corners, reproj=0.367px
+  [PnP] cam3(F): OK ids=[2, 5] reproj=0.81px
+  [ChArUco] OK: 16 corners, reproj=0.473px
+[SKIP] gripper cube_pnp missing
+[SKIP] Capture 15 skipped
+
+[ManualRobot] Capture signal received (capture_index=16, set_index=2)
+  TCP: [-518.962, 255.02399999999997, 364.13, -68.29909019389271, 27.438089372122427, -141.8987848378792]
+  Joints: [85.25077351485147, -30.839573019801982, -75.08725247524752, -37.58539603960396, -100.61997215346534, -104.95823019801979]
+  [PnP] cam0(F): OK ids=[4, 0, 1] reproj=0.79px
+  [ChArUco] OK: 46 corners, reproj=0.330px
+  [PnP] cam1(F): OK ids=[3, 2] reproj=0.69px
+  [ChArUco] OK: 25 corners, reproj=0.453px
+  [PnP] cam2(G): OK ids=[3, 2] reproj=0.97px
+  [ChArUco] OK: 60 corners, reproj=0.321px
+  [PnP] cam3(F): OK ids=[2, 5] reproj=0.64px
+  [ChArUco] OK: 24 corners, reproj=0.495px
+[SKIP] timestamp span 2301.6ms > 120.0ms
+[SKIP] Capture 16 skipped
+
+[ManualRobot] Capture signal received (capture_index=17, set_index=2)
+  TCP: [-518.968, 425.031, 364.13, -90.686900376614, 1.682146790724584, -148.72723854446883]
+  Joints: [63.47176670792079, -57.515625, -14.268796410891088, -20.406868811881186, -134.46418626237624, -126.35202660891088]
+  [PnP] cam0(F): OK ids=[4, 0, 1] reproj=0.72px
+  [ChArUco] OK: 42 corners, reproj=0.320px
+  [PnP] cam1(F): OK ids=[3, 2] reproj=0.62px
+  [ChArUco] OK: 32 corners, reproj=0.515px
+  [PnP] cam2(G): OK ids=[2] reproj=0.23px
+  [ChArUco] OK: 60 corners, reproj=0.331px
+  [PnP] cam3(F): OK ids=[2, 5] reproj=0.78px
+  [ChArUco] OK: 23 corners, reproj=0.521px
+[SKIP] timestamp span 2902.8ms > 120.0ms
+[SKIP] Capture 17 skipped
+
+[ManualRobot] Capture signal received (capture_index=18, set_index=3)
+  TCP: [135.216, 317.69, 351.267, -115.36253103529269, 5.396231106101119, 138.88806351180526]
+  Joints: [-34.805383663366335, 1.448019801980198, -98.90508972772277, 41.40872524752475, -86.578125, -195.57410272277227]
+  [PnP] cam0(F): OK ids=[3, 2, 1, 0] reproj=1.24px
+  [ChArUco] OK: 41 corners, reproj=0.347px
+  [PnP] cam1(F): OK ids=[5, 2] reproj=0.63px
+  [ChArUco] OK: 20 corners, reproj=0.455px
+  [PnP] cam2(G): OK ids=[2, 3, 1, 0] reproj=0.94px
+  [ChArUco] OK: 58 corners, reproj=0.297px
+  [PnP] cam3(F): OK ids=[4, 5] reproj=0.84px
+  [ChArUco] OK: 16 corners, reproj=0.391px
+[SAVE] event=8 | cam0(F):4mkr cam1(F):2mkr cam2(G):4mkr cam3(F):2mkr span=48.6ms charuco[cam0(F):41cor/pose41 cam1(F):20cor/pose20 cam2(G):58co
+r/pose58 cam3(F):16cor/pose16]                                                                                                                 [OK] Capture 18 saved
+
+[ManualRobot] Capture signal received (capture_index=19, set_index=3)
+  TCP: [-488.948, 195.029, 264.14, -15.472782553287393, -1.1429935055064793, -134.4706162071261]
+  Joints: [92.97609839108911, -23.449334777227723, -104.18479269801979, -43.82580445544554, -76.21132425742573, -141.80453279702968]
+  [PnP] cam0(F): OK ids=[3, 2, 1, 0] reproj=1.29px
+  [ChArUco] OK: 42 corners, reproj=0.339px
+  [PnP] cam1(F): OK ids=[5, 2] reproj=0.63px
+  [ChArUco] OK: 19 corners, reproj=0.500px
+  [PnP] cam2(G): OK ids=[5, 2, 0] reproj=1.09px
+  [ChArUco] OK: 54 corners, reproj=0.397px
+  [PnP] cam3(F): OK ids=[4, 5] reproj=0.76px
+  [ChArUco] OK: 19 corners, reproj=0.589px
+[SKIP] timestamp span 1995.5ms > 120.0ms
+[SKIP] Capture 19 skipped
+
+[ManualRobot] Capture signal received (capture_index=20, set_index=3)
+  TCP: [-449.004, 545.055, 214.116, -102.68371987418122, -7.10805711061348, -141.58852819181584]
+  Joints: [50.77560334158416, -70.35357363861387, -11.291537747524751, -15.63072400990099, -134.89232673267327, -126.43162128712872]
+  [PnP] cam0(F): OK ids=[3, 2, 1, 0] reproj=1.26px
+  [ChArUco] OK: 45 corners, reproj=0.323px
+  [PnP] cam1(F): OK ids=[5, 2] reproj=0.56px
+  [ChArUco] OK: 27 corners, reproj=0.478px
+  [ChArUco] OK: 60 corners, reproj=0.453px
+  [PnP] cam3(F): OK ids=[4, 5] reproj=1.36px
+  [ChArUco] OK: 30 corners, reproj=0.529px
+[SKIP] gripper cube markers 0 < required 1 | gripper cube_pnp missing | timestamp span 2303.1ms > 120.0ms
+[SKIP] Capture 20 skipped
+
+[ManualRobot] Capture signal received (capture_index=21, set_index=3)
+  TCP: [-118.916, 225.032, 364.124, 14.526943825085432, 28.85644639396878, -145.47066102850425]
+  Joints: [53.52405631188118, 36.70846225247525, -129.32603650990097, -3.9581528465346536, -43.700727103960396, -220.0934405940594]
+  [PnP] cam0(F): OK ids=[3, 2, 1, 0] reproj=1.18px
+  [ChArUco] OK: 36 corners, reproj=0.336px
+  [PnP] cam1(F): OK ids=[5, 2] reproj=0.93px
+  [ChArUco] OK: 27 corners, reproj=0.420px
+  [PnP] cam2(G): OK ids=[2] reproj=1.47px
+  [ChArUco] OK: 58 corners, reproj=0.350px
+  [PnP] cam3(F): OK ids=[4, 5] reproj=0.85px
+  [ChArUco] OK: 29 corners, reproj=0.406px
+[SKIP] timestamp span 3644.2ms > 120.0ms
+[SKIP] Capture 21 skipped
+
+[ManualRobot] Capture signal received (capture_index=22, set_index=3)
+  TCP: [-518.962, 255.02399999999997, 364.13, -68.29909019389271, 27.438089372122427, -141.8987848378792]
+  Joints: [85.25077351485147, -30.839573019801982, -75.08725247524752, -37.58539603960396, -100.61997215346534, -104.95823019801979]
+  [PnP] cam0(F): OK ids=[3, 2, 1, 0] reproj=1.17px
+  [ChArUco] OK: 45 corners, reproj=0.319px
+  [PnP] cam1(F): OK ids=[5, 2] reproj=1.08px
+  [ChArUco] OK: 33 corners, reproj=0.493px
+  [PnP] cam2(G): OK ids=[5, 2, 0] reproj=0.96px
+  [ChArUco] OK: 58 corners, reproj=0.310px
+  [PnP] cam3(F): OK ids=[4, 5] reproj=1.32px
+  [ChArUco] OK: 23 corners, reproj=0.445px
+[SKIP] timestamp span 2931.8ms > 120.0ms
+[SKIP] Capture 22 skipped
+
+[ManualRobot] Capture signal received (capture_index=23, set_index=3)
+  TCP: [-528.985, 425.044, 214.122, -72.68405079158792, 2.8916034004662388, -134.5887028087026]
+  Joints: [67.67984220297029, -54.12206064356435, -52.68726794554455, -30.32650061881188, -107.49551361386138, -128.6205909653465]
+  [PnP] cam0(F): OK ids=[3, 2, 1, 0] reproj=1.32px
+  [ChArUco] OK: 40 corners, reproj=0.325px
+  [PnP] cam1(F): OK ids=[5, 2] reproj=0.75px
+  [ChArUco] OK: 26 corners, reproj=0.452px
+  [ChArUco] OK: 60 corners, reproj=0.465px
+  [PnP] cam3(F): OK ids=[4, 5] reproj=0.87px
+  [ChArUco] OK: 21 corners, reproj=0.422px
+[SKIP] gripper cube markers 0 < required 1 | gripper cube_pnp missing
+[SKIP] Capture 23 skipped
+
+[ManualRobot] Capture signal received (capture_index=24, set_index=4)
+  TCP: [135.216, 317.69, 351.267, -115.36253103529269, 5.396231106101119, 138.88806351180526]
+  Joints: [-34.805383663366335, 1.448019801980198, -98.90508972772277, 41.40872524752475, -86.578125, -195.57410272277227]
+  [PnP] cam0(F): OK ids=[2, 5, 0] reproj=1.05px
+  [ChArUco] OK: 45 corners, reproj=0.331px
+  [PnP] cam1(F): OK ids=[5, 4] reproj=0.62px
+  [ChArUco] OK: 28 corners, reproj=0.455px
+  [PnP] cam2(G): OK ids=[5, 2, 0, 1] reproj=1.13px
+  [ChArUco] OK: 60 corners, reproj=0.285px
+  [PnP] cam3(F): OK ids=[3, 4, 1, 0] reproj=1.26px
+  [ChArUco] OK: 25 corners, reproj=0.428px
+[SKIP] timestamp span 2442.5ms > 120.0ms
+[SKIP] Capture 24 skipped
+
+[ManualRobot] Capture signal received (capture_index=25, set_index=4)
+  TCP: [-488.948, 195.029, 264.14, -15.472782553287393, -1.1429935055064793, -134.4706162071261]
+  Joints: [92.97609839108911, -23.449334777227723, -104.18479269801979, -43.82580445544554, -76.21132425742573, -141.80453279702968]
+  [PnP] cam0(F): OK ids=[2, 5, 1, 0] reproj=0.97px
+  [ChArUco] OK: 42 corners, reproj=0.323px
+  [PnP] cam1(F): OK ids=[5, 4] reproj=0.64px
+  [ChArUco] OK: 26 corners, reproj=0.391px
+  [PnP] cam2(G): OK ids=[5, 4] reproj=0.81px
+  [ChArUco] OK: 60 corners, reproj=0.425px
+  [PnP] cam3(F): OK ids=[3, 4, 1, 0] reproj=1.17px
+  [ChArUco] OK: 23 corners, reproj=0.528px
+[SKIP] timestamp span 1832.6ms > 120.0ms
+[SKIP] Capture 25 skipped
+
+[ManualRobot] Capture signal received (capture_index=26, set_index=4)
+  TCP: [35.932, 609.154, 374.07, -21.366111842444017, 16.582086140440182, 160.3319257270485]
+  Joints: [-2.2894492574257423, -36.26918316831683, -41.80043316831683, 23.542620668316832, -114.32093131188118, -246.35527537128712]
+  [PnP] cam0(F): OK ids=[2, 5, 0] reproj=1.15px
+  [ChArUco] OK: 44 corners, reproj=0.337px
+  [PnP] cam1(F): OK ids=[5, 4] reproj=0.71px
+  [ChArUco] OK: 30 corners, reproj=0.438px
+  [PnP] cam2(G): OK ids=[2, 1, 0] reproj=0.83px
+  [ChArUco] OK: 60 corners, reproj=0.310px
+  [PnP] cam3(F): OK ids=[3, 4, 1, 0] reproj=1.24px
+  [ChArUco] OK: 26 corners, reproj=0.590px
+[SKIP] timestamp span 1767.6ms > 120.0ms
+[SKIP] Capture 26 skipped
+
+[ManualRobot] Capture signal received (capture_index=27, set_index=4)
+  TCP: [-528.985, 425.044, 214.122, -72.68405079158792, 2.8916034004662388, -134.5887028087026]
+  Joints: [67.67984220297029, -54.12206064356435, -52.68726794554455, -30.32650061881188, -107.49551361386138, -128.6205909653465]
+  [PnP] cam0(F): OK ids=[2, 5, 1, 0] reproj=0.97px
+  [ChArUco] OK: 42 corners, reproj=0.343px
+  [PnP] cam1(F): OK ids=[5, 4] reproj=0.56px
+  [ChArUco] OK: 25 corners, reproj=0.400px
+  [PnP] cam2(G): OK ids=[4, 5] reproj=1.06px
+  [ChArUco] OK: 60 corners, reproj=0.473px
+  [PnP] cam3(F): OK ids=[3, 4, 1, 0] reproj=1.17px
+  [ChArUco] OK: 24 corners, reproj=0.528px
+[SKIP] timestamp span 2689.5ms > 120.0ms
+[SKIP] Capture 27 skipped
+
+[ManualRobot] Capture signal received (capture_index=28, set_index=4)
+  TCP: [-118.916, 225.032, 364.124, 14.526943825085432, 28.85644639396878, -145.47066102850425]
+  Joints: [53.52405631188118, 36.70846225247525, -129.32603650990097, -3.9581528465346536, -43.700727103960396, -220.0934405940594]
+  [PnP] cam0(F): OK ids=[2, 5, 0] reproj=1.01px
+  [ChArUco] OK: 45 corners, reproj=0.322px
+  [PnP] cam1(F): OK ids=[5, 4] reproj=0.62px
+  [ChArUco] OK: 23 corners, reproj=0.467px
+  [PnP] cam2(G): OK ids=[5] reproj=0.05px
+  [ChArUco] OK: 60 corners, reproj=0.333px
+  [PnP] cam3(F): OK ids=[3, 4, 1, 0] reproj=0.76px
+  [ChArUco] OK: 25 corners, reproj=0.571px
+[SAVE] event=9 | cam0(F):3mkr cam1(F):2mkr cam2(G):1mkr cam3(F):4mkr span=17.7ms charuco[cam0(F):45cor/pose45 cam1(F):23cor/pose23 cam2(G):60co
+r/pose60 cam3(F):25cor/pose25]                                                                                                                 [OK] Capture 28 saved
+
+[ManualRobot] Capture signal received (capture_index=29, set_index=4)
+  TCP: [33.477, 248.256, 254.568, -104.71055807445653, 46.8826726570362, 133.17246573069824]
+  Joints: [-45.810102103960396, 10.509978341584157, -130.4398978960396, 66.71008663366337, -73.89008353960396, -261.4399752475248]
+  [PnP] cam0(F): OK ids=[2, 5, 1, 0] reproj=1.19px
+  [ChArUco] OK: 44 corners, reproj=0.321px
+  [PnP] cam1(F): OK ids=[5, 4] reproj=0.89px
+  [ChArUco] OK: 32 corners, reproj=0.490px
+  [PnP] cam2(G): OK ids=[5, 1] reproj=0.75px
+  [ChArUco] OK: 54 corners, reproj=0.441px
+  [PnP] cam3(F): OK ids=[3, 4, 1, 0] reproj=1.11px
+  [ChArUco] OK: 18 corners, reproj=0.507px
+[SKIP] timestamp span 1649.5ms > 120.0ms
+[SKIP] Capture 29 skipped
+[ManualRobot] Server sent quit.
+[INFO] Recorded waypoints saved: data/session02/calib_train/capture_waypoints_recorded.json (30 poses)
+
+[DONE] Manual robot capture complete. 10 captures saved.
+
+[DONE] Total captures: 10
+  Meta saved: data/session02/calib_train/meta.json
