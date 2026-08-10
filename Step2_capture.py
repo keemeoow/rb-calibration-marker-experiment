@@ -54,7 +54,7 @@ from charuco_utils import CharucoTarget
 from config import CubeConfig, CharucoBoardConfig, get_default_cube_config
 from calibration_runtime_utils import resolve_cube_config_for_run
 from capture_detection_utils import detect_cube_markers_in_frame, marker_roi_quality
-from capture_gate import evaluate_capture_gate
+from capture_gate import evaluate_capture_gate, resolve_camera_storage
 from capture_session import allocate_next_capture_session
 from cube_config_utils import (
     cube_config_mismatch_keys,
@@ -735,6 +735,15 @@ def main():
                         help="Minimum valid depth samples for a depth-supported cube pose")
     parser.add_argument("--min_gripper_charuco_corners", type=int, default=8,
                         help="Min ChArUco corners required in gripper camera to accept capture")
+    parser.add_argument("--a_fixed_cam_views_per_set", type=int, default=1,
+                        help="A_placement: how many A captures per set store the fixed-camera "
+                             "images and records. The cube is static within a set, so the "
+                             "remaining views are the same scene again (default: 1). "
+                             "0 stores the fixed cameras on every A view.")
+    parser.add_argument("--b_save_gripper_cam", action="store_true",
+                        help="B_eyetohand: also store the gripper camera. Off by default — the "
+                             "wrist camera cannot see the cube it is holding and the B gate "
+                             "requires nothing from it.")
     parser.add_argument(
         "--require_gripper_cube_pnp",
         dest="require_gripper_cube_pnp",
@@ -1041,6 +1050,12 @@ def main():
         "capture_gate": capture_gate_cfg,
         "allow_force_save": bool(args.allow_force_save),
         "allow_intrinsics_res_mismatch": bool(args.allow_intrinsics_res_mismatch),
+        # Which cameras each block persists.  Part of capture_config so a session
+        # cannot silently mix two storage policies across a resume — a set that
+        # stored one A view of the fixed cameras is not comparable to one that
+        # stored six.
+        "a_fixed_cam_views_per_set": int(args.a_fixed_cam_views_per_set),
+        "b_save_gripper_cam": bool(args.b_save_gripper_cam),
         # Per-camera exposure/gain/white balance actually in force. Recorded so a
         # later session can reproduce the same photometry, and so a session shot
         # with auto-exposure is identifiable after the fact rather than silently
@@ -1097,6 +1112,18 @@ def main():
         }
         event_id = 0
         print("[INFO] New session (meta.json created)")
+
+    # set_index -> A captures whose fixed-camera frames are already on disk.
+    # Rebuilt from meta so resuming a session continues where it stopped instead
+    # of storing a second redundant copy of every covered set.
+    fixed_cam_stored: Dict[int, int] = {}
+    for _cap in meta.get("captures", []):
+        if _cap.get("cube_gripped") or _cap.get("set_index") is None:
+            continue
+        if any(rec.get("saved") and not rec.get("is_gripper")
+               for rec in (_cap.get("cams") or {}).values()):
+            _s = int(_cap["set_index"])
+            fixed_cam_stored[_s] = fixed_cam_stored.get(_s, 0) + 1
     meta["cube_config_source"] = cube_cfg_source
     meta["capture_config"] = capture_config
     if "cube_config" not in meta:
@@ -1413,8 +1440,36 @@ def main():
             except Exception:
                 pass
 
+        # ─── 카메라별 저장 범위 (근거는 resolve_camera_storage 참조) ───
+        is_placement = not bool(cube_gripped)
+        sidx = None if set_index is None else int(set_index)
+        storage = resolve_camera_storage(
+            is_placement=is_placement,
+            set_index=sidx,
+            fixed_views_already_stored=fixed_cam_stored.get(sidx, 0),
+            a_fixed_cam_views_per_set=int(args.a_fixed_cam_views_per_set),
+            b_save_gripper_cam=bool(args.b_save_gripper_cam),
+        )
+
         for ci in sorted(frames.keys()):
             fr = frames[ci]
+            is_gripper_cam = (ci == gripper_cam_idx)
+
+            # 저장하지 않는 카메라도 기록은 남긴다. 아래 소비자들이 모두
+            # cams[ci]["saved"] 로 거르므로 (CP_common, Step3,
+            # calibration_corner_observations), 조용히 빠지지 않고 왜 없는지가 남는다.
+            if (is_gripper_cam and not storage.store_gripper) or \
+                    (not is_gripper_cam and not storage.store_fixed):
+                cap_rec["cams"][str(ci)] = {
+                    "saved": False,
+                    "is_gripper": is_gripper_cam,
+                    "skip_reason": (storage.gripper_skip_reason if is_gripper_cam
+                                    else storage.fixed_skip_reason),
+                    "n_markers_detected": fr["n_markers"],
+                    "cube_visible": fr["ok"],
+                    "charuco_detect_n": int(fr.get("charuco_detect_n", 0)),
+                }
+                continue
 
             rgb_rel = f"cam{ci}/rgb_{fid:05d}.jpg"
             cv2.imwrite(os.path.join(root, rgb_rel), fr["color"])
@@ -1455,6 +1510,11 @@ def main():
                 cam_rec["charuco"] = fr["charuco"]
 
             cap_rec["cams"][str(ci)] = cam_rec
+
+        # 게이트를 통과해 실제로 디스크에 쓴 뒤에만 센다. 게이트 실패는 위에서
+        # 이미 return 했으므로 여기 도달한 캡처만 그 set 의 몫을 채운다.
+        if is_placement and storage.store_fixed and sidx is not None:
+            fixed_cam_stored[sidx] = fixed_cam_stored.get(sidx, 0) + 1
 
         meta["captures"].append(cap_rec)
         with open(meta_path, "w") as f:

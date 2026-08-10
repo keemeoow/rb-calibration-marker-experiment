@@ -222,8 +222,14 @@ python tools/build_waypoints_from_pool.py \
   --output data/next_capture_waypoints.json \
   --safe_joints_empty <D1,D2,D3,D4,D5,D6> \
   --safe_joints_gripped <D1,D2,D3,D4,D5,D6> \
-  --n_grip_per_set 10 --n_per_set 8 --seed 0
+  --n_per_set 6 --b_station_set <마지막 set 인덱스>
 ```
+
+`--b_station_set`은 `A_sets_plus_B_station` 레이아웃을 만든다. Set마다 A placement만
+찍고, 마지막에 큐브를 스테이션 한 곳으로 옮겨 거기서만 B 스윕을 한 번 한다. 기존
+`per_set_AB`(set마다 `--n_grip_per_set`개씩 B 반복)도 그대로 쓸 수 있으며, 어느
+레이아웃인지는 출력 파일의 `capture_protocol`로 선언되어 서버가 첫 모션 전에 그 모양
+그대로 검증한다.
 
 - [ ] Empty payload `current→safe→첫 A pose→safe`를 저속 확인한다.
 - [ ] Gripped payload `current→safe→첫 B pose→safe`를 저속 확인한다.
@@ -427,8 +433,8 @@ threshold, split, hyperparameter와 분석 코드를 동결한다.
 첫 engineering-pilot session의 end-to-end 통과 후 동일 절차를 반복한다.
 
 - [ ] 다음 번호 session 전에 카메라를 독립적으로 재설치하고 새 manifest를 작성한다.
-- [ ] Session당 A 13–15 placements × 8–12 views를 촬영한다.
-- [ ] Session당 B 30–40 poses를 촬영한다.
+- [ ] Session당 A 13–15 placements × 6 views를 촬영한다.
+- [ ] Session당 B는 스테이션 1곳에서 15 poses를 한 번만 촬영한다.
 - [ ] Session당 서로 다른 blind external-GT 30 poses를 촬영한다.
 - [ ] 카메라를 움직이기 전에 session audit와 백업을 완료한다.
 - [ ] 독립적인 pilot session 5개를 완료한다.
@@ -436,6 +442,49 @@ threshold, split, hyperparameter와 분석 코드를 동결한다.
 - [ ] 필요한 최종 독립 session 수를 확정하고 추가 촬영한다.
 
 한 session의 pose 30개는 독립 session 30개가 아니다.
+
+### 촬영량 근거와 감수한 리스크 (2026-08-10 확정)
+
+B를 set마다 반복하지 않는 이유: gripped 캡처의 cube 관측은 solve에 들어가지 않는다
+(`CP_ablation_7row.detect_observations`의 `exclude_gripped_cube=True`, `CP_C1`/`CP_C3`/
+`CP_cube_selfcal`/`Step3` 모두 동일). B 게이트는 그리퍼 카메라도 요구하지 않는다
+(`B_eyetohand` 프로파일의 `min_cams_with_cube: 0`). 남는 소비처는
+`CP_common.estimate_robot_pos_scale` 하나이고, 그 추정기는 상대회전 ≤5°·변위 ≥40 mm인
+pure-translation 쌍만 쓴다. 따라서 스테이션 15 poses 중 일부는 **자세를 고정한 채 위치만
+벌려** 티칭해야 하며, 자세가 전부 다른 15 poses는 유효 쌍을 0개 만든다.
+
+A를 set당 6 views로 정한 것은 하한을 깎은 결정이다. Canonical 아티팩트
+(`CP_result/ablation_7row_canonical/seven_row_ablation.json`, 13 sets × 11 views) 실측
+전환율은 A view → `train_eih_cube_event` 기준 평균 0.75, 최악 set 0.55다.
+
+| n_per_set | 기대 | 최악 set | split 계약 최소 3 |
+| ---: | ---: | ---: | --- |
+| 6 (채택) | 4.5 | **3.3** | 턱걸이 |
+| 8 | 6.0 | 4.4 | 여유 |
+
+- [ ] 6 views에서는 전환율이 나쁜 set이 계약 최소치 아래로 떨어져 solve에서 탈락할 수 있다.
+      탈락한 set은 position holdout에서 위치 하나가 통째로 사라진다. **촬영 직후 set별
+      `train_eih_cube_events`를 확인하고, 3 미만인 set은 카메라를 옮기기 전에 재촬영한다.**
+- [ ] Builder가 생성 시 같은 투영값을 출력하고 `_meta.projected_train_eih_cube_per_set`에
+      기록한다. 그 경고를 무시하고 진행하지 않는다.
+
+### 카메라별 저장 범위
+
+`Step2_capture.py`는 solve가 쓸 수 없는 프레임을 저장하지 않는다. 두 규칙 모두
+`capture_config`에 기록되므로 한 session이 두 저장 정책을 섞을 수 없고, 저장하지 않은
+카메라도 `cams[ci].saved=false`와 `skip_reason`으로 남는다(조용히 빠지지 않는다).
+
+| 옵션 | 기본값 | 규칙 | 근거 (session01 실측) |
+| --- | --- | --- | --- |
+| `--a_fixed_cam_views_per_set` | 1 | A: set당 앞 N개 캡처만 고정 카메라를 저장. 나머지 뷰는 그리퍼 카메라만 | 큐브가 바닥에 정지해 있고 팔만 움직인다. set×고정카메라 39조합 전부가 뷰마다 동일 마커 수, 팔에 가려 첫 뷰만 놓친 경우 **0/39** |
+| `--b_save_gripper_cam` | off | B: 그리퍼 카메라를 저장하지 않음 | 큐브를 쥐고 있어 손목 카메라가 큐브를 못 본다. `cube_visible` **0/89**, ChArUco ≥8 코너 **3/89**. B 게이트도 손목 카메라에 아무 요구 없음 |
+
+- [ ] 잃는 것은 관측이 아니라 반복에 의한 √N 노이즈 평균화다. A 6뷰 → 1뷰면 set별
+      고정-카메라 큐브 코너 노이즈가 √6 ≈ 2.4배 커진다. 이를 줄이려면
+      `--a_fixed_cam_views_per_set 2`로 올린다(저장량은 여전히 크게 준다).
+- [ ] 13 sets × A 6 + B 15 기준 카메라-프레임 **372 → 162 (56% 감소)**,
+      이미지 84 MB → 37 MB. `marker_quads/` 진단 이미지(93장 39 MB)는 이 규칙의
+      대상이 아니므로 필요 없으면 별도로 정리한다.
 
 ## 7. External-GT 최종 평가
 

@@ -4,12 +4,58 @@ The acquisition program imports this module, while unit tests can exercise the
 gate without importing OpenCV, RealSense, or robot libraries.
 """
 
-from typing import Dict, Optional, Tuple
+from typing import Dict, NamedTuple, Optional, Tuple
 
 
 CAPTURE_BLOCK_A = "A_placement"
 CAPTURE_BLOCK_B = "B_eyetohand"
 KNOWN_CAPTURE_BLOCKS = (CAPTURE_BLOCK_A, CAPTURE_BLOCK_B)
+
+
+class CameraStorage(NamedTuple):
+    """Which camera groups a gate-passing capture writes to disk."""
+
+    store_fixed: bool
+    store_gripper: bool
+    fixed_skip_reason: Optional[str]
+    gripper_skip_reason: Optional[str]
+
+
+def resolve_camera_storage(is_placement: bool,
+                           set_index: Optional[int],
+                           fixed_views_already_stored: int,
+                           a_fixed_cam_views_per_set: int,
+                           b_save_gripper_cam: bool) -> CameraStorage:
+    """Drop the camera frames that carry no observation the solve can use.
+
+    A placement: the cube sits on the floor and only the arm moves, so within one
+    set every A view shows the fixed cameras the same static scene.  Measured on
+    session01, all 39 (set, fixed camera) combinations detected the same marker
+    count on every view and the arm never occluded a camera that a later view
+    recovered, so keeping the first view loses no observation — only the sqrt(N)
+    noise averaging over repeats.
+
+    B eye-to-hand: the gripper holds the cube, so the wrist camera cannot see it
+    (session01: cube_visible 0/89, >=8 ChArUco corners on 3/89), and the
+    B_eyetohand gate asks nothing of that camera either.
+
+    ``a_fixed_cam_views_per_set <= 0`` disables the A-side reduction.  A capture
+    with no set index keeps everything, because without a set there is nothing to
+    call a repeat of.
+    """
+    store_fixed, fixed_skip_reason = True, None
+    if is_placement and a_fixed_cam_views_per_set > 0 and set_index is not None:
+        if fixed_views_already_stored >= a_fixed_cam_views_per_set:
+            store_fixed = False
+            fixed_skip_reason = (
+                "redundant_static_scene: set {} already stored {} A view(s) of "
+                "the fixed cameras".format(set_index, fixed_views_already_stored))
+    store_gripper, gripper_skip_reason = True, None
+    if not is_placement and not b_save_gripper_cam:
+        store_gripper = False
+        gripper_skip_reason = "gripped_cube_occludes_wrist_camera"
+    return CameraStorage(store_fixed, store_gripper,
+                         fixed_skip_reason, gripper_skip_reason)
 
 
 def resolve_capture_gate_profile(gate_cfg: dict,

@@ -1,6 +1,6 @@
 import unittest
 
-from capture_gate import evaluate_capture_gate
+from capture_gate import evaluate_capture_gate, resolve_camera_storage
 
 
 def _pnp(depth=True, plane=5.0):
@@ -197,6 +197,63 @@ class MarkerRoiQualityGateTests(unittest.TestCase):
                            min_roi_sharpness=1000.0)
         self.assertTrue(result["pass"], result["reason"])
         self.assertIsNone(result["per_camera"][1]["roi_clip_frac_median"])
+
+
+class CameraStorageTests(unittest.TestCase):
+    def _a(self, already, **kw):
+        opts = dict(is_placement=True, set_index=3,
+                    fixed_views_already_stored=already,
+                    a_fixed_cam_views_per_set=1, b_save_gripper_cam=False)
+        opts.update(kw)
+        return resolve_camera_storage(**opts)
+
+    def _b(self, **kw):
+        opts = dict(is_placement=False, set_index=3,
+                    fixed_views_already_stored=0,
+                    a_fixed_cam_views_per_set=1, b_save_gripper_cam=False)
+        opts.update(kw)
+        return resolve_camera_storage(**opts)
+
+    def test_first_a_view_of_a_set_stores_the_fixed_cameras(self):
+        s = self._a(0)
+        self.assertTrue(s.store_fixed)
+        self.assertIsNone(s.fixed_skip_reason)
+        self.assertTrue(s.store_gripper)
+
+    def test_later_a_views_drop_the_fixed_cameras_with_a_reason(self):
+        s = self._a(1)
+        self.assertFalse(s.store_fixed)
+        self.assertIn("redundant_static_scene", s.fixed_skip_reason)
+        self.assertIn("set 3", s.fixed_skip_reason)
+        # The wrist camera is the whole point of the extra A views.
+        self.assertTrue(s.store_gripper)
+
+    def test_a_quota_above_one_keeps_that_many_views(self):
+        self.assertTrue(self._a(1, a_fixed_cam_views_per_set=2).store_fixed)
+        self.assertFalse(self._a(2, a_fixed_cam_views_per_set=2).store_fixed)
+
+    def test_zero_quota_disables_the_reduction(self):
+        self.assertTrue(self._a(99, a_fixed_cam_views_per_set=0).store_fixed)
+
+    def test_a_capture_without_a_set_keeps_every_camera(self):
+        # Nothing to call a repeat of, so nothing may be dropped as one.
+        self.assertTrue(self._a(99, set_index=None).store_fixed)
+
+    def test_b_drops_the_gripper_camera_and_keeps_the_fixed_ones(self):
+        s = self._b()
+        self.assertFalse(s.store_gripper)
+        self.assertEqual(s.gripper_skip_reason, "gripped_cube_occludes_wrist_camera")
+        self.assertTrue(s.store_fixed)
+
+    def test_b_never_applies_the_a_side_quota(self):
+        # B poses move the cube, so a B capture is never a repeat of an earlier one.
+        s = self._b(fixed_views_already_stored=99)
+        self.assertTrue(s.store_fixed)
+
+    def test_b_gripper_camera_can_be_kept_on_request(self):
+        s = self._b(b_save_gripper_cam=True)
+        self.assertTrue(s.store_gripper)
+        self.assertIsNone(s.gripper_skip_reason)
 
 
 if __name__ == "__main__":
