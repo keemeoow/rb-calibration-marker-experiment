@@ -73,7 +73,10 @@ TRANSIT_LIFT_Z_MM = 50.0
 FINAL_LIFT_Z_MM = 100.0
 # safe_pose_mode=z_lift_only 일 때 매 전이에서 물러나는 높이. 티칭된 안전자세가
 # 없으므로 "현재 위치에서 수직으로 물러난다"가 유일한 공통 후퇴 동작이다.
-RETRACT_Z_MM = 100.0
+# B(큐브 그립)에만 적용된다 — A 는 retract=False 로 직행한다. 100mm 는 매 캡처마다
+# 왕복하기엔 과해서 20mm 로 낮췄다. 테이블을 살짝 벗어나는 정도면 충분하고, 이후
+# 관절 보간 경로는 어차피 이 값이 보장하지 못한다. 0 으로 두면 B 도 직행한다.
+RETRACT_Z_MM = 20.0
 SAFE_JOINT_TOL_DEG = 2.0
 MOTION_STILL_TOL_DEG = 0.15
 MOTION_STILL_SAMPLE_SEC = 0.25
@@ -353,15 +356,34 @@ def verify_at_joint_pose(rb, target_joints, tolerance_deg=SAFE_JOINT_TOL_DEG):
     return [float(x) for x in actual]
 
 
-def move_to_validated_safe(rb, safe_joints, safe_kind, transition_label):
+def move_to_validated_safe(rb, safe_joints, safe_kind, transition_label,
+                           retract=True):
     """Execute and verify the mandatory current -> safe portion of a transition.
 
     ``safe_joints=None`` means the waypoint declared safe_pose_mode=z_lift_only:
     there is no taught safe pose, so retract straight up by RETRACT_Z_MM instead.
     The lift bounds the start of the path but not the joint interpolation that
     follows, so the whole run still has to be validated by a slow dry-run.
+
+    ``retract=False`` skips even that lift and goes straight to the target. It is
+    for A_placement, where the cube already sits on the table and the gripper is
+    empty: nothing is carried, so lifting 100mm between every viewpoint only
+    costs time. B keeps the lift because the cube is held.
     """
     started = time.time()
+    if safe_joints is None and not retract:
+        print '[SAFE] {} -> 직행 (A 블록, 리트랙트 없음)'.format(transition_label)
+        actual = verify_robot_still(rb)
+        return {
+            'state_machine': 'direct_to_target_v1',
+            'safe_transition_verified': True,
+            'safe_pose_kind': 'none_direct',
+            'retract_z_mm': 0.0,
+            'safe_joints_commanded': None,
+            'safe_joints_actual': actual,
+            'safe_move_started_epoch_s': started,
+            'safe_reached_epoch_s': time.time(),
+        }
     if safe_joints is None:
         print '[SAFE] {} -> +Z {:.0f}mm retract (no taught safe pose)'.format(
             transition_label, RETRACT_Z_MM)
@@ -551,6 +573,39 @@ def approach_place_pose(rb, place_j, label, approach_z_mm=PLACE_APPROACH_Z_MM):
     return place_tcp
 
 
+def jog_at_pose(rb, kind):
+    """촬영 확인 중 한 축만 상대 이동하거나 속도를 바꾼다.
+
+    read_key 는 한 글자만 받으므로, 여기서 나머지를 한 줄로 마저 읽는다.
+    예외는 삼켜서 오타 때문에 자동 촬영 루프가 죽지 않게 한다.
+    """
+    try:
+        if kind == 'v':
+            raw = raw_input('  speed 0-100 > ').strip()
+            spd = int(raw)
+            if not (0 <= spd <= 100):
+                print '  (0-100 범위)'
+                return
+            rb.override(spd)
+            print '  Speed: {}'.format(spd)
+            return
+        prompt = '  p <axis>,<delta>  (x,y,z,rz,ry,rx) > ' if kind == 'p' \
+                 else '  j <joint>,<delta>  (d1..d6) > '
+        raw = raw_input(prompt).strip()
+        if not raw:
+            return
+        axis, _, val = raw.partition(',')
+        delta = float(val)
+        if kind == 'p':
+            move_tcp(axis.strip(), delta)
+        else:
+            move_joint(axis.strip(), delta)
+    except (ValueError, IndexError) as e:
+        print '  err: {} (형식: <axis>,<delta>)'.format(e)
+    except Exception as e:
+        print '  이동 실패: {}'.format(e)
+
+
 def manual_recover(rb, conn, pose_idx, capture_kwargs):
     """Marker detection failed at an auto waypoint. Hand control to the operator to
     jog the robot until the cube is detected, then re-capture from the current pose.
@@ -697,7 +752,7 @@ def run_auto_capture(rb, conn, waypoint_file=None, speed=30):
 
 def _capture_at_pose(rb, conn, wp, sidx, place_j, set_cc,
                      cube_gripped, capture_block, grasp_id, confirm,
-                     safe_joints, safe_kind, label=''):
+                     safe_joints, safe_kind, label='', retract=True):
     """safe pose -> waypoint -> 정지 확인 -> 촬영 -> safe pose.
 
     이동 방식: wp 에 'capture_joints' 가 있으면 관절 이동(rb.move), 없고 'capture_tcp'
@@ -716,7 +771,8 @@ def _capture_at_pose(rb, conn, wp, sidx, place_j, set_cc,
         label, sidx, pose_idx, capture_block, 'joint' if cap_j is not None else 'tcp')
     try:
         motion_safety = move_to_validated_safe(
-            rb, safe_joints, safe_kind, 'capture {}'.format(pose_idx))
+            rb, safe_joints, safe_kind, 'capture {}'.format(pose_idx),
+            retract=retract)
         target_started = time.time()
         if cap_j is not None:
             move_joint_shortest(rb, cap_j, 'capture')
@@ -743,19 +799,27 @@ def _capture_at_pose(rb, conn, wp, sidx, place_j, set_cc,
     if confirm:
         action = None
         while action is None:
-            ans = read_key("  [SPACE]=촬영  [s]=skip  [q]=quit > ")
+            ans = read_key("  [SPACE]=촬영 [s]=skip [q]=quit "
+                           "[p]/[j]=수동이동 [v]=속도 > ")
             if ans in (' ', '\r', '\n', 'c', 'C'):
                 action = 'capture'
             elif ans in ('s', 'S'):
                 action = 'skip'
             elif ans in ('q', 'Q'):
                 action = 'quit'
+            elif ans in ('p', 'P', 'j', 'J', 'v', 'V'):
+                # 촬영 직전에 조금 어긋난 프레이밍을 그 자리에서 고칠 수 있게 한다.
+                # 여기서 움직인 결과가 그대로 촬영·기록되므로, 목표 자세를 바꾸는
+                # 것이 아니라 "이 포즈를 실제로 쓸 수 있게 만드는" 조정이다.
+                jog_at_pose(rb, ans.lower())
+                show_pose()
             else:
-                print "  (SPACE=촬영 / s=skip / q=quit)"
+                print "  (SPACE=촬영 / s=skip / q=quit / p,j=이동 / v=속도)"
         if action == 'skip':
             print '  -> skipped by user'
             try:
-                move_to_validated_safe(rb, safe_joints, safe_kind, 'skip return')
+                move_to_validated_safe(rb, safe_joints, safe_kind, 'skip return',
+                                       retract=retract)
             except Exception as e:
                 print '  [SAFETY-ABORT] cannot return to safe pose: {}'.format(e)
                 return 'abort'
@@ -763,7 +827,8 @@ def _capture_at_pose(rb, conn, wp, sidx, place_j, set_cc,
         if action == 'quit':
             print '  -> quit by user'
             try:
-                move_to_validated_safe(rb, safe_joints, safe_kind, 'quit return')
+                move_to_validated_safe(rb, safe_joints, safe_kind, 'quit return',
+                                       retract=retract)
             except Exception as e:
                 print '  [SAFETY-ABORT] cannot return to safe pose: {}'.format(e)
                 return 'abort'
@@ -784,7 +849,8 @@ def _capture_at_pose(rb, conn, wp, sidx, place_j, set_cc,
     }
     status, _, _ = do_capture(conn, pose_idx, **cap_kwargs)
     try:
-        move_to_validated_safe(rb, safe_joints, safe_kind, 'post-capture return')
+        move_to_validated_safe(rb, safe_joints, safe_kind, 'post-capture return',
+                                       retract=retract)
     except Exception as e:
         print '  [SAFETY-ABORT] cannot return to safe pose: {}'.format(e)
         return 'abort'
@@ -1029,7 +1095,7 @@ def _run_auto_multiset(rb, conn, data, speed, confirm=True):
                 rb, conn, wp, sidx, place_j, set_cc,
                 cube_gripped=False, capture_block='A_placement', grasp_id=grasp_id,
                 confirm=confirm, safe_joints=safe_empty, safe_kind='empty',
-                label='A {}/{}'.format(wi + 1, len(block_a)))
+                label='A {}/{}'.format(wi + 1, len(block_a)), retract=False)
             if r == 'success':
                 success += 1
             elif r == 'skip':

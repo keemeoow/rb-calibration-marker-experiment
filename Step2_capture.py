@@ -24,7 +24,19 @@ gc
 python Step2_capture.py \
     --root_folder data/session02/calib_train \
     --intrinsics_dir ./intrinsics --use_robot --manual_robot \
-    --robot_ip 192.168.0.23 --robot_port 12348 --show --save_depth
+    --robot_ip 192.168.0.23 --robot_port 12348 --show --save_depth \
+    --max_capture_span_ms 0 \
+    --min_cams_with_cube 0 --min_fixed_cams_with_cube 0 \
+    --a_min_fixed_multimarker_cams 0 \
+    --min_cube_pnp_ok_cams 0 --min_fixed_cube_pnp_ok_cams 0 \
+    --max_cube_pnp_reproj_mean_px 0 --min_depth_samples 0 \
+    --gripper_cube_min_markers 0 --min_gripper_charuco_corners 0 \
+    --allow_gripper_cube_pnp_fail --allow_gripper_depth_invalid \
+    --max_gripper_depth_plane_mean_mm 0 \
+    --b_min_fixed_cams_with_cube 0 --b_min_fixed_multimarker_cams 0 \
+    --b_min_fixed_cube_pnp_ok_cams 0 --b_min_fixed_depth_quality_cams 0 \
+    --b_max_fixed_depth_plane_mean_mm 0 \
+    --max_roi_clip_frac 0
 
 저장 파일:
   - meta.json               : 캡처별 상세 (robot pose, set_index, set_cube_center_6dof, cube/board quality)
