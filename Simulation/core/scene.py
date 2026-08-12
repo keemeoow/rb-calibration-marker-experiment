@@ -128,16 +128,17 @@ class SimScene:
         if not use_real_layout:
             self.bTo = {}
             for s in self.sets:
-              yaw = rng.uniform(-np.pi, np.pi)
-            Ryaw = rot_axis_angle(np.array([0, 0, 1.0]), yaw)
-            ax = rng.normal(size=3); ax[2] = 0; ax /= (np.linalg.norm(ax) + 1e-12)
-            Rtilt = rot_axis_angle(ax, np.deg2rad(rng.uniform(-15, 15)))
-            T = np.eye(4)
-            T[:3, :3] = Rtilt @ Ryaw
-            T[:3, 3] = center + np.array([rng.uniform(-0.1, 0.1),
-                                          rng.uniform(-0.1, 0.1),
-                                          rng.uniform(0.0, 0.05)])
-            self.bTo[s] = T
+                yaw = rng.uniform(-np.pi, np.pi)
+                Ryaw = rot_axis_angle(np.array([0, 0, 1.0]), yaw)
+                ax = rng.normal(size=3); ax[2] = 0
+                ax /= (np.linalg.norm(ax) + 1e-12)
+                Rtilt = rot_axis_angle(ax, np.deg2rad(rng.uniform(-15, 15)))
+                T = np.eye(4)
+                T[:3, :3] = Rtilt @ Ryaw
+                T[:3, 3] = center + np.array([rng.uniform(-0.1, 0.1),
+                                              rng.uniform(-0.1, 0.1),
+                                              rng.uniform(0.0, 0.05)])
+                self.bTo[s] = T
 
         # ---- 로봇 그리퍼 자세 bTg (event 마다). 카메라가 중심을 바라보게 look-at → bTg 역산 ----
         if not use_real_layout:
