@@ -43,6 +43,7 @@ class SimScene:
                  intrinsic_err=0.0, outlier_rate=0.0, outlier_px=15.0,
                  fk_slip_sets=0, fk_slip_mm=0.0, fk_slip_deg=0.0,
                  corner_bias_px=0.0, outlier_focus_cam=None,
+                 max_cams_per_set=None,
                  intrinsic_jitter=0.0, use_real_layout=False,
                  cam_radius_m=0.35, cam_height_m=0.35,
                  incidence_max_deg=75.0, use_real_cameras=True,
@@ -60,6 +61,8 @@ class SimScene:
         self.outlier_focus_cam = outlier_focus_cam
         # 내부파라미터 랜덤오차: 프레임마다 초점거리가 흔들림
         self.intrinsic_jitter = float(intrinsic_jitter)
+        # 세트마다 몇 대의 고정 카메라가 보는지 제한(현장에서 가림이 있는 경우)
+        self.max_cams_per_set = max_cams_per_set
 
         # ---- 고정 카메라 배치 ----
         # use_real_cameras=True: 실측 위치(높이 ~0.2m) 사용. 단, 저장된 캘리브 행렬의
@@ -244,8 +247,22 @@ class SimScene:
         self.reproj = {}
         self.corn = {}      # (id(store), key) -> (obj_rig3d, img2d_noisy, cam_key) : held-out 픽셀 재투영(③)용
         orng = np.random.default_rng(7000 + seed)
+        # 세트별로 관측하는 고정 카메라를 제한할 수 있다.
+        vis_rng = np.random.default_rng(13000 + seed)
+        cams_for_set = {}
+        for s in self.sets:
+            if self.max_cams_per_set is None:
+                cams_for_set[s] = list(self.fixed_cam_ids)
+            else:
+                k = min(int(self.max_cams_per_set), len(self.fixed_cam_ids))
+                pick = vis_rng.choice(len(self.fixed_cam_ids), size=k, replace=False)
+                cams_for_set[s] = [self.fixed_cam_ids[i] for i in sorted(pick)]
+        self.cams_for_set = cams_for_set
+
         for ci in self.fixed_cam_ids:
             for s in self.sets:
+                if ci not in cams_for_set[s]:
+                    continue
                 self._obs(_CUBE, inv_T(self.bTf[ci]) @ self.bTo[s],
                           self.obs_fix_cube, (ci, s), orng, ci)
                 self._obs(_BOARD, inv_T(self.bTf[ci]) @ self.bTboard,

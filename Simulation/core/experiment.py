@@ -108,6 +108,7 @@ def run_config(cfg: ExpConfig, seeds=20, n_sets=10, sigma_px=0.3, train_size=8,
                n_gripped_events=0,
                fk_slip_sets=0, fk_slip_mm=0.0, fk_slip_deg=0.0,
                corner_bias_px=0.0, outlier_focus_cam=None,
+               max_cams_per_set=None,
                intrinsic_jitter=0.0, use_real_layout=False):
     """한 설정을 여러 seed × (seed당 n_splits 개의 train/test holdout)로 평가.
        코너 수준(실물 마커 투영→PnP). sigma_px = 코너 픽셀 노이즈.
@@ -128,6 +129,7 @@ def run_config(cfg: ExpConfig, seeds=20, n_sets=10, sigma_px=0.3, train_size=8,
                       fk_slip_deg=fk_slip_deg,
                       corner_bias_px=corner_bias_px,
                       outlier_focus_cam=outlier_focus_cam,
+                      max_cams_per_set=max_cams_per_set,
                       intrinsic_jitter=intrinsic_jitter,
                       use_real_layout=use_real_layout)
         reproj_seed = float(_np.mean(list(sc.reproj.values()))) if getattr(sc, "reproj", None) else None
