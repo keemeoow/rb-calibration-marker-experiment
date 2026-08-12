@@ -30,6 +30,8 @@ _BOARD = BoardTarget()
 
 # 실측 카메라 배치 (CP_result/C1 에서 추출, 높이 ~0.2m 거의 수평 하향 10°)
 _REAL = np.load(os.path.join(os.path.dirname(__file__), "real_setup", "real_cameras.npz"))
+_LAYOUT_PATH = os.path.join(os.path.dirname(__file__), "real_setup",
+                            "real_layout_session02.npz")
 _REAL_BTF = _REAL["bTf"]           # (3,4,4) base←camera
 _REAL_CENTER = _REAL["center"]     # 작업공간(큐브) 중심
 
@@ -40,6 +42,8 @@ class SimScene:
                  fk_sys_mm=0.0, fk_sys_deg=0.0,
                  intrinsic_err=0.0, outlier_rate=0.0, outlier_px=15.0,
                  fk_slip_sets=0, fk_slip_mm=0.0, fk_slip_deg=0.0,
+                 corner_bias_px=0.0, outlier_focus_cam=None,
+                 intrinsic_jitter=0.0, use_real_layout=False,
                  cam_radius_m=0.35, cam_height_m=0.35,
                  incidence_max_deg=75.0, use_real_cameras=True,
                  cam_downtilt_deg=27.0, n_gripped_events=0):
@@ -50,6 +54,12 @@ class SimScene:
         self.outlier_rate = outlier_rate
         self.outlier_px = outlier_px
         self.intrinsic_err = intrinsic_err
+        # 코너 검출 계통오차: 카메라마다 고정된 픽셀 편향(방향은 카메라별 무작위, 크기 동일)
+        self.corner_bias_px = float(corner_bias_px)
+        # 이상치 계통오차: 한 카메라에만 이상치가 몰리는 경우
+        self.outlier_focus_cam = outlier_focus_cam
+        # 내부파라미터 랜덤오차: 프레임마다 초점거리가 흔들림
+        self.intrinsic_jitter = float(intrinsic_jitter)
 
         # ---- 고정 카메라 배치 ----
         # use_real_cameras=True: 실측 위치(높이 ~0.2m) 사용. 단, 저장된 캘리브 행렬의
@@ -57,7 +67,30 @@ class SimScene:
         #   실측 카메라 *위치*는 유지하고 광축이 작업공간 중심을 향하되 하향각을
         #   cam_downtilt_deg(기본 27°)로 맞춘다 → 평면 보드가 부분적으로 보임.
         # False: 이상적 원형 look-at 배치 (개발/디버그용).
-        if use_real_cameras:
+        if use_real_layout:
+            # ── session02 실측 배치를 참값으로 사용 ──────────────
+            #   카메라 자세, 큐브 자세, 로봇 이동을 전부 실제 값으로 심는다.
+            #   출처: Step3_calibration.py 를 session02 에 돌린 결과.
+            L = np.load(_LAYOUT_PATH)
+            self.real_layout = True
+            self.fixed_cam_ids = [int(c) for c in L["cam_ids"]]
+            self.bTf = {ci: L["bTf"][i].copy()
+                        for i, ci in enumerate(self.fixed_cam_ids)}
+            self.gTc = L["gTc"].copy()
+            self.sets = [int(x) for x in L["sets"]]
+            self.bTo = {int(s): L["bTo"][i].copy()
+                        for i, s in enumerate(self.sets)}
+            center = L["bTo"][:, :3, 3].mean(axis=0)
+            self.bTboard = np.eye(4)
+            self.bTboard[:3, 3] = center.copy()
+            self.events, self.event_set, self.bTg = [], {}, {}
+            for e, (M, s) in enumerate(zip(L["bTg"], L["event_set"])):
+                self.bTg[e] = M.copy()
+                self.event_set[e] = int(s)
+                self.events.append(e)
+            self.set_events = {s: [e for e in self.events if self.event_set[e] == s]
+                               for s in self.sets}
+        elif use_real_cameras:
             center = _REAL_CENTER.copy()
             self.fixed_cam_ids = list(range(len(_REAL_BTF)))
             self.bTf = {}
@@ -81,17 +114,21 @@ class SimScene:
                                          cam_radius_m * np.sin(th),
                                          cam_height_m + rng.uniform(-0.02, 0.02)])
                 self.bTf[ci] = look_at(pos, center)
-        self.sets = list(range(n_sets))
+        if not use_real_layout:
+            self.sets = list(range(n_sets))
 
         # 핸드아이 gTc: 카메라가 그리퍼 축에 대략 정렬(작은 오프셋).
-        self.gTc = rand_se3(rng, t_range_m=0.05, ang_range_deg=20.0)
+        if not use_real_layout:
+            self.gTc = rand_se3(rng, t_range_m=0.05, ang_range_deg=20.0)
         # 보드: 테이블에 고정 (윗면 +Z 위로)
-        self.bTboard = np.eye(4)
-        self.bTboard[:3, 3] = center.copy()
+        if not use_real_layout:
+            self.bTboard = np.eye(4)
+            self.bTboard[:3, 3] = center.copy()
         # 큐브: set 마다 재배치. 실물처럼 "테이블에 앉은" 자세(윗면 위, yaw 자유 + 작은 틸트).
-        self.bTo = {}
-        for s in self.sets:
-            yaw = rng.uniform(-np.pi, np.pi)
+        if not use_real_layout:
+            self.bTo = {}
+            for s in self.sets:
+              yaw = rng.uniform(-np.pi, np.pi)
             Ryaw = rot_axis_angle(np.array([0, 0, 1.0]), yaw)
             ax = rng.normal(size=3); ax[2] = 0; ax /= (np.linalg.norm(ax) + 1e-12)
             Rtilt = rot_axis_angle(ax, np.deg2rad(rng.uniform(-15, 15)))
@@ -103,20 +140,21 @@ class SimScene:
             self.bTo[s] = T
 
         # ---- 로봇 그리퍼 자세 bTg (event 마다). 카메라가 중심을 바라보게 look-at → bTg 역산 ----
-        self.events, self.event_set, self.bTg = [], {}, {}
-        eid = 0
-        for s in self.sets:
-            for _ in range(n_events_per_set):
-                cam_pos = center + np.array([rng.uniform(-0.12, 0.12),
-                                             rng.uniform(-0.12, 0.12),
-                                             rng.uniform(0.30, 0.45)])
-                look = center + rng.uniform(-0.03, 0.03, size=3)
-                self.bTg[eid] = look_at(cam_pos, look) @ inv_T(self.gTc)
-                self.event_set[eid] = s
-                self.events.append(eid)
-                eid += 1
-        self.set_events = {s: [e for e in self.events if self.event_set[e] == s]
-                           for s in self.sets}
+        if not use_real_layout:
+            self.events, self.event_set, self.bTg = [], {}, {}
+            eid = 0
+            for s in self.sets:
+                for _ in range(n_events_per_set):
+                    cam_pos = center + np.array([rng.uniform(-0.12, 0.12),
+                                                 rng.uniform(-0.12, 0.12),
+                                                 rng.uniform(0.30, 0.45)])
+                    look = center + rng.uniform(-0.03, 0.03, size=3)
+                    self.bTg[eid] = look_at(cam_pos, look) @ inv_T(self.gTc)
+                    self.event_set[eid] = s
+                    self.events.append(eid)
+                    eid += 1
+            self.set_events = {s: [e for e in self.events if self.event_set[e] == s]
+                               for s in self.sets}
 
         # ---- 로봇 FK 큐브 위치 (fk_cube). 완벽=GT, 옵션 노이즈 ----
         #   두 종류:
@@ -190,6 +228,15 @@ class SimScene:
             self.K_pnp[ck] = Kp
             self.dist_pnp[ck] = dt.copy()                # dist 는 실측 그대로(계측 신뢰)
 
+        # ---- 코너 검출 계통 편향: 카메라마다 방향은 다르고 크기는 같다 ----
+        self._corner_bias = {}
+        if self.corner_bias_px > 0:
+            rb = np.random.default_rng(11000 + seed)
+            for ck in cam_keys:
+                th = rb.uniform(0, 2 * np.pi)
+                self._corner_bias[ck] = (self.corner_bias_px * np.cos(th),
+                                         self.corner_bias_px * np.sin(th))
+
         # ---- 코너 수준 관측 생성 ----
         self.obs_fix_cube, self.obs_fix_board = {}, {}
         self.obs_grip_cube, self.obs_grip_board = {}, {}
@@ -236,11 +283,22 @@ class SimScene:
 
     def _obs(self, target, T_gt, store, key, rng, cam_key):
         """3D 코너 투영→픽셀노이즈(+outlier)→PnP(부정확 K_pnp). 미검출이면 저장 안 함."""
+        # 이상치 계통오차: 지정 카메라에만 몰아준다(다른 카메라는 이상치 없음).
+        orate = self.outlier_rate
+        if self.outlier_focus_cam is not None:
+            orate = self.outlier_rate if cam_key == self.outlier_focus_cam else 0.0
+        # 내부파라미터 랜덤오차: PnP 가 쓰는 K 를 프레임마다 흔든다.
+        K_pnp = self.K_pnp[cam_key]
+        if self.intrinsic_jitter > 0:
+            K_pnp = K_pnp.copy()
+            K_pnp[0, 0] *= 1 + rng.normal(0, self.intrinsic_jitter)
+            K_pnp[1, 1] *= 1 + rng.normal(0, self.intrinsic_jitter)
         r = observe(target, T_gt, sigma_px=self.sigma_px,
                     incidence_max_deg=self.incidence_max_deg, rng=rng,
                     K=self.K_true[cam_key], dist=self.dist_true[cam_key],
-                    K_pnp=self.K_pnp[cam_key], dist_pnp=self.dist_pnp[cam_key],
-                    outlier_rate=self.outlier_rate, outlier_px=self.outlier_px)
+                    K_pnp=K_pnp, dist_pnp=self.dist_pnp[cam_key],
+                    outlier_rate=orate, outlier_px=self.outlier_px,
+                    corner_bias_px=self._corner_bias.get(cam_key, (0.0, 0.0)))
         if r is not None:
             T_est, ncorner, reproj, obj, img = r
             store[key] = T_est

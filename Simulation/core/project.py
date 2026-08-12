@@ -37,7 +37,8 @@ REAL_CAM_INTR = {
 def observe(target, T_cam_target, sigma_px=0.5, incidence_max_deg=75.0,
             K=DEFAULT_K, dist=DEFAULT_DIST, rng=None,
             min_markers=1, min_corners=4,
-            K_pnp=None, dist_pnp=None, outlier_rate=0.0, outlier_px=15.0):
+            K_pnp=None, dist_pnp=None, outlier_rate=0.0, outlier_px=15.0,
+            corner_bias_px=(0.0, 0.0)):
     """카메라가 타깃을 관측 → (T_cam_target_est, n_corners, reproj_px) 또는 None(미검출).
 
     target        : CubeTarget | BoardTarget (rig 로컬 3D 코너 제공)
@@ -87,7 +88,11 @@ def observe(target, T_cam_target, sigma_px=0.5, incidence_max_deg=75.0,
         if not np.all(inb):
             continue
         # 픽셀 노이즈 (랜덤 지터) + 이상치(outlier)
+        # 랜덤 지터 + 카메라별 고정 편향(계통). 편향은 매 코너 같은 방향으로 작용해
+        # 평균으로 상쇄되지 않는다.
         proj_n = proj + rng.normal(0, sigma_px, proj.shape)
+        if corner_bias_px[0] or corner_bias_px[1]:
+            proj_n = proj_n + np.asarray(corner_bias_px, dtype=float)
         if outlier_rate > 0:
             mask = rng.random(len(proj_n)) < outlier_rate
             if np.any(mask):

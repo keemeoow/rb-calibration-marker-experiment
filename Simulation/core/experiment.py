@@ -106,7 +106,9 @@ def run_config(cfg: ExpConfig, seeds=20, n_sets=10, sigma_px=0.3, train_size=8,
                fk_sys_mm=0.0, fk_sys_deg=0.0,
                intrinsic_err=0.0, outlier_rate=0.0,
                n_gripped_events=0,
-               fk_slip_sets=0, fk_slip_mm=0.0, fk_slip_deg=0.0):
+               fk_slip_sets=0, fk_slip_mm=0.0, fk_slip_deg=0.0,
+               corner_bias_px=0.0, outlier_focus_cam=None,
+               intrinsic_jitter=0.0, use_real_layout=False):
     """한 설정을 여러 seed × (seed당 n_splits 개의 train/test holdout)로 평가.
        코너 수준(실물 마커 투영→PnP). sigma_px = 코너 픽셀 노이즈.
        n_splits: seed 당 평가할 holdout 조합 수 (전체는 느려 제한; 통계는 seed 수로 확보)."""
@@ -123,7 +125,11 @@ def run_config(cfg: ExpConfig, seeds=20, n_sets=10, sigma_px=0.3, train_size=8,
                       intrinsic_err=intrinsic_err, outlier_rate=outlier_rate,
                       n_gripped_events=n_gripped_events,
                       fk_slip_sets=fk_slip_sets, fk_slip_mm=fk_slip_mm,
-                      fk_slip_deg=fk_slip_deg)
+                      fk_slip_deg=fk_slip_deg,
+                      corner_bias_px=corner_bias_px,
+                      outlier_focus_cam=outlier_focus_cam,
+                      intrinsic_jitter=intrinsic_jitter,
+                      use_real_layout=use_real_layout)
         reproj_seed = float(_np.mean(list(sc.reproj.values()))) if getattr(sc, "reproj", None) else None
         sets = sc.sets
         splits = 0
