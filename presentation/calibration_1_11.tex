@@ -52,6 +52,20 @@
 % 표 안에서 줄 간격을 조금 넓힌다
 \renewcommand{\arraystretch}{1.3}
 
+% ── 변환행렬 표기 ────────────────────────────────────────
+% 축약 기호(C_i, X, Z, G, F, V, A ...)를 쓰지 않고
+% 항상 <도착>T<출발> 형태로 적는다. 곱셈에서 중간 좌표계가
+% 맞물려 사라지는 것이 눈에 보이게 하기 위함.
+% \T{도착}{출발}  또는  \T[윗표시]{도착}{출발}
+\newcommand{\T}[3][]{{}^{#2}\mathbf{T}^{#1}_{#3}}   % 예: \T{B}{C_i}, \T[(0)]{B}{C_i}
+\newcommand{\Tb}[2]{{}^{#1}\overline{\mathbf{T}}_{#2}} % 세트 공통(평균) 변환
+% 큐브 좌표계의 여러 추정치 = 서로 다른 좌표계 이름으로 구분
+\newcommand{\Oref}{O^{\mathrm{ref}}}   % 목적함수가 맞추는 기준 자세
+\newcommand{\Ofk}{O^{\mathrm{fk}}}     % raw FK가 말하는 큐브
+\newcommand{\Ovis}{O^{\mathrm{vis}}}   % vision 합의가 말하는 큐브
+\newcommand{\Ocorr}{O^{\mathrm{corr}}} % 공통 보정 후의 FK 큐브
+\newcommand{\Oanc}{O^{\mathrm{anc}}}   % gate를 거쳐 확정된 anchor
+
 \title[Cube-in-Hand Calibration]{Cube-in-Hand Calibration}
 \subtitle{마커 큐브와 로봇 FK를 함께 쓰는 멀티카메라 캘리브레이션}
 \author{이수민, 김지우}
@@ -346,23 +360,31 @@
 \end{frame}
 
 \begin{frame}{4.1 -- 4.3 관측값의 정의}
-  \textbf{4.1 고정 카메라 관측}
-  \[
-    \mathbf{Z}_{i,s} \equiv {}^{C_i}\mathbf{T}_{O,s}
-  \]
-  세트 $s$의 큐브가 고정 카메라 $i$에서 어떻게 보였는가
+  이미 측정이 끝나 \textbf{바꿀 수 없는} 값 세 가지
   \vfill
-  \textbf{4.2 그리퍼 카메라 관측}
-  \[
-    \mathbf{Z}_{g,e} \equiv {}^{C_g}\mathbf{T}_{O,e}
-  \]
-  이벤트 $e$에서 큐브가 그리퍼 카메라에 어떻게 보였는가
+  \textbf{4.1 고정 카메라 관측} \hfill $\T{C_i}{O,s}$
+  \vspace{-1mm}
+  \begin{itemize}
+    \item 세트 $s$의 큐브가 고정 카메라 $i$에서 어떻게 보였는가
+  \end{itemize}
   \vfill
-  \textbf{4.3 로봇 FK로 아는 그리퍼 자세}
-  \[
-    \mathbf{G}_e \equiv {}^{B}\mathbf{T}_{G,e}
-  \]
-  촬영 순간 그리퍼의 위치와 방향. 관절각으로부터 FK로 계산
+  \textbf{4.2 그리퍼 카메라 관측} \hfill $\T{C_g}{O,e}$
+  \vspace{-1mm}
+  \begin{itemize}
+    \item 이벤트 $e$에서 큐브가 그리퍼 카메라에 어떻게 보였는가
+  \end{itemize}
+  \vfill
+  \textbf{4.3 로봇 FK로 아는 그리퍼 자세} \hfill $\T{B}{G,e}$
+  \vspace{-1mm}
+  \begin{itemize}
+    \item 촬영 순간 그리퍼의 위치와 방향. 관절각으로부터 FK로 계산
+  \end{itemize}
+  \vfill
+  \begin{block}{}
+    \centering
+    앞의 둘은 출발점이 \textbf{카메라}, 마지막은 출발점이 \textbf{베이스}\\
+    $\rightarrow$ 그대로는 서로 이어붙일 수 없음 (6장에서 연결)
+  \end{block}
 \end{frame}
 
 \begin{frame}{4.3 FK란}
@@ -383,23 +405,28 @@
 %==================================================================
 
 \begin{frame}{5. 우리가 찾아야 하는 미지수}
-  \textbf{5.1 고정 카메라 외부파라미터}
-  \[
-    \mathbf{C}_i \equiv {}^{B}\mathbf{T}_{C_i}
-  \]
+  \textbf{5.1 고정 카메라 외부파라미터} \hfill $\T{B}{C_i}$
+  \vspace{-1mm}
+  \begin{itemize}
+    \item 고정 카메라 $i$가 베이스 기준 어디에 어떻게 놓여 있는가
+  \end{itemize}
   \vfill
-  \textbf{5.2 그리퍼와 그리퍼 카메라 사이의 hand-eye 변환}
-  \[
-    \mathbf{X} \equiv {}^{G}\mathbf{T}_{C_g}
-  \]
+  \textbf{5.2 그리퍼와 그리퍼 카메라 사이의 hand-eye 변환} \hfill $\T{G}{C_g}$
+  \vspace{-1mm}
+  \begin{itemize}
+    \item 손목 카메라가 그리퍼에 어떻게 붙어 있는가. 세트와 무관하게 하나
+  \end{itemize}
   \vfill
-  \textbf{5.3 세트별 큐브 자세}
-  \[
-    \mathbf{O}_s \equiv {}^{B}\mathbf{T}_{O,s}
-  \]
+  \textbf{5.3 세트별 큐브 자세} \hfill $\T{B}{O,s}$
+  \vspace{-1mm}
+  \begin{itemize}
+    \item 세트 $s$에서 큐브가 베이스 기준 실제로 어디에 있었는가
+  \end{itemize}
   \vfill
-  세 FK 방식의 차이 = $\mathbf{O}_s$를 자유롭게 찾는가 / FK 값에 고정하는가 /
-  보정된 anchor에 고정하는가
+  \begin{alertblock}{}
+    세 FK 방식의 차이 = $\T{B}{O,s}$를 자유롭게 찾는가 / FK 값에 고정하는가 /
+    보정된 anchor에 고정하는가
+  \end{alertblock}
 \end{frame}
 
 %==================================================================
@@ -409,44 +436,38 @@
 \begin{frame}{6.1 고정 카메라 경로}
   베이스 $\rightarrow$ 고정 카메라 $\rightarrow$ 큐브
   \[
-    {}^{B}\mathbf{T}_{C_i}\,
-    {}^{C_i}\mathbf{T}_{O,s}
+    \T{B}{C_i}\,
+    \T{C_i}{O,s}
     =
-    {}^{B}\mathbf{T}_{O,s}
+    \T{B}{O,s}
   \]
-  짧은 기호로
-  \[
-    \mathbf{C}_i\mathbf{Z}_{i,s}=\mathbf{O}_s
-  \]
-  고정 카메라가 예측한 큐브 자세
-  \[
-    \widehat{\mathbf{O}}^{\mathrm{fix}}_{i,s}
-    =
-    \mathbf{C}_i\mathbf{Z}_{i,s}
-  \]
+  \begin{itemize}
+    \item 가운데 $C_i$가 위아래로 맞물려 사라짐 $\rightarrow$ 경로가 이어짐 (3.1절)
+    \item 왼쪽: 모르는 값 (5.1절) \quad 가운데: 카메라가 준 값 (4.1절)
+  \end{itemize}
+  \vfill
+  \begin{block}{}
+    \centering
+    카메라 자세를 하나 가정하면 $\T{B}{C_i}\,\T{C_i}{O,s}$ 는\\
+    ``$i$번 카메라 말로는 큐브가 여기 있다''는 \textbf{예측} 하나가 됨
+  \end{block}
 \end{frame}
 
 \begin{frame}{6.2 그리퍼 카메라 경로}
   베이스 $\rightarrow$ 그리퍼 $\rightarrow$ 카메라 $\rightarrow$ 큐브
   \[
-    {}^{B}\mathbf{T}_{G,e}\,
-    {}^{G}\mathbf{T}_{C_g}\,
-    {}^{C_g}\mathbf{T}_{O,e}
+    \T{B}{G,e}\,
+    \T{G}{C_g}\,
+    \T{C_g}{O,e}
     =
-    {}^{B}\mathbf{T}_{O,s(e)}
+    \T{B}{O,s(e)}
   \]
-  짧은 기호로
-  \[
-    \mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e}
-    =
-    \mathbf{O}_{s(e)}
-  \]
-  그리퍼 카메라가 예측한 큐브 자세
-  \[
-    \widehat{\mathbf{O}}^{\mathrm{grip}}_e
-    =
-    \mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e}
-  \]
+  \begin{itemize}
+    \item $G$와 $C_g$가 차례로 맞물려 사라지고 $B$와 $O$만 남음
+    \item $\T{B}{G,e}$: 로봇이 준 값 \quad
+          $\T{G}{C_g}$: 모르는 값 \quad
+          $\T{C_g}{O,e}$: 카메라가 준 값
+  \end{itemize}
   \vfill
   \begin{alertblock}{목표}
     같은 세트의 모든 예측이 같은 큐브 자세로 모이게 하기
@@ -493,24 +514,34 @@
 %==================================================================
 
 \begin{frame}{8. 모든 방법이 공유하는 목적함수}
-  세트 $s$의 공통 큐브 자세를 $\mathbf{Q}_s$라 하면
+  세트 $s$에서 모든 예측이 맞춰야 할 기준 자세를 $\T{B}{\Oref_s}$ 라 하면
   \[
     \begin{aligned}
       \mathcal{E}_{\mathrm{vis}}
-      \left(\{\mathbf{C}_i\},\mathbf{X},\{\mathbf{Q}_s\}\right)
       ={}&
       \sum_{i,s}
       \left\|
-        \mathbf{r}\left(\mathbf{C}_i\mathbf{Z}_{i,s},\ \mathbf{Q}_s\right)
+        \mathbf{r}\left(
+          \T{B}{C_i}\,\T{C_i}{O,s},
+          \ \ \T{B}{\Oref_s}
+        \right)
       \right\|_2^2
       \\[4pt]
       &+
       \sum_e
       \left\|
-        \mathbf{r}\left(\mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e},\ \mathbf{Q}_{s(e)}\right)
-      \right\|_2^2 .
+        \mathbf{r}\left(
+          \T{B}{G,e}\,\T{G}{C_g}\,\T{C_g}{O,e},
+          \ \ \T{B}{\Oref_{s(e)}}
+        \right)
+      \right\|_2^2
     \end{aligned}
   \]
+  \vfill
+  \begin{itemize}
+    \item 첫 줄 = 6.1절 경로, 둘째 줄 = 6.2절 경로. 새로운 것은 없음
+    \item 각 예측을 같은 기준 $\T{B}{\Oref_s}$ 와 비교해 차이를 모두 더함
+  \end{itemize}
 \end{frame}
 
 \begin{frame}{8.1 식에 나오는 기호}
@@ -520,13 +551,13 @@
       \toprule
       기호 & 뜻 & 값이 어디서 오는가 \\
       \midrule
-      $\mathbf{C}_i$ & 고정 카메라 $i$의 자세 (베이스 기준) & 모름. 최적화로 찾아야 함 \\
-      $\mathbf{X}$ & 그리퍼와 그리퍼 카메라 사이의 hand-eye 변환 & 모름. 최적화로 찾아야 함 \\
-      $\mathbf{Q}_s$ & 세트 $s$의 공통 큐브 자세 (베이스 기준) & FK 방식마다 다름 \\
-      $\mathbf{Z}_{i,s}$ & 고정 카메라 $i$가 세트 $s$에서 본 큐브 자세 & 사진에서 PnP를 풀어 얻음 \\
-      $\mathbf{Z}_{g,e}$ & 그리퍼 카메라가 이벤트 $e$에서 본 큐브 자세 & 사진에서 PnP를 풀어 얻음 \\
-      $\mathbf{G}_e$ & 이벤트 $e$의 그리퍼 자세 (베이스 기준) & 관절각으로 FK를 계산해 얻음 \\
-      $\mathbf{r}(\cdot,\cdot)$ & 두 자세의 차이를 $6$개 숫자로 만드는 잔차 함수 &  \\
+      $\T{B}{C_i}$ & 고정 카메라 $i$의 자세 (베이스 기준) & 모름. 최적화로 찾아야 함 \\
+      $\T{G}{C_g}$ & 그리퍼와 그리퍼 카메라 사이의 hand-eye 변환 & 모름. 최적화로 찾아야 함 \\
+      $\T{B}{\Oref_s}$ & 세트 $s$에서 모든 예측이 맞출 기준 자세 & FK 방식마다 다름 (9장) \\
+      $\T{C_i}{O,s}$ & 고정 카메라 $i$가 세트 $s$에서 본 큐브 자세 & 사진에서 PnP를 풀어 얻음 \\
+      $\T{C_g}{O,e}$ & 그리퍼 카메라가 이벤트 $e$에서 본 큐브 자세 & 사진에서 PnP를 풀어 얻음 \\
+      $\T{B}{G,e}$ & 이벤트 $e$의 그리퍼 자세 (베이스 기준) & 관절각으로 FK를 계산해 얻음 \\
+      $\mathbf{r}(\cdot,\cdot)$ & 두 자세의 차이를 $6$개 숫자로 만드는 잔차 함수 & 7장 \\
       $\|\cdot\|_2^2$ & 그 $6$개 숫자를 제곱해서 더한 값 & 잔차로부터 계산 \\
       $\sum_{i,s}$ & 모든 고정 카메라와 모든 세트에 대해 더한다 & 합 기호 \\
       $\sum_e$ & 모든 그리퍼 카메라 촬영 이벤트에 대해 더한다 & 합 기호 \\
@@ -534,37 +565,36 @@
       \bottomrule
     \end{tabularx}
   \end{center}
+  \vspace{1mm}
+  {\footnotesize 위 첨자 = 도착 좌표계, 아래 첨자 = 출발 좌표계 (2장)}
 \end{frame}
 
 \begin{frame}{8.1 식을 읽는 순서}
   \vspace{-2mm}
-  {\small
+  {\footnotesize
   \[
-    \begin{aligned}
-      \mathcal{E}_{\mathrm{vis}}
-      \left(\{\mathbf{C}_i\},\mathbf{X},\{\mathbf{Q}_s\}\right)
-      ={}&
-      \sum_{i,s}
-      \left\|
-        \mathbf{r}\left(\mathbf{C}_i\mathbf{Z}_{i,s},\ \mathbf{Q}_s\right)
-      \right\|_2^2
-      +
-      \sum_e
-      \left\|
-        \mathbf{r}\left(\mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e},\ \mathbf{Q}_{s(e)}\right)
-      \right\|_2^2
-    \end{aligned}
+    \mathcal{E}_{\mathrm{vis}}
+    =
+    \sum_{i,s}
+    \left\|
+      \mathbf{r}\left(\T{B}{C_i}\,\T{C_i}{O,s},\ \T{B}{\Oref_s}\right)
+    \right\|_2^2
+    +
+    \sum_e
+    \left\|
+      \mathbf{r}\left(\T{B}{G,e}\,\T{G}{C_g}\,\T{C_g}{O,e},\ \T{B}{\Oref_{s(e)}}\right)
+    \right\|_2^2
   \]
   }
   \vspace{-2mm}
 
   안쪽부터 밖으로
   \begin{enumerate}
-    \item $\mathbf{C}_i\mathbf{Z}_{i,s}$ $\rightarrow$ 고정 카메라들이 예측한 큐브 자세
-    \item 그 예측을 $\mathbf{Q}_s$와 비교 $\rightarrow$ 잔차 $6$개 숫자
+    \item $\T{B}{C_i}\,\T{C_i}{O,s}$ $\rightarrow$ 고정 카메라들이 예측한 큐브 자세
+    \item 그 예측을 $\T{B}{\Oref_s}$ 와 비교 $\rightarrow$ 잔차 $6$개 숫자
     \item 제곱해서 더함 $\rightarrow$ 오차 하나의 숫자
     \item 모든 카메라 $\times$ 모든 세트에 대해 합산
-    \item 그리퍼 카메라 쪽도 $\mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e}$로 동일하게 합산
+    \item 그리퍼 카메라 쪽도 $\T{B}{G,e}\,\T{G}{C_g}\,\T{C_g}{O,e}$ 로 동일하게 합산
   \end{enumerate}
 \end{frame}
 
@@ -576,25 +606,27 @@
   \vfill
   \begin{block}{캘리브레이션이란}
     \begin{itemize}
-      \item $\mathcal{E}_{\mathrm{vis}}$를 최소로 만드는 $\mathbf{C}_i$와 $\mathbf{X}$를 찾는 것
-      \item 측정값 $\mathbf{Z}$, $\mathbf{G}$는 고정 $\rightarrow$ 움직일 수 없음
+      \item $\mathcal{E}_{\mathrm{vis}}$를 최소로 만드는
+        $\T{B}{C_i}$ 와 $\T{G}{C_g}$ 를 찾는 것
+      \item 측정값 $\T{C_i}{O,s}$, $\T{C_g}{O,e}$, $\T{B}{G,e}$ 는
+        고정 $\rightarrow$ 움직일 수 없음
       \item 미지수만 움직여서 모든 예측이 한 점에 모이게 만듦
     \end{itemize}
   \end{block}
   \vfill
   \begin{alertblock}{앞으로 비교할 Calibration 방식의 차이}
-    관측식은 동일. $\mathbf{Q}_s$를 무엇으로 정의하느냐가 다름
+    관측식은 동일. $\T{B}{\Oref_s}$ 를 무엇으로 정의하느냐가 다름
   \end{alertblock}
 \end{frame}
 
 \begin{frame}{9. 앞으로 볼 세 가지 방식}
-  같은 관측식. $\mathbf{Q}_s$를 무엇으로 채우는지가 다름
+  같은 관측식. $\T{B}{\Oref_s}$ 를 무엇으로 채우는지가 다름
   \[
-    \mathbf{Q}_s=
+    \T{B}{\Oref_s}=
     \begin{cases}
-      \mathbf{O}_s, & \texttt{No-FK} \quad (\text{자유변수}) \\[4pt]
-      \mathbf{F}_s, & \texttt{Fixed-FK} \quad (\text{raw FK에 고정}) \\[4pt]
-      \mathbf{A}_s, & \texttt{Corrected-FK} \quad (\text{보정된 anchor에 고정})
+      \T{B}{O,s}, & \texttt{No-FK} \quad (\text{자유변수}) \\[4pt]
+      \T{B}{\Ofk_s}, & \texttt{Fixed-FK} \quad (\text{raw FK에 고정}) \\[4pt]
+      \T{B}{\Oanc_s}, & \texttt{Corrected-FK} \quad (\text{보정된 anchor에 고정})
     \end{cases}
   \]
   \vfill
@@ -605,8 +637,8 @@
       gate 통과 세트에서만 사용 \hfill (11장)
   \end{itemize}
   \vfill
-  {\small $\mathbf{F}_s$는 10.1절, $\mathbf{A}_s$는 11.7절에서 정의.
-  여기서는 세 방식이 같은 자리를 서로 다른 값으로 채운다는 점만 확인}
+  {\small 어깨의 $\mathrm{fk}$, $\mathrm{anc}$ 는 \textbf{같은 큐브를 누가 어떻게 짚었는가}를 구분하는 이름.
+  $\Ofk_s$는 10.1절, $\Oanc_s$는 11.7절에서 정의}
 \end{frame}
 
 %==================================================================
@@ -623,18 +655,19 @@
   \vfill
   \textbf{9.2 목적함수}
   \[
-    \left\{
-      \{\widehat{\mathbf{C}}_i\},\ \widehat{\mathbf{X}},\ \{\widehat{\mathbf{O}}_s\}
-    \right\}
-    =
-    \underset{\{\mathbf{C}_i\},\,\mathbf{X},\,\{\mathbf{O}_s\}}{\operatorname{argmin}}
+    \underset{
+      \{\T{B}{C_i}\},\ \T{G}{C_g},\ \{\T{B}{O,s}\}
+    }{\operatorname{argmin}}
     \ \mathcal{E}_{\mathrm{vis}}
-    \left(\{\mathbf{C}_i\},\ \mathbf{X},\ \{\mathbf{O}_s\}\right)
+    \qquad\text{단}\qquad
+    \T{B}{\Oref_s}=\T{B}{O,s}
   \]
-  공통 자세는 자유변수
-  \[
-    \mathbf{Q}_s=\mathbf{O}_s
-  \]
+  \vfill
+  \begin{itemize}
+    \item 기준 자세 자리에 \textbf{자유변수}를 넣음
+      $\rightarrow$ 큐브 위치도 함께 찾는 대상이 됨
+    \item argmin 아래 = 움직여도 되는 값. 큐브 자세가 여기 들어가 있음
+  \end{itemize}
 \end{frame}
 
 \begin{frame}{9.2 장점과 주의점}
@@ -646,9 +679,10 @@
   \vfill
   \begin{block}{주의점}
     \begin{itemize}
-      \item 세트마다 $6$자유도인 $\mathbf{O}_s$가 추가 $\rightarrow$ 미지수 증가
+      \item 세트마다 $6$자유도인 $\T{B}{O,s}$ 가 추가 $\rightarrow$ 미지수 증가
       \item 카메라 연결이나 로봇 움직임이 부족하면 전체 좌표계의 gauge가 흔들릴 수 있음
-      \item $\mathbf{G}_e$는 사용함. 큐브 FK prior $\mathbf{F}_s$만 사용하지 않음
+      \item $\T{B}{G,e}$ \textbf{는 사용함}.
+        큐브 FK prior $\T{B}{\Ofk_s}$ 만 사용하지 않음
     \end{itemize}
   \end{block}
 \end{frame}
@@ -662,48 +696,65 @@
     로봇 FK가 알려준 큐브 자세를 정답으로 간주 $\rightarrow$ 움직이지 못하게 고정
   \end{block}
   \vfill
-  raw FK 큐브 prior
+  raw FK가 말하는 큐브 자세: $\T{B}{\Ofk_s}$
+  \begin{itemize}
+    \item 카메라를 전혀 쓰지 않고 로봇의 관절 센서만으로 얻는 큐브 자세
+    \item 좌표계 이름에 $\mathrm{fk}$를 붙여 vision이 말하는 큐브와 구분
+  \end{itemize}
+  \vfill
+  기준 자세를 여기에 못 박음
   \[
-    \mathbf{F}_s \equiv {}^{B}\mathbf{T}^{\mathrm{FK}}_{O,s}
-  \]
-  큐브 자세가 만족해야 하는 제약
-  \[
-    \mathbf{O}_s=\mathbf{F}_s
+    \T{B}{\Oref_s}=\T{B}{\Ofk_s}
   \]
 \end{frame}
 
 \begin{frame}{10.2 목적함수}
   \[
-    \left\{\{\widehat{\mathbf{C}}_i\},\ \widehat{\mathbf{X}}\right\}
-    =
-    \underset{\{\mathbf{C}_i\},\,\mathbf{X}}{\operatorname{argmin}}
+    \underset{\{\T{B}{C_i}\},\ \T{G}{C_g}}{\operatorname{argmin}}
     \ \mathcal{E}_{\mathrm{vis}}
-    \left(\{\mathbf{C}_i\},\ \mathbf{X},\ \{\mathbf{F}_s\}\right)
+    \qquad\text{단}\qquad
+    \T{B}{\Oref_s}=\T{B}{\Ofk_s}
   \]
   \vfill
   완전히 펼치면
+  {\footnotesize
   \[
     \begin{aligned}
-      \min_{\{\mathbf{C}_i\},\,\mathbf{X}}\ {}&
+      \min\ {}&
       \sum_{i,s}
-      \left\|\mathbf{r}(\mathbf{C}_i\mathbf{Z}_{i,s},\ \mathbf{F}_s)\right\|_2^2
+      \left\|\mathbf{r}\left(
+        \T{B}{C_i}\,\T{C_i}{O,s},\ \T{B}{\Ofk_s}
+      \right)\right\|_2^2
       \\[4pt]
       &+
       \sum_e
-      \left\|\mathbf{r}(\mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e},\ \mathbf{F}_{s(e)})\right\|_2^2 .
+      \left\|\mathbf{r}\left(
+        \T{B}{G,e}\,\T{G}{C_g}\,\T{C_g}{O,e},\ \T{B}{\Ofk_{s(e)}}
+      \right)\right\|_2^2
     \end{aligned}
   \]
+  }
+  \vfill
+  \begin{itemize}
+    \item argmin 아래에서 큐브 자세가 빠짐 $\rightarrow$ 미지수가 둘로 줄어듦
+  \end{itemize}
 \end{frame}
 
 \begin{frame}{10.3 왜 FK 오차가 카메라로 전파되는가}
-  실제 큐브 자세를 $\mathbf{O}^{\mathrm{true}}_s$, raw FK의 계통오차를 $\mathbf{D}$라 하면
+  raw FK가 말하는 큐브와 실제 큐브 사이의 어긋남
   \[
-    \mathbf{F}_s = \mathbf{O}^{\mathrm{true}}_s\mathbf{D}
+    \T{B}{\Ofk_s}
+    =
+    \T{B}{O,s}\;\T{O}{\Ofk}
   \]
+  \begin{itemize}
+    \item $\T{O}{\Ofk}$ = 세트가 바뀌어도 늘 같은 어긋남 (계통오차)
+    \item 아래 첨자에 $s$가 없음 = \textbf{모든 세트에서 동일}하다는 뜻
+  \end{itemize}
   \vfill
   \begin{itemize}
-    \item 최적화는 $\mathbf{F}_s$를 움직일 수 없음
-    \item 남은 오차를 줄이려면 $\mathbf{C}_i$나 $\mathbf{X}$가 잘못 움직이게 됨
+    \item 최적화는 $\T{B}{\Ofk_s}$ 를 움직일 수 없음 (못 박아 두었으므로)
+    \item 남은 오차를 줄이려면 $\T{B}{C_i}$ 나 $\T{G}{C_g}$ 가 잘못 움직이게 됨
   \end{itemize}
   \vfill
   \begin{alertblock}{맞교환}
@@ -747,12 +798,12 @@
 \end{frame}
 
 \begin{frame}{10.4 카메라에도 계통오차가 있으면 (2) 계산}
-  $\mathbf{Q}_s$는 FK 값 $105$에 고정 $\rightarrow$
-  $\mathbf{C}\mathbf{Z}=\mathbf{Q}_s$를 만족하도록 카메라 위치 결정
+  기준 자세가 FK 값 $105$에 고정 $\rightarrow$
+  $\T{B}{C}\,\T{C}{O}=\T{B}{\Ofk}$ 를 만족하도록 카메라 위치 결정
   \[
-    \mathbf{C}+103=105
+    \T{B}{C}+103=105
     \quad\Longrightarrow\quad
-    \mathbf{C}=2
+    \T{B}{C}=2
   \]
   카메라의 진짜 위치는 $0$ $\rightarrow$ 결과는 $2\,\mathrm{mm}$ 틀림
   \vfill
@@ -769,24 +820,25 @@
   \begin{itemize}
     \item $5$와 $3$이든, $7$과 $5$든, $2$와 $0$이든 모두 같은 $2$를 만듦
     \item 목적함수 안에 셋을 구별할 정보가 없음
-    \item 카메라 오차가 반대 방향이었다면 $\mathbf{C}=8$ $\rightarrow$ 훨씬 악화
+    \item 카메라 오차가 반대 방향이었다면 $\T{B}{C}=8$ $\rightarrow$ 훨씬 악화
   \end{itemize}
   \vfill
   \begin{block}{구조적으로 분리가 불가능한 이유}
     카메라 좌표계에서의 일정한 어긋남 = 카메라가 다른 곳에 있다고 말하는 것\\
-    $\rightarrow$ $\mathbf{C}_i$를 바꾸는 것과 수학적으로 구별되지 않음
+    $\rightarrow$ $\T{B}{C_i}$ 를 바꾸는 것과 수학적으로 구별되지 않음
   \end{block}
   \vfill
   \begin{block}{\texttt{No-FK}와 비교}
     \begin{itemize}
       \item \texttt{No-FK}: 오염원이 카메라 하나뿐
-      \item \texttt{Fixed-FK}: FK 오차와 카메라 오차가 모두 $\mathbf{C}_i$, $\mathbf{X}$로 유입
+      \item \texttt{Fixed-FK}: FK 오차와 카메라 오차가 모두
+        $\T{B}{C_i}$, $\T{G}{C_g}$ 로 유입
     \end{itemize}
   \end{block}
 \end{frame}
 
 \begin{frame}{10.4 카메라에도 계통오차가 있으면 (4) 잔차의 함정}
-  $\mathbf{C}=2$를 넣으면 $2+103=105$로 정확히 일치
+  $\T{B}{C}=2$를 넣으면 $2+103=105$로 정확히 일치
   $\rightarrow$ \alert{잔차 $0$}\\
   수렴은 완벽해 보이지만 카메라 위치는 $2\,\mathrm{mm}$ 틀림
   \vfill
@@ -822,11 +874,11 @@
   \begin{block}{전체 흐름 (11.2 -- 11.8절)}
     \centering\small
     vision-only 초기 해
-    $\rightarrow$ 세트별 합의 $\mathbf{V}_s$
-    $\rightarrow$ 공통 차이 $\overline{\boldsymbol{\Delta}}$
-    $\rightarrow$ FK 보정 $\mathbf{F}^{\mathrm{corr}}_s$\\[1mm]
+    $\rightarrow$ 세트별 합의 $\T{B}{\Ovis_s}$
+    $\rightarrow$ 공통 차이 $\Tb{\Ofk}{\Ovis}$
+    $\rightarrow$ FK 보정 $\T{B}{\Ocorr_s}$\\[1mm]
     $\rightarrow$ gate 검사
-    $\rightarrow$ anchor 확정 $\mathbf{A}_s$
+    $\rightarrow$ anchor 확정 $\T{B}{\Oanc_s}$
     $\rightarrow$ anchor 고정 refinement
   \end{block}
 \end{frame}
@@ -834,33 +886,38 @@
 \begin{frame}{11.2 단계 1: vision-only 초기 해}
   No-FK 문제를 먼저 풀어 초기 카메라와 hand-eye 확보
   \[
-    \{\mathbf{C}^{(0)}_i\},\ \mathbf{X}^{(0)},\ \{\mathbf{O}^{(0)}_s\}
-    =
+    \left\{\T[(0)]{B}{C_i}\right\},\ \ \T[(0)]{G}{C_g}
+    \ \ =\ \
     \operatorname{SolveNoFK}(\text{vision observations})
   \]
   \vfill
+  \begin{itemize}
+    \item 어깨의 $(0)$ = \textbf{초기값}. 아직 확정된 답이 아니라는 표시
+    \item 로봇 FK를 안 썼으므로 \textbf{FK 오차에 오염되지 않은} 값
+    \item $\rightarrow$ 앞으로 raw FK를 검산할 기준자 역할
+  \end{itemize}
 \end{frame}
 
 \begin{frame}{11.3 단계 2: 세트별 vision 합의 자세}
   각 세트에서 고정 카메라와 그리퍼 카메라의 예측을 전부 수집
+  {\small
   \[
     \mathcal{P}_s
     =
-    \left\{\mathbf{C}^{(0)}_i\mathbf{Z}_{i,s}\right\}_{i}
+    \left\{\T[(0)]{B}{C_i}\,\T{C_i}{O,s}\right\}_{i}
     \cup
-    \left\{\mathbf{G}_e\mathbf{X}^{(0)}\mathbf{Z}_{g,e}\right\}_{e:\,s(e)=s}
+    \left\{\T{B}{G,e}\,\T[(0)]{G}{C_g}\,\T{C_g}{O,e}\right\}_{e:\,s(e)=s}
   \]
+  }
   \begin{itemize}
-    \item $\mathcal{P}_s$ = 출처 구분 없이 예측을 전부 담은 주머니
-      \begin{itemize}
-        \item 카메라 $3$대 + 그리퍼 촬영 $4$번 $\rightarrow$ 자세 $7$개
-      \end{itemize}
+    \item 두 원소 모두 6장의 경로 그대로. 카메라 값만 11.2절 초기값으로 채움
+    \item 카메라 $3$대 + 그리퍼 촬영 $4$번 $\rightarrow$ 한 주머니에 자세 $7$개
     \item $\cup$ = 합집합. 두 출처를 한 통에 담아 동등하게 취급
   \end{itemize}
   \vfill
-  강건 평균으로 vision 합의 자세 $\mathbf{V}_s$ 생성
+  강건 평균으로 vision 합의 자세 생성
   \[
-    \mathbf{V}_s = \operatorname{RobustAverage}\left(\mathcal{P}_s\right)
+    \T{B}{\Ovis_s} = \operatorname{RobustAverage}\left(\mathcal{P}_s\right)
   \]
   이 단계에서는 예측을 모두 동등하게 다루고 MAD로 이상치만 제거
 \end{frame}
@@ -907,7 +964,7 @@
          & 무엇들의 거리를 재는가 \\
         \midrule
         강건 평균 (11.3) & 한 세트 \textbf{안에서} 예측들이 평균에서 얼마나 떨어졌는가 \\
-        gate (11.6) & $\boldsymbol{\Delta}_s$가 \textbf{세트 사이의} 공통 보정량에서 얼마나 떨어졌는가 \\
+        gate (11.6) & 한 세트가 \textbf{다른 세트들의} 공통 경향에서 얼마나 벗어났는가 \\
         \bottomrule
       \end{tabular}
     \end{center}
@@ -915,44 +972,63 @@
 \end{frame}
 
 \begin{frame}{11.4 단계 3: raw FK와 vision의 공통 차이}
-  세트별 차이
+  세트마다, FK가 짚은 큐브에서 vision이 짚은 큐브로 가는 변환
   \[
-    \boldsymbol{\Delta}_s = \mathbf{F}_s^{-1}\mathbf{V}_s
+    \T{B}{\Ofk_s}\;\T{\Ofk_s}{\Ovis_s}
+    =
+    \T{B}{\Ovis_s}
+    \qquad\Longrightarrow\qquad
+    \T{\Ofk_s}{\Ovis_s}
+    =
+    \left(\T{B}{\Ofk_s}\right)^{-1}\T{B}{\Ovis_s}
   \]
-  = raw FK에서 vision 결과로 가려면 얼마나 더 움직여야 하는가
+  \begin{itemize}
+    \item 왼쪽 식은 그냥 경로 잇기. 오른쪽은 아는 항을 역행렬로 걷어낸 것 (3.2절)
+    \item = raw FK에서 vision 결과로 가려면 얼마나 더 움직여야 하는가
+  \end{itemize}
   \vfill
-  강건 가중 평균으로 공통 보정량 산출
+  강건 가중 평균으로 \textbf{모든 세트에 공통인} 보정량 산출
   \[
-    \overline{\boldsymbol{\Delta}}
+    \Tb{\Ofk}{\Ovis}
     =
     \operatorname{RobustWeightedAverage}_s
-    \left(\boldsymbol{\Delta}_s;\ w_s\right)
+    \left(\T{\Ofk_s}{\Ovis_s};\ w_s\right)
   \]
+  \begin{itemize}
+    \item 아래 첨자에서 $s$가 사라짐 = \textbf{세트마다 다르지 않은 하나의 값}
+  \end{itemize}
   \vfill
   \begin{block}{가중치 $w_s$}
-    \begin{itemize}
-      \item 그 세트를 뒷받침한 \textbf{관측의 개수}
-      \item 고정 카메라 $3$대 + 그리퍼 촬영 $4$번 $\rightarrow$ $w_s=7$
-      \item 카메라 종류는 구분하지 않고 개수만 셈
-    \end{itemize}
+    그 세트를 뒷받침한 \textbf{관측의 개수}.
+    고정 카메라 $3$대 + 그리퍼 촬영 $4$번 $\rightarrow$ $w_s=7$
+    (카메라 종류는 구분하지 않고 개수만 셈)
   \end{block}
 \end{frame}
 
 \begin{frame}{11.5 단계 4: FK에 공통 보정량 적용}
   보정량을 오른쪽에 곱함
   \[
-    \mathbf{F}^{\mathrm{corr}}_s = \mathbf{F}_s\,\overline{\boldsymbol{\Delta}}
+    \T{B}{\Ocorr_s}
+    =
+    \T{B}{\Ofk_s}\;\Tb{\Ofk}{\Ovis}
   \]
+  \begin{itemize}
+    \item 가운데 $\Ofk$가 맞물려 사라짐 $\rightarrow$ 다시 $B$에서 큐브로 가는 변환
+    \item 세트마다 다른 것은 왼쪽 항뿐. 오른쪽은 모든 세트에 같은 값
+  \end{itemize}
   \vfill
-  \begin{block}{세 가지 FK 값의 구분}
+  \begin{block}{큐브 좌표계의 다섯 가지 이름}
     \begin{center}
-      \begin{tabular}{cl}
+      \small
+      \begin{tabular}{cll}
         \toprule
-        기호 & 무엇 \\
+        좌표계 & 누가 짚은 큐브인가 & 표기 \\
         \midrule
-        $\mathbf{F}_s$ & raw FK. 로봇이 준 원본 \\
-        $\mathbf{F}^{\mathrm{corr}}_s$ & 공통 치우침을 걷어낸 FK \\
-        $\mathbf{A}_s$ & gate를 거쳐 확정된 최종 anchor \\
+        $O_s$      & 실제 큐브 (참값)          & $\T{B}{O,s}$ \\
+        $\Ofk_s$   & raw FK. 로봇이 준 원본     & $\T{B}{\Ofk_s}$ \\
+        $\Ovis_s$  & vision 합의 (11.3절)      & $\T{B}{\Ovis_s}$ \\
+        $\Ocorr_s$ & 공통 치우침을 걷어낸 FK    & $\T{B}{\Ocorr_s}$ \\
+        $\Oanc_s$  & gate를 거쳐 확정 (11.7절)  & $\T{B}{\Oanc_s}$ \\
         \bottomrule
       \end{tabular}
     \end{center}
@@ -960,8 +1036,8 @@
 \end{frame}
 
 \begin{frame}{11.5 이 보정은 무엇을 누구에게서 빌리는가}
-  $\mathbf{F}^{\mathrm{corr}}_s = \mathbf{F}_s\,\overline{\boldsymbol{\Delta}}$
-  에서 $\mathbf{F}_s$는 그대로 남고, 모든 세트에 같은 $\overline{\boldsymbol{\Delta}}$만 곱해짐
+  $\T{B}{\Ocorr_s} = \T{B}{\Ofk_s}\,\Tb{\Ofk}{\Ovis}$
+  에서 $\T{B}{\Ofk_s}$ 는 그대로 남고, 모든 세트에 같은 $\Tb{\Ofk}{\Ovis}$ 만 곱해짐
   \vfill
   \begin{center}
     \begin{tabular}{lll}
@@ -987,7 +1063,7 @@
 
 \begin{frame}{11.6 단계 5: gate로 보정 FK를 검사}
   \begin{itemize}
-    \item $\overline{\boldsymbol{\Delta}}$는 모든 세트에 적용되는 \textbf{하나의} 보정량
+    \item $\Tb{\Ofk}{\Ovis}$ 는 모든 세트에 적용되는 \textbf{하나의} 보정량
     \item 세트마다 사정이 다르면 잘 맞지 않을 수 있음
       \begin{itemize}
         \item 큐브가 그리퍼 안에서 미끄러진 세트
@@ -1004,16 +1080,20 @@
 \end{frame}
 
 \begin{frame}{11.6 두 가지 차이를 재는 식}
-  이동 차이
+  두 큐브 자세 $\T{B}{\Ovis_s}$ 와 $\T{B}{\Ocorr_s}$ 의 차이를 두 갈래로
+  \vfill
+  이동 차이 (mm)
   \[
     d_t(s)
     =
     1000
     \left\|
-      \mathbf{t}(\mathbf{V}_s) - \mathbf{t}(\mathbf{F}^{\mathrm{corr}}_s)
+      \mathbf{t}\!\left(\T{B}{\Ovis_s}\right)
+      -
+      \mathbf{t}\!\left(\T{B}{\Ocorr_s}\right)
     \right\|_2
   \]
-  회전 차이
+  회전 차이 (deg)
   \[
     d_R(s)
     =
@@ -1023,8 +1103,8 @@
       \frac{
         \operatorname{tr}
         \left(
-          \mathbf{R}(\mathbf{V}_s)^{\mathsf T}
-          \mathbf{R}(\mathbf{F}^{\mathrm{corr}}_s)
+          \mathbf{R}\!\left(\T{B}{\Ovis_s}\right)^{\mathsf T}
+          \mathbf{R}\!\left(\T{B}{\Ocorr_s}\right)
         \right)-1
       }{2}
     \right)
@@ -1078,12 +1158,12 @@
 \begin{frame}{11.6 왜 분포 기준으로 정하는가}
   \begin{block}{어떤 세트의 어긋남이 공통 치우침과 같다면}
     \begin{enumerate}
-      \item $\boldsymbol{\Delta}_s = \overline{\boldsymbol{\Delta}}$
+      \item $\T{\Ofk_s}{\Ovis_s} = \Tb{\Ofk}{\Ovis}$
         (이 세트의 어긋남 = 전체 평균 어긋남)
-      \item 보정은 $\overline{\boldsymbol{\Delta}}$만큼 해줌
+      \item 보정은 $\Tb{\Ofk}{\Ovis}$ 만큼 해줌
         $\rightarrow$ 어긋난 만큼 정확히 상쇄됨
       \item $\rightarrow$ 두 자세가 통째로 겹침:
-        $\mathbf{F}^{\mathrm{corr}}_s=\mathbf{V}_s$\\
+        $\T{B}{\Ocorr_s}=\T{B}{\Ovis_s}$\\
         위치도 방향도 같아짐 $\rightarrow$ $d_t(s)=0$, $d_R(s)=0$
     \end{enumerate}
     \vspace{1mm}
@@ -1105,7 +1185,8 @@
     \item 중앙값 = 절반은 그보다 작고 절반은 그보다 큼
     \item 세트들이 모두 잘 맞아 흩어짐이 거의 없으면 기준선이 중앙값에 밀착
     \item $\rightarrow$ \alert{멀쩡한 세트의 절반이 탈락}
-    \item $\rightarrow$ 걸러낼 이상치가 없는데도 절반이 보정된 FK $\mathbf{F}^{\mathrm{corr}}_s$를 못 쓰게 됨
+    \item $\rightarrow$ 걸러낼 이상치가 없는데도 절반이
+      보정된 FK $\T{B}{\Ocorr_s}$ 를 못 쓰게 됨
   \end{itemize}
   \vfill
   \begin{alertblock}{하한의 역할}
@@ -1126,10 +1207,10 @@
   \vfill
   \begin{itemize}
     \item 셋이 $1.5\,\mathrm{mm}$씩 어긋남
-    \item $\rightarrow$ 이들을 평균한 $\mathbf{V}_s$도 그만큼 불확실
+    \item $\rightarrow$ 이들을 평균한 $\T{B}{\Ovis_s}$ 도 그만큼 불확실
   \end{itemize}
   \vfill
-  \begin{alertblock}{이때 FK가 $\mathbf{V}_s$에서 $1\,\mathrm{mm}$ 벗어났다면?}
+  \begin{alertblock}{이때 FK가 $\T{B}{\Ovis_s}$ 에서 $1\,\mathrm{mm}$ 벗어났다면?}
     이 세트를 탈락시켜야 하는가 $\rightarrow$ \textbf{판단 불가}\\
     그 $1\,\mathrm{mm}$가 FK 탓인지 vision 탓인지 알 수 없음
   \end{alertblock}
@@ -1166,12 +1247,12 @@
 
 \begin{frame}{11.7 단계 6: gate 결과에 따라 anchor 확정}
   \[
-    \mathbf{A}_s
+    \T{B}{\Oanc_s}
     =
     \begin{cases}
-      \mathbf{F}^{\mathrm{corr}}_s,
+      \T{B}{\Ocorr_s},
         & d_t(s)\leq\tau_t \ \land\  d_R(s)\leq\tau_R, \\[6pt]
-      \mathbf{V}_s, & \text{otherwise}.
+      \T{B}{\Ovis_s}, & \text{otherwise}.
     \end{cases}
   \]
   \vfill
@@ -1180,28 +1261,33 @@
       \toprule
       gate & anchor & FK 사용 \\
       \midrule
-      통과 & $\mathbf{F}^{\mathrm{corr}}_s$ & 그대로 사용 \\
-      탈락 & $\mathbf{V}_s$ & 사용하지 않음 \\
+      통과 & $\T{B}{\Ocorr_s}$ & 그대로 사용 \\
+      탈락 & $\T{B}{\Ovis_s}$ & 사용하지 않음 \\
       \bottomrule
     \end{tabular}
   \end{center}
   \vfill
   \begin{itemize}
     \item 통과한 세트: 보정된 FK를 \textbf{그대로} anchor로 사용
-    \item 탈락한 세트: FK를 쓰지 않고 vision 합의 $\mathbf{V}_s$를 anchor로 사용
+    \item 탈락한 세트: FK를 쓰지 않고 vision 합의 $\T{B}{\Ovis_s}$ 를 anchor로 사용
+    \item 탈락해도 \textbf{사진은 그대로 씀}. 그 세트만 No-FK와 같은 취급이 됨
     \item 판단은 세트마다 전부 아니면 전무
   \end{itemize}
 \end{frame}
 
 \begin{frame}{11.8 단계 7: anchor 고정 후 최종 refinement}
-  확정된 $\mathbf{A}_s$를 고정 anchor로 사용
+  확정된 $\T{B}{\Oanc_s}$ 를 고정 anchor로 사용
   \[
-    \left\{\{\widehat{\mathbf{C}}_i\},\ \widehat{\mathbf{X}}\right\}
-    =
-    \underset{\{\mathbf{C}_i\},\,\mathbf{X}}{\operatorname{argmin}}
+    \underset{\{\T{B}{C_i}\},\ \T{G}{C_g}}{\operatorname{argmin}}
     \ \mathcal{E}_{\mathrm{vis}}
-    \left(\{\mathbf{C}_i\},\ \mathbf{X},\ \{\mathbf{A}_s\}\right)
+    \qquad\text{단}\qquad
+    \T{B}{\Oref_s}=\T{B}{\Oanc_s}
   \]
+  \begin{itemize}
+    \item 식의 형태는 10.2절 \texttt{Fixed-FK}와 동일
+    \item 다른 것은 못 박은 값뿐:
+      raw FK $\T{B}{\Ofk_s}$ 가 아니라 검산을 거친 $\T{B}{\Oanc_s}$
+  \end{itemize}
   \vfill
   \begin{alertblock}{정리}
     목적함수에 약한 벌점 하나를 더하는 것과는 다름\\
