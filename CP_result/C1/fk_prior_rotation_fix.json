@@ -4,5 +4,5 @@
   "n_train_sets_used": 9,
   "reason": "FK prior 회전이 관측과 median 179.8deg 어긋남 (> 45.0deg) — train 9개 set 에서 복원한 상수 회전으로 대체",
   "corr_angle_deg": 179.77884355259624,
-  "set_spread_deg": 2.4804951723290105
+  "set_spread_deg": 2.480495172328998
 }

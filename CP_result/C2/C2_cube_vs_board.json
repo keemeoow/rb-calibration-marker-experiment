@@ -12,39 +12,39 @@
       "mode": "board_only",
       "num_base_cameras": "2",
       "base_cameras": "cam0, cam1",
-      "cross_camera_mean_mm": "26.94",
+      "cross_camera_mean_mm": "28.26",
       "cube_reproj_mean_px": "0.619",
       "board_reproj_mean_px": "0.671",
-      "mesh_rmse_mm": "3.73",
-      "dimension_err_mm": "1.87",
-      "pose_repeat_mm": "26.94",
-      "pose_repeat_deg": "15.603",
+      "mesh_rmse_mm": "3.38",
+      "dimension_err_mm": "1.86",
+      "pose_repeat_mm": "28.26",
+      "pose_repeat_deg": "16.407",
       "handeye_pass": "PASS"
     },
     {
       "mode": "cube_only",
       "num_base_cameras": "3",
       "base_cameras": "cam0, cam1, cam3",
-      "cross_camera_mean_mm": "4.69",
+      "cross_camera_mean_mm": "4.59",
       "cube_reproj_mean_px": "0.619",
       "board_reproj_mean_px": "0.671",
-      "mesh_rmse_mm": "3.49",
-      "dimension_err_mm": "1.67",
-      "pose_repeat_mm": "4.69",
-      "pose_repeat_deg": "1.904",
+      "mesh_rmse_mm": "3.35",
+      "dimension_err_mm": "1.81",
+      "pose_repeat_mm": "4.60",
+      "pose_repeat_deg": "2.068",
       "handeye_pass": "PASS"
     },
     {
       "mode": "hybrid",
       "num_base_cameras": "3",
       "base_cameras": "cam0, cam1, cam3",
-      "cross_camera_mean_mm": "4.86",
+      "cross_camera_mean_mm": "3.95",
       "cube_reproj_mean_px": "0.619",
       "board_reproj_mean_px": "0.671",
-      "mesh_rmse_mm": "3.37",
-      "dimension_err_mm": "1.75",
-      "pose_repeat_mm": "4.86",
-      "pose_repeat_deg": "1.830",
+      "mesh_rmse_mm": "3.25",
+      "dimension_err_mm": "1.83",
+      "pose_repeat_mm": "3.95",
+      "pose_repeat_deg": "1.873",
       "handeye_pass": "PASS"
     }
   ],
@@ -58,7 +58,7 @@
         "n_target_events": 105,
         "mean_simul_observers": 1.0285714285714285,
         "pct_events_2plus_observers": 2.857142857142857,
-        "mean_angular_coverage_deg": 118.87655170463209,
+        "mean_angular_coverage_deg": 118.47934043247386,
         "per_cam_seen_events": {
           "0": 104,
           "1": 4
@@ -68,7 +68,7 @@
         "n_target_events": 232,
         "mean_simul_observers": 2.7025862068965516,
         "pct_events_2plus_observers": 89.65517241379311,
-        "mean_angular_coverage_deg": 104.02968906091712,
+        "mean_angular_coverage_deg": 103.63771995858053,
         "per_cam_seen_events": {
           "0": 232,
           "1": 206,
@@ -80,12 +80,12 @@
   "verification": {
     "board_only": {
       "cross_camera": {
-        "events_with_2plus_cams": 20,
-        "num_errors": 40,
-        "mean_mm": 26.936105967621792,
-        "median_mm": 13.654661027490263,
-        "max_mm": 79.6789509290848,
-        "std_mm": 24.93234624713974,
+        "events_with_2plus_cams": 19,
+        "num_errors": 38,
+        "mean_mm": 28.260853943208513,
+        "median_mm": 13.813089453598518,
+        "max_mm": 79.90652448882499,
+        "std_mm": 25.054901851740528,
         "pass": false
       },
       "reprojection": {
@@ -98,10 +98,10 @@
       },
       "handeye": {
         "frames": 146,
-        "board_position_std_mm": 1.2868869211680192,
-        "board_position_max_mm": 7.704706323954023,
-        "board_rotation_mean_deg": 0.7907029135661637,
-        "board_rotation_max_deg": 1.3926523798125936,
+        "board_position_std_mm": 2.236474262982037,
+        "board_position_max_mm": 19.42371875945879,
+        "board_rotation_mean_deg": 0.7934867749687443,
+        "board_rotation_max_deg": 1.2960826300110633,
         "pass": true
       },
       "board_reprojection": {
@@ -130,37 +130,37 @@
         }
       },
       "pose_repeatability": {
-        "num_events": 20,
-        "mean_dt_mm": 26.936105967621803,
-        "mean_dr_deg": 15.60314292429788,
-        "max_dt_mm": 107.96400692648893,
-        "max_dr_deg": 116.83444440315952,
+        "num_events": 19,
+        "mean_dt_mm": 28.260853943208502,
+        "mean_dr_deg": 16.40720643014235,
+        "max_dt_mm": 108.31138536535069,
+        "max_dr_deg": 116.80744852063563,
         "pass": false
       },
       "mesh_alignment": {
-        "usable_clouds": 430,
+        "usable_clouds": 429,
         "usable_events": 232,
-        "mean_rmse_mm": 3.7334329197617286,
-        "median_rmse_mm": 3.9433164486160766,
+        "mean_rmse_mm": 3.375242431160343,
+        "median_rmse_mm": 3.360619306388931,
         "max_rmse_mm": 5.400537754345151,
         "pass": true
       },
       "dimension_accuracy": {
-        "usable_events": 228,
-        "mean_abs_err_mm": 1.8669612746342996,
-        "median_abs_err_mm": 1.8145802550748202,
-        "max_abs_err_mm": 4.207906582612941,
+        "usable_events": 229,
+        "mean_abs_err_mm": 1.8601632410007323,
+        "median_abs_err_mm": 1.7737152622691505,
+        "max_abs_err_mm": 3.897035605625515,
         "pass": true
       }
     },
     "cube_only": {
       "cross_camera": {
         "events_with_2plus_cams": 208,
-        "num_errors": 564,
-        "mean_mm": 4.687886373970794,
-        "median_mm": 2.561059317704174,
-        "max_mm": 87.28694803583724,
-        "std_mm": 11.069936264994324,
+        "num_errors": 505,
+        "mean_mm": 4.586859591687238,
+        "median_mm": 2.270509473825656,
+        "max_mm": 87.24196909738716,
+        "std_mm": 11.720840540985016,
         "pass": true
       },
       "reprojection": {
@@ -173,10 +173,10 @@
       },
       "handeye": {
         "frames": 146,
-        "board_position_std_mm": 1.2868869211680192,
-        "board_position_max_mm": 7.704706323954023,
-        "board_rotation_mean_deg": 0.7907029135661637,
-        "board_rotation_max_deg": 1.3926523798125936,
+        "board_position_std_mm": 2.236474262982037,
+        "board_position_max_mm": 19.42371875945879,
+        "board_rotation_mean_deg": 0.7934867749687443,
+        "board_rotation_max_deg": 1.2960826300110633,
         "pass": true
       },
       "board_reprojection": {
@@ -206,24 +206,24 @@
       },
       "pose_repeatability": {
         "num_events": 208,
-        "mean_dt_mm": 4.688377046356739,
-        "mean_dr_deg": 1.9037383989456695,
-        "max_dt_mm": 115.67918195733779,
-        "max_dr_deg": 119.50014533629576,
+        "mean_dt_mm": 4.60216984975761,
+        "mean_dr_deg": 2.0682508217966484,
+        "max_dt_mm": 115.59052733240179,
+        "max_dr_deg": 119.47641351310065,
         "pass": false
       },
       "mesh_alignment": {
-        "usable_clouds": 577,
+        "usable_clouds": 518,
         "usable_events": 232,
-        "mean_rmse_mm": 3.4875721730809204,
-        "median_rmse_mm": 3.60490214852054,
+        "mean_rmse_mm": 3.3452192256669853,
+        "median_rmse_mm": 3.3441044852179607,
         "max_rmse_mm": 5.400537754345151,
         "pass": true
       },
       "dimension_accuracy": {
         "usable_events": 229,
-        "mean_abs_err_mm": 1.670846654461076,
-        "median_abs_err_mm": 1.61931391162991,
+        "mean_abs_err_mm": 1.8108455905783314,
+        "median_abs_err_mm": 1.76833378146062,
         "max_abs_err_mm": 3.920912922610348,
         "pass": true
       }
@@ -231,11 +231,11 @@
     "hybrid": {
       "cross_camera": {
         "events_with_2plus_cams": 208,
-        "num_errors": 432,
-        "mean_mm": 4.855967743498906,
-        "median_mm": 2.6828893129074842,
-        "max_mm": 85.85592486142149,
-        "std_mm": 11.6016349339744,
+        "num_errors": 431,
+        "mean_mm": 3.9470080798377216,
+        "median_mm": 1.4681912778435646,
+        "max_mm": 83.30104934917993,
+        "std_mm": 11.289669110381467,
         "pass": true
       },
       "reprojection": {
@@ -248,10 +248,10 @@
       },
       "handeye": {
         "frames": 146,
-        "board_position_std_mm": 1.2868869211680192,
-        "board_position_max_mm": 7.704706323954023,
-        "board_rotation_mean_deg": 0.7907029135661637,
-        "board_rotation_max_deg": 1.3926523798125936,
+        "board_position_std_mm": 2.236474262982037,
+        "board_position_max_mm": 19.42371875945879,
+        "board_rotation_mean_deg": 0.7934867749687443,
+        "board_rotation_max_deg": 1.2960826300110633,
         "pass": true
       },
       "board_reprojection": {
@@ -281,25 +281,25 @@
       },
       "pose_repeatability": {
         "num_events": 208,
-        "mean_dt_mm": 4.864346374039182,
-        "mean_dr_deg": 1.8300359481057198,
-        "max_dt_mm": 119.1510716966698,
-        "max_dr_deg": 113.63027325446328,
+        "mean_dt_mm": 3.954658005049077,
+        "mean_dr_deg": 1.8726749521023267,
+        "max_dt_mm": 114.87445869281962,
+        "max_dr_deg": 114.23161156345486,
         "pass": false
       },
       "mesh_alignment": {
-        "usable_clouds": 445,
+        "usable_clouds": 444,
         "usable_events": 232,
-        "mean_rmse_mm": 3.37000947120026,
-        "median_rmse_mm": 3.3607970936663927,
+        "mean_rmse_mm": 3.2515726607079176,
+        "median_rmse_mm": 3.2670310398053446,
         "max_rmse_mm": 5.400537754345151,
         "pass": true
       },
       "dimension_accuracy": {
-        "usable_events": 226,
-        "mean_abs_err_mm": 1.748051758336246,
-        "median_abs_err_mm": 1.6829908325137408,
-        "max_abs_err_mm": 3.75803161579881,
+        "usable_events": 229,
+        "mean_abs_err_mm": 1.8324460690610316,
+        "median_abs_err_mm": 1.7121490188079687,
+        "max_abs_err_mm": 3.732844380632571,
         "pass": true
       }
     }

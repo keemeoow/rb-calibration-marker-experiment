@@ -18,7 +18,6 @@ from __future__ import annotations
 
 import csv
 import json
-import shutil
 from pathlib import Path
 from typing import Iterable
 
@@ -38,7 +37,6 @@ C3_JSON = ROOT / "CP_result" / "C3" / "ablation_summary.json"
 FIG_DIR = ROOT / "CP_result" / "figures"
 
 OUT_C1 = FIG_DIR / "fig_CP_C1_fk_correction.png"
-OUT_C1_LEGACY = FIG_DIR / "fig_C1_unified_vs_independent.png"
 OUT_INTERNAL = FIG_DIR / "fig_CP_C1_internal_metrics.png"
 OUT_LINK = FIG_DIR / "fig_CP_C1_C3_interpretation.png"
 OUT_PROVENANCE = FIG_DIR / "fig_CP_C1_real_data_provenance.json"
@@ -111,9 +109,6 @@ def _pct_drop(before: float, after: float) -> float:
 def _save(fig, path: Path) -> None:
     save_figure(fig, path)
     print(f"[DONE] {path}")
-    if path == OUT_C1:
-        shutil.copyfile(path, OUT_C1_LEGACY)
-        print(f"[DONE] {OUT_C1_LEGACY} (current-data compatibility alias)")
 
 
 def figure_1(rows: list[dict[str, str]]) -> None:

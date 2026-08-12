@@ -1,0 +1,24 @@
+{
+  "schema": "canonical_ablation_repeated_event_split_plan_v1",
+  "split_seeds_predeclared": [
+    20260729,
+    20260730,
+    20260731,
+    20260732,
+    20260733
+  ],
+  "num_initializations_per_split": 5,
+  "rows": [
+    "A0",
+    "A1",
+    "A2",
+    "A3",
+    "B1",
+    "B2",
+    "B3"
+  ],
+  "optimizer": {
+    "max_nfev": 300,
+    "tol": 1e-08
+  }
+}

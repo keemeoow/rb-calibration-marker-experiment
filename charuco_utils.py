@@ -2,7 +2,7 @@
 ChArUco 보드 검출 및 포즈 추정 유틸리티.
 Eye-in-hand (그리퍼 카메라) 캘리브레이션에 사용.
 
-보드 사양: 7x11, 체커 22mm, 마커 16mm, DICT_4X4_250
+보드 사양: 11x7 squares, 체커 25mm, 마커 18mm, DICT_4X4_250
 """
 
 import cv2

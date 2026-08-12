@@ -1,0 +1,10 @@
+contrast,first_row,second_row,component,delta_definition,lower_is_better,n_splits,delta_mean,delta_split_std,n_splits_second_better,causal_interpretation,interpretation
+A0_to_A1,A0,A1,heldout_reprojection.board,second_minus_first,True,5,0.0031476194246059298,0.0029692987456154066,1,cube_observability_gain_at_seq_and_estimated_pose,
+A0_to_A1,A0,A1,N_reg,second_minus_first,False,5,1.0,0.0,5,cube_observability_gain_at_seq_and_estimated_pose,
+A1_to_A2,A1,A2,heldout_reprojection.overall,second_minus_first,True,5,-0.14858163836453073,0.021606523962783328,5,unified_feedback_with_estimated_cube_pose,
+B1_to_A3,B1,A3,heldout_reprojection.overall,second_minus_first,True,5,-0.008688718258466021,0.002199937419720998,5,unified_feedback_with_identical_FK_fixed_cube,
+A2_to_A3,A2,A3,heldout_reprojection.overall,second_minus_first,True,5,0.11554545546538568,0.025288824285119638,0,FK_fixed_cube_pose_effect,
+B2_to_A3,B2,A3,heldout_reprojection.cube,second_minus_first,True,5,0.029602727290468776,0.0027256023810804243,0,board_addition_given_identical_FK_fixed_cube,
+B2_to_A3,B2,A3,e_e2e,second_minus_first,True,5,0.4993795903061766,0.06760107965202655,0,board_addition_given_identical_FK_fixed_cube,
+B2_to_A3,B2,A3,e_cross,second_minus_first,True,5,0.18860835857657038,0.009010805224467747,0,board_addition_given_identical_FK_fixed_cube,
+B3_to_A3,B3,A3,heldout_reprojection.board,second_minus_first,True,5,0.009552330698740664,0.022377619563497292,1,,board_only_vs_full_system_reference_not_marker_only_causal

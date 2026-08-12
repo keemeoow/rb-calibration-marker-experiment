@@ -1,0 +1,63 @@
+{
+  "artifact_schema": "external_gt_eval_manifest_v1",
+  "methods": ["A4", "A1", "A2", "A3", "B1", "C1", "C2", "C3", "C4"],
+  "ours_method": "A4",
+  "blind_gt_used_for_training": false,
+  "gt_independent_of_fk_factor": true,
+  "add_mode": "ADD-S",
+  "object_points_m": [
+    [-0.0295, -0.0295, -0.0295],
+    [0.0295, -0.0295, -0.0295],
+    [0.0295, 0.0295, -0.0295],
+    [-0.0295, 0.0295, -0.0295],
+    [-0.0295, -0.0295, 0.0295],
+    [0.0295, -0.0295, 0.0295],
+    [0.0295, 0.0295, 0.0295],
+    [-0.0295, 0.0295, 0.0295]
+  ],
+  "alpha": 0.05,
+  "margins": {
+    "rotation_deg": null,
+    "p95_tre_mm": null,
+    "failure_rate": null,
+    "worst_stratum_p95_tre_mm": null,
+    "add_mm": null
+  },
+  "gt_uncertainty_floor": {
+    "translation_mm": null,
+    "rotation_deg": null
+  },
+  "bootstrap": {
+    "repetitions": 10000,
+    "seed": 20260806
+  },
+  "sessions": [
+    {
+      "session_id": "session_01",
+      "external_gt": "session_01/blind_test/external_gt.json",
+      "predictions": {
+        "A4": "session_01/predictions/A4.json",
+        "A1": "session_01/predictions/A1.json",
+        "A2": "session_01/predictions/A2.json",
+        "A3": "session_01/predictions/A3.json",
+        "B1": "session_01/predictions/B1.json",
+        "C1": "session_01/predictions/C1.json",
+        "C2": "session_01/predictions/C2.json",
+        "C3": "session_01/predictions/C3.json",
+        "C4": "session_01/predictions/C4.json"
+      },
+      "registered_cameras": {
+        "A4": 4,
+        "A1": 4,
+        "A2": 4,
+        "A3": 4,
+        "B1": 4,
+        "C1": 4,
+        "C2": 4,
+        "C3": 4,
+        "C4": 4
+      }
+    }
+  ],
+  "warning": "Replace all nulls, paths, camera counts and task geometry before preregistration. At least two sessions are required; five are recommended for the pilot."
+}

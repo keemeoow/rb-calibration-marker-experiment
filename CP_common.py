@@ -161,6 +161,10 @@ class CornerObs:
     object_points: np.ndarray  # Nx3, cube/object frame
     image_points: np.ndarray   # Nx2
     err_hint_px: float
+    # Grasp this observation was taken under, or None when the cube was resting
+    # on the table.  A gripped cube is not at a per-set pose: it is at
+    # FK(q_event) @ T_gripper_cube[grasp], so the two cases cannot share a target.
+    grasp_idx: Optional[int] = None
 
 
 def try_parse_pose6(obj: Any) -> Optional[List[float]]:
@@ -181,10 +185,150 @@ def try_parse_pose6(obj: Any) -> Optional[List[float]]:
     return None
 
 
+# Pinned isotropic scale applied to every robot-reported TRANSLATION at load
+# time.  k is a *processing* multiplier, not robot behaviour: the controller
+# writes identical robot_pose_6dof values for every run, so two results that
+# used different k are not comparable even though the raw data is identical.
+# The shift is large (~12mm mean on the FK cube poses between 1.0 and 1.0229)
+# and no downstream metric reveals it, which is exactly how one stored table
+# ended up mixing both values.
+#
+# k is therefore pinned here instead of read per-run from the environment.  It
+# stays at 1.0 — robot values untouched — until the physical dial-gauge
+# measurement settles the true factor.  Vision and depth both put it near
+# 1.023, but the per-camera spread is 1.014-1.029, so adopting it now would
+# bake a provisional constant into every stored number.
+#
+# To adopt a measured value: change this one constant and regenerate every
+# stored result together.  Never mix.
+ROBOT_POS_SCALE_PINNED: float = 1.0
+
+
+def robot_pos_scale() -> float:
+    """Isotropic correction applied to every robot-reported TRANSLATION (not rotation).
+
+    The robot under-reports Cartesian distances by ~2.3% on this arm (a kinematic
+    scale error confirmed independently by both marker-vision and depth — see
+    fk_scale_crosscheck / estimate_robot_pos_scale).  Correcting it is a one-line
+    change to ``ROBOT_POS_SCALE_PINNED`` above, not a per-run environment knob:
+    RB_ROBOT_POS_SCALE now only survives as a guard that refuses to run when it
+    disagrees with the pin, so a stale shell cannot silently produce results at a
+    second scale.
+    """
+    requested = os.environ.get("RB_ROBOT_POS_SCALE")
+    if requested is not None:
+        try:
+            value = float(requested)
+        except (TypeError, ValueError):
+            raise RuntimeError(
+                f"RB_ROBOT_POS_SCALE={requested!r} is not a number") from None
+        if value != ROBOT_POS_SCALE_PINNED:
+            raise RuntimeError(
+                f"RB_ROBOT_POS_SCALE={value} conflicts with "
+                f"CP_common.ROBOT_POS_SCALE_PINNED={ROBOT_POS_SCALE_PINNED}. "
+                "Per-run overrides are refused because results produced at "
+                "different scales are silently incomparable. Change the pinned "
+                "constant and regenerate every stored result together.")
+    return ROBOT_POS_SCALE_PINNED
+
+
+def artifact_robot_pos_scale(payload: dict):
+    """The ``robot_pos_scale`` a stored result recorded, or None if it predates it.
+
+    Producers write the key either at the top level (D1, D2) or inside
+    ``protocol`` (the 7-row runner, the repeated-split aggregate).
+    """
+    for holder in (payload, payload.get("protocol") if isinstance(payload, dict) else None):
+        if isinstance(holder, dict) and "robot_pos_scale" in holder:
+            return float(holder["robot_pos_scale"])
+    return None
+
+
+def verify_stored_fk_cube_scale(fk_cube_path: str, meta: dict,
+                                tol_mm: float = 1e-3) -> float:
+    """Recompute the FK cube poses at the pinned k and return the max deviation (mm).
+
+    Independent of any recorded metadata: ``shared_board_free_fk_cube.json`` stores
+    ``raw_fk_pose_by_set``, which is exactly what
+    ``Step3_calibration.load_nominal_set_cube_transforms`` produces, so recomputing
+    it at the current pin either reproduces the stored poses or does not.  This is
+    how the k=1.0229 contamination was originally caught — the same poses agreed to
+    0.0000 mm at k=1.0 and differed by 12.36 mm mean / 16.50 mm max at k=1.0229.
+
+    Raises if the artifact was produced at a different scale.
+    """
+    import Step3_calibration  # local: Step3 imports this module at load time
+
+    with open(fk_cube_path) as handle:
+        stored = json.load(handle).get("raw_fk_pose_by_set")
+    if not stored:
+        raise RuntimeError(
+            f"{fk_cube_path} stores no raw_fk_pose_by_set, so its robot scale "
+            "cannot be verified.")
+    recomputed = Step3_calibration.load_nominal_set_cube_transforms(meta)
+    worst = 0.0
+    for set_id, pose in stored.items():
+        current = recomputed.get(int(set_id))
+        if current is None:
+            continue
+        delta = np.asarray(pose, dtype=np.float64)[:3, 3] - current[:3, 3]
+        worst = max(worst, float(np.linalg.norm(delta)) * 1000.0)
+    if worst > tol_mm:
+        raise RuntimeError(
+            f"{fk_cube_path} does not reproduce at "
+            f"CP_common.ROBOT_POS_SCALE_PINNED={ROBOT_POS_SCALE_PINNED}: FK cube "
+            f"centers differ by up to {worst:.4f} mm. It was produced at a different "
+            "robot scale — regenerate it instead of reusing it.")
+    return worst
+
+
+def assert_artifact_robot_pos_scale(payload: dict, path: str,
+                                    fk_cube_path: str = None,
+                                    root_folder: str = None) -> None:
+    """Refuse to reuse a stored artifact that was produced at a different k.
+
+    ``robot_pos_scale()`` guards the *shell* — it stops a stale environment
+    variable from producing a second scale.  It cannot stop the other half of the
+    failure: reading a result file that was written before the pin changed.  That
+    is what actually happened; Table 1 ended up with A0-B3 at k=1.0 and the
+    adopted-configuration rows at k=1.0229, and D2's own ``reference_agreement``
+    tolerance was too coarse (3.5 mm split std vs a 5.3 mm shift) to notice.
+
+    Artifacts written before ``robot_pos_scale`` was recorded carry no metadata to
+    check, so they are accepted only when ``fk_cube_path``/``root_folder`` let the
+    scale be verified from the stored FK cube poses themselves.  Unverifiable is
+    refused — trusting an unlabelled artifact is the exact mistake this guard is for.
+    """
+    stored = artifact_robot_pos_scale(payload)
+    if stored is not None:
+        if stored != ROBOT_POS_SCALE_PINNED:
+            raise RuntimeError(
+                f"{path} was produced at robot_pos_scale={stored}, but "
+                f"CP_common.ROBOT_POS_SCALE_PINNED={ROBOT_POS_SCALE_PINNED}. Results at "
+                "two scales are silently incomparable — regenerate this artifact "
+                "instead of mixing it with freshly computed rows.")
+        return
+    if fk_cube_path and root_folder and os.path.exists(fk_cube_path):
+        with open(os.path.join(root_folder, "meta.json")) as handle:
+            meta = json.load(handle)
+        verify_stored_fk_cube_scale(fk_cube_path, meta)
+        return
+    raise RuntimeError(
+        f"{path} records no robot_pos_scale and has no FK cube artifact to verify "
+        f"against, so it cannot be shown to match "
+        f"CP_common.ROBOT_POS_SCALE_PINNED={ROBOT_POS_SCALE_PINNED}. Regenerate it "
+        "instead of reusing it.")
+
+
 def pose6_to_T_base_gripper(pose6: List[float]) -> np.ndarray:
     # Project convention: robot 6-DoF pose is [x,y,z (mm), rz,ry,rx (deg)] and
     # euler_deg_to_matrix returns the full 4x4 with translation in meters.
-    return euler_deg_to_matrix(*[float(v) for v in pose6])
+    T = euler_deg_to_matrix(*[float(v) for v in pose6])
+    s = robot_pos_scale()
+    if s != 1.0:
+        T = np.array(T, dtype=np.float64, copy=True)
+        T[:3, 3] *= s   # rotation is correct (joint angles); only the length scale is off
+    return T
 
 
 def T_to_pose6_mm(T: np.ndarray) -> List[float]:
@@ -356,6 +500,7 @@ def detect_corner_observations(
     min_aspect_fixed: float,
     min_aspect_gripper: float,
     exclude_gripped: bool = False,
+    image_scale: float = 1.0,
 ) -> Tuple[List[CornerObs], str]:
     """Return (corner observations, reason-string-if-empty).
 
@@ -363,6 +508,9 @@ def detect_corner_observations(
     detections were loaded" from "cube model 3D marker corners are unavailable".
     exclude_gripped: see load_pose_observations().
     """
+    image_scale = float(image_scale)
+    if not np.isfinite(image_scale) or image_scale <= 0.0:
+        raise ValueError("image_scale must be finite and positive")
     obs: List[CornerObs] = []
     # counters for an actionable zero-observations reason
     n_imgs_read = n_imgs_missing = 0
@@ -374,6 +522,16 @@ def detect_corner_observations(
         if exclude_gripped and cap.get("cube_gripped"):
             continue
         sidx = get_capture_set_index(cap)
+        gripped = bool(cap.get("cube_gripped"))
+        grasp = cap.get("grasp_id")
+        if gripped and grasp is None:
+            # Without a grasp id there is no way to say which constant offset
+            # this frame shares.  Failing here beats silently demoting it to a
+            # placement observation, which would pin the cube to the wrong pose.
+            raise ValueError(
+                f"capture event {eid} is cube_gripped but carries no grasp_id; "
+                "repair the meta before feeding gripped frames to the solver")
+        grasp = int(grasp) if gripped else None
         for ci_str, cinfo in cap.get("cams", {}).items():
             ci = int(ci_str)
             if ci not in all_cam_ids or not cinfo.get("saved"):
@@ -386,6 +544,12 @@ def detect_corner_observations(
             if img is None:
                 n_imgs_missing += 1
                 continue
+            if image_scale != 1.0:
+                interpolation = (cv2.INTER_AREA if image_scale < 1.0
+                                 else cv2.INTER_CUBIC)
+                img = cv2.resize(
+                    img, None, fx=image_scale, fy=image_scale,
+                    interpolation=interpolation)
             n_imgs_read += 1
             try:
                 corners_list, ids = cube.detect(img)
@@ -400,7 +564,13 @@ def detect_corner_observations(
                 if not cube.model.has_marker(mid):
                     continue
                 n_detections += 1
-                img_pts_raw = np.asarray(corners, dtype=np.float64).reshape(4, 2)
+                # Detection happens at the requested raster scale, but the
+                # returned coordinates are mapped back to the native pixel
+                # frame.  This keeps K, robust-loss thresholds, and held-out
+                # RMSE units identical across resolution conditions.
+                img_pts_raw = (
+                    np.asarray(corners, dtype=np.float64).reshape(4, 2)
+                    / image_scale)
                 try:
                     img_pts = np.asarray(cube.model.reorder_image_corners(mid, img_pts_raw), dtype=np.float64).reshape(4, 2)
                 except Exception:
@@ -422,6 +592,7 @@ def detect_corner_observations(
                     object_points=np.concatenate(obj_all, axis=0),
                     image_points=np.concatenate(img_all, axis=0),
                     err_hint_px=max_err_gripper if ci == gripper_cam_idx else max_err_fixed,
+                    grasp_idx=grasp,
                 ))
 
     reason = ""
@@ -623,6 +794,203 @@ def load_nominal_set_cube_pose6(meta: Dict[str, Any]) -> Dict[int, List[float]]:
         if pose is not None:
             out[int(sidx)] = [float(x) for x in pose]
     return out
+
+
+def depth_scale_crosscheck(meta: Dict[str, Any], fixed_only: bool = True) -> Dict[str, Any]:
+    """Independent scale cross-check (DIAGNOSTIC ONLY — never feeds the solver).
+
+    Compares each cube observation's vision PnP camera-distance (which scales with
+    the colour focal length) against the RealSense depth distance (independent of
+    the colour intrinsics). A median PnP/depth ratio != 1 flags a vision/intrinsics
+    scale error; a ratio ~1 while a scale error persists downstream points at the
+    robot/FK side instead. Requires depth-populated meta (see
+    AprilTagCubeTarget._depth_plane_metrics); returns {"n": 0, ...} otherwise.
+
+    Uses the surface-to-surface scale (depth_z_scale_pred_over_meas): PnP-predicted
+    plane depth vs measured depth at the SAME pixels, so the cube-centre-vs-surface
+    offset cancels. plane residual is reported as a reliability guard.
+    """
+    scales: List[float] = []
+    planes: List[float] = []
+    per_cam: Dict[int, List[float]] = defaultdict(list)
+    for cap in meta.get("captures", []):
+        for ci_s, cinfo in (cap.get("cams") or {}).items():
+            if not cinfo.get("saved"):
+                continue
+            if fixed_only and cinfo.get("is_gripper"):
+                continue
+            pnp = cinfo.get("cube_pnp") or {}
+            if not (pnp.get("ok") and pnp.get("depth_valid")):
+                continue
+            s = pnp.get("depth_z_scale_pred_over_meas")
+            if s is None or not np.isfinite(float(s)) or float(s) <= 0.0:
+                continue
+            scales.append(float(s))
+            per_cam[int(ci_s)].append(float(s))
+            pm = pnp.get("depth_plane_median_mm")
+            if pm is not None:
+                planes.append(float(pm))
+    if not scales:
+        return {"n": 0, "reason": "no depth-valid cube observations with a surface scale "
+                "(reprocess capture so depth metrics populate)"}
+    arr = np.asarray(scales, dtype=np.float64)
+    med = float(np.median(arr))
+    return {
+        "n": int(arr.size),
+        "median_pred_over_meas": med,
+        "mean_pred_over_meas": float(arr.mean()),
+        "implied_vision_scale_pct": (med - 1.0) * 100.0,
+        "median_plane_residual_mm": (float(np.median(planes)) if planes else None),
+        "per_cam_median": {int(k): float(np.median(v)) for k, v in per_cam.items()},
+    }
+
+
+def fk_scale_crosscheck(
+    meta: Dict[str, Any],
+    min_disp_mm: float = 100.0,
+    max_reproj_px: float = 1.5,
+    max_plane_mm: float = 15.0,
+    max_iqr_width: float = 0.15,
+) -> Dict[str, Any]:
+    """Independent FK-scale cross-check (DIAGNOSTIC ONLY — never feeds the solver).
+
+    Compares how far the cube CENTRE moves between captures as seen by vision
+    (per fixed camera, from cube_pnp) vs by robot FK (capture_cube_center_6dof,
+    tool-4 TCP — purely kinematic, no vision). Both track the same physical point,
+    so |dVis|/|dFK| over capture pairs is rotation/translation-invariant and isolates
+    a scale mismatch. ~1.0 means FK and vision distances agree; a robust ratio != 1
+    while vision matches depth (see depth_scale_crosscheck) points the scale error at
+    the robot/FK side (kinematics or the tool-4 cube-centre offset).
+
+    Only vision poses with low reprojection AND depth-confirmed planarity are used.
+    Per-camera IQR width flags cameras whose cube motion is mostly along the optical
+    axis (monocular depth is unreliable there); the 'reliable' aggregate keeps only
+    cameras with IQR width <= max_iqr_width.
+    """
+    from itertools import combinations
+    per_cam_pts: Dict[int, List[Tuple[np.ndarray, np.ndarray]]] = defaultdict(list)
+    for cap in meta.get("captures", []):
+        fk = cap.get("capture_cube_center_6dof")
+        if not fk or len(fk) < 3:
+            continue
+        p_fk = np.asarray(fk[:3], dtype=np.float64)
+        for ci_s, cinfo in (cap.get("cams") or {}).items():
+            if not cinfo.get("saved") or cinfo.get("is_gripper"):
+                continue
+            pnp = cinfo.get("cube_pnp") or {}
+            if not (pnp.get("ok") and pnp.get("T_cam_cube_4x4")):
+                continue
+            reproj = pnp.get("reproj_mean_px")
+            plane = pnp.get("depth_plane_median_mm")
+            if reproj is None or float(reproj) > max_reproj_px:
+                continue
+            if plane is None or float(plane) > max_plane_mm:
+                continue
+            p_vis = np.asarray(pnp["T_cam_cube_4x4"], dtype=np.float64).reshape(4, 4)[:3, 3] * 1000.0
+            per_cam_pts[int(ci_s)].append((p_vis, p_fk))
+
+    per_cam: Dict[int, Dict[str, Any]] = {}
+    reliable_ratios: List[float] = []
+    all_ratios: List[float] = []
+    for ci, lst in sorted(per_cam_pts.items()):
+        V = np.array([v for v, _ in lst])
+        F = np.array([f for _, f in lst])
+        rr = [np.linalg.norm(V[i] - V[j]) / d
+              for i, j in combinations(range(len(lst)), 2)
+              for d in [np.linalg.norm(F[i] - F[j])] if d >= min_disp_mm]
+        if not rr:
+            continue
+        rr = np.asarray(rr, dtype=np.float64)
+        lo, hi = float(np.percentile(rr, 25)), float(np.percentile(rr, 75))
+        per_cam[ci] = {"median": float(np.median(rr)), "iqr_lo": lo, "iqr_hi": hi, "n": int(rr.size)}
+        all_ratios.extend(rr.tolist())
+        if (hi - lo) <= max_iqr_width:
+            reliable_ratios.extend(rr.tolist())
+    if not all_ratios:
+        return {"n": 0, "reason": "no quality-gated cube poses with FK cube-centre "
+                "(reprocess capture so depth metrics populate, and capture FK cube centre)"}
+    rel = np.asarray(reliable_ratios or all_ratios, dtype=np.float64)
+    med = float(np.median(rel))
+    return {
+        "n": int(len(all_ratios)),
+        "n_reliable": int(rel.size),
+        "reliable_median_vis_over_fk": med,
+        "implied_fk_scale_pct": (1.0 / med - 1.0) * 100.0,  # FK larger than vision if >0
+        "pooled_median_vis_over_fk": float(np.median(all_ratios)),
+        "per_cam": per_cam,
+    }
+
+
+def estimate_robot_pos_scale(
+    meta: Dict[str, Any],
+    max_rot_deg: float = 5.0,
+    min_disp_mm: float = 40.0,
+    max_reproj_px: float = 1.5,
+    max_plane_mm: float = 15.0,
+    max_iqr_width: float = 0.05,
+) -> Dict[str, Any]:
+    """Estimate the robot Cartesian scale factor k = |dVis| / |dFlange| from data.
+
+    Offset/tool/grasp-independent: uses only capture PAIRS with near-zero relative
+    flange rotation (pure translation), where the gripped cube's displacement equals
+    the flange's displacement. |dVis| (vision, metrically anchored by the marker and
+    confirmed by depth) over |dFlange| (robot_pose_6dof) gives k directly. This is a
+    measurement, not a switch: adopting k means editing ROBOT_POS_SCALE_PINNED and
+    regenerating every stored result. Robust median over cameras whose
+    per-camera IQR width <= max_iqr_width (noisier cameras are reported but excluded).
+    """
+    from itertools import combinations
+    per_cam: Dict[int, List[Tuple[np.ndarray, np.ndarray, np.ndarray]]] = defaultdict(list)
+    for cap in meta.get("captures", []):
+        if not cap.get("cube_gripped"):
+            continue
+        p6 = try_parse_pose6(cap.get("robot_pose_6dof"))
+        Tf = cap.get("robot_pose_matrix_4x4")
+        if p6 is None or Tf is None:
+            continue
+        p_fl = np.asarray(p6[:3], dtype=np.float64)
+        Rf = np.asarray(Tf, dtype=np.float64).reshape(4, 4)[:3, :3]
+        for ci_s, cinfo in (cap.get("cams") or {}).items():
+            if not cinfo.get("saved") or cinfo.get("is_gripper"):
+                continue
+            pnp = cinfo.get("cube_pnp") or {}
+            if not (pnp.get("ok") and pnp.get("T_cam_cube_4x4")):
+                continue
+            if (pnp.get("reproj_mean_px") or 99.0) > max_reproj_px:
+                continue
+            if (pnp.get("depth_plane_median_mm") or 99.0) > max_plane_mm:
+                continue
+            p_vis = np.asarray(pnp["T_cam_cube_4x4"], dtype=np.float64).reshape(4, 4)[:3, 3] * 1000.0
+            per_cam[int(ci_s)].append((p_vis, p_fl, Rf))
+
+    def rot_angle(Ra, Rb):
+        return np.degrees(np.arccos(np.clip((np.trace(Ra @ Rb.T) - 1.0) / 2.0, -1.0, 1.0)))
+
+    per_cam_med: Dict[int, Dict[str, Any]] = {}
+    reliable: List[float] = []
+    for ci, lst in sorted(per_cam.items()):
+        V = np.array([x[0] for x in lst]); Fl = np.array([x[1] for x in lst]); Rs = [x[2] for x in lst]
+        rr = [np.linalg.norm(V[i] - V[j]) / d
+              for i, j in combinations(range(len(lst)), 2)
+              for d in [np.linalg.norm(Fl[i] - Fl[j])]
+              if d >= min_disp_mm and rot_angle(Rs[i], Rs[j]) <= max_rot_deg]
+        if not rr:
+            continue
+        rr = np.asarray(rr, dtype=np.float64)
+        lo, hi = float(np.percentile(rr, 25)), float(np.percentile(rr, 75))
+        per_cam_med[ci] = {"median": float(np.median(rr)), "iqr_lo": lo, "iqr_hi": hi, "n": int(rr.size)}
+        if (hi - lo) <= max_iqr_width:
+            reliable.extend(rr.tolist())
+    if not per_cam_med:
+        return {"n": 0, "reason": "no pure-translation gripped pairs with quality-gated vision"}
+    pool = reliable if reliable else [d["median"] for d in per_cam_med.values()]
+    k = float(np.median(pool))
+    return {
+        "k": k,
+        "implied_robot_short_pct": (1.0 - 1.0 / k) * 100.0,
+        "n_reliable": len(reliable),
+        "per_cam": per_cam_med,
+    }
 
 
 def kabsch_rigid(src: np.ndarray, dst: np.ndarray) -> np.ndarray:
@@ -951,17 +1319,24 @@ def prior_residual_terms(T_obj: Dict[int, np.ndarray],
     return res
 
 
-def _finalize_opt(init_T_cam, init_T_obj, opt_T_cam, opt_T_obj, residual, x0, opt
+def _finalize_opt(init_T_cam, init_T_obj, opt_T_cam, opt_T_obj, residual, x0, opt,
+                  adoption_guard: bool = True,
                   ) -> Tuple[Dict[int, np.ndarray], Dict[int, np.ndarray], Dict[str, Any]]:
     """비용이 실제로 낮아졌을 때만 최적화 결과를 채택 (아니면 초기값 유지).
 
     scipy `success` 는 종료조건 도달만 뜻하지 목적함수 개선을 보장하지 않는다."""
     c0 = float(np.mean(residual(x0) ** 2))
     c1 = float(np.mean(residual(opt.x) ** 2))
-    accepted = bool(opt.success) and (c1 < c0)
+    improved = bool(c1 < c0)
+    candidate_usable = bool(opt.success) and np.isfinite(c1)
+    accepted = candidate_usable and (improved or not bool(adoption_guard))
     info = {"optimized": True, "optimizer_success": bool(opt.success),
             "accepted": accepted, "cost_initial": c0, "cost_final": c1,
-            "nfev": int(opt.nfev)}
+            "cost_improved": improved,
+            "adoption_guard_enabled": bool(adoption_guard),
+            "forced_candidate_used": bool(accepted and not adoption_guard),
+            "status": int(opt.status), "message": str(opt.message),
+            "optimality": float(opt.optimality), "nfev": int(opt.nfev)}
     if accepted:
         return opt_T_cam, opt_T_obj, info
     info["fallback_reason"] = ("final cost was not lower than initial cost"
@@ -976,6 +1351,8 @@ def optimize_pose_consistency(
     ref_cam: Optional[int], event_to_set: Dict[int, Optional[int]],
     set_priors: Optional[Dict[int, np.ndarray]],
     prior_weight_trans: float = 0.0, prior_weight_rot: float = 0.0,
+    adoption_guard: bool = True, max_nfev: int = 300,
+    tol: float = 1e-10,
 ) -> Tuple[Dict[int, np.ndarray], Dict[int, np.ndarray], Dict[str, Any]]:
     """03: 카메라·이벤트 pose 를 SE(3) pose 일관성으로 동시 최적화 (픽셀 불필요)."""
     event_ids = sorted(init_T_obj.keys())
@@ -1002,9 +1379,12 @@ def optimize_pose_consistency(
         return np.asarray(res, dtype=np.float64)
 
     opt = least_squares(residual, x0, method="trf", loss="huber", f_scale=0.003,
-                        max_nfev=300, xtol=1e-10, ftol=1e-10, gtol=1e-10)
+                        max_nfev=int(max_nfev), xtol=float(tol),
+                        ftol=float(tol), gtol=float(tol))
     T_cam, T_obj = unpack_params(opt.x, layout, ref_cam=ref_cam)
-    return _finalize_opt(init_T_cam, init_T_obj, T_cam, T_obj, residual, x0, opt)
+    return _finalize_opt(
+        init_T_cam, init_T_obj, T_cam, T_obj, residual, x0, opt,
+        adoption_guard=adoption_guard)
 
 
 def optimize_reprojection(
@@ -1014,6 +1394,8 @@ def optimize_reprojection(
     event_to_set: Dict[int, Optional[int]], set_priors: Optional[Dict[int, np.ndarray]],
     prior_weight_trans: float = 0.0, prior_weight_rot: float = 0.0,
     pose_regularizer_weight: float = 2.0,
+    adoption_guard: bool = True, max_nfev: int = 500,
+    tol: float = 1e-10,
 ) -> Tuple[Dict[int, np.ndarray], Dict[int, np.ndarray], Dict[str, Any]]:
     """04: 마커 코너의 픽셀 재투영오차를 직접 최소화 (pose 항으로 약하게 정규화)."""
     event_ids = sorted(init_T_obj.keys())
@@ -1048,9 +1430,12 @@ def optimize_reprojection(
         return np.asarray(res, dtype=np.float64)
 
     opt = least_squares(residual, x0, method="trf", loss="huber", f_scale=2.0,
-                        max_nfev=500, xtol=1e-10, ftol=1e-10, gtol=1e-10)
+                        max_nfev=int(max_nfev), xtol=float(tol),
+                        ftol=float(tol), gtol=float(tol))
     T_cam, T_obj = unpack_params(opt.x, layout, ref_cam=ref_cam)
-    return _finalize_opt(init_T_cam, init_T_obj, T_cam, T_obj, residual, x0, opt)
+    return _finalize_opt(
+        init_T_cam, init_T_obj, T_cam, T_obj, residual, x0, opt,
+        adoption_guard=adoption_guard)
 
 
 def solve_fixed_cameras(

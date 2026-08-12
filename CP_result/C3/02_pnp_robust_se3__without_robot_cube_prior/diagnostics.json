@@ -4,11 +4,11 @@
   "n_pose_obs": 286,
   "n_corner_obs": 297,
   "corner_obs_reason_if_zero": "",
-  "reproj_rmse_px": 9.307023420300004,
-  "reproj_median_px": 1.4803874534708479,
-  "pose_trans_rmse_mm": 11.19556476343035,
-  "pose_rot_rmse_deg": 8.37749782554836,
-  "prior_trans_rmse_mm": 10.058327776486298,
+  "reproj_rmse_px": 9.307023420300034,
+  "reproj_median_px": 1.4803874534704706,
+  "pose_trans_rmse_mm": 11.195564763430319,
+  "pose_rot_rmse_deg": 8.377497825548364,
+  "prior_trans_rmse_mm": 9.130422825893268,
   "prior_rot_rmse_deg": 179.75242902487665,
   "prior_stats": {},
   "extra": {
@@ -29,7 +29,7 @@
         "rotation_std_deg": 0.30774474492880927
       }
     },
-    "anchor_rms_mm": 10.027162159522856,
+    "anchor_rms_mm": 9.096078511856968,
     "anchor_used_sets": [
       1,
       2,
@@ -46,12 +46,12 @@
       "num_prior_total": 99,
       "num_prior_used": 99,
       "num_prior_rejected": 0,
-      "median_prior_trans_error_mm": 6.5928354056103355,
+      "median_prior_trans_error_mm": 4.516021238913755,
       "median_prior_rot_error_deg": 179.86283076319376,
       "rotation_prior_used": false,
       "translation_prior_used": true,
-      "anchor_rms_mm": 10.027162159522856,
-      "reason": "translation-only anchor, rms=10.0mm over 9 sets; rotation prior REJECTED (median 179.9deg > 45deg): orientation in set_cube_center_6dof does not match the observed cube"
+      "anchor_rms_mm": 9.096078511856968,
+      "reason": "translation-only anchor, rms=9.1mm over 9 sets; rotation prior REJECTED (median 179.9deg > 45deg): orientation in set_cube_center_6dof does not match the observed cube"
     },
     "init": "vision_robust_base"
   }

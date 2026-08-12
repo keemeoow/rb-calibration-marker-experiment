@@ -20,6 +20,66 @@ def filter_marker_ids(corners_list, ids, allowed_ids: Sequence[int]):
     return filt_corners, np.asarray(filt_ids, dtype=np.int32)
 
 
+def marker_roi_quality(bgr: np.ndarray,
+                       quads: Sequence[np.ndarray],
+                       clip_low: int = 2,
+                       clip_high: int = 253) -> Dict[str, Optional[float]]:
+    """Sharpness and clipping measured on the marker regions only.
+
+    Whole-frame statistics gate on the wrong thing: a blown-out background or a
+    blurred table costs nothing, while a crisp background can hide one smeared
+    marker. Only the pixels the corner solver actually consumes matter, so each
+    detected quad is measured on its own and the worst one decides the frame.
+
+    ``sharpness`` is Laplacian variance over the quad's bounding box. It is not
+    comparable across cameras — a marker imaged larger spreads its edge energy
+    over more pixels — which is why the gate threshold is per camera and starts
+    disabled until pilot data fixes it. ``clip_frac`` (fraction of pixels pinned
+    at black or white) is scale-free and can be gated immediately.
+
+    Returns worst-case and median values plus ``n_rois``; all-None when there is
+    nothing to measure, which callers must treat as "unknown", not "good".
+    """
+    empty = {"sharpness_min": None, "sharpness_median": None,
+             "clip_frac_median": None, "clip_frac_max": None,
+             "roi_px_min": None, "n_rois": 0}
+    if bgr is None or not len(quads):
+        return empty
+
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if bgr.ndim == 3 else bgr
+    h, w = gray.shape[:2]
+
+    sharps, clips, sizes = [], [], []
+    for quad in quads:
+        pts = np.asarray(quad, dtype=np.float32).reshape(-1, 2)
+        if pts.shape[0] < 3:
+            continue
+        x0 = max(int(np.floor(pts[:, 0].min())), 0)
+        y0 = max(int(np.floor(pts[:, 1].min())), 0)
+        x1 = min(int(np.ceil(pts[:, 0].max())) + 1, w)
+        y1 = min(int(np.ceil(pts[:, 1].max())) + 1, h)
+        if x1 - x0 < 4 or y1 - y0 < 4:
+            continue
+        roi = gray[y0:y1, x0:x1]
+        sharps.append(float(cv2.Laplacian(roi, cv2.CV_64F).var()))
+        clips.append(float(np.mean((roi <= clip_low) | (roi >= clip_high))))
+        sizes.append(float(min(x1 - x0, y1 - y0)))
+
+    if not sharps:
+        return empty
+    return {
+        "sharpness_min": min(sharps),
+        "sharpness_median": float(np.median(sharps)),
+        # Gate on the median, diagnose with the max: one specular highlight on
+        # one marker should not discard a capture whose other markers are clean,
+        # but a camera whose typical marker is blown out has no usable corners.
+        "clip_frac_median": float(np.median(clips)),
+        "clip_frac_max": max(clips),
+        "roi_px_min": min(sizes),
+        "n_rois": len(sharps),
+    }
+
+
 def _expand_quad(corners, pad_px: float) -> np.ndarray:
     pts = np.asarray(corners, dtype=np.float32).reshape(-1, 2)
     if pts.shape[0] != 4:

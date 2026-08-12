@@ -1,0 +1,24 @@
+{
+  "artifact_schema": "fk_factor_covariance_v1",
+  "twist_order": [
+    "rx_rad",
+    "ry_rad",
+    "rz_rad",
+    "tx_m",
+    "ty_m",
+    "tz_m"
+  ],
+  "measurement_source": "REPLACE_WITH_REPEAT_GRASP_OR_PLACEMENT_PROTOCOL",
+  "n_repeats": 0,
+  "blind_external_gt_used": false,
+  "preregistered_before_blind_test": true,
+  "shared_covariance_6x6": [
+    [null, null, null, null, null, null],
+    [null, null, null, null, null, null],
+    [null, null, null, null, null, null],
+    [null, null, null, null, null, null],
+    [null, null, null, null, null, null],
+    [null, null, null, null, null, null]
+  ],
+  "warning": "Template values are invalid placeholders. Replace them with a positive-definite covariance estimated in rad/metre before confirmatory use."
+}

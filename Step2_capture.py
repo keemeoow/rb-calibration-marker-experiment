@@ -11,9 +11,32 @@ Step 2: 멀티카메라 캘리브레이션용 캡처 수집.
 """
 
 """
-python Step2_capture.py --root_folder ./data/session \
+<< 서버 >> 
+python c1.py
+[set 0 z+100]
+gotoj 37.96, -9.45, -136.81, 0.25, -33.05, -117.92
+p z,-100
+gc
+[자동화 촬영시] start
+[티칭시] rs(set) / rp(pose) -A / rg(grip) -B
+
+<< session 파일 번호 변경 필요 >>
+python Step2_capture.py \
+    --root_folder data/session02/calib_train \
     --intrinsics_dir ./intrinsics --use_robot --manual_robot \
-    --robot_ip 192.168.0.23 --robot_port 12348 --show --save_depth
+    --robot_ip 192.168.0.23 --robot_port 12348 --show --save_depth \
+    --max_capture_span_ms 0 \
+    --min_cams_with_cube 0 --min_fixed_cams_with_cube 0 \
+    --a_min_fixed_multimarker_cams 0 \
+    --min_cube_pnp_ok_cams 0 --min_fixed_cube_pnp_ok_cams 0 \
+    --max_cube_pnp_reproj_mean_px 0 --min_depth_samples 0 \
+    --gripper_cube_min_markers 0 --min_gripper_charuco_corners 0 \
+    --allow_gripper_cube_pnp_fail --allow_gripper_depth_invalid \
+    --max_gripper_depth_plane_mean_mm 0 \
+    --b_min_fixed_cams_with_cube 0 --b_min_fixed_multimarker_cams 0 \
+    --b_min_fixed_cube_pnp_ok_cams 0 --b_min_fixed_depth_quality_cams 0 \
+    --b_max_fixed_depth_plane_mean_mm 0 \
+    --max_roi_clip_frac 0
 
 저장 파일:
   - meta.json               : 캡처별 상세 (robot pose, set_index, set_cube_center_6dof, cube/board quality)
@@ -42,7 +65,9 @@ from apriltag_cube import AprilTagCubeTarget, depth_metrics_to_fields, rodrigues
 from charuco_utils import CharucoTarget
 from config import CubeConfig, CharucoBoardConfig, get_default_cube_config
 from calibration_runtime_utils import resolve_cube_config_for_run
-from capture_detection_utils import detect_cube_markers_in_frame
+from capture_detection_utils import detect_cube_markers_in_frame, marker_roi_quality
+from capture_gate import evaluate_capture_gate, resolve_camera_storage
+from capture_session import allocate_next_capture_session
 from cube_config_utils import (
     cube_config_mismatch_keys,
     cube_config_to_dict,
@@ -50,6 +75,7 @@ from cube_config_utils import (
     load_cube_config_from_meta,
 )
 from robot_comm import euler_deg_to_matrix
+from server.waypoint_safety import validate_safe_joint_config, validate_waypoint_semantics
 
 
 def ensure_dir(p: str) -> str:
@@ -109,7 +135,8 @@ def annotate_image(bgr, cube, cam_idx, is_gripper, n_markers, ids, corners,
 
 def wait_for_start_command_capture(cams, cam_order, gripper_cam_idx,
                                      extra_lines: Optional[List[str]] = None,
-                                     frame_builder=None, cube=None) -> bool:
+                                     frame_builder=None, cube=None,
+                                     preview_frac: float = 0.6) -> bool:
     """캘리브레이션 캡처 시작 전 cv2 프리뷰 + 'start' 입력 대기.
 
     `frame_builder`가 주어지면 각 카메라에서 인식되는 AprilTag 큐브/보드/ChArUco
@@ -181,7 +208,9 @@ def wait_for_start_command_capture(cams, cam_order, gripper_cam_idx,
                 cv2.putText(quad, "no frames", (20, 240),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
         else:
+            # make_quad_image 와 같은 이유로 빈 타일은 나중에 채운다.
             tiles = []
+            missing = []
             tile_h = tile_w = None
             for ci in cam_order:
                 cam = cams.get(ci)
@@ -198,14 +227,17 @@ def wait_for_start_command_capture(cams, cam_order, gripper_cam_idx,
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, col, 2)
                     tiles.append(disp)
                 else:
-                    if tile_h is None:
-                        tile_h, tile_w = 480, 640
-                    blank = np.zeros((tile_h, tile_w, 3), dtype=np.uint8)
-                    cv2.putText(blank, f"cam{ci} N/A", (20, tile_h // 2),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
-                    tiles.append(blank)
+                    missing.append((len(tiles), ci))
+                    tiles.append(None)
+            if tile_h is None:
+                tile_h, tile_w = 720, 1280
+            for idx, ci in missing:
+                blank = np.zeros((tile_h, tile_w, 3), dtype=np.uint8)
+                cv2.putText(blank, f"cam{ci} N/A", (20, tile_h // 2),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+                tiles[idx] = blank
             while len(tiles) < 4:
-                tiles.append(np.zeros((tile_h or 480, tile_w or 640, 3), dtype=np.uint8))
+                tiles.append(np.zeros((tile_h, tile_w, 3), dtype=np.uint8))
             tiles = tiles[:4]
             top = cv2.hconcat([tiles[0], tiles[1]])
             bot = cv2.hconcat([tiles[2], tiles[3]])
@@ -226,8 +258,7 @@ def wait_for_start_command_capture(cams, cam_order, gripper_cam_idx,
                             cv2.FONT_HERSHEY_SIMPLEX, 0.55, (220, 220, 220), 1)
                 y += 24
         quad = cv2.vconcat([quad, foot])
-        h2 = int(quad.shape[0] * 0.6); w2 = int(quad.shape[1] * 0.6)
-        cv2.imshow(win, cv2.resize(quad, (w2, h2)))
+        cv2.imshow(win, fit_to_screen(quad, preview_frac))
 
         key = cv2.waitKey(50) & 0xFF
         if key == 27 or key == ord('q'):
@@ -250,9 +281,70 @@ def wait_for_start_command_capture(cams, cam_order, gripper_cam_idx,
     return False
 
 
+_SCREEN_SIZE: Optional[Tuple[int, int]] = None
+
+
+def get_screen_size() -> Tuple[int, int]:
+    """(width, height) of the primary display, cached.
+
+    720p x 4 타일이면 원본이 2560x1440 이라 그대로 띄우면 화면을 덮는다. 화면 크기를
+    알아야 "모니터의 몇 %" 로 맞출 수 있는데, OpenCV 는 이를 알려주지 않는다.
+    tkinter(표준 라이브러리) -> xrandr 순으로 시도하고, 둘 다 실패하면 1920x1080 으로
+    가정한다. 실패해도 프리뷰는 떠야 하므로 예외를 올리지 않는다.
+    """
+    global _SCREEN_SIZE
+    if _SCREEN_SIZE is not None:
+        return _SCREEN_SIZE
+    size = None
+    try:
+        import tkinter
+        _root = tkinter.Tk()
+        _root.withdraw()
+        size = (_root.winfo_screenwidth(), _root.winfo_screenheight())
+        _root.destroy()
+    except Exception:
+        try:
+            import subprocess
+            out = subprocess.check_output(["xrandr"], stderr=subprocess.DEVNULL).decode()
+            for line in out.splitlines():
+                if " connected" in line and "x" in line:
+                    for tok in line.split():
+                        if "x" in tok and tok.split("x")[0].isdigit():
+                            w, h = tok.split("+")[0].split("x")
+                            size = (int(w), int(h))
+                            break
+                if size:
+                    break
+        except Exception:
+            size = None
+    _SCREEN_SIZE = size or (1920, 1080)
+    return _SCREEN_SIZE
+
+
+def fit_to_screen(img, frac: float):
+    """Scale ``img`` so it occupies at most ``frac`` of the screen in both axes.
+
+    Aspect ratio is preserved and the image is never upscaled — a small panel
+    should stay small rather than being blown up to fill the budget.
+    """
+    if img is None or frac <= 0:
+        return img
+    sw, sh = get_screen_size()
+    h, w = img.shape[:2]
+    scale = min(frac * sw / float(w), frac * sh / float(h), 1.0)
+    if scale >= 0.999:
+        return img
+    return cv2.resize(img, (max(1, int(w * scale)), max(1, int(h * scale))),
+                      interpolation=cv2.INTER_AREA)
+
+
 def make_quad_image(frames_dict, cam_order, cube, gripper_cam_idx):
     """4개 카메라로부터 마커 오버레이가 포함된 2x2 분할 이미지를 생성."""
-    tiles = []
+    # 빈 타일은 실제 타일 크기를 안 뒤에 채운다. 먼저 채우면 cam_order 앞쪽
+    # 카메라가 프레임을 못 준 순간 그 크기가 고정돼, 뒤따르는 실제 타일과
+    # hconcat 에서 크기가 어긋난다.
+    tiles: List[Optional[np.ndarray]] = []
+    missing: List[Tuple[int, int]] = []
     tile_h, tile_w = None, None
 
     for ci in cam_order:
@@ -274,12 +366,17 @@ def make_quad_image(frames_dict, cam_order, cube, gripper_cam_idx):
             )
             tiles.append(annotated)
         else:
-            if tile_h is None:
-                tile_h, tile_w = 480, 640
-            blank = np.zeros((tile_h, tile_w, 3), dtype=np.uint8)
-            cv2.putText(blank, f"cam{ci} N/A", (20, tile_h // 2),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
-            tiles.append(blank)
+            missing.append((len(tiles), ci))
+            tiles.append(None)
+
+    # 어느 카메라도 프레임을 못 준 경우에만 기본 크기를 쓴다 (표준 촬영 해상도).
+    if tile_h is None:
+        tile_h, tile_w = 720, 1280
+    for idx, ci in missing:
+        blank = np.zeros((tile_h, tile_w, 3), dtype=np.uint8)
+        cv2.putText(blank, f"cam{ci} N/A", (20, tile_h // 2),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 2)
+        tiles[idx] = blank
 
     while len(tiles) < 4:
         tiles.append(np.zeros((tile_h, tile_w, 3), dtype=np.uint8))
@@ -291,158 +388,56 @@ def make_quad_image(frames_dict, cam_order, cube, gripper_cam_idx):
 
 
 def make_capture_gate_config(args) -> dict:
+    common_span = float(args.max_capture_span_ms)
     return {
-        "min_cams_with_cube": int(args.min_cams_with_cube),
-        "min_fixed_cams_with_cube": int(args.min_fixed_cams_with_cube),
-        "min_cube_pnp_ok_cams": int(args.min_cube_pnp_ok_cams),
-        "min_fixed_cube_pnp_ok_cams": int(args.min_fixed_cube_pnp_ok_cams),
-        "min_gripper_charuco_corners": int(args.min_gripper_charuco_corners),
-        "require_gripper_cube_pnp": bool(args.require_gripper_cube_pnp),
-        "require_gripper_depth_valid": bool(args.require_gripper_depth_valid),
-        "max_gripper_depth_plane_mean_mm": float(args.max_gripper_depth_plane_mean_mm),
-        "max_capture_span_ms": float(args.max_capture_span_ms),
-    }
-
-
-def evaluate_capture_gate(frames_dict: Dict[int, dict],
-                          gate_cfg: dict,
-                          gripper_cam_idx: Optional[int] = None) -> dict:
-    cams_with_cube = 0
-    fixed_visible = 0
-    cube_pnp_ok_cams = 0
-    fixed_cube_pnp_ok_cams = 0
-    depth_valid_cams = 0
-    fixed_depth_valid_cams = 0
-    capture_ts = []
-    per_camera = {}
-    gripper_markers = 0
-    gripper_charuco_corners = 0
-    gripper_cube_pnp_ok = False
-    gripper_depth_valid = False
-    gripper_depth_plane_mean_mm = None
-
-    for ci, fr in frames_dict.items():
-        n_markers = int(fr.get("n_markers", 0))
-        cube_visible = bool(fr.get("ok", False))
-        cube_pnp = fr.get("cube_pnp")
-        cube_pnp_ok = bool(cube_pnp is not None)
-        depth_valid = bool(cube_pnp and cube_pnp.get("depth_valid"))
-        depth_plane_mean_mm = None if not cube_pnp else cube_pnp.get("depth_plane_mean_mm")
-        ts_ms = fr.get("ts_ms")
-        if ts_ms is not None:
-            capture_ts.append(float(ts_ms))
-        if cube_visible:
-            cams_with_cube += 1
-            if gripper_cam_idx is None or int(ci) != int(gripper_cam_idx):
-                fixed_visible += 1
-        if cube_pnp_ok:
-            cube_pnp_ok_cams += 1
-            if gripper_cam_idx is None or int(ci) != int(gripper_cam_idx):
-                fixed_cube_pnp_ok_cams += 1
-        if depth_valid:
-            depth_valid_cams += 1
-            if gripper_cam_idx is None or int(ci) != int(gripper_cam_idx):
-                fixed_depth_valid_cams += 1
-        if gripper_cam_idx is not None and int(ci) == int(gripper_cam_idx):
-            gripper_markers = int(n_markers)
-            ch_ids = fr.get("ch_ids")
-            gripper_charuco_corners = 0 if ch_ids is None else len(ch_ids)
-            gripper_cube_pnp_ok = cube_pnp_ok
-            gripper_depth_valid = depth_valid
-            if depth_plane_mean_mm is not None:
-                gripper_depth_plane_mean_mm = float(depth_plane_mean_mm)
-        per_camera[int(ci)] = {
-            "n_markers": n_markers,
-            "cube_visible": cube_visible,
-            "cube_pnp_ok": cube_pnp_ok,
-            "depth_valid": depth_valid,
-        }
-
-    capture_span_ms = (max(capture_ts) - min(capture_ts)) if len(capture_ts) >= 2 else 0.0
-    reasons = []
-    min_cams_with_cube = int(gate_cfg.get("min_cams_with_cube", 0))
-    min_fixed_cams_with_cube = int(gate_cfg.get("min_fixed_cams_with_cube", 0))
-    min_cube_pnp_ok_cams = int(gate_cfg.get("min_cube_pnp_ok_cams", 0))
-    min_fixed_cube_pnp_ok_cams = int(gate_cfg.get("min_fixed_cube_pnp_ok_cams", 0))
-    min_gripper_charuco_corners = int(gate_cfg.get("min_gripper_charuco_corners", 0))
-    require_gripper_cube_pnp = bool(gate_cfg.get("require_gripper_cube_pnp", False))
-    require_gripper_depth_valid = bool(gate_cfg.get("require_gripper_depth_valid", False))
-    max_gripper_depth_plane_mean_mm = float(gate_cfg.get("max_gripper_depth_plane_mean_mm", 0.0))
-    max_capture_span_ms = float(gate_cfg.get("max_capture_span_ms", 0.0))
-
-    if cams_with_cube < min_cams_with_cube:
-        reasons.append(
-            "cube-visible cams {} < required {}".format(cams_with_cube, min_cams_with_cube)
-        )
-    if fixed_visible < min_fixed_cams_with_cube:
-        reasons.append(
-            "fixed cube-visible cams {} < required {}".format(fixed_visible, min_fixed_cams_with_cube)
-        )
-    if cube_pnp_ok_cams < min_cube_pnp_ok_cams:
-        reasons.append(
-            "cube_pnp-ok cams {} < required {}".format(cube_pnp_ok_cams, min_cube_pnp_ok_cams)
-        )
-    if fixed_cube_pnp_ok_cams < min_fixed_cube_pnp_ok_cams:
-        reasons.append(
-            "fixed cube_pnp-ok cams {} < required {}".format(
-                fixed_cube_pnp_ok_cams, min_fixed_cube_pnp_ok_cams
-            )
-        )
-    if require_gripper_cube_pnp and not gripper_cube_pnp_ok:
-        reasons.append("gripper cube_pnp missing")
-    if min_gripper_charuco_corners > 0 and gripper_charuco_corners < min_gripper_charuco_corners:
-        reasons.append(
-            "gripper charuco corners {} < required {}".format(
-                gripper_charuco_corners, min_gripper_charuco_corners
-            )
-        )
-    if require_gripper_depth_valid and require_gripper_cube_pnp and gripper_cube_pnp_ok and not gripper_depth_valid:
-        reasons.append("gripper depth support invalid")
-    if (
-        require_gripper_depth_valid
-        and gripper_depth_valid
-        and max_gripper_depth_plane_mean_mm > 0
-        and gripper_depth_plane_mean_mm is not None
-        and float(gripper_depth_plane_mean_mm) > max_gripper_depth_plane_mean_mm
-    ):
-        reasons.append(
-            "gripper depth plane {:.1f}mm > {:.1f}mm".format(
-                float(gripper_depth_plane_mean_mm), max_gripper_depth_plane_mean_mm
-            )
-        )
-    if max_capture_span_ms > 0 and capture_span_ms > float(max_capture_span_ms):
-        reasons.append(
-            "timestamp span {:.1f}ms > {:.1f}ms".format(
-                float(capture_span_ms), float(max_capture_span_ms)
-            )
-        )
-
-    status = "PASS" if not reasons else "FAIL"
-    reason = " | ".join(reasons) if reasons else "capture gate satisfied"
-    return {
-        "pass": bool(not reasons),
-        "status": status,
-        "reason": reason,
-        "reasons": reasons,
-        "cams_with_cube": int(cams_with_cube),
-        "min_cams_with_cube": int(min_cams_with_cube),
-        "capture_span_ms": float(capture_span_ms),
-        "max_capture_span_ms": float(max_capture_span_ms),
-        "fixed_visible_cams": int(fixed_visible),
-        "min_fixed_cams_with_cube": int(min_fixed_cams_with_cube),
-        "cube_pnp_ok_cams": int(cube_pnp_ok_cams),
-        "min_cube_pnp_ok_cams": int(min_cube_pnp_ok_cams),
-        "fixed_cube_pnp_ok_cams": int(fixed_cube_pnp_ok_cams),
-        "min_fixed_cube_pnp_ok_cams": int(min_fixed_cube_pnp_ok_cams),
-        "depth_valid_cams": int(depth_valid_cams),
-        "fixed_depth_valid_cams": int(fixed_depth_valid_cams),
-        "gripper_markers": int(gripper_markers),
-        "gripper_charuco_corners": int(gripper_charuco_corners),
-        "min_gripper_charuco_corners": int(min_gripper_charuco_corners),
-        "gripper_cube_pnp_ok": bool(gripper_cube_pnp_ok),
-        "gripper_depth_valid": bool(gripper_depth_valid),
-        "gripper_depth_plane_mean_mm": gripper_depth_plane_mean_mm,
-        "per_camera": per_camera,
+        "schema_version": "capture_gate_profiles_v1",
+        "profiles": {
+            "A_placement": {
+                "expected_cube_gripped": False,
+                "min_cams_with_cube": int(args.min_cams_with_cube),
+                "min_fixed_cams_with_cube": int(args.min_fixed_cams_with_cube),
+                "min_fixed_multimarker_cams": int(args.a_min_fixed_multimarker_cams),
+                "fixed_multimarker_min_markers": int(args.fixed_multimarker_min_markers),
+                "max_cube_pnp_reproj_mean_px": float(args.max_cube_pnp_reproj_mean_px),
+                "min_depth_samples": int(args.min_depth_samples),
+                "min_cube_pnp_ok_cams": int(args.min_cube_pnp_ok_cams),
+                "min_fixed_cube_pnp_ok_cams": int(args.min_fixed_cube_pnp_ok_cams),
+                "min_fixed_depth_quality_cams": 0,
+                "min_gripper_markers": int(args.gripper_cube_min_markers),
+                "min_gripper_charuco_corners": int(args.min_gripper_charuco_corners),
+                "require_gripper_cube_pnp": bool(args.require_gripper_cube_pnp),
+                "require_gripper_depth_valid": bool(args.require_gripper_depth_valid),
+                "max_gripper_depth_plane_mean_mm": float(args.max_gripper_depth_plane_mean_mm),
+                "max_fixed_depth_plane_mean_mm": 0.0,
+                "max_capture_span_ms": common_span,
+                "require_all_frame_timestamps": True,
+                "max_roi_clip_frac": float(args.max_roi_clip_frac),
+                "min_roi_sharpness": float(args.min_roi_sharpness),
+            },
+            "B_eyetohand": {
+                "expected_cube_gripped": True,
+                # The gripper camera is not an observation requirement in B.
+                "min_cams_with_cube": 0,
+                "min_fixed_cams_with_cube": int(args.b_min_fixed_cams_with_cube),
+                "min_fixed_multimarker_cams": int(args.b_min_fixed_multimarker_cams),
+                "fixed_multimarker_min_markers": int(args.fixed_multimarker_min_markers),
+                "max_cube_pnp_reproj_mean_px": float(args.max_cube_pnp_reproj_mean_px),
+                "min_depth_samples": int(args.min_depth_samples),
+                "min_cube_pnp_ok_cams": 0,
+                "min_fixed_cube_pnp_ok_cams": int(args.b_min_fixed_cube_pnp_ok_cams),
+                "min_fixed_depth_quality_cams": int(args.b_min_fixed_depth_quality_cams),
+                "min_gripper_markers": 0,
+                "min_gripper_charuco_corners": 0,
+                "require_gripper_cube_pnp": False,
+                "require_gripper_depth_valid": False,
+                "max_gripper_depth_plane_mean_mm": 0.0,
+                "max_fixed_depth_plane_mean_mm": float(args.b_max_fixed_depth_plane_mean_mm),
+                "max_capture_span_ms": common_span,
+                "require_all_frame_timestamps": True,
+                "max_roi_clip_frac": float(args.max_roi_clip_frac),
+                "min_roi_sharpness": float(args.min_roi_sharpness),
+            },
+        },
     }
 
 
@@ -450,7 +445,8 @@ def build_capture_gate_lines(gate: dict,
                              gripper_cam_idx: Optional[int],
                              frames_dict: Dict[int, dict]) -> List[str]:
     line1 = (
-        "SAVE gate: {} | visible cams {}/{} | span {:.1f}/{:.1f} ms".format(
+        "SAVE gate [{}]: {} | visible cams {}/{} | span {:.1f}/{:.1f} ms".format(
+            gate.get("capture_block", "A_placement"),
             gate.get("status", "N/A"),
             int(gate.get("cams_with_cube", 0)),
             int(gate.get("min_cams_with_cube", 0)),
@@ -480,12 +476,15 @@ def build_capture_gate_lines(gate: dict,
         )
     )
     line3 = (
-        "PnP quality: total ok cams {}/{} | fixed ok cams {}/{} | depth-valid cams={}".format(
+        "PnP/depth: total {}/{} | fixed {}/{} | fixed multi {}/{} | fixed depth-quality {}/{}".format(
             int(gate.get("cube_pnp_ok_cams", 0)),
             int(gate.get("min_cube_pnp_ok_cams", 0)),
             int(gate.get("fixed_cube_pnp_ok_cams", 0)),
             int(gate.get("min_fixed_cube_pnp_ok_cams", 0)),
-            int(gate.get("depth_valid_cams", 0)),
+            int(gate.get("fixed_multimarker_cams", 0)),
+            int(gate.get("min_fixed_multimarker_cams", 0)),
+            int(gate.get("fixed_depth_quality_cams", 0)),
+            int(gate.get("min_fixed_depth_quality_cams", 0)),
         )
     )
 
@@ -652,21 +651,64 @@ def main():
     parser = argparse.ArgumentParser(
         description="Place-and-Capture calibration: gripper camera + fixed cameras"
     )
-    parser.add_argument("--root_folder", required=True)
+    parser.add_argument(
+        "--root_folder",
+        default=None,
+        help=(
+            "Explicit capture folder for a deliberate resume/legacy run. "
+            "Omit this option for the default automatic data/sessionNN/calib_train allocation."
+        ),
+    )
+    parser.add_argument(
+        "--data_root",
+        default="data",
+        help="Parent for automatic sessionNN allocation when --root_folder is omitted (default: data)",
+    )
+    parser.add_argument(
+        "--waypoints_file",
+        default=None,
+        help=(
+            "Validated waypoint JSON to copy into a newly allocated session as "
+            "capture_waypoints.json before robot connection"
+        ),
+    )
     parser.add_argument("--intrinsics_dir", required=True)
     parser.add_argument("--cube_config_json", type=str, default=None,
                         help="Optional cube config JSON override. Leave unset to use the project's canonical cube definition.")
 
     # 스트림 설정
-    # 해상도 기본값 640x480 — 기존 인트린식(color_w/color_h)이 이 해상도로 캘리브됨.
-    # 더 높은 해상도로 촬영하려면 먼저 Step1/Step1b 로 그 해상도에서 재캘리브해야 하며,
+    # 해상도 기본값 1280x720 — 프로젝트 표준 촬영 해상도(color/depth 동일).
+    # 640x480 에서는 18mm ChArUco 마커가 한 변 중앙값 21px 로 검출 하한(~18px)에 걸쳐
+    # 고정 카메라 3대의 코너 수율이 60개 중 4~8개까지 떨어졌다. 720p 는 4대 동시
+    # color+depth 로 드롭 0, 카메라 간 span p50 46ms 로 통과 확인됨
+    # (tools/smoke_test_resolution.py). 인트린식도 반드시 이 해상도로 캘리브되어야 하며,
     # 아래 정합성 검사가 --intrinsics_dir 의 color_w/color_h 와 불일치를 잡아 중단시킨다.
     parser.add_argument("--fps", type=int, default=15)
-    parser.add_argument("--width", type=int, default=640)
-    parser.add_argument("--height", type=int, default=480)
+    parser.add_argument("--width", type=int, default=1280)
+    parser.add_argument("--height", type=int, default=720)
     parser.add_argument("--allow_intrinsics_res_mismatch", action="store_true",
                         help="캡처 해상도가 인트린식(color_w/h)과 달라도 강행. "
                              "PnP/ChArUco pose 가 부정확해지므로 디버깅용에만 사용.")
+
+    # 측광 고정 — 캘리브레이션 프레임은 세션 내내 동일 노출이어야 한다. auto-exposure 는
+    # 로봇이 자세를 바꿀 때마다 재수렴해 코너 서브픽셀 정확도를 프레임마다 바꾸고,
+    # 어두운 뷰에서 노출을 늘려 모션 블러를 만든다. 기본은 warmup 수렴값을 읽어 잠근다.
+    parser.add_argument("--no-lock-exposure", dest="no_lock_exposure", action="store_true",
+                        help="측광 고정을 끄고 auto-exposure 로 촬영(비권장, 진단용).")
+    parser.add_argument("--color_exposure_us", type=float, default=None,
+                        help="색상 노출을 이 값(us)으로 명시 고정. 생략 시 warmup 수렴값 사용.")
+    parser.add_argument("--color_gain", type=float, default=None,
+                        help="색상 gain 명시 고정. 생략 시 warmup 수렴값 사용.")
+    parser.add_argument("--color_white_balance", type=float, default=None,
+                        help="화이트밸런스(K) 명시 고정. 생략 시 warmup 수렴값 사용.")
+
+    # 마커 ROI 품질 게이트. clip 은 스케일 무관이라 기본 활성, sharpness 는 카메라마다
+    # 절대값이 달라 0(비활성)으로 두고 pilot 첫 set 의 측정값으로 카메라별 확정한다.
+    parser.add_argument("--max_roi_clip_frac", type=float, default=0.05,
+                        help="마커 ROI 에서 흑/백 포화 픽셀 비율 상한. 0 이면 비활성.")
+    parser.add_argument("--min_roi_sharpness", type=float, default=0.0,
+                        help="마커 ROI Laplacian 분산 하한. 0 이면 비활성(기본). "
+                             "pilot 측정 후 카메라별로 설정.")
 
     # 검출 설정
     parser.add_argument("--min_markers", type=int, default=1,
@@ -685,8 +727,35 @@ def main():
                         help="Min cameras with successful cube pose solve to accept capture")
     parser.add_argument("--min_fixed_cube_pnp_ok_cams", type=int, default=1,
                         help="Min fixed cameras with successful cube pose solve to accept capture")
+    parser.add_argument("--fixed_multimarker_min_markers", type=int, default=2,
+                        help="Number of cube markers that makes one fixed-camera observation multi-marker")
+    parser.add_argument("--a_min_fixed_multimarker_cams", type=int, default=1,
+                        help="A_placement: fixed cameras that must see at least --fixed_multimarker_min_markers")
+    parser.add_argument("--b_min_fixed_cams_with_cube", type=int, default=2,
+                        help="B_eyetohand: minimum fixed cameras that must see the gripped cube")
+    parser.add_argument("--b_min_fixed_cube_pnp_ok_cams", type=int, default=2,
+                        help="B_eyetohand: minimum fixed cameras with a successful cube pose")
+    parser.add_argument("--b_min_fixed_multimarker_cams", type=int, default=2,
+                        help="B_eyetohand: fixed cameras that must have a multi-marker observation")
+    parser.add_argument("--b_min_fixed_depth_quality_cams", type=int, default=1,
+                        help="B_eyetohand: fixed cameras with valid depth support (0 disables)")
+    parser.add_argument("--b_max_fixed_depth_plane_mean_mm", type=float, default=20.0,
+                        help="B_eyetohand: max depth-plane mean error for a depth-quality fixed camera")
+    parser.add_argument("--max_cube_pnp_reproj_mean_px", type=float, default=2.0,
+                        help="Count a cube PnP as gate-quality only at or below this mean reprojection error")
+    parser.add_argument("--min_depth_samples", type=int, default=20,
+                        help="Minimum valid depth samples for a depth-supported cube pose")
     parser.add_argument("--min_gripper_charuco_corners", type=int, default=8,
                         help="Min ChArUco corners required in gripper camera to accept capture")
+    parser.add_argument("--a_fixed_cam_views_per_set", type=int, default=1,
+                        help="A_placement: how many A captures per set store the fixed-camera "
+                             "images and records. The cube is static within a set, so the "
+                             "remaining views are the same scene again (default: 1). "
+                             "0 stores the fixed cameras on every A view.")
+    parser.add_argument("--b_save_gripper_cam", action="store_true",
+                        help="B_eyetohand: also store the gripper camera. Off by default — the "
+                             "wrist camera cannot see the cube it is holding and the B gate "
+                             "requires nothing from it.")
     parser.add_argument(
         "--require_gripper_cube_pnp",
         dest="require_gripper_cube_pnp",
@@ -713,10 +782,16 @@ def main():
         action="store_false",
         help="Allow gripper cube pose even when depth support is invalid",
     )
-    parser.add_argument("--max_gripper_depth_plane_mean_mm", type=float, default=15.0,
-                        help="Reject a capture when gripper cube depth plane error exceeds this mm (<=0 disables)")
+    parser.add_argument("--max_gripper_depth_plane_mean_mm", type=float, default=40.0,
+                        help="Reject a capture when gripper cube depth plane error exceeds this mm (<=0 disables). "
+                             "Conservative 40mm margin; with correct per-marker plane geometry the measured "
+                             "plane residual is ~5mm (fixed-cam single-marker), so 15-20mm is also defensible if "
+                             "you want the gate to actually catch bad depth.")
     parser.add_argument("--max_capture_span_ms", type=float, default=120.0,
                         help="Skip a capture when camera timestamps span more than this many ms (<=0 disables)")
+    parser.add_argument("--allow_force_save", action="store_true",
+                        help="Diagnostic only: allow robot force_save to retain a gate-failed frame. "
+                             "Never use for Table 1 data.")
 
     # 뎁스 저장
     parser.add_argument(
@@ -742,6 +817,13 @@ def main():
     parser.add_argument("--robot_port", type=int, default=12348)
     parser.add_argument("--manual_robot", action="store_true",
                         help="Manual robot mode: server sends capture commands interactively (use with robot_calb.py)")
+    parser.add_argument("--preview_frac", type=float, default=0.6,
+                        help="프리뷰 창이 차지할 화면 비율(0~1). 종횡비는 유지하고 "
+                             "원본보다 키우지는 않는다. 기본 0.6 = 모니터의 60%%.")
+    parser.add_argument("--frame_sync_timeout_s", type=float, default=3.0,
+                        help="촬영 직전 네 카메라의 최신 프레임이 max_capture_span_ms 안으로 "
+                             "모일 때까지 기다리는 최대 시간. 초과하면 어느 카메라가 "
+                             "뒤처졌는지 출력하고 그대로 진행한다.")
     parser.add_argument("--settle_time", type=float, default=1.5,
                         help="Wait time (s) after robot signals capture before taking images")
     # start gate — 기본은 대기 없이 즉시 시작. --start_gate 를 줘야 프리뷰 + 'start' 대기.
@@ -752,7 +834,14 @@ def main():
 
     args = parser.parse_args()
 
-    root = ensure_dir(args.root_folder)
+    waypoint_source = None
+    waypoint_payload = None
+    if args.waypoints_file:
+        waypoint_source = os.path.abspath(os.path.expanduser(args.waypoints_file))
+        with open(waypoint_source, "r", encoding="utf-8") as waypoint_handle:
+            waypoint_payload = json.load(waypoint_handle)
+        validate_safe_joint_config(waypoint_payload)
+        validate_waypoint_semantics(waypoint_payload)
     intr_dir = args.intrinsics_dir
     print(f"[INFO] Depth capture/save: {'ON' if args.save_depth else 'OFF'}")
 
@@ -837,6 +926,38 @@ def main():
                 "--allow_intrinsics_res_mismatch 로 강행(부정확).")
         print("[WARN] --allow_intrinsics_res_mismatch: 불일치 상태로 강행합니다(pose 부정확).")
 
+    # Allocate only after device, intrinsic-resolution and waypoint validation.
+    # This avoids consuming a session number for an invalid command/config.
+    allocated_session = None
+    if args.root_folder is None:
+        allocated_session = allocate_next_capture_session(args.data_root)
+        root = allocated_session.capture_root
+        print(f"[SESSION] Allocated {allocated_session.session_id}: {allocated_session.session_root}")
+        print(f"[SESSION] Calibration capture root: {root}")
+        print(f"[SESSION] Manifest: {allocated_session.manifest_path}")
+    else:
+        root = ensure_dir(args.root_folder)
+        print(f"[SESSION] Explicit capture root: {os.path.abspath(root)}")
+        print("[SESSION] Automatic numbering bypassed because --root_folder was supplied.")
+    # The network teaching/waypoint paths below use args.root_folder directly.
+    args.root_folder = root
+    # 캡처 프레임은 <session>/calib_train 에, 티칭 풀과 최종 웨이포인트는 그 위
+    # <session>/ 에 둔다. 티칭은 여러 번 이어붙이고 웨이포인트는 그것들을 조합한
+    # 산출물이라, 프레임과 섞이면 어느 티칭이 어느 촬영을 만들었는지가 흐려진다.
+    session_root = (os.path.dirname(os.path.abspath(root))
+                    if os.path.basename(os.path.normpath(root)) == "calib_train"
+                    else os.path.abspath(root))
+    teach_dir = ensure_dir(os.path.join(session_root, "teaching"))
+    waypoints_path = os.path.join(session_root, "capture_waypoints.json")
+    print(f"[SESSION] frames    -> {root}")
+    print(f"[SESSION] teaching  -> {teach_dir}")
+    print(f"[SESSION] waypoints -> {waypoints_path}")
+    if waypoint_source is not None and waypoint_payload is not None:
+        waypoint_destination = waypoints_path
+        if os.path.realpath(waypoint_source) != os.path.realpath(waypoint_destination):
+            shutil.copyfile(waypoint_source, waypoint_destination)
+        print(f"[SESSION] Validated waypoints: {waypoint_destination}")
+
     # ─── 카메라 시작 ───
     # 이전 실행이 비정상 종료(세그폴트 등)된 경우 디바이스가 비정상 상태로
     # 남을 수 있어 D435가 첫 pipeline.start()에서 "Frame didn't arrive"로
@@ -856,6 +977,10 @@ def main():
             use_depth=args.save_depth,
             align_depth_to_color=True,
             warmup_frames=10,
+            lock_color_exposure=not args.no_lock_exposure,
+            color_exposure_us=args.color_exposure_us,
+            color_gain=args.color_gain,
+            color_white_balance=args.color_white_balance,
         )
         cam.start()
         cams[ci] = cam
@@ -880,21 +1005,31 @@ def main():
     if not args.save_depth and args.require_gripper_depth_valid:
         print("[WARN] Depth capture is disabled; gripper depth-valid gate will be ignored.")
         args.require_gripper_depth_valid = False
+    if not args.save_depth and args.b_min_fixed_depth_quality_cams > 0:
+        print("[WARN] Depth capture is disabled; B fixed depth-quality gate will be ignored.")
+        args.b_min_fixed_depth_quality_cams = 0
     capture_gate_cfg = make_capture_gate_config(args)
-    print("[INFO] Capture gate:")
-    print("  visible cams >= {} | fixed visible >= {} | cube_pnp ok cams >= {} | fixed cube_pnp ok cams >= {}".format(
-        capture_gate_cfg["min_cams_with_cube"],
-        capture_gate_cfg["min_fixed_cams_with_cube"],
-        capture_gate_cfg["min_cube_pnp_ok_cams"],
-        capture_gate_cfg["min_fixed_cube_pnp_ok_cams"],
-    ))
-    print("  gripper cube_pnp required={} | gripper charuco >= {} | gripper depth required={} | depth plane <= {:.1f}mm | span <= {:.1f}ms".format(
-        "yes" if capture_gate_cfg["require_gripper_cube_pnp"] else "no",
-        capture_gate_cfg["min_gripper_charuco_corners"],
-        "yes" if capture_gate_cfg["require_gripper_depth_valid"] else "no",
-        capture_gate_cfg["max_gripper_depth_plane_mean_mm"],
-        capture_gate_cfg["max_capture_span_ms"],
-    ))
+    print("[INFO] Block-aware capture gates:")
+    for block_name in ("A_placement", "B_eyetohand"):
+        p = capture_gate_cfg["profiles"][block_name]
+        print("  {}: fixed visible >= {} | fixed multi-marker >= {} | fixed PnP >= {} | fixed depth-quality >= {}".format(
+            block_name,
+            p["min_fixed_cams_with_cube"],
+            p["min_fixed_multimarker_cams"],
+            p["min_fixed_cube_pnp_ok_cams"],
+            p["min_fixed_depth_quality_cams"],
+        ))
+        print("    gripper PnP required={} | gripper markers >= {} | charuco >= {} | gripper depth required={} | span <= {:.1f}ms".format(
+            "yes" if p["require_gripper_cube_pnp"] else "no",
+            p["min_gripper_markers"],
+            p["min_gripper_charuco_corners"],
+            "yes" if p["require_gripper_depth_valid"] else "no",
+            p["max_capture_span_ms"],
+        ))
+        print("    PnP reproj mean <= {:.2f}px | depth samples >= {}".format(
+            p["max_cube_pnp_reproj_mean_px"], p["min_depth_samples"]))
+    if args.allow_force_save:
+        print("[WARN] --allow_force_save is ON. Gate-failed frames are diagnostic-only and must be excluded from Table 1.")
     print(f"  gripper board mask pad: {float(args.board_mask_pad_px):.1f}px")
 
     # (Board marker detection uses charuco.detect() directly — no separate detector needed)
@@ -912,6 +1047,40 @@ def main():
 
     # ─── 메타 데이터 (기존 meta.json이 있으면 이어서 저장) ───
     meta_path = os.path.join(root, "meta.json")
+    capture_config = {
+        "schema_version": "capture_config_v1",
+        "intrinsics_dir": os.path.abspath(intr_dir),
+        "width": int(args.width),
+        "height": int(args.height),
+        "fps": int(args.fps),
+        "save_depth": bool(args.save_depth),
+        "settle_time_s": float(args.settle_time),
+        "cross_camera_timestamp_basis": "host_monotonic_receipt_v1",
+        "min_markers_for_visibility": int(args.min_markers),
+        "gripper_cube_min_aspect": float(args.gripper_cube_min_aspect),
+        "board_mask_pad_px": float(args.board_mask_pad_px),
+        "capture_gate": capture_gate_cfg,
+        "allow_force_save": bool(args.allow_force_save),
+        "allow_intrinsics_res_mismatch": bool(args.allow_intrinsics_res_mismatch),
+        # Which cameras each block persists.  Part of capture_config so a session
+        # cannot silently mix two storage policies across a resume — a set that
+        # stored one A view of the fixed cameras is not comparable to one that
+        # stored six.
+        "a_fixed_cam_views_per_set": int(args.a_fixed_cam_views_per_set),
+        "b_save_gripper_cam": bool(args.b_save_gripper_cam),
+        # Per-camera exposure/gain/white balance actually in force. Recorded so a
+        # later session can reproduce the same photometry, and so a session shot
+        # with auto-exposure is identifiable after the fact rather than silently
+        # mixed in with locked ones.
+        "color_photometry": {
+            str(ci): cams[ci].color_photometry for ci, _ in idx_serial_pairs
+        },
+    }
+    _unlocked = [ci for ci, _ in idx_serial_pairs
+                 if not cams[ci].color_photometry.get("locked")]
+    if _unlocked:
+        print(f"[WARN] cam {_unlocked}: color photometry NOT locked — exposure will "
+              f"drift between captures. Corner accuracy varies frame to frame.")
     if os.path.exists(meta_path):
         with open(meta_path, "r") as f:
             meta = json.load(f)
@@ -925,22 +1094,50 @@ def main():
                 f"Differing fields: {', '.join(mismatch_keys) if mismatch_keys else 'unknown'}\n"
                 "Use a new session folder, or run recompute_session_cube_pnp.py with the intended cube config before resuming."
             )
+        if meta.get("captures") and meta.get("capture_config") != capture_config:
+            raise RuntimeError(
+                "Existing meta.json has missing or different capture_config; refusing to mix "
+                "resolutions/gates in one session. Use a new session folder."
+            )
         event_id = max((int(c.get("event_id", -1)) for c in meta.get("captures", [])), default=-1) + 1
         print(f"[INFO] Resuming from existing meta.json ({len(meta['captures'])} captures, next event_id={event_id})")
     else:
         meta = {
             "root_folder": os.path.abspath(root),
+            "session_allocation": (
+                None if allocated_session is None else {
+                    "session_id": allocated_session.session_id,
+                    "session_index": int(allocated_session.index),
+                    "session_root": allocated_session.session_root,
+                    "manifest_path": allocated_session.manifest_path,
+                    "policy": "max_existing_index_plus_one_no_reuse",
+                }
+            ),
             "gripper_cam_idx": gripper_cam_idx,
             "n_fixed_cams": n_fixed,
             "n_gripper_cams": n_gripper,
             "cam_indices": [ci for ci, _ in idx_serial_pairs],
             "cube_config_source": cube_cfg_source,
             "cube_config": cube_config_to_dict(cfg),
+            "capture_config": capture_config,
             "captures": [],
         }
         event_id = 0
         print("[INFO] New session (meta.json created)")
+
+    # set_index -> A captures whose fixed-camera frames are already on disk.
+    # Rebuilt from meta so resuming a session continues where it stopped instead
+    # of storing a second redundant copy of every covered set.
+    fixed_cam_stored: Dict[int, int] = {}
+    for _cap in meta.get("captures", []):
+        if _cap.get("cube_gripped") or _cap.get("set_index") is None:
+            continue
+        if any(rec.get("saved") and not rec.get("is_gripper")
+               for rec in (_cap.get("cams") or {}).values()):
+            _s = int(_cap["set_index"])
+            fixed_cam_stored[_s] = fixed_cam_stored.get(_s, 0) + 1
     meta["cube_config_source"] = cube_cfg_source
+    meta["capture_config"] = capture_config
     if "cube_config" not in meta:
         meta["cube_config"] = cube_config_to_dict(cfg)
     else:
@@ -953,6 +1150,8 @@ def main():
         color: np.ndarray,
         depth: Optional[np.ndarray],
         ts_ms: Optional[float],
+        device_ts_ms: Optional[float] = None,
+        device_timestamp_domain: Optional[str] = None,
         include_marker_poses: bool = True,
         include_charuco_pose: bool = True,
         log_pose_status: bool = False,
@@ -973,6 +1172,9 @@ def main():
             "color": color,
             "depth": depth,
             "ts_ms": ts_ms,
+            "host_monotonic_ts_ms": ts_ms,
+            "device_ts_ms": device_ts_ms,
+            "device_timestamp_domain": device_timestamp_domain,
             "ok": bool(n_markers >= args.min_markers),
             "n_markers": n_markers,
             "ids": ([] if ids is None else [int(x) for x in ids]),
@@ -990,6 +1192,14 @@ def main():
         fr["ch_corners"] = detect_info["ch_corners"]
         fr["ch_ids"] = detect_info["ch_ids"]
         fr["charuco_detect_n"] = int(detect_info["charuco_detect_n"])
+
+        # Photometric quality of the regions the solver will actually use. Both
+        # cube and board quads count: a board-only row (A0/B3) is gated on the
+        # same evidence as a cube row.
+        _quads = list(corners or [])
+        _board_quads = detect_info.get("board_mkr_corners") or []
+        _quads.extend(_board_quads)
+        fr["roi_quality"] = marker_roi_quality(color, _quads)
 
         intr = cam_intrinsics.get(ci)
         if intr is not None and ids is not None and len(ids) > 0:
@@ -1069,7 +1279,8 @@ def main():
             extra.append(f"robot {args.robot_ip}:{args.robot_port}"
                          + (" (manual)" if args.manual_robot else ""))
         if not wait_for_start_command_capture(cams, cam_order, gripper_cam_idx, extra,
-                                               frame_builder=build_frame_record, cube=cube):
+                                               frame_builder=build_frame_record, cube=cube,
+                                               preview_frac=float(args.preview_frac)):
             for cam in cams.values():
                 cam.stop()
             cv2.destroyAllWindows()
@@ -1091,6 +1302,7 @@ def main():
         capture_block: Optional[str] = None,
         grasp_id: Optional[int] = None,
         force_save: bool = False,
+        motion_safety: Optional[dict] = None,
     ) -> Tuple[bool, dict]:
         """모든 카메라에서 마커별 포즈 추정과 함께 촬영."""
         nonlocal event_id
@@ -1101,34 +1313,62 @@ def main():
 
         frames: Dict[int, dict] = {}
 
-        # Software-sync: 각 카메라의 latest ts 중 가장 오래된 것(=가장 느린 카메라)을
+        # Software-sync: 공통 host-monotonic clock의 latest ts 중 가장 오래된 것(=가장 느린 카메라)을
         # 기준으로 잡고, 다른 카메라들은 버퍼에서 그 시각에 가장 가까운 프레임을 고른다.
-        # 하드웨어 sync 없는 RealSense들의 timestamp span을 1프레임(~33ms) 이내로 좁힘.
-        latest_ts_list = []
-        for ci, cam in cams.items():
-            _c, _d, ts_ms = cam.get_latest()
-            if ts_ms is not None:
-                latest_ts_list.append(ts_ms)
+        # 독립 RealSense device timestamp는 epoch가 다를 수 있으므로 동기화에 직접 쓰지 않는다.
+        # 먼저 네 카메라의 최신 프레임이 서로 가까워질 때까지 기다린다. 한 대라도
+        # 뒤처져 있으면 target_ts 가 그만큼 과거로 잡히고, 나머지 카메라 버퍼
+        # (buffer_size 프레임 = 1초 미만)는 그 시각을 담고 있지 않아 수 초짜리 span 이
+        # 만들어진다. 그러면 게이트가 전 프레임을 버린다 — 실제로 그렇게 되었다.
+        _sync_deadline = time.time() + float(args.frame_sync_timeout_s)
+        _lag = None
+        while True:
+            _ts = {ci: cam.get_latest()[2] for ci, cam in cams.items()}
+            _have = {ci: t for ci, t in _ts.items() if t is not None}
+            if len(_have) == len(cams):
+                _lag = max(_have.values()) - min(_have.values())
+                if _lag <= float(args.max_capture_span_ms):
+                    break
+            if time.time() >= _sync_deadline:
+                if len(_have) < len(cams):
+                    _missing = sorted(set(cams) - set(_have))
+                    print(f"[SYNC] cam {_missing}: 프레임 없음 — 스트림이 끊겼는지 확인")
+                else:
+                    _newest = max(_have.values())
+                    _behind = {ci: round(_newest - t, 1) for ci, t in _have.items()}
+                    _worst = max(_behind, key=lambda k: _behind[k])
+                    print(f"[SYNC] {float(args.frame_sync_timeout_s):.1f}s 안에 동기화 실패 "
+                          f"(span {_lag:.0f}ms). 카메라별 지연(ms): {_behind}  "
+                          f"-> cam{_worst} 가 가장 뒤처짐")
+                break
+            time.sleep(0.02)
+
+        latest_ts_list = [t for t in
+                          (cam.get_latest()[2] for cam in cams.values()) if t is not None]
 
         if latest_ts_list:
             target_ts = min(latest_ts_list)
             for ci, cam in cams.items():
-                color, depth, ts_ms = cam.get_at(target_ts)
+                color, depth, ts_ms, device_ts_ms, ts_domain = cam.get_at_with_timestamps(target_ts)
                 if color is None:
                     continue
                 frames[ci] = build_frame_record(
                     ci, color, depth, ts_ms,
+                    device_ts_ms=device_ts_ms,
+                    device_timestamp_domain=ts_domain,
                     include_marker_poses=True,
                     include_charuco_pose=True,
                     log_pose_status=True,
                 )
         else:
             for ci, cam in cams.items():
-                color, depth, ts_ms = cam.get_latest()
+                color, depth, ts_ms, device_ts_ms, ts_domain = cam.get_latest_with_timestamps()
                 if color is None:
                     continue
                 frames[ci] = build_frame_record(
                     ci, color, depth, ts_ms,
+                    device_ts_ms=device_ts_ms,
+                    device_timestamp_domain=ts_domain,
                     include_marker_poses=True,
                     include_charuco_pose=True,
                     log_pose_status=True,
@@ -1138,14 +1378,18 @@ def main():
             frames,
             capture_gate_cfg,
             gripper_cam_idx=gripper_cam_idx,
+            capture_block=capture_block,
+            cube_gripped=cube_gripped,
         )
         capture_span_ms = float(gate["capture_span_ms"])
         if not gate["pass"]:
-            if force_save:
+            if force_save and args.allow_force_save:
                 # c+Enter 확인 시: 마커/게이트 실패여도 프레임을 무조건 저장한다.
                 # (gate 결과는 meta 에 그대로 남아 나중에 필터 가능; Step3는 이미지에서 재검출)
                 print(f"[FORCE-SAVE] gate 실패({gate['reason']}) 이지만 강제 저장")
             else:
+                if force_save:
+                    print("[WARN] robot requested force_save, but it is disabled without --allow_force_save")
                 print(f"[SKIP] {gate['reason']}")
                 return False, gate
 
@@ -1156,6 +1400,7 @@ def main():
             "capture_index": capture_index,
             "capture_span_ms": float(capture_span_ms),
             "capture_gate": gate,
+            "force_saved": bool(not gate["pass"] and force_save and args.allow_force_save),
             "cams": {},
         }
 
@@ -1195,6 +1440,8 @@ def main():
             cap_rec["capture_block"] = str(capture_block)
         if grasp_id is not None:
             cap_rec["grasp_id"] = int(grasp_id)
+        if motion_safety is not None:
+            cap_rec["motion_safety"] = motion_safety
 
         if place_pose_6dof is not None and place_pose_6dof != robot_tcp:
             cap_rec["place_pose_6dof"] = [float(x) for x in place_pose_6dof]
@@ -1205,8 +1452,36 @@ def main():
             except Exception:
                 pass
 
+        # ─── 카메라별 저장 범위 (근거는 resolve_camera_storage 참조) ───
+        is_placement = not bool(cube_gripped)
+        sidx = None if set_index is None else int(set_index)
+        storage = resolve_camera_storage(
+            is_placement=is_placement,
+            set_index=sidx,
+            fixed_views_already_stored=fixed_cam_stored.get(sidx, 0),
+            a_fixed_cam_views_per_set=int(args.a_fixed_cam_views_per_set),
+            b_save_gripper_cam=bool(args.b_save_gripper_cam),
+        )
+
         for ci in sorted(frames.keys()):
             fr = frames[ci]
+            is_gripper_cam = (ci == gripper_cam_idx)
+
+            # 저장하지 않는 카메라도 기록은 남긴다. 아래 소비자들이 모두
+            # cams[ci]["saved"] 로 거르므로 (CP_common, Step3,
+            # calibration_corner_observations), 조용히 빠지지 않고 왜 없는지가 남는다.
+            if (is_gripper_cam and not storage.store_gripper) or \
+                    (not is_gripper_cam and not storage.store_fixed):
+                cap_rec["cams"][str(ci)] = {
+                    "saved": False,
+                    "is_gripper": is_gripper_cam,
+                    "skip_reason": (storage.gripper_skip_reason if is_gripper_cam
+                                    else storage.fixed_skip_reason),
+                    "n_markers_detected": fr["n_markers"],
+                    "cube_visible": fr["ok"],
+                    "charuco_detect_n": int(fr.get("charuco_detect_n", 0)),
+                }
+                continue
 
             rgb_rel = f"cam{ci}/rgb_{fid:05d}.jpg"
             cv2.imwrite(os.path.join(root, rgb_rel), fr["color"])
@@ -1222,6 +1497,9 @@ def main():
                 "rgb_path": rgb_rel,
                 "depth_path": depth_rel,
                 "ts_ms": fr["ts_ms"],
+                "host_monotonic_ts_ms": fr.get("host_monotonic_ts_ms"),
+                "device_ts_ms": fr.get("device_ts_ms"),
+                "device_timestamp_domain": fr.get("device_timestamp_domain"),
                 "n_markers_detected": fr["n_markers"],
                 "marker_ids": fr["ids"],
                 "cube_visible": fr["ok"],
@@ -1229,6 +1507,10 @@ def main():
                 "cube_detect_raw_ids": fr.get("cube_detect_raw_ids", []),
                 "cube_detect_filtered_ids": fr.get("cube_detect_filtered_ids", []),
                 "board_mask_applied": bool(fr.get("board_mask_applied", False)),
+                # Saved on every frame, including ones the sharpness gate is not
+                # yet enforcing — this is the pilot evidence the per-camera
+                # threshold gets fixed from.
+                "roi_quality": fr.get("roi_quality"),
             }
             # ChArUco 검출/pose 는 모든 카메라에 기록 (고정캠 보드-전용 비교실험).
             cam_rec["charuco_detect_n"] = int(fr.get("charuco_detect_n", 0))
@@ -1240,6 +1522,11 @@ def main():
                 cam_rec["charuco"] = fr["charuco"]
 
             cap_rec["cams"][str(ci)] = cam_rec
+
+        # 게이트를 통과해 실제로 디스크에 쓴 뒤에만 센다. 게이트 실패는 위에서
+        # 이미 return 했으므로 여기 도달한 캡처만 그 set 의 몫을 채운다.
+        if is_placement and storage.store_fixed and sidx is not None:
+            fixed_cam_stored[sidx] = fixed_cam_stored.get(sidx, 0) + 1
 
         meta["captures"].append(cap_rec)
         with open(meta_path, "w") as f:
@@ -1350,17 +1637,19 @@ def main():
                                 print(f"[Teach] invalid teach_save (kind={kind})")
                                 continue
                             if teach["session"] is None:
+                                # 세션은 그대로 두고 티칭 회차만 올린다. 로봇 서버를
+                                # 다시 붙일 때마다 새 번호가 붙으므로 이전 회차 파일은
+                                # 덮이지 않고 남는다.
                                 n = 1
                                 while any(os.path.exists(os.path.join(
-                                        args.root_folder, f"{b}_{n:03d}.json"))
+                                        teach_dir, f"{b}_{n:03d}.json"))
                                         for b in ("grip_poses", "capture_poses", "capture_sets")):
                                     n += 1
                                 teach["session"] = n
-                                os.makedirs(args.root_folder, exist_ok=True)
-                                print(f"[Teach] recording session #{n:03d} "
-                                      f"-> {args.root_folder}/*_{n:03d}.json")
+                                print(f"[Teach] recording round #{n:03d} "
+                                      f"-> {teach_dir}/*_{n:03d}.json")
                             path = os.path.join(
-                                args.root_folder, f"{name}_{teach['session']:03d}.json")
+                                teach_dir, f"{name}_{teach['session']:03d}.json")
                             try:
                                 with open(path, "w") as tf:
                                     json.dump({name: entries}, tf, indent=2)
@@ -1370,11 +1659,13 @@ def main():
                             continue
 
                         if cmd == "request_waypoints":
-                            wp_path = os.path.join(args.root_folder, "capture_waypoints.json")
+                            wp_path = waypoints_path
                             print(f"[ManualRobot] Robot requested waypoints. Sending {wp_path}")
                             try:
                                 with open(wp_path, "r") as wf:
                                     wp_data = json.load(wf)
+                                validate_safe_joint_config(wp_data)
+                                validate_waypoint_semantics(wp_data)
                                 resp_msg = json.dumps({
                                     "action": "waypoints",
                                     "status": "ok",
@@ -1403,7 +1694,7 @@ def main():
                         if cmd == "save_waypoints":
                             # teach_extend.py가 머지된 전체 waypoint 데이터를 통째로 보내며
                             # PC에 영구 저장을 요청. 기존 파일은 .bak으로 백업한 뒤 덮어씀.
-                            wp_path = os.path.join(args.root_folder, "capture_waypoints.json")
+                            wp_path = waypoints_path
                             wp_data = msg.get("waypoints_data")
                             if not isinstance(wp_data, dict):
                                 err = json.dumps({
@@ -1461,6 +1752,7 @@ def main():
                             m_block = msg.get("capture_block")
                             m_grasp = msg.get("grasp_id")
                             m_force = msg.get("force_save")
+                            m_motion_safety = msg.get("motion_safety")
 
                             print(f"\n[ManualRobot] Capture signal received (capture_index={pose_idx}, set_index={s_idx})")
                             if capture_tcp:
@@ -1479,6 +1771,7 @@ def main():
                                 capture_block=m_block,
                                 grasp_id=m_grasp,
                                 force_save=bool(m_force),
+                                motion_safety=m_motion_safety,
                             )
 
                             status = "success" if saved else "skipped"
@@ -1559,7 +1852,8 @@ def main():
                             ph = int(quad.shape[0] * 0.6)
                             pw = int(quad.shape[1] * 0.6)
                             preview = cv2.resize(quad, (pw, ph))
-                            cv2.imshow("Capture Preview", preview)
+                            cv2.imshow("Capture Preview",
+                                       fit_to_screen(preview, float(args.preview_frac)))
 
                         key = cv2.waitKey(50) & 0xFF
                         if key == 27 or key == ord('q'):
@@ -1629,7 +1923,7 @@ def main():
                         )
                         cv2.putText(panel, gate_line, (12, 28 + line_idx * 28),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.58, color, 2)
-                    cv2.imshow("Capture Gate", panel)
+                    cv2.imshow("Capture Gate", fit_to_screen(panel, float(args.preview_frac)))
                     for ci in sorted(frames_view.keys()):
                         img = frames_view[ci]["color"].copy()
                         ids_np = frames_view[ci]["ids_np"]
@@ -1645,7 +1939,7 @@ def main():
                         txt = f"cam{ci}({tag}) markers={n} ok={frames_view[ci]['ok']}"
                         cv2.putText(img, txt, (10, 30),
                                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                        cv2.imshow(f"cam{ci}", img)
+                        cv2.imshow(f"cam{ci}", fit_to_screen(img, float(args.preview_frac) / 2.0))
 
                 key = cv2.waitKey(1) & 0xFF
                 if key == 27 or key == ord('q'):

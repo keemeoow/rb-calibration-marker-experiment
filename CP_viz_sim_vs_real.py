@@ -29,7 +29,6 @@ import os
 import csv
 import json
 import argparse
-import shutil
 
 import numpy as np
 import matplotlib
@@ -130,12 +129,6 @@ def _save(fig, name):
     for ax in fig.axes:
         clean_axis(ax)
     save_figure(fig, path)
-    legacy_aliases = {
-        "fig_CP_C2_board_vs_cube.png": "fig_C2_board_vs_cube.png",
-        "fig_CP_C3_gtc_estimation.png": "fig_C3_fk_prior.png",
-    }
-    if name in legacy_aliases:
-        shutil.copyfile(path, os.path.join(OUT_DIR, legacy_aliases[name]))
     print(f"[저장] {path}")
     return path
 

@@ -72,7 +72,8 @@ class CubeObservationSet:
 
 
 def depth_metrics_to_fields(metrics: Optional[Dict[str, Any]]) -> Dict[str, Any]:
-    """Compatibility helper for older CSV/log code. Depth is not used here."""
+    """Flatten a depth-metrics dict (from AprilTagCubeTarget._depth_plane_metrics)
+    into the flat depth_* fields consumed by CSV/log/meta code."""
     metrics = metrics or {}
     return {
         "depth_valid": bool(metrics.get("valid", False)),
@@ -85,6 +86,8 @@ def depth_metrics_to_fields(metrics: Optional[Dict[str, Any]]) -> Dict[str, Any]
         "depth_z_mean_mm": metrics.get("z_mean_mm"),
         "depth_z_median_mm": metrics.get("z_median_mm"),
         "depth_inlier_ratio": metrics.get("inlier_ratio"),
+        "depth_z_scale_pred_over_meas": metrics.get("z_scale_pred_over_meas"),
+        "depth_z_bias_mm": metrics.get("z_bias_mm"),
     }
 
 
@@ -257,7 +260,114 @@ class AprilTagCubeTarget:
             used,
         )
 
-    def single_marker_ippe_candidates(self, marker_id: int, img_pts: np.ndarray, K: np.ndarray, D: np.ndarray, **_) -> List[Dict[str, Any]]:
+    def _depth_plane_metrics(
+        self,
+        planes,                       # list of (poly_2d [>=3,2], T_C_plane 4x4): plane origin=col3, normal=col2
+        K,
+        D,
+        depth_u16,
+        depth_scale,
+        marker_ids=None,
+        plane_tol_mm: float = 8.0,
+        min_samples: int = 20,
+    ) -> Dict[str, Any]:
+        """Measured RealSense depth vs the PnP-predicted plane depth over marker polygons.
+
+        Populates the fields consumed by depth_metrics_to_fields(). Returns
+        {"valid": False} when depth is unavailable or too sparse, so callers can
+        record the reason without special-casing. z_*_mm is the measured surface
+        depth (independent of colour intrinsics); plane_*_mm is |measured - PnP|.
+        """
+        invalid = {"valid": False, "num_samples": 0}
+        if depth_u16 is None or depth_scale is None:
+            return invalid
+        try:
+            scale = float(depth_scale)
+        except (TypeError, ValueError):
+            return invalid
+        if not np.isfinite(scale) or scale <= 0.0:
+            return invalid
+        d = np.asarray(depth_u16)
+        if d.ndim != 2:
+            return invalid
+        h, w = d.shape
+        Kf = np.asarray(K, dtype=np.float64)
+        Df = np.asarray(D, dtype=np.float64)
+
+        meas_all, resid_all, pred_all = [], [], []
+        for poly, T in planes:
+            q = np.asarray(poly, dtype=np.float64).reshape(-1, 2)
+            if q.shape[0] < 3:
+                continue
+            mask = np.zeros((h, w), dtype=np.uint8)
+            cv2.fillConvexPoly(mask, np.round(q).astype(np.int32), 1)
+            ys, xs = np.where(mask > 0)
+            if xs.size == 0:
+                continue
+            z_units = d[ys, xs].astype(np.float64)
+            good = z_units > 0
+            if not np.any(good):
+                continue
+            xs_g = xs[good].astype(np.float64)
+            ys_g = ys[good].astype(np.float64)
+            z_meas_mm = z_units[good] * scale * 1000.0
+            pix = np.stack([xs_g, ys_g], axis=1).reshape(-1, 1, 2)
+            norm = cv2.undistortPoints(pix, Kf, Df).reshape(-1, 2)
+            rays = np.concatenate([norm, np.ones((norm.shape[0], 1))], axis=1)  # z-component = 1
+            Tf = np.asarray(T, dtype=np.float64).reshape(4, 4)
+            p0 = Tf[:3, 3]
+            nrm = Tf[:3, 2]
+            denom = rays @ nrm
+            with np.errstate(divide="ignore", invalid="ignore"):
+                t = (nrm @ p0) / denom
+            z_pred_mm = t * 1000.0  # ray z-component is 1, so intersection depth == t (m)
+            resid = np.abs(z_meas_mm - z_pred_mm)
+            finite = np.isfinite(resid) & np.isfinite(z_pred_mm) & (z_pred_mm > 0)
+            if not np.any(finite):
+                continue
+            meas_all.append(z_meas_mm[finite])
+            resid_all.append(resid[finite])
+            pred_all.append(z_pred_mm[finite])
+
+        if not meas_all:
+            return invalid
+        z_meas_mm = np.concatenate(meas_all)
+        resid = np.concatenate(resid_all)
+        z_pred_mm = np.concatenate(pred_all)
+        n_samp = int(z_meas_mm.size)
+        if n_samp < int(min_samples):
+            return {"valid": False, "num_samples": n_samp}
+        inlier = resid < float(plane_tol_mm)
+        # surface-to-surface scale: PnP-predicted plane depth vs measured depth at the
+        # SAME pixels — free of the cube-centre-vs-surface offset. ~1.0 means the colour
+        # focal length is metrically consistent with the (intrinsics-independent) depth.
+        scale = z_pred_mm / z_meas_mm
+        ids_list = [int(x) for x in (marker_ids or [])]
+        return {
+            "valid": True,
+            "num_samples": n_samp,
+            "num_markers": max(1, len(ids_list)),
+            "support_marker_ids": ids_list,
+            "z_mean_mm": float(np.mean(z_meas_mm)),
+            "z_median_mm": float(np.median(z_meas_mm)),
+            "plane_mean_mm": float(np.mean(resid)),
+            "plane_median_mm": float(np.median(resid)),
+            "plane_max_mm": float(np.max(resid)),
+            "inlier_ratio": float(np.mean(inlier)),
+            "z_scale_pred_over_meas": float(np.median(scale)),
+            "z_bias_mm": float(np.median(z_pred_mm - z_meas_mm)),
+        }
+
+    def single_marker_ippe_candidates(
+        self,
+        marker_id: int,
+        img_pts: np.ndarray,
+        K: np.ndarray,
+        D: np.ndarray,
+        depth_u16: Optional[np.ndarray] = None,
+        depth_scale: Optional[float] = None,
+        **_,
+    ) -> List[Dict[str, Any]]:
         """Return both IPPE solutions for a single visible marker, ranked by visibility + reprojection."""
         if not self.model.has_marker(marker_id):
             return []
@@ -275,6 +385,9 @@ class AprilTagCubeTarget:
             proj = proj.reshape(-1, 2)
             err = np.linalg.norm(proj - img.reshape(-1, 2), axis=1)
             T_C_O = rodrigues_to_Rt(rvec, tvec)
+            # marker surface plane in the camera frame (NOT the cube frame): the
+            # cube z-axis only coincides with the marker normal on the +Z face.
+            T_C_marker = T_C_O @ self.model.marker_pose_in_rig(marker_id)
             z_ok = float(tvec[2, 0]) > 0.0
             vis_ok, vis_score = self.model.marker_visibility_score(marker_id, T_C_O)
             tier = 0 if (z_ok and vis_ok) else (1 if z_ok else 2)
@@ -291,7 +404,10 @@ class AprilTagCubeTarget:
                 "vis_ok": vis_ok,
                 "vis_score": float(vis_score),
                 "visibility_tier": tier,
-                "depth_metrics": {"valid": False},
+                "depth_metrics": self._depth_plane_metrics(
+                    [(img.reshape(-1, 2), T_C_marker)], K, D, depth_u16, depth_scale,
+                    marker_ids=[marker_id],
+                ),
                 "rank": (tier, err_mean, -float(vis_score)),
             })
         return candidates
@@ -307,8 +423,8 @@ class AprilTagCubeTarget:
         only_ids: Optional[List[int]] = None,
         return_reproj: bool = False,
         min_aspect: float = 0.3,
-        depth_u16: Optional[np.ndarray] = None,  # kept for backward-compatible signature; ignored
-        depth_scale: Optional[float] = None,    # kept for backward-compatible signature; ignored
+        depth_u16: Optional[np.ndarray] = None,  # aligned z16 depth for the measured-vs-PnP plane check
+        depth_scale: Optional[float] = None,    # metres per depth unit (from the camera intrinsics)
     ):
         corners_list, ids = self.detect(bgr)
         obj_pts, img_pts, used = self.build_correspondences(corners_list, ids, min_markers, only_ids, min_aspect)
@@ -317,7 +433,10 @@ class AprilTagCubeTarget:
 
         n_points = int(obj_pts.shape[0])
         if n_points == 4 and len(used) == 1:
-            candidates = self.single_marker_ippe_candidates(used[0], img_pts.reshape(-1, 2), K, D)
+            candidates = self.single_marker_ippe_candidates(
+                used[0], img_pts.reshape(-1, 2), K, D,
+                depth_u16=depth_u16, depth_scale=depth_scale,
+            )
             if not candidates:
                 return (False, None, None, used, None) if return_reproj else (False, None, None, used)
             best = min(candidates, key=lambda x: x["rank"])
@@ -338,7 +457,18 @@ class AprilTagCubeTarget:
             proj2, _ = cv2.projectPoints(obj_pts.reshape(-1, 3), rvec, tvec, K, D)
             proj2 = proj2.reshape(-1, 2)
             err = np.linalg.norm(proj2 - img_pts.reshape(-1, 2), axis=1)
-            extra = {}
+            T_C_O_cube = rodrigues_to_Rt(rvec, tvec)
+            img_pts_flat = img_pts.reshape(-1, 2)
+            planes = [
+                (img_pts_flat[4 * k:4 * k + 4], T_C_O_cube @ self.model.marker_pose_in_rig(mid))
+                for k, mid in enumerate(used)
+                if 4 * k + 4 <= img_pts_flat.shape[0]
+            ]
+            extra = {
+                "depth_metrics": self._depth_plane_metrics(
+                    planes, K, D, depth_u16, depth_scale, marker_ids=used,
+                )
+            }
 
         err_mean = float(np.mean(err)) if err.size else float("inf")
         reproj = {
