@@ -10,14 +10,12 @@ CP_common.py — CP_C1/C2/C3 비교실험이 공유하는 로더·기하·지표
 
 from __future__ import annotations
 
-import argparse
-import csv
 import json
 import math
 import os
 from collections import defaultdict
-from dataclasses import dataclass, asdict
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple
 
 import cv2
 import numpy as np
@@ -31,12 +29,15 @@ from calibration_runtime_utils import (
     filter_candidates_for_camera_role,
     get_capture_set_index,
     get_capture_set_cube_center_transform_raw,
-    load_intrinsics_with_depth_scale,
-    resolve_cube_config_for_run,
+    load_intrinsics_with_depth_scale as load_intrinsics_with_depth_scale,
+    resolve_cube_config_for_run as resolve_cube_config_for_run,
     select_primary_cube_candidate,
 )
-from config import get_default_cube_config
-from cube_config_utils import cube_configs_equivalent, load_cube_config_from_meta
+from config import get_default_cube_config as get_default_cube_config
+from cube_config_utils import (
+    cube_configs_equivalent as cube_configs_equivalent,
+    load_cube_config_from_meta as load_cube_config_from_meta,
+)
 from robot_comm import euler_deg_to_matrix
 
 
@@ -1256,10 +1257,8 @@ def reprojection_errors(
 # median 1.48→0.79px(-47%) 로 낮춰 픽셀 정합이 가장 좋았다. 그래서 세 스크립트
 # (Step3 / CP_C1 / CP_C3)가 모두 같은 solver 를 쓰도록 여기로 끌어올린다.
 #
-# 기본 정책: solve_fixed_cameras(prefer="reproj") = 04 를 먼저 시도하고, 마커 코너
-# 관측이 없거나(코너 검출 불가) 최적화가 개선에 실패하면 자동으로 03 으로 폴백한다.
-# 두 최적화기 모두 게이지(ref_cam)를 항등으로 고정한 cam-ref 프레임에서 풀고, 초기값은
-# pairwise robust SE(3)(build_ref_relative_from_pairwise) 로 준다.
+# 두 최적화기 모두 게이지(ref_cam)를 항등으로 고정한 cam-ref 프레임에서 풀고,
+# 호출부가 목적에 맞는 최적화기와 초기값을 선택한다.
 
 def build_param_layout(cam_ids: List[int], event_ids: List[int],
                        ref_cam: Optional[int]) -> Dict[str, Any]:
@@ -1436,60 +1435,3 @@ def optimize_reprojection(
     return _finalize_opt(
         init_T_cam, init_T_obj, T_cam, T_obj, residual, x0, opt,
         adoption_guard=adoption_guard)
-
-
-def solve_fixed_cameras(
-    pose_obs: List[PoseObs], fixed_cam_ids: List[int], ref_cam: int,
-    K_map: Optional[Dict[int, np.ndarray]] = None,
-    D_map: Optional[Dict[int, np.ndarray]] = None,
-    corner_obs: Optional[List[CornerObs]] = None,
-    event_to_set: Optional[Dict[int, Optional[int]]] = None,
-    set_priors: Optional[Dict[int, np.ndarray]] = None,
-    prior_weight_trans: float = 0.0, prior_weight_rot: float = 0.0,
-    pose_regularizer_weight: float = 2.0,
-    prefer: str = "reproj",
-    init_T_cam: Optional[Dict[int, np.ndarray]] = None,
-    init_T_obj: Optional[Dict[int, np.ndarray]] = None,
-) -> Tuple[Dict[int, np.ndarray], Dict[int, np.ndarray], Dict[str, Any]]:
-    """고정 카메라 상대 pose 를 04(재투영)→03(pose-consistency) 폴백으로 푼다.
-
-    반환 (T_cam, T_obj, diag). 모두 cam-ref 프레임(ref_cam=항등). diag["method"] 는
-    실제로 채택된 방법("04_direct_reprojection" | "03_pose_consistency" |
-    "init_robust_se3"). 초기값은 pairwise robust SE(3) 로 자동 생성(명시 init 가능).
-
-    prefer="reproj"(기본): 코너 관측이 충분하고 최적화가 개선하면 04 채택. 코너가
-    없거나 04 가 기각되면 03 을 시도하고, 그것도 기각되면 robust 초기값을 그대로 반환.
-    prefer="pose": 04 를 건너뛰고 03 만.
-    """
-    if init_T_cam is None or init_T_obj is None:
-        init_T_cam, _ = build_ref_relative_from_pairwise(pose_obs, fixed_cam_ids, ref_cam, robust=True)
-        init_T_obj = initialize_ref_object_poses(pose_obs, init_T_cam, fixed_cam_ids, ref_cam)
-    event_to_set = event_to_set or {}
-
-    diag: Dict[str, Any] = {"method": "init_robust_se3", "prefer": prefer}
-
-    can_reproj = (prefer == "reproj" and corner_obs and K_map is not None and D_map is not None)
-    if can_reproj:
-        T_cam, T_obj, info04 = optimize_reprojection(
-            corner_obs=corner_obs, pose_obs=pose_obs, fixed_cam_ids=fixed_cam_ids,
-            init_T_cam=init_T_cam, init_T_obj=init_T_obj, ref_cam=ref_cam,
-            K_map=K_map, D_map=D_map, event_to_set=event_to_set, set_priors=set_priors,
-            prior_weight_trans=prior_weight_trans, prior_weight_rot=prior_weight_rot,
-            pose_regularizer_weight=pose_regularizer_weight)
-        diag["reproj"] = info04
-        if info04.get("accepted"):
-            diag["method"] = "04_direct_reprojection"
-            return T_cam, T_obj, diag
-
-    # 04 를 못 썼거나 기각됨 → 03 으로 폴백
-    T_cam, T_obj, info03 = optimize_pose_consistency(
-        pose_obs=pose_obs, fixed_cam_ids=fixed_cam_ids,
-        init_T_cam=init_T_cam, init_T_obj=init_T_obj, ref_cam=ref_cam,
-        event_to_set=event_to_set, set_priors=set_priors,
-        prior_weight_trans=prior_weight_trans, prior_weight_rot=prior_weight_rot)
-    diag["pose"] = info03
-    if info03.get("accepted"):
-        diag["method"] = "03_pose_consistency"
-        return T_cam, T_obj, diag
-
-    return init_T_cam, init_T_obj, diag

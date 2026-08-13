@@ -52,6 +52,7 @@ from CP_ablation_schema import (
 )
 from apriltag_cube import AprilTagCubeTarget, inv_T
 from calibration_runtime_utils import (
+    filter_meta_by_set_indices,
     get_capture_set_index,
     load_intrinsics_with_depth_scale,
     resolve_cube_config_for_run,
@@ -231,24 +232,6 @@ def average_board_with_gtc(eih_board: Sequence[PixelObs], gtc: np.ndarray,
             values.append(robot_T[int(obs.event)] @ gtc @ T_C_B)
     if not values:
         raise RuntimeError("board initialization unavailable with the supplied gTc")
-    return cp.robust_se3_average(values, None)[0]
-
-
-def estimate_gtc_from_fixed_cube(eih_cube: Sequence[PixelObs], fixed_cubes,
-                                 robot_T, K_map, D_map, gripper: int) -> np.ndarray:
-    values = []
-    for obs in eih_cube:
-        if obs.marker != "cube" or int(obs.cam) != int(gripper) or obs.set_idx is None:
-            continue
-        s = int(obs.set_idx)
-        if s not in fixed_cubes or int(obs.event) not in robot_T:
-            continue
-        T_C_O = solve_observed_pose(obs, K_map, D_map)
-        if T_C_O is None:
-            continue
-        values.append(inv_T(robot_T[int(obs.event)]) @ fixed_cubes[s] @ inv_T(T_C_O))
-    if len(values) < 3:
-        raise RuntimeError(f"FK-fixed cube gTc initialization needs >=3 poses, got {len(values)}")
     return cp.robust_se3_average(values, None)[0]
 
 
@@ -739,6 +722,11 @@ def prepare_ablation_data(args) -> PreparedAblationData:
     """Build the exact train/test data and train-only initialization artifacts."""
     with open(os.path.join(args.root_folder, "meta.json")) as handle:
         meta = json.load(handle)
+    meta, included_set_indices = filter_meta_by_set_indices(
+        meta, getattr(args, "include_sets", ""))
+    if included_set_indices and not meta.get("captures"):
+        raise RuntimeError(
+            f"include_sets={args.include_sets!r} did not match any captures")
     all_cam_ids = sorted({int(ci) for cap in meta.get("captures", [])
                           for ci in cap.get("cams", {})})
     gripper = int(meta["gripper_cam_idx"])
@@ -1053,8 +1041,11 @@ def parse_args():
     parser.add_argument("--root_folder", default="data/session")
     parser.add_argument("--intrinsics_dir", default="intrinsics")
     parser.add_argument("--calib_dir", default="data/session/calib_out")
-    parser.add_argument("--out_dir", default="CP_result/ablation_7row")
+    parser.add_argument("--out_dir", default="CP_result/session01/main/ablation_7row")
     parser.add_argument("--rows", default="A0,A1,A2,A3,B1,B2,B3")
+    parser.add_argument(
+        "--include_sets", default="",
+        help="Use only these set_index values (comma list/ranges, e.g. 5-12).")
     parser.add_argument("--test_fraction", type=float, default=0.2)
     parser.add_argument("--split_seed", type=int, default=20260729)
     parser.add_argument("--min_train_eih_cube_events", type=int, default=3)
@@ -1097,7 +1088,6 @@ def main() -> None:
     if unknown:
         raise ValueError(f"unknown rows: {unknown}")
     prepared = prepare_ablation_data(args)
-    meta = prepared.meta
     cube_cfg_source = prepared.cube_config_source
     cube_reason = prepared.cube_detection
     split = prepared.split
@@ -1124,6 +1114,9 @@ def main() -> None:
     result = {
         "protocol": {
             "dataset": args.root_folder,
+            "intrinsics_dir": args.intrinsics_dir,
+            "requested_set_filter": str(getattr(args, "include_sets", "")),
+            "resolved_set_indices": split["eligible_sets"],
             "cube_config_source": cube_cfg_source,
             "primary_metric": PRIMARY_METRIC,
             "split": split,

@@ -38,7 +38,7 @@ from calibration_path_evaluation import evaluate_paths_with_common_mask
 from calibration_reprojection_backend import PoseState, variable_keys
 
 
-FINAL_METHODS = ("A2", "A3", "A4a", "A4b", "A4", "B1")
+FINAL_METHODS = ("A2", "A3", "A4a", "A4b", "A4", "B1", "B2")
 
 
 def _sha256_file(path: str) -> str:
@@ -240,6 +240,37 @@ def _solve_fair_independent(data, initial: PoseState,
     }
 
 
+def _solve_cube_only_soft_fk(data, initial: PoseState,
+                             covariances: Mapping[int, np.ndarray], seed: int, args):
+    """B2 fair arm: remove board observations while retaining A4's soft-FK factor."""
+    condition = _condition("B2")
+    observations = legacy.filter_observations(
+        data.train_obs, condition, None, data.gripper, initial.cams)
+    cube_only = initial.clone()
+    cube_only.board = None
+    return solve_factorized_fk(
+        observations=observations,
+        variable_keys_=variable_keys(
+            ("T_base_Ci", "T_gripper_cam", "T_base_cube_by_set"), cube_only),
+        reference_state=cube_only,
+        robot_T=data.robot_T,
+        K_map=data.K_map,
+        D_map=data.D_map,
+        gripper_cam_idx=data.gripper,
+        options=legacy.canonical_solver_options(args),
+        fk_targets=data.fixed_cubes,
+        fk_covariances=covariances,
+        fk_spec=FKFactorSpec(
+            mode="covariance",
+            loss=str(args.fk_loss),
+            robust_scale=float(args.fk_robust_scale),
+        ),
+        seed=seed,
+        init_translation_mm=float(args.init_translation_mm),
+        init_rotation_deg=float(args.init_rotation_deg),
+    )
+
+
 def run_method(method: str, data, initial_a2: PoseState, initial_a3: PoseState,
                covariances, seed: int, args) -> dict:
     if method == "A2":
@@ -286,12 +317,16 @@ def run_method(method: str, data, initial_a2: PoseState, initial_a3: PoseState,
     elif method == "B1":
         state, diagnostics = _solve_fair_independent(
             data, initial_a2, covariances, seed, args)
+    elif method == "B2":
+        state, diagnostics = _solve_cube_only_soft_fk(
+            data, initial_a2, covariances, seed, args)
     else:
         raise ValueError(f"unknown final method {method}")
     metrics = _common_metrics(
         data,
         state,
-        _condition("A3") if method == "A3" else _condition("A2"),
+        (_condition("A3") if method == "A3" else
+         _condition("B2") if method == "B2" else _condition("A2")),
         data.train_obs,
         data.test_obs,
     )
@@ -345,12 +380,16 @@ def _write_outputs(result: dict, out_dir: str) -> None:
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Final A2/A3/A4/B1 calibration-method runner")
+    parser = argparse.ArgumentParser(
+        description="Final A2/A3/A4/B1/B2 calibration-method runner")
     parser.add_argument("--root_folder", default="data/session")
     parser.add_argument("--intrinsics_dir", default="intrinsics")
     parser.add_argument("--calib_dir", default="data/session/calib_out")
-    parser.add_argument("--out_dir", default="CP_result/final_methods_preflight")
+    parser.add_argument("--out_dir", default="CP_result/session01/main/final_methods_preflight")
     parser.add_argument("--methods", default=",".join(FINAL_METHODS))
+    parser.add_argument(
+        "--include_sets", default="",
+        help="Use only these set_index values (comma list/ranges, e.g. 5-12).")
     parser.add_argument("--fk_covariance_json")
     parser.add_argument("--preflight_isotropic_fk_std", default="3.0,0.3",
                         help="Diagnostic-only translation-mm,rotation-deg covariance when no artifact exists")
@@ -410,8 +449,13 @@ def main() -> None:
                 method, data, initial_a2, initial_a3, covariances, seed, args))
 
     result = {
-        "experiment": "final_A2_A3_A4_factor_decomposition_and_fair_B1",
+        "experiment": "final_A2_A3_A4_factor_decomposition_and_fair_B1_B2",
         "protocol": {
+            "dataset": args.root_folder,
+            "intrinsics_dir": args.intrinsics_dir,
+            "requested_set_filter": str(getattr(args, "include_sets", "")),
+            "resolved_set_indices": data.split["eligible_sets"],
+            "cube_config_source": data.cube_config_source,
             "visual_objective_shared_by_A2_A4_B1": True,
             "visual_loss": str(args.loss),
             "visual_f_scale_px": float(args.f_scale_px),

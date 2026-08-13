@@ -33,7 +33,6 @@ import os
 import json
 import argparse
 import itertools
-import sys
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
@@ -45,12 +44,17 @@ import matplotlib
 if not os.environ.get("FORCE_GUI"):
     matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 from figure_style import apply_paper_style, save_figure
 
 apply_paper_style()
 
-from apriltag_cube import AprilTagCubeTarget, AprilTagCubeModel, rodrigues_to_Rt, inv_T
+from apriltag_cube import (
+    AprilTagCubeTarget,
+    AprilTagCubeModel,
+    rodrigues_to_Rt,
+    inv_T,
+    rot_axis_angle,
+)
 from calibration_runtime_utils import (
     build_event_cube_selection,
     build_capture_cube_candidate_map,
@@ -62,6 +66,7 @@ from calibration_runtime_utils import (
     load_intrinsics_color,
     load_intrinsics_with_depth_scale,
     load_robot_pose_from_capture,
+    filter_meta_by_set_indices,
     rotation_error_deg,
     resolve_cube_config_for_run,
     select_consistent_event_cube_candidates,
@@ -87,13 +92,48 @@ def build_named_corner_permutations():
         "flip_diag": [0, 3, 2, 1],
         "flip_anti": [2, 1, 0, 3],
     }
+    seen = {tuple(v) for v in named.values()}
     for perm in itertools.permutations(range(4)):
+        if perm in seen:
+            continue
         key = f"p{perm[0]}{perm[1]}{perm[2]}{perm[3]}"
-        named.setdefault(key, list(perm))
+        named[key] = list(perm)
+        seen.add(perm)
     return named
 
 
 DIAG_CORNER_PERMUTATIONS = build_named_corner_permutations()
+
+
+def diagnostic_marker_corners_in_cube(model: AprilTagCubeModel,
+                                      cfg: CubeConfig,
+                                      marker_id: int,
+                                      face: str) -> np.ndarray:
+    """Return candidate object corners while preserving the configured marker roll.
+
+    The configured face is the exact production geometry, including explicit
+    marker-pose overrides and inset. Alternate faces retain the marker's configured
+    in-plane roll; the permutation search then tests any additional corner-order
+    correction. Keeping those two concepts separate makes the reported "current"
+    candidate identical to the geometry used by the calibration solver.
+    """
+    mid = int(marker_id)
+    if face == cfg.id_to_face.get(mid):
+        return model.marker_corners_in_rig(mid)
+
+    center, u, v, n = model.face_defs[face]
+    center = np.asarray(center, dtype=np.float64)
+    n = np.asarray(n, dtype=np.float64)
+    inset = float(getattr(cfg, "marker_inset_m", 0.0) or 0.0)
+    if inset:
+        center = center - inset * (n / (np.linalg.norm(n) + 1e-12))
+    R_roll = rot_axis_angle(
+        n, np.deg2rad(float(getattr(cfg, "face_roll_deg", {}).get(mid, 0.0))))
+    u = R_roll @ np.asarray(u, dtype=np.float64)
+    v = R_roll @ np.asarray(v, dtype=np.float64)
+    return np.asarray(
+        [center + u * p[0] + v * p[1] for p in model.local_corners_for(mid)],
+        dtype=np.float64)
 
 
 load_calib = load_calib_dir
@@ -674,7 +714,6 @@ def collect_cube_candidate_diagnostics(meta, transforms, intrinsics_dir, root_fo
                                        gripper_cam_idx, all_cam_ids, cube_cfg=None,
                                        include_meta=False,
                                        selection_profile="default"):
-    T_gTc = transforms.get("T_gripper_cam")
     if not any(True for _ in iter_object_anchor_items(transforms)):
         print("  [SKIP] Candidate diagnostics need T_base_O or T_base_O_set*")
         return []
@@ -954,21 +993,6 @@ def collect_marker_override_diagnostics(meta, transforms, intrinsics_dir, root_f
     for ci in all_cam_ids:
         K_map[ci], D_map[ci] = load_intrinsics_color(intrinsics_dir, ci)
 
-    def candidate_marker_corners_in_cube(mid: int, face: str) -> np.ndarray:
-        """Cube/object-frame 3D corners (m) under the hypothesis that marker `mid`
-        sits on `face`. Uses marker `mid`'s own size (top tags 25mm vs side tags
-        51mm) so the recovered pose scale is correct. Center is the marker's
-        configured center on its real face, else the geometric face center for
-        alternate-face hypotheses. Corner order follows local_corners_for."""
-        c_face, u, v, _ = model.face_defs[face]
-        if face == cfg.id_to_face.get(int(mid)):
-            center = np.asarray(cfg.marker_center_m.get(int(mid), c_face), dtype=np.float64)
-        else:
-            center = np.asarray(c_face, dtype=np.float64)
-        return np.asarray(
-            [center + u * p[0] + v * p[1] for p in model.local_corners_for(int(mid))],
-            dtype=np.float64)
-
     per_marker_obs = defaultdict(list)
     for cap in meta.get("captures", []):
         eid = int(cap.get("event_id", -1))
@@ -1046,7 +1070,7 @@ def collect_marker_override_diagnostics(meta, transforms, intrinsics_dir, root_f
 
         rankings = []
         for face in DIAG_FACES:
-            obj_corners = candidate_marker_corners_in_cube(mid, face)
+            obj_corners = diagnostic_marker_corners_in_cube(model, cfg, mid, face)
             for perm_name, reorder in DIAG_CORNER_PERMUTATIONS.items():
                 rows = []
                 for row in obs:
@@ -1071,6 +1095,8 @@ def collect_marker_override_diagnostics(meta, transforms, intrinsics_dir, root_f
                         obj_dr = rotation_error_deg(
                             T_base_O_cand[:3, :3], row["T_base_O_anchor"][:3, :3])
                         reproj = float(reproj_errs[si][0]) if reproj_errs is not None else 99.0
+                        if not np.all(np.isfinite([obj_dt, obj_dr, reproj])):
+                            continue
                         score = obj_dt + 5.0 * obj_dr + 10.0 * reproj
                         if best is None or score < best["score"]:
                             best = {
@@ -1103,6 +1129,7 @@ def collect_marker_override_diagnostics(meta, transforms, intrinsics_dir, root_f
                     "face": face,
                     "corner_permutation": perm_name,
                     "corner_reorder": list(reorder),
+                    "base_face_roll_deg": float(cfg.face_roll_deg.get(mid, 0.0)),
                     "num_obs": int(len(obs)),
                     "num_used": int(num_rows),
                     "num_inliers": int(num_inliers),
@@ -1148,6 +1175,7 @@ def collect_marker_override_diagnostics(meta, transforms, intrinsics_dir, root_f
                 "face": current_face,
                 "corner_permutation": current_perm_name,
                 "corner_reorder": list(cfg.corner_reorder[mid]),
+                "face_roll_deg": float(cfg.face_roll_deg.get(mid, 0.0)),
                 "rank": current_rank,
                 "score": None if current_entry is None else current_entry["score"],
                 "num_inliers": None if current_entry is None else current_entry["num_inliers"],
@@ -1283,12 +1311,9 @@ def visualize_3d(meta,
         draw_frame(ax, T, scale=20.0, lw=1.0)
 
     # 3. Cube positions per event
-    T_gTc = transforms.get("T_gripper_cam")
     cube_positions = []
 
     for cap in meta.get("captures", []):
-        eid = cap.get("event_id", -1)
-
         # From fixed cameras
         for ci_str, cinfo in cap.get("cams", {}).items():
             ci = int(ci_str)
@@ -1334,14 +1359,12 @@ def visualize_3d(meta,
                       color='red', linewidth=1.3, alpha=0.35, label='Gripper trajectory')
 
     # 5. Board position (average)
-    drawn_anchor = False
     for key, T_base_O in iter_object_anchor_items(transforms):
         if key == "T_base_O":
             label = "Cube (avg)"
         else:
             label = f"Cube set {key.replace('T_base_O_set', '')}"
         draw_frame(ax, T_base_O, label=label, scale=25.0, lw=2.0, fontsize=object_label_size)
-        drawn_anchor = True
 
     # Formatting
     ax.set_xlabel("X (mm)")
@@ -1426,6 +1449,9 @@ def main():
                         help="Optional cube config JSON override. Leave unset to use the project's canonical cube definition.")
     parser.add_argument("--cube_selection_profile", type=str, default="default",
                         choices=["default", "cube_only_specialized"])
+    parser.add_argument(
+        "--include_sets", type=str, default="",
+        help="Verify only these set_index values (comma list and inclusive ranges, e.g. 5-13).")
     parser.add_argument("--hide_gripper_trajectory", action="store_true",
                         help="Do not draw gripper trajectory in 3D overview")
     parser.add_argument("--camera_label_size", type=float, default=7.0)
@@ -1440,17 +1466,34 @@ def main():
     root = args.root_folder
     calib_dir = args.calib_dir or os.path.join(root, "calib_out")
 
-    # Load meta
-    meta_path = os.path.join(root, "meta.json")
-    with open(meta_path, "r") as f:
-        meta = json.load(f)
-
-    # Load calibration summary
+    # Load calibration summary first so verification inherits the exact data
+    # selection used by Step3 unless the caller explicitly overrides it.
     summary_path = os.path.join(calib_dir, "calibration_summary.json")
     summary = {}
     if os.path.exists(summary_path):
         with open(summary_path, "r") as f:
             summary = json.load(f)
+
+    # Load meta
+    meta_path = os.path.join(root, "meta.json")
+    with open(meta_path, "r") as f:
+        meta = json.load(f)
+    effective_include_sets = str(args.include_sets or "").strip()
+    set_filter_source = "cli" if effective_include_sets else "all"
+    if not effective_include_sets:
+        recorded_sets = (
+            summary.get("data_selection", {}).get("included_set_indices", []))
+        if recorded_sets:
+            effective_include_sets = ",".join(str(int(x)) for x in recorded_sets)
+            set_filter_source = "calibration_summary"
+    n_meta_captures = len(meta.get("captures", []))
+    meta, included_set_indices = filter_meta_by_set_indices(meta, effective_include_sets)
+    if included_set_indices:
+        print(f"[INFO] set filter={included_set_indices} ({set_filter_source}): "
+              f"{len(meta.get('captures', []))}/{n_meta_captures} captures")
+        if not meta.get("captures"):
+            raise RuntimeError(
+                f"include_sets={effective_include_sets!r} did not match any captures")
 
     # Load transforms
     transforms = load_calib(calib_dir)
@@ -1579,6 +1622,12 @@ def main():
         print(f"    {name}: pos=[{pos[0]:.1f}, {pos[1]:.1f}, {pos[2]:.1f}]mm")
 
     verification = {
+        "data_selection": {
+            "include_sets_arg": effective_include_sets,
+            "included_set_indices": [int(x) for x in included_set_indices],
+            "num_captures_used": int(len(meta.get("captures", []))),
+            "source": set_filter_source,
+        },
         "cross_camera": {
             "num_errors": int(len(cross_err)),
             "mean_mm": None if not cross_err else float(np.mean(cross_err)),
@@ -1647,10 +1696,6 @@ def main():
     fig_3d_cv_path = os.path.join(save_dir, "base_frame_overview_3d_cv.png")
     cv2.imwrite(fig_3d_cv_path, fig_3d_cv)
     print(f"[SAVE] {fig_3d_cv_path}")
-
-    if args.no_show:
-        print("\n[DONE] Verification complete")
-        return
 
     # ─── Visualize ───
     fig_err = visualize_errors(cross_err, reproj_err, he_err)

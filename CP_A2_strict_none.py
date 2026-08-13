@@ -24,7 +24,7 @@ import json
 import os
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple
 
 import cv2
 import numpy as np
@@ -492,7 +492,7 @@ def main():
     ap.add_argument("--root_folder", default="data/session")
     ap.add_argument("--intrinsics_dir", default="intrinsics")
     ap.add_argument("--calib_dir", default="data/session/calib_out")
-    ap.add_argument("--out_dir", default="CP_result/A2_strict_none")
+    ap.add_argument("--out_dir", default="CP_result/session01/main/A2_strict_none")
     ap.add_argument("--test_sets", default="0,4,6,12")
     ap.add_argument("--num_inits", type=int, default=5)
     ap.add_argument("--init_translation_mm", type=float, default=5.0)

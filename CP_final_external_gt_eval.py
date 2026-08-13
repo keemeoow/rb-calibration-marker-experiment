@@ -15,7 +15,7 @@ import csv
 import json
 import os
 from dataclasses import dataclass
-from typing import Dict, Iterable, Mapping, Optional, Sequence
+from typing import Mapping, Optional, Sequence
 
 import numpy as np
 from scipy.spatial import cKDTree
@@ -451,7 +451,7 @@ def write_outputs(result: Mapping, output_dir: str) -> None:
 def parse_args():
     parser = argparse.ArgumentParser(description="Paired hierarchical external-GT evaluation")
     parser.add_argument("--manifest", required=True)
-    parser.add_argument("--output_dir", default="CP_result/final_external_gt")
+    parser.add_argument("--output_dir", default="CP_result/shared/final_external_gt")
     return parser.parse_args()
 
 

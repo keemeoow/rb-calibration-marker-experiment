@@ -1,0 +1,10 @@
+method,status,converged_runs,total_runs,n_registered_fixed_cameras,heldout_overall_rmse_px,heldout_board_rmse_px,heldout_cube_rmse_px,e_cross_translation_rmse_mm,e_cross_rotation_rmse_deg,e_e2e_translation_rmse_mm,e_e2e_rotation_rmse_deg,confirmatory_ready
+A0,complete,3,3,3,2.4829,2.4829,,,,,,false
+A1,complete,3,3,3,3.1267,2.5103,4.5317,13.7546,1.2193,4.2459,1.0239,false
+A2,complete,3,3,3,3.1154,2.5038,4.5109,13.1276,1.1910,4.0693,1.0385,false
+A3,complete,3,3,3,2.4997,2.4952,2.5136,10.8320,1.0602,4.7904,1.1893,false
+A4,preflight_placeholder_covariance,3,3,3,3.1030,2.5038,4.4758,13.0590,1.1901,4.0396,1.0316,false
+A5,not_run,0,0,,,,,,,,,false
+B1,preflight_placeholder_covariance,3,3,3,3.1128,2.5101,4.4927,13.6410,1.2158,4.2097,1.0186,false
+B2,preflight_placeholder_covariance,3,3,3,4.4938,,4.4938,11.9911,1.2833,3.8443,0.9315,false
+B3,complete,3,3,3,2.4829,2.4829,,,,,,false

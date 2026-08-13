@@ -49,6 +49,7 @@ from calibration_runtime_utils import (
     cube_selection_profile_kwargs,
     filter_candidates_for_camera_role,
     get_capture_set_index,
+    filter_meta_by_set_indices,
     get_capture_set_cube_center_transform_raw,
     get_object_anchor_key_for_set,
     load_intrinsics_with_depth_scale,
@@ -59,7 +60,7 @@ from calibration_runtime_utils import (
     validate_cube_model_against_captures,
 )
 import CP_common as cp
-from config import CubeConfig, get_default_cube_config
+from config import get_default_cube_config
 from calibration_corner_observations import load_cube_board_pixel_observations
 from calibration_reprojection_backend import (
     PoseState as CornerPoseState,
@@ -74,7 +75,7 @@ from cube_config_utils import (
     cube_configs_equivalent,
     load_cube_config_from_meta,
 )
-from utils_pose import robust_se3_average, se3_distance
+from utils_pose import se3_distance
 from robot_comm import euler_deg_to_matrix
 
 
@@ -2042,6 +2043,10 @@ def main():
                         help="특정 capture_block 만 사용해 캘리브 "
                              "(A_placement=큐브 바닥에 놓음, B_eyetohand=큐브 그립 후 스윕). "
                              "기본 ALL=전체. 태그 없는 프레임은 A_placement 로 간주.")
+    parser.add_argument(
+        "--include_sets", type=str, default="",
+        help="Use only these set_index values (comma list and inclusive ranges, e.g. 5-13). "
+             "The source meta.json is never modified.")
     parser.add_argument("--gripper_cube_min_markers", type=int, default=1)
     parser.add_argument("--gripper_cube_min_aspect", type=float, default=0.35)
     parser.add_argument("--fixed_cube_min_aspect", type=float, default=0.0,
@@ -2105,6 +2110,17 @@ def main():
 
     with open(os.path.join(root, "meta.json"), "r") as f:
         meta = json.load(f)
+
+    _all_caps_before_set_filter = len(meta.get("captures", []))
+    meta, included_set_indices = filter_meta_by_set_indices(meta, args.include_sets)
+    if included_set_indices:
+        print(f"[INFO] set 필터={included_set_indices}: "
+              f"{len(meta.get('captures', []))}/{_all_caps_before_set_filter} captures 사용")
+        if not meta.get("captures"):
+            raise RuntimeError(
+                f"include_sets={args.include_sets!r} 에 해당하는 capture가 없습니다.")
+    else:
+        print("[INFO] set 필터=ALL")
 
     # ─── capture_block 필터 (선택) ───
     # 한 세션에 method (a) placement 와 method (b) eye-to-hand 스윕을 모두 찍었을 때,
@@ -2397,13 +2413,11 @@ def main():
         print(f"  Using ChArUco board ({len(common_he)} common events)")
         R_target2cam = [charuco_obs[eid]["T_cam_board"][:3, :3] for eid in common_he]
         t_target2cam = [charuco_obs[eid]["T_cam_board"][:3, 3].reshape(3, 1) for eid in common_he]
-        w_he = [1.0 / max(charuco_obs[eid]["reproj"], 1e-9) for eid in common_he]
     else:
         common_he = sorted(set(robot_T.keys()) & set(pnp_obs[gripper_cam_idx].keys()))
         print(f"  Fallback: cube PnP ({len(common_he)} common events)")
         R_target2cam = [pnp_obs[gripper_cam_idx][eid]["T_C_O"][:3, :3] for eid in common_he]
         t_target2cam = [pnp_obs[gripper_cam_idx][eid]["T_C_O"][:3, 3].reshape(3, 1) for eid in common_he]
-        w_he = [1.0 / max(pnp_obs[gripper_cam_idx][eid]["err_mean"], 1e-9) for eid in common_he]
 
     if len(common_he) < 5:
         raise RuntimeError(f"Not enough events for hand-eye ({len(common_he)} < 5)")
@@ -3389,6 +3403,11 @@ def main():
         "gripper_cam_idx": int(gripper_cam_idx),
         "ref_fixed_cam_idx": int(ref_fixed) if ref_fixed is not None else None,
         "common_object_mode": str(args.common_object_mode),
+        "data_selection": {
+            "include_sets_arg": str(args.include_sets or ""),
+            "included_set_indices": [int(x) for x in included_set_indices],
+            "num_captures_used": int(len(meta.get("captures", []))),
+        },
         "fixed_cam_ids": [int(x) for x in fixed_cam_ids],
         "all_cam_ids": [int(x) for x in all_cam_ids],
         "selected_handeye_method": best_method,
