@@ -30,7 +30,14 @@ DEFAULT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 
 
 class Calibration:
-    def __init__(self, calib_dir: str = DEFAULT_DIR, use_ridge: bool = True):
+    def __init__(self, calib_dir: str = DEFAULT_DIR, use_ridge: bool = True,
+                 robot_tool_offset_z_m: Optional[float] = None):
+        """robot_tool_offset_z_m: 지금 로봇에 설정된 툴오프셋(미터).
+
+        캘리브는 툴오프셋 z=150 mm 상태에서 했다. 그리퍼 카메라를 쓸 때만 문제가 되며,
+        다른 값을 쓰고 있으면 여기에 알려주면 `T_gripper_cam` 을 그 프레임으로 옮긴다.
+        고정 카메라(cam1/cam3)는 base 프레임이라 툴오프셋과 무관하다.
+        """
         with open(os.path.join(calib_dir, "calibration_for_use.json")) as handle:
             self.meta = json.load(handle)
         self.dir = calib_dir
@@ -38,6 +45,15 @@ class Calibration:
             int(k.split("C")[-1]): np.asarray(v, float)
             for k, v in self.meta["transforms"].items() if k.startswith("T_base_C")}
         self.T_gripper_cam = np.asarray(self.meta["transforms"]["T_gripper_cam"], float)
+        conv = self.meta.get("gripper_cam_tcp_convention", {})
+        self.calibration_tool_offset_z = float(conv.get("calibration_tcp_offset_z_m", 0.150))
+        self.tool_offset_z = (self.calibration_tool_offset_z
+                              if robot_tool_offset_z_m is None
+                              else float(robot_tool_offset_z_m))
+        if abs(self.tool_offset_z - self.calibration_tool_offset_z) > 1e-9:
+            shift = np.eye(4)
+            shift[2, 3] = self.calibration_tool_offset_z - self.tool_offset_z
+            self.T_gripper_cam = shift @ self.T_gripper_cam
         self.use_cameras = [int(c) for c in self.meta["use_cameras"]]
         self.W = np.asarray(self.meta["ridge_correction"]["W"], float)
         self.use_ridge = bool(use_ridge)
