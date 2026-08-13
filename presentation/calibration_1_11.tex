@@ -59,6 +59,7 @@
 % \T{도착}{출발}  또는  \T[윗표시]{도착}{출발}
 \newcommand{\T}[3][]{{}^{#2}\mathbf{T}^{#1}_{#3}}   % 예: \T{B}{C_i}, \T[(0)]{B}{C_i}
 \newcommand{\Tb}[2]{{}^{#1}\overline{\mathbf{T}}_{#2}} % 세트 공통(평균) 변환
+\newcommand{\Th}[3][]{{}^{#2}\widehat{\mathbf{T}}^{#1}_{#3}} % 최적화로 찾은 추정값
 % 큐브 좌표계의 여러 추정치 = 서로 다른 좌표계 이름으로 구분
 \newcommand{\Oref}{O^{\mathrm{ref}}}   % 목적함수가 맞추는 기준 자세
 \newcommand{\Ofk}{O^{\mathrm{fk}}}     % raw FK가 말하는 큐브
@@ -665,21 +666,29 @@
   \end{block}
   \vfill
   \textbf{9.2 목적함수}
-
-  8장 식의 세 번째 자리에 넣는 값
+  {\footnotesize
   \[
-    \T{B}{\Oref_s}\;=\;\T{B}{O,s}
-    \qquad\text{(자유변수)}
+    \begin{aligned}
+      \left\{
+        \{\Th{B}{C_i}\},\ \Th{G}{C_g},\ \{\Th{B}{O,s}\}
+      \right\}
+      \ =\ &
+      \underset{
+        \{\T{B}{C_i}\},\ \T{G}{C_g},\ \{\T{B}{O,s}\}
+      }{\operatorname{argmin}}
+      \ \,
+      \mathcal{E}_{\mathrm{vis}}
+      \left(
+        \{\T{B}{C_i}\},\ \T{G}{C_g},\ \{\T{B}{O,s}\}
+      \right)
+    \end{aligned}
   \]
+  }
   \vfill
-  \begin{itemize}
-    \item 큐브 자세를 미리 정해주지 않고 \textbf{찾아야 할 값}으로 남겨둠
-    \item $\mathcal{E}_{\mathrm{vis}}$ 를 최소화하며 찾는 값은
-      \textbf{세 덩어리}
-      \begin{itemize}
-        \item $\{\T{B}{C_i}\}$, \quad $\T{G}{C_g}$, \quad $\{\T{B}{O,s}\}$
-      \end{itemize}
-  \end{itemize}
+  기준 자세 자리를 자유변수가 채움
+  \[
+    \T{B}{\Oref_s}=\T{B}{O,s}
+  \]
 \end{frame}
 
 \begin{frame}{9.2 장점과 주의점}
@@ -721,15 +730,26 @@
 \end{frame}
 
 \begin{frame}{10.2 목적함수}
-  8장 식의 세 번째 자리에 넣는 값
+  raw FK 값을 세 번째 자리에 넣고 최적화
+  {\footnotesize
   \[
-    \T{B}{\Oref_s}\;=\;\T{B}{\Ofk_s}
-    \qquad\text{(상수. 못 박음)}
+    \left\{
+      \{\Th{B}{C_i}\},\ \Th{G}{C_g}
+    \right\}
+    \ =\
+    \underset{
+      \{\T{B}{C_i}\},\ \T{G}{C_g}
+    }{\operatorname{argmin}}
+    \ \,
+    \mathcal{E}_{\mathrm{vis}}
+    \left(
+      \{\T{B}{C_i}\},\ \T{G}{C_g},\ \{\T{B}{\Ofk_s}\}
+    \right)
   \]
+  }
   \begin{itemize}
-    \item 최소화하며 찾는 값은 \textbf{두 덩어리}:
-      \ $\{\T{B}{C_i}\}$, \quad $\T{G}{C_g}$
-    \item 9.2절과 달리 큐브 자세가 빠짐 $\rightarrow$ 미지수가 줄어듦
+    \item 9.2절과 비교하면 \textbf{세 번째 자리가 상수로 바뀌고},
+      argmin 아래에서도 빠짐
   \end{itemize}
   \vfill
   완전히 펼치면
@@ -1288,15 +1308,26 @@
 \end{frame}
 
 \begin{frame}{11.8 단계 7: anchor 고정 후 최종 refinement}
-  8장 식의 세 번째 자리에 넣는 값
+  확정된 anchor를 세 번째 자리에 넣고 다시 최적화
+  {\footnotesize
   \[
-    \T{B}{\Oref_s}\;=\;\T{B}{\Oanc_s}
-    \qquad\text{(상수. 못 박음)}
+    \left\{
+      \{\Th{B}{C_i}\},\ \Th{G}{C_g}
+    \right\}
+    \ =\
+    \underset{
+      \{\T{B}{C_i}\},\ \T{G}{C_g}
+    }{\operatorname{argmin}}
+    \ \,
+    \mathcal{E}_{\mathrm{vis}}
+    \left(
+      \{\T{B}{C_i}\},\ \T{G}{C_g},\ \{\T{B}{\Oanc_s}\}
+    \right)
   \]
+  }
   \begin{itemize}
-    \item 최소화하며 찾는 값은 \textbf{두 덩어리}:
-      \ $\{\T{B}{C_i}\}$, \quad $\T{G}{C_g}$ \quad (10.2절과 동일)
-    \item 다른 것은 넣은 값뿐:
+    \item 10.2절 \texttt{Fixed-FK}와 \textbf{완전히 같은 형태}
+    \item 다른 것은 세 번째 자리뿐:
       raw FK $\T{B}{\Ofk_s}$ 가 아니라 검산을 거친 $\T{B}{\Oanc_s}$
   \end{itemize}
   \vfill
