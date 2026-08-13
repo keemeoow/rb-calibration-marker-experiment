@@ -515,9 +515,13 @@
 
 \begin{frame}{8. 모든 방법이 공유하는 목적함수}
   세트 $s$에서 모든 예측이 맞춰야 할 기준 자세를 $\T{B}{\Oref_s}$ 라 하면
+  {\small
   \[
     \begin{aligned}
       \mathcal{E}_{\mathrm{vis}}
+      \left(
+        \{\T{B}{C_i}\},\ \T{G}{C_g},\ \{\T{B}{\Oref_s}\}
+      \right)
       ={}&
       \sum_{i,s}
       \left\|
@@ -537,11 +541,18 @@
       \right\|_2^2
     \end{aligned}
   \]
+  }
   \vfill
   \begin{itemize}
     \item 첫 줄 = 6.1절 경로, 둘째 줄 = 6.2절 경로. 새로운 것은 없음
     \item 각 예측을 같은 기준 $\T{B}{\Oref_s}$ 와 비교해 차이를 모두 더함
   \end{itemize}
+  \vfill
+  \begin{alertblock}{}
+    \centering
+    \textbf{앞으로 이 식은 그대로 두고, 세 번째 자리
+    $\{\T{B}{\Oref_s}\}$ 에 무엇을 넣느냐만 바꾼다}
+  \end{alertblock}
 \end{frame}
 
 \begin{frame}{8.1 식에 나오는 기호}
@@ -654,22 +665,20 @@
   \end{block}
   \vfill
   \textbf{9.2 목적함수}
+  {\small
   \[
-    \begin{aligned}
-      \text{최소화} \quad & \mathcal{E}_{\mathrm{vis}}
-      \\[3pt]
-      \text{움직이는 값} \quad &
-        \{\T{B}{C_i}\},\quad \T{G}{C_g},\quad \{\T{B}{O,s}\}
-      \\[3pt]
-      \text{기준 자세} \quad &
-        \T{B}{\Oref_s}\;\equiv\;\T{B}{O,s}
-    \end{aligned}
+    \min_{\{\T{B}{C_i}\},\ \T{G}{C_g},\ \{\T{B}{O,s}\}}
+    \ \ \mathcal{E}_{\mathrm{vis}}
+    \left(
+      \{\T{B}{C_i}\},\ \T{G}{C_g},\ \{\T{B}{O,s}\}
+    \right)
   \]
+  }
   \vfill
   \begin{itemize}
-    \item 둘째 줄에 \textbf{큐브 자세가 들어가 있음} $\rightarrow$ 함께 찾는 대상
-    \item 셋째 줄의 $\equiv$ 는 제약이 아니라 \textbf{같은 것을 가리키는 두 이름}
-      $\rightarrow$ \texttt{No-FK}에는 못 박는 값이 하나도 없음
+    \item 세 번째 자리에 \textbf{자유변수} $\{\T{B}{O,s}\}$ 를 넣음
+    \item 그 값이 $\min$ 아래에도 그대로 있음
+      $\rightarrow$ \textbf{큐브 자세까지 함께 찾는다}는 뜻
   \end{itemize}
 \end{frame}
 
@@ -712,19 +721,15 @@
 \end{frame}
 
 \begin{frame}{10.2 목적함수}
+  {\small
   \[
-    \begin{aligned}
-      \text{최소화} \quad & \mathcal{E}_{\mathrm{vis}}
-      \\[3pt]
-      \text{움직이는 값} \quad &
-        \{\T{B}{C_i}\},\quad \T{G}{C_g}
-        \qquad\text{\small(큐브 자세가 빠짐)}
-      \\[3pt]
-      \text{기준 자세} \quad &
-        \T{B}{\Oref_s}=\T{B}{\Ofk_s}
-        \qquad\text{\small(상수. 못 박음)}
-    \end{aligned}
+    \min_{\{\T{B}{C_i}\},\ \T{G}{C_g}}
+    \ \ \mathcal{E}_{\mathrm{vis}}
+    \left(
+      \{\T{B}{C_i}\},\ \T{G}{C_g},\ \{\T{B}{\Ofk_s}\}
+    \right)
   \]
+  }
   \vfill
   완전히 펼치면
   {\footnotesize
@@ -746,8 +751,9 @@
   }
   \vfill
   \begin{itemize}
-    \item 9.2절과 비교하면 \textbf{둘째 줄에서 큐브 자세가 사라짐}
-      $\rightarrow$ 미지수가 둘로 줄어듦
+    \item 세 번째 자리에 \textbf{raw FK 값} $\{\T{B}{\Ofk_s}\}$ 를 넣음
+    \item 9.2절과 달리 그 값이 $\min$ 아래에는 \textbf{없음}
+      $\rightarrow$ 못 박혀서 움직이지 못함
   \end{itemize}
 \end{frame}
 
@@ -1288,21 +1294,18 @@
 
 \begin{frame}{11.8 단계 7: anchor 고정 후 최종 refinement}
   확정된 $\T{B}{\Oanc_s}$ 를 고정 anchor로 사용
+  {\small
   \[
-    \begin{aligned}
-      \text{최소화} \quad & \mathcal{E}_{\mathrm{vis}}
-      \\[3pt]
-      \text{움직이는 값} \quad &
-        \{\T{B}{C_i}\},\quad \T{G}{C_g}
-      \\[3pt]
-      \text{기준 자세} \quad &
-        \T{B}{\Oref_s}=\T{B}{\Oanc_s}
-        \qquad\text{\small(상수. 못 박음)}
-    \end{aligned}
+    \min_{\{\T{B}{C_i}\},\ \T{G}{C_g}}
+    \ \ \mathcal{E}_{\mathrm{vis}}
+    \left(
+      \{\T{B}{C_i}\},\ \T{G}{C_g},\ \{\T{B}{\Oanc_s}\}
+    \right)
   \]
+  }
   \begin{itemize}
-    \item 세 줄 모두 10.2절 \texttt{Fixed-FK}와 같은 자리, 같은 형태
-    \item 다른 것은 셋째 줄에 못 박은 값뿐:
+    \item 10.2절 \texttt{Fixed-FK}와 \textbf{글자 하나까지 같은 형태}
+    \item 다른 것은 세 번째 자리에 넣은 값뿐:
       raw FK $\T{B}{\Ofk_s}$ 가 아니라 검산을 거친 $\T{B}{\Oanc_s}$
   \end{itemize}
   \vfill
