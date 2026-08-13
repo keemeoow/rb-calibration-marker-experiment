@@ -177,7 +177,10 @@ def run_config(cfg: ExpConfig, seeds=20, n_sets=10, sigma_px=0.3, train_size=8,
             splits += 1
             if splits >= n_splits:
                 break
-    return {k: (float(np.mean(v)), float(np.std(v)), len(v)) if v else (None, None, 0)
+    # (평균, 표준편차, 개수, 중앙값). 발산 seed 가 섞이면 평균이 크게 흔들리므로
+    # 중앙값을 함께 돌려준다. 기존 호출부는 앞 세 개만 쓰므로 영향이 없다.
+    return {k: (float(np.mean(v)), float(np.std(v)), len(v), float(np.median(v)))
+            if v else (None, None, 0, None)
             for k, v in acc.items()}
 
 
