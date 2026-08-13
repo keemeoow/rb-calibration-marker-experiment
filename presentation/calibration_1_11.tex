@@ -480,6 +480,30 @@
   \end{alertblock}
 \end{frame}
 
+\begin{frame}{4. 재투영오차: 얼마나 맞는지 재는 자}
+  지금 알고 있는 값으로 \textbf{코너가 사진의 어디에 찍힐지 계산}하고,
+  실제로 검출된 픽셀과 비교
+  \[
+    \mathbf{e}_j
+    =
+    \underbrace{
+      \pi\!\left(\left(\T{B}{C}\right)^{-1}\T{B}{O},\ \mathbf{p}_j\right)
+    }_{\text{계산한 픽셀}}
+    \ -\
+    \underbrace{\mathbf{u}_j}_{\text{검출된 픽셀}}
+  \]
+  \begin{itemize}
+    \item $\mathbf{p}_j$: 물체 도면상의 $j$번째 코너 좌표
+      \quad $\mathbf{u}_j$: 사진에서 찾은 그 코너의 픽셀
+    \item $\pi$: 내부파라미터와 렌즈 왜곡을 써서 $3$차원 점을 픽셀로 옮기는 함수
+    \item 단위는 \textbf{픽셀}. 코너 하나마다 값이 하나씩 나옴
+  \end{itemize}
+  \vfill
+  \begin{block}{PnP도 사실 이것을 줄여서 자세를 찾는다}
+    자세를 이리저리 바꿔보며 재투영오차가 가장 작아지는 자세를 고르는 것
+  \end{block}
+\end{frame}
+
 \begin{frame}{4.1 -- 4.3 관측값의 정의}
   이미 측정이 끝나 \textbf{바꿀 수 없는} 값 세 가지
   \vfill
@@ -755,6 +779,32 @@
   \end{alertblock}
 \end{frame}
 
+\begin{frame}{8.3 실제 구현은 자세가 아니라 픽셀에서 잰다}
+  8장 식은 \textbf{자세끼리} 비교했지만, 실제 코드는
+  \textbf{코너 재투영오차}를 최소화 (4장)
+  \vfill
+  \begin{block}{경로는 그대로, 마지막 한 걸음만 다름}
+    \begin{enumerate}
+      \item $\left(\T{B}{C_i}\right)^{-1}\T{B}{\Oref_s}$
+        $\rightarrow$ 카메라가 물체를 어떻게 볼지 예측
+      \item 그 자세로 \textbf{코너를 사진에 투영} $\rightarrow$ 계산한 픽셀
+      \item 검출된 픽셀과 빼서 제곱합
+    \end{enumerate}
+  \end{block}
+  \vfill
+  \begin{itemize}
+    \item 코너마다 값이 하나 $\rightarrow$ 많이 보인 세트가 자연히 발언권을 더 가짐
+    \item 자세 잔차는 회전(rad)과 이동(m)을 섞어야 함
+      $\rightarrow$ 픽셀은 단위가 하나
+    \item PnP로 압축하기 전의 \textbf{원래 측정값}을 그대로 씀
+  \end{itemize}
+  \vfill
+  \begin{alertblock}{바뀌지 않는 것}
+    기준 자세 $\T{B}{\Oref_s}$ 자리에 무엇을 넣느냐는 \textbf{그대로}
+    $\rightarrow$ 9장, 10장의 비교는 두 형태에서 동일
+  \end{alertblock}
+\end{frame}
+
 \ifcorrectedfk
 \begin{frame}{9. 앞으로 볼 세 가지 방식}
   같은 관측식. $\T{B}{\Oref_s}$ 를 무엇으로 채우는지가 다름
@@ -1022,7 +1072,8 @@
   \vfill
   \begin{block}{지표가 잡지 못하는 이유}
     \begin{itemize}
-      \item 재투영오차: 카메라 자기 자신과의 일치도 $\rightarrow$ 이 편향에 둔감
+      \item 재투영오차 (4장): 카메라가 \textbf{자기 예측과 자기 사진}을 맞춰본 값\\
+        치우친 카메라도 \textbf{일관되게} 치우치면 픽셀은 잘 맞음 $\rightarrow$ 둔감
       \item 카메라 간 consistency: 같은 모델, 같은 절차로 캘리브레이션되면
         비슷한 방향으로 치우쳐 함께 통과
     \end{itemize}
