@@ -197,7 +197,7 @@ def _refine_fixed_subsystem(sc, cams0, markers, train_sets, cube_anchors=None,
 
 # ---------------------------------------------------------------- 통합(unified) BA
 def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=200, anchor_weight=0.0,
-                  fk_prior=None):
+                  fk_prior=None, rel_weight=0.0, anchor_weight_by_set=None):
     """모든 관측을 하나의 비선형 최소제곱으로 동시 최적화 (CP_C1 solve_unified_joint 정합).
        fk_mode='fixed' 면 큐브를 FK 상수로 고정(미지수 제외).
        anchor_weight>0 이면 자유 큐브를 FK prior 로 약하게 당기는 soft anchor 항 추가.
@@ -258,6 +258,17 @@ def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=200, anchor_weight=
         return fk_prior[s]                              # fixed: FK 상수(raw 또는 de-biased)
 
     aw = float(anchor_weight)
+    rw = float(rel_weight)
+    # 세트 쌍: FK 가 말하는 상대 변환을 제약으로 쓴다. 상수 오정렬 D 는
+    # F_s^-1 F_t 에서 대부분 상쇄되므로, FK 의 절대 편향을 들이지 않고
+    # 반복성(세트 사이 상대 관계)만 가져올 수 있다.
+    rel_pairs = []
+    if rw > 0.0 and cube_free:
+        ts = [s for s in train_sets if ("cube", s) in idx]
+        for i in range(len(ts) - 1):
+            for j in range(i + 1, min(i + 4, len(ts))):   # 이웃 3개까지만
+                rel_pairs.append((ts[i], ts[j],
+                                  inv_T(fk_prior[ts[i]]) @ fk_prior[ts[j]]))
 
     def resid(p):
         cams, gTc = unpack(p)
@@ -273,7 +284,17 @@ def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=200, anchor_weight=
         if aw > 0.0 and cube_free:
             for s in train_sets:
                 if ("cube", s) in idx:
-                    r.append(aw * se3_residual(target_pose(p, "cube", s), fk_prior[s]))
+                    w = aw
+                    if anchor_weight_by_set is not None:
+                        w = float(anchor_weight_by_set.get(s, aw))
+                    if w > 0.0:
+                        r.append(w * se3_residual(target_pose(p, "cube", s),
+                                                  fk_prior[s]))
+        # FK 상대 제약: 세트 쌍의 상대 변환을 FK 값에 맞춘다.
+        for (sa, sb, T_rel_fk) in rel_pairs:
+            Ta = target_pose(p, "cube", sa)
+            Tb = target_pose(p, "cube", sb)
+            r.append(rw * se3_residual(inv_T(Ta) @ Tb, T_rel_fk))
         # gripped: 고정카메라 @ 관측 == bTg_grip @ X (로봇 모션 기반 eye-to-hand)
         if use_grip:
             Xm = vec_to_se3(p[idx[("X",)]:idx[("X",)]+6])

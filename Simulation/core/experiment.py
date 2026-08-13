@@ -38,6 +38,14 @@ class ExpConfig:
     gate_mode: str = "adaptive"     # adaptive | fixed
     gate_k: float = 2.5
     gate_use_floor: bool = True
+    # ── corrected-FK 변형 ────────────────────────────────────
+    #   hard : gate 통과 anchor 를 고정 (현재 방식)
+    #   soft : anchor 를 벌점으로만 당기고 큐브는 자유변수로 둔다
+    #   rel  : 절대 anchor 대신 세트 쌍의 상대 변환만 FK 로 구속한다
+    #   init : anchor 는 초기값으로만 쓰고 제약은 걸지 않는다
+    corr_variant: str = "hard"      # hard | soft | rel | init
+    corr_lambda: float = 0.3        # soft/rel 의 가중치
+    corr_weight_by_support: bool = False   # 관측 적은 세트일수록 FK 를 더 믿는다
     post_correction: str = "none"   # none | ridge (C1 output correction, separate axis)
     fk_degree: int = 1              # Ridge feature degree when explicitly enabled
 
@@ -52,6 +60,8 @@ class ExpConfig:
             raise ValueError(f"bad post_correction={self.post_correction}")
         if self.gate_mode not in ("fixed", "adaptive"):
             raise ValueError(f"bad gate_mode={self.gate_mode}")
+        if self.corr_variant not in ("hard", "soft", "rel", "init"):
+            raise ValueError(f"bad corr_variant={self.corr_variant}")
 
 
 def calibrate(sc, cfg: ExpConfig, train_sets):
@@ -66,6 +76,8 @@ def calibrate(sc, cfg: ExpConfig, train_sets):
     cfg.validate()
     fk_solve = cfg.fk
     aw = 0.0
+    rel_w = 0.0
+    aw_by_set = None
     fk_prior = None
     prior_diag = None
     if cfg.fk == "corr":
@@ -85,12 +97,28 @@ def calibrate(sc, cfg: ExpConfig, train_sets):
         prior_diag = aligned.diagnostics
         if aligned.anchors:
             fk_prior = aligned.anchors
-            fk_solve = "fixed"  # Step3 D-2: accepted set anchors are fixed during refinement
+            if cfg.corr_variant == "hard":
+                fk_solve = "fixed"   # anchor 를 상수로 고정 (기본)
+            else:
+                fk_solve = "none"    # 큐브는 자유변수로 두고 방식별로 다르게 쓴다
+                if cfg.corr_variant == "soft":
+                    aw = cfg.corr_lambda
+                elif cfg.corr_variant == "rel":
+                    rel_w = cfg.corr_lambda
+                # init 은 아무 제약도 걸지 않는다(anchor 는 초기화 정보로만 남음)
+                if cfg.corr_weight_by_support and cfg.corr_variant == "soft":
+                    sup = (prior_diag or {}).get("per_set", {})
+                    # 관측이 적은 세트일수록 FK 를 더 믿는다
+                    aw_by_set = {}
+                    for s_key, v in sup.items():
+                        n = max(int(v.get("support", 1)), 1)
+                        aw_by_set[int(s_key)] = cfg.corr_lambda * (6.0 / n)
         else:
             fk_solve = "none"   # no reliable visual alignment: do not trust raw FK silently
     if cfg.solve == "unified":
         model = solve_unified(sc, cfg.markers, fk_solve, train_sets,
-                              anchor_weight=aw, fk_prior=fk_prior)
+                              anchor_weight=aw, fk_prior=fk_prior,
+                              rel_weight=rel_w, anchor_weight_by_set=aw_by_set)
     else:
         model = solve_independent(sc, cfg.markers, fk_solve, train_sets, fk_prior=fk_prior)
     model["requested_fk_mode"] = cfg.fk
