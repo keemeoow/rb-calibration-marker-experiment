@@ -43,7 +43,7 @@ class ExpConfig:
     #   soft : anchor 를 벌점으로만 당기고 큐브는 자유변수로 둔다
     #   rel  : 절대 anchor 대신 세트 쌍의 상대 변환만 FK 로 구속한다
     #   init : anchor 는 초기값으로만 쓰고 제약은 걸지 않는다
-    corr_variant: str = "hard"      # hard | soft | rel | init
+    corr_variant: str = "hard"      # hard | soft | rel | init | auto | iv
     corr_lambda: float = 0.3        # soft/rel 의 가중치
     corr_weight_by_support: bool = False   # 관측 적은 세트일수록 FK 를 더 믿는다
     post_correction: str = "none"   # none | ridge (C1 output correction, separate axis)
@@ -60,7 +60,7 @@ class ExpConfig:
             raise ValueError(f"bad post_correction={self.post_correction}")
         if self.gate_mode not in ("fixed", "adaptive"):
             raise ValueError(f"bad gate_mode={self.gate_mode}")
-        if self.corr_variant not in ("hard", "soft", "rel", "init"):
+        if self.corr_variant not in ("hard", "soft", "rel", "init", "auto", "iv"):
             raise ValueError(f"bad corr_variant={self.corr_variant}")
 
 
@@ -96,7 +96,10 @@ def calibrate(sc, cfg: ExpConfig, train_sets):
             visual_model=visual_model)
         prior_diag = aligned.diagnostics
         if aligned.anchors:
-            fk_prior = aligned.anchors
+            # iv 는 gate 대신 세트별 가중치로 신뢰도를 표현하므로
+            # gate 로 걸러진 anchor 대신 보정된 FK 전체를 넘긴다.
+            fk_prior = (aligned.corrected if cfg.corr_variant == "iv"
+                        else aligned.anchors)
             if cfg.corr_variant == "hard":
                 fk_solve = "fixed"   # anchor 를 상수로 고정 (기본)
             else:
@@ -106,6 +109,41 @@ def calibrate(sc, cfg: ExpConfig, train_sets):
                 elif cfg.corr_variant == "rel":
                     rel_w = cfg.corr_lambda
                 # init 은 아무 제약도 걸지 않는다(anchor 는 초기화 정보로만 남음)
+                if cfg.corr_variant == "iv":
+                    # 상수가 하나도 없는 방식.
+                    #   각 세트마다 두 값을 잰다.
+                    #     sigma_s : 그 세트 vision 합의의 흔들림 (관측들의 산포)
+                    #     d_s     : 보정된 FK 가 vision 합의에서 벗어난 거리
+                    #   가중치 w_s = sigma_s / sqrt(sigma_s^2 + d_s^2)
+                    #   FK 가 vision 의 흔들림 안에 있으면 w -> 1 (FK 를 믿는다)
+                    #   FK 가 크게 벗어나면 w -> 0 (그 세트에서 FK 를 버린다)
+                    #   문턱값도, 배율도, 잘라내기도 없다. gate 를 대체한다.
+                    aw = 1.0
+                    aw_by_set = {}
+                    for s_key, v in (prior_diag or {}).get("per_set", {}).items():
+                        sig = v.get("vision_scatter_mm")
+                        dts_ = v.get("prior_blend_dt_mm")
+                        if sig is None or dts_ is None:
+                            continue
+                        aw_by_set[int(s_key)] = float(
+                            sig / np.hypot(sig, dts_)) if (sig or dts_) else 1.0
+                elif cfg.corr_variant == "auto":
+                    # FK anchor 를 얼마나 믿을지 데이터에서 정한다.
+                    #   sigma_V = vision 합의 자신의 흔들림 (gate 하한으로 이미 계산됨)
+                    #   sigma_F = de-bias 후 남은 FK 잔차 (gate 거리의 중앙값)
+                    # 둘의 비가 곧 상대 신뢰도다. FK 잔차가 vision 흔들림보다 작으면
+                    # anchor 를 강하게, 크면 약하게 당긴다. 극단에서 각각
+                    # fixed-FK 와 no-FK 로 수렴한다.
+                    dg = prior_diag or {}
+                    sV = dg.get("gate_floor_dt_mm") or 0.0
+                    dts = [v.get("prior_blend_dt_mm") for v in
+                           dg.get("per_set", {}).values()
+                           if v.get("prior_blend_dt_mm") is not None]
+                    sF = float(np.median(dts)) if dts else 0.0
+                    if sV > 0 and sF > 0:
+                        aw = float(np.clip(cfg.corr_lambda * (sV / sF), 0.02, 5.0))
+                    else:
+                        aw = cfg.corr_lambda
                 if cfg.corr_weight_by_support and cfg.corr_variant == "soft":
                     sup = (prior_diag or {}).get("per_set", {})
                     # 관측이 적은 세트일수록 FK 를 더 믿는다
@@ -135,6 +173,7 @@ def run_config(cfg: ExpConfig, seeds=20, n_sets=10, sigma_px=0.3, train_size=8,
                intrinsic_err=0.0, outlier_rate=0.0,
                n_gripped_events=0,
                fk_slip_sets=0, fk_slip_mm=0.0, fk_slip_deg=0.0,
+               fk_sys_res_ratio=0.4,
                corner_bias_px=0.0, outlier_focus_cam=None,
                max_cams_per_set=None,
                intrinsic_jitter=0.0, use_real_layout=False):
@@ -155,6 +194,7 @@ def run_config(cfg: ExpConfig, seeds=20, n_sets=10, sigma_px=0.3, train_size=8,
                       n_gripped_events=n_gripped_events,
                       fk_slip_sets=fk_slip_sets, fk_slip_mm=fk_slip_mm,
                       fk_slip_deg=fk_slip_deg,
+                      fk_sys_res_ratio=fk_sys_res_ratio,
                       corner_bias_px=corner_bias_px,
                       outlier_focus_cam=outlier_focus_cam,
                       max_cams_per_set=max_cams_per_set,

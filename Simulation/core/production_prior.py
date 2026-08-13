@@ -233,6 +233,12 @@ def align_and_blend_set_priors(
             "prior_accepted": bool(accepted),
             "prior_blend_dt_mm": dt_mm,
             "prior_blend_dr_deg": dr_deg,
+            # 그 세트의 vision 합의가 얼마나 흔들리는지(관측들의 산포).
+            # 상수 없는 가중치 계산에 쓰인다.
+            "vision_scatter_mm": (float(scatter_by_set.get(int(s), (0.0, 0.0))[0])
+                                  if scatter_by_set else None),
+            "vision_scatter_deg": (float(scatter_by_set.get(int(s), (0.0, 0.0))[1])
+                                   if scatter_by_set else None),
         }
 
     return PriorAlignmentResult(corrected, anchors, delta, {

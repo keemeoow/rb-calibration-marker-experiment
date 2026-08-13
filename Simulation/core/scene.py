@@ -42,6 +42,7 @@ class SimScene:
                  fk_sys_mm=0.0, fk_sys_deg=0.0,
                  intrinsic_err=0.0, outlier_rate=0.0, outlier_px=15.0,
                  fk_slip_sets=0, fk_slip_mm=0.0, fk_slip_deg=0.0,
+                 fk_sys_res_ratio=0.4,
                  corner_bias_px=0.0, outlier_focus_cam=None,
                  max_cams_per_set=None,
                  intrinsic_jitter=0.0, use_real_layout=False,
@@ -176,7 +177,9 @@ class SimScene:
             T_delta = np.eye(4)
             T_delta[:3, 3] = bvec * (fk_sys_mm / 1000.0)
             T_delta[:3, :3] = rot_axis_angle(ax_s, np.deg2rad(fk_sys_deg))
-            res_std = (fk_sys_mm / 1000.0) * 0.4               # per-set 잔차 std (de-bias 후 남음)
+            # per-set 잔차 std (de-bias 후 남음). 실측 session02 는 계통 40.9mm 에
+            # 잔차 3.5mm 로 비율이 0.086 이었다. 기본 0.4 는 예전 가정값이다.
+            res_std = (fk_sys_mm / 1000.0) * float(fk_sys_res_ratio)
             fk_sys = (T_delta, res_std)
         self.fk_cube = {}
         for s in self.sets:
