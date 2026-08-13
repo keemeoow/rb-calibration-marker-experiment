@@ -655,22 +655,21 @@
   \vfill
   \textbf{9.2 목적함수}
   \[
-    \underset{
-      \{\T{B}{C_i}\},\ \T{G}{C_g},\ \{\T{B}{O,s}\}
-    }{\operatorname{argmin}}
-    \ \mathcal{E}_{\mathrm{vis}}
-    \qquad\text{이때}\qquad
-    \T{B}{\Oref_s}\;\equiv\;\T{B}{O,s}
+    \begin{aligned}
+      \text{최소화} \quad & \mathcal{E}_{\mathrm{vis}}
+      \\[3pt]
+      \text{움직이는 값} \quad &
+        \{\T{B}{C_i}\},\quad \T{G}{C_g},\quad \{\T{B}{O,s}\}
+      \\[3pt]
+      \text{기준 자세} \quad &
+        \T{B}{\Oref_s}\;\equiv\;\T{B}{O,s}
+    \end{aligned}
   \]
   \vfill
   \begin{itemize}
-    \item argmin 아래 = \textbf{움직여도 되는 값}. 큐브 자세가 여기 들어가 있음
-    \item 오른쪽 $\equiv$ 는 제약이 아니라 \textbf{같은 것을 가리키는 두 이름}
-      \begin{itemize}
-        \item 8장의 기준 자세 자리를 자유변수가 그대로 채운다는 뜻
-        \item \texttt{No-FK}에서는 \textbf{못 박는 값이 하나도 없음}
-          (10.2절, 11.8절과 다른 점)
-      \end{itemize}
+    \item 둘째 줄에 \textbf{큐브 자세가 들어가 있음} $\rightarrow$ 함께 찾는 대상
+    \item 셋째 줄의 $\equiv$ 는 제약이 아니라 \textbf{같은 것을 가리키는 두 이름}
+      $\rightarrow$ \texttt{No-FK}에는 못 박는 값이 하나도 없음
   \end{itemize}
 \end{frame}
 
@@ -714,10 +713,17 @@
 
 \begin{frame}{10.2 목적함수}
   \[
-    \underset{\{\T{B}{C_i}\},\ \T{G}{C_g}}{\operatorname{argmin}}
-    \ \mathcal{E}_{\mathrm{vis}}
-    \qquad\text{단}\qquad
-    \T{B}{\Oref_s}=\T{B}{\Ofk_s}
+    \begin{aligned}
+      \text{최소화} \quad & \mathcal{E}_{\mathrm{vis}}
+      \\[3pt]
+      \text{움직이는 값} \quad &
+        \{\T{B}{C_i}\},\quad \T{G}{C_g}
+        \qquad\text{\small(큐브 자세가 빠짐)}
+      \\[3pt]
+      \text{기준 자세} \quad &
+        \T{B}{\Oref_s}=\T{B}{\Ofk_s}
+        \qquad\text{\small(상수. 못 박음)}
+    \end{aligned}
   \]
   \vfill
   완전히 펼치면
@@ -740,7 +746,8 @@
   }
   \vfill
   \begin{itemize}
-    \item argmin 아래에서 큐브 자세가 빠짐 $\rightarrow$ 미지수가 둘로 줄어듦
+    \item 9.2절과 비교하면 \textbf{둘째 줄에서 큐브 자세가 사라짐}
+      $\rightarrow$ 미지수가 둘로 줄어듦
   \end{itemize}
 \end{frame}
 
@@ -1282,14 +1289,20 @@
 \begin{frame}{11.8 단계 7: anchor 고정 후 최종 refinement}
   확정된 $\T{B}{\Oanc_s}$ 를 고정 anchor로 사용
   \[
-    \underset{\{\T{B}{C_i}\},\ \T{G}{C_g}}{\operatorname{argmin}}
-    \ \mathcal{E}_{\mathrm{vis}}
-    \qquad\text{단}\qquad
-    \T{B}{\Oref_s}=\T{B}{\Oanc_s}
+    \begin{aligned}
+      \text{최소화} \quad & \mathcal{E}_{\mathrm{vis}}
+      \\[3pt]
+      \text{움직이는 값} \quad &
+        \{\T{B}{C_i}\},\quad \T{G}{C_g}
+      \\[3pt]
+      \text{기준 자세} \quad &
+        \T{B}{\Oref_s}=\T{B}{\Oanc_s}
+        \qquad\text{\small(상수. 못 박음)}
+    \end{aligned}
   \]
   \begin{itemize}
-    \item 식의 형태는 10.2절 \texttt{Fixed-FK}와 동일
-    \item 다른 것은 못 박은 값뿐:
+    \item 세 줄 모두 10.2절 \texttt{Fixed-FK}와 같은 자리, 같은 형태
+    \item 다른 것은 셋째 줄에 못 박은 값뿐:
       raw FK $\T{B}{\Ofk_s}$ 가 아니라 검산을 거친 $\T{B}{\Oanc_s}$
   \end{itemize}
   \vfill
