@@ -49,6 +49,13 @@
   \vspace*{\fill}
 }
 
+% ── 11장 Corrected-FK 수록 여부 ──────────────────────────
+% 아직 검증이 끝나지 않은 방식이라 현재 발표본에서는 제외한다.
+% 되살리려면 아래 한 줄을 \correctedfktrue 로 바꾸기만 하면 된다.
+% (11장 본문과 1.4 / 5 / 9장의 관련 서술이 함께 되돌아온다)
+\newif\ifcorrectedfk
+\correctedfkfalse
+
 % 표 안에서 줄 간격을 조금 넓힌다
 \renewcommand{\arraystretch}{1.3}
 
@@ -84,7 +91,7 @@
 \end{frame}
 
 %==================================================================
-\section{1. 왜 캘리브레이션이 필요한가}
+\section{1. 캘리브레이션이란, 그리고 카메라 구성}
 %==================================================================
 
 \begin{frame}{1.1 로봇과 카메라는 서로 다른 것을 안다}
@@ -153,7 +160,118 @@
   \end{block}
 \end{frame}
 
-\begin{frame}{1.4 이 프로젝트의 설정}
+\begin{frame}{1.4 구성 1: eye-in-hand (카메라가 손에 붙음)}
+  카메라를 로봇 손목에 장착 $\rightarrow$ 로봇이 움직이면 카메라도 함께 움직임
+  \vfill
+  \begin{block}{보는 경로}
+    \centering
+    베이스 $\rightarrow$ 손 $\rightarrow$ 카메라 $\rightarrow$ 물체
+  \end{block}
+  \vfill
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{찾아야 하는 것}
+        \begin{minipage}[t][20mm][t]{\linewidth}
+          \begin{itemize}
+            \item \textbf{손과 카메라 사이 관계} 하나
+            \item 나사로 고정 $\rightarrow$ 안 변함
+          \end{itemize}
+        \end{minipage}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{어떻게 푸는가}
+        \begin{minipage}[t][20mm][t]{\linewidth}
+          \begin{itemize}
+            \item 로봇을 여러 자세로 옮기며 같은 물체를 촬영
+            \item 손 위치는 로봇이 알려줌
+          \end{itemize}
+        \end{minipage}
+      \end{block}
+    \end{column}
+  \end{columns}
+  \vfill
+  \centering
+  카메라가 물체에 가까이 갈 수 있음. 대신 한 번에 좁은 범위만 봄
+\end{frame}
+
+\begin{frame}{1.5 구성 2: eye-to-hand (카메라가 밖에 고정)}
+  카메라를 작업대에 고정 $\rightarrow$ 로봇이 움직여도 카메라는 그대로
+  \vfill
+  \begin{block}{보는 경로}
+    \centering
+    베이스 $\rightarrow$ 카메라 $\rightarrow$ 물체
+    \qquad {\small(손을 거치지 않음. 한 칸 짧다)}
+  \end{block}
+  \vfill
+  \begin{columns}[T]
+    \begin{column}{0.48\textwidth}
+      \begin{block}{찾아야 하는 것}
+        \begin{minipage}[t][20mm][t]{\linewidth}
+          \begin{itemize}
+            \item \textbf{베이스와 카메라 사이 관계} 하나
+          \end{itemize}
+        \end{minipage}
+      \end{block}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \begin{block}{어떻게 푸는가}
+        \begin{minipage}[t][20mm][t]{\linewidth}
+          \begin{itemize}
+            \item 로봇 손에 마커를 들려 여러 자세로 움직임
+            \item 마커 위치를 로봇도 알고 카메라도 봄 $\rightarrow$ 맞춰봄
+          \end{itemize}
+        \end{minipage}
+      \end{block}
+    \end{column}
+  \end{columns}
+  \vfill
+  \centering
+  작업 공간 전체를 봄. 대신 멀어서 정밀도가 떨어지고 로봇에 가려짐
+\end{frame}
+
+\begin{frame}{1.6 구성 3: eye-to-hand 여러 대}
+  가림과 사각지대를 줄이려고 고정 카메라를 여러 대 설치
+  \vfill
+  \begin{alertblock}{순진한 방법: 카메라마다 따로 캘리브레이션}
+    카메라 $0$은 카메라 $0$대로, 카메라 $1$은 카메라 $1$대로 각각 품\\
+    $\rightarrow$ 같은 물체를 두고 \textbf{서로 다른 좌표}를 말하게 됨 (1.3절)
+  \end{alertblock}
+  \vfill
+  \begin{block}{그래서 한꺼번에 푼다}
+    \begin{itemize}
+      \item 모든 카메라가 \textbf{같은 물체를 동시에} 보게 함
+      \item 모두가 같은 답을 말하도록 카메라 위치들을 \textbf{함께} 조정
+      \item 새로 생기는 미지수: \textbf{그때 물체가 어디 있었는가}
+    \end{itemize}
+  \end{block}
+  \vfill
+  \centering
+  {\small 카메라를 따로 세우면 어긋남이 남는다 $\rightarrow$ 묶어서 세워야 한다}
+\end{frame}
+
+\begin{frame}{1.7 구성 4: 여기에 eye-in-hand까지 추가}
+  고정 카메라 여러 대 \textbf{+} 손목 카메라 하나 = 이 프로젝트의 구성
+  \vfill
+  \begin{block}{손목 카메라를 왜 더하는가}
+    \begin{itemize}
+      \item 로봇과 함께 움직이며 \textbf{여러 각도에서} 같은 물체를 봄
+      \item 고정 카메라 A와 B가 서로 안 보여도,
+        손목 카메라가 양쪽을 차례로 방문 $\rightarrow$ \textbf{둘을 이어주는 다리}
+      \item 물체에 가까이 가서 찍으므로 정밀한 관측을 보탬
+    \end{itemize}
+  \end{block}
+  \vfill
+  \begin{alertblock}{이제 한 번에 찾아야 하는 것}
+    고정 카메라들의 자세 (여러 개) \ $+$ \ 손-카메라 관계 (한 개)
+    \ $+$ \ 물체 자세 (촬영 상황마다)
+  \end{alertblock}
+  \vfill
+  \centering
+  {\small 5장에서 기호로, 6장에서 식으로 다시 정리}
+\end{frame}
+
+\begin{frame}{1.8 이 프로젝트의 설정}
   \begin{itemize}
     \item 로봇 그리퍼가 큐브를 잡고 여러 위치로 옮김
     \item 큐브를 한 번 놓은 상태 = \textbf{세트}
@@ -166,7 +284,7 @@
     \end{itemize}
   \end{block}
   \vfill
-  \begin{alertblock}{9\,--\,11장의 핵심 주제}
+  \begin{alertblock}{9\,--\,\ifcorrectedfk 11\else 10\fi 장의 핵심 주제}
     로봇이 큐브를 잡고 있음 $\rightarrow$ 관절값으로 큐브 위치를 짐작 가능\\
     이 정보를 \textbf{얼마나 믿을 것인가}
   \end{alertblock}
@@ -425,8 +543,12 @@
   \end{itemize}
   \vfill
   \begin{alertblock}{}
-    세 FK 방식의 차이 = $\T{B}{O,s}$를 자유롭게 찾는가 / FK 값에 고정하는가 /
-    보정된 anchor에 고정하는가
+    \ifcorrectedfk
+      세 FK 방식의 차이 = $\T{B}{O,s}$를 자유롭게 찾는가 / FK 값에 고정하는가 /
+      보정된 anchor에 고정하는가
+    \else
+      두 FK 방식의 차이 = $\T{B}{O,s}$를 자유롭게 찾는가 / FK 값에 고정하는가
+    \fi
   \end{alertblock}
 \end{frame}
 
@@ -631,6 +753,7 @@
   \end{alertblock}
 \end{frame}
 
+\ifcorrectedfk
 \begin{frame}{9. 앞으로 볼 세 가지 방식}
   같은 관측식. $\T{B}{\Oref_s}$ 를 무엇으로 채우는지가 다름
   \[
@@ -649,9 +772,30 @@
       gate 통과 세트에서만 사용 \hfill (11장)
   \end{itemize}
   \vfill
-  {\small 어깨의 $\mathrm{fk}$, $\mathrm{anc}$ 는 \textbf{같은 큐브를 누가 어떻게 짚었는가}를 구분하는 이름.
+  {\small 어깨의 $\mathrm{fk}$, $\mathrm{anc}$ 는
+  \textbf{같은 큐브를 누가 어떻게 짚었는가}를 구분하는 이름.
   $\Ofk_s$는 10.1절, $\Oanc_s$는 11.7절에서 정의}
 \end{frame}
+\else
+\begin{frame}{9. 앞으로 볼 두 가지 방식}
+  같은 관측식. $\T{B}{\Oref_s}$ 를 무엇으로 채우는지가 다름
+  \[
+    \T{B}{\Oref_s}=
+    \begin{cases}
+      \T{B}{O,s}, & \texttt{No-FK} \quad (\text{자유변수}) \\[4pt]
+      \T{B}{\Ofk_s}, & \texttt{Fixed-FK} \quad (\text{raw FK에 고정})
+    \end{cases}
+  \]
+  \vfill
+  \begin{itemize}
+    \item \texttt{No-FK}: 큐브 자세도 직접 찾음 \hfill (9장)
+    \item \texttt{Fixed-FK}: 큐브 자세를 raw FK에 못 박음 \hfill (10장)
+  \end{itemize}
+  \vfill
+  {\small 어깨의 $\mathrm{fk}$ 는 \textbf{같은 큐브를 누가 짚었는가}를 구분하는 이름.
+  $\Ofk_s$는 10.1절에서 정의}
+\end{frame}
+\fi
 
 %==================================================================
 \section{9.1 방법 1: No-FK}
@@ -890,6 +1034,10 @@
 \end{frame}
 
 %==================================================================
+% 11장 Corrected-FK. 검증이 끝나지 않아 현재 발표본에서는 제외.
+% 프리앰블의 \correctedfkfalse 를 \correctedfktrue 로 바꾸면 되살아난다.
+%==================================================================
+\ifcorrectedfk
 \section{11. 방법 3: Corrected-FK}
 %==================================================================
 
@@ -1364,5 +1512,41 @@
   \vfill
   \centering 이 장의 수치와 정책은 이후 실험 결과에 따라 변경 가능
 \end{frame}
+\fi
+% ── 11장 끝 ──────────────────────────────────────────────
+
+%==================================================================
+% 11장을 빼고 발표할 때의 마무리. 10장이 문제 제기로 끝나므로
+% 여기서 두 방식을 정리하고 현재 선택을 밝힌다.
+%==================================================================
+\ifcorrectedfk\else
+\begin{frame}{11. 정리: 두 방식의 비교}
+  \begin{center}
+    \small
+    \begin{tabular}{lll}
+      \toprule
+       & \texttt{No-FK} (9장) & \texttt{Fixed-FK} (10장) \\
+      \midrule
+      큐브 자세 $\T{B}{\Oref_s}$ & 자유변수 & raw FK에 고정 \\
+      미지수 개수 & 많음 (세트마다 $6$개 추가) & 적음 \\
+      raw FK 오차 & 들어오지 않음 & $\T{B}{C_i}$, $\T{G}{C_g}$ 로 유입 \\
+      카메라 계통오차 & 들어옴 & 들어옴 \\
+      오염원 & \textbf{하나} & \textbf{둘} \\
+      \bottomrule
+    \end{tabular}
+  \end{center}
+  \vfill
+  \begin{alertblock}{현재 선택}
+    \begin{itemize}
+      \item FK가 정확하다고 보장할 수 없고,
+        틀려도 잔차로는 확인되지 않음 (10.4절)
+      \item $\rightarrow$ 오염원이 하나뿐인 \texttt{No-FK}를 기준으로 삼음
+    \end{itemize}
+  \end{alertblock}
+  \vfill
+  \centering
+  {\small raw FK를 보정해서 쓰는 방식은 검증 진행 중 $\rightarrow$ 별도 발표}
+\end{frame}
+\fi
 
 \end{document}
