@@ -127,7 +127,7 @@ PYTHONPATH= python CP_C2_cube_vs_board.py \
 
 모든 A0–B3 조건은 손목 카메라 뷰를 정합하기 위한 운동학 백본
 `T_base_gripper=FK(q)`를 공통으로 사용한다. 실험 축은 백본 FK 사용 여부가 아니라
-target pose source이며, [`CP_ablation_schema.py`](CP_ablation_schema.py)에 7행 정의와
+target pose source이며, [`CP_table1_schema.py`](CP_table1_schema.py)에 7행 정의와
 검증 규칙을 고정했다. 외부 고정 board에는 robot FK pose가 없으므로
 `FK→board=FK-fixed`인 조건은 실행 전에 오류로 반려된다.
 
@@ -141,12 +141,7 @@ FK-fixed 행의 artifact는 board hand-eye보다 먼저, raw `set_cube_center_6d
 cube corners만으로 `T_gripper_cam`과 FK-cube→tag-object delta를 공동 추정한다.
 B1/A3/B2는 동일 SHA와 fixed cube matrix를 사용하며 B2의 전처리에도 board가 들어가지 않는다.
 
-```bash
-python3 CP_build_board_free_fk_artifact.py \
-  --root_folder data/session \
-  --intrinsics_dir intrinsics \
-  --out_dir CP_result/session01/artifacts/fk_cube_artifact
-```
+board-free FK artifact 생성은 `CP_table1_ablation.py`의 공통 data preparation 단계에 통합돼 있다.
 
 실데이터 canonical artifact는 108 observations/1148 corners, Jacobian 12/12 full rank,
 condition 38.11이며 3개 초기값 모두 수렴했다. 기존 board-derived delta와는
@@ -155,7 +150,7 @@ condition 38.11이며 3개 초기값 모두 수렴했다. 기존 board-derived d
 어떤 ablation 행도 소비하지 않는다.
 
 ```bash
-python3 CP_ablation_7row.py \
+python3 CP_table1_ablation.py \
   --root_folder data/session \
   --intrinsics_dir intrinsics \
   --calib_dir data/session/calib_out \
@@ -301,25 +296,6 @@ SOTA 표는 서로 다른 논문의 mm/°를 `e_task_pose` 하나로 합치지 �
 원문 링크와 전체 표·runtime/view 정의는
 [`Calibration_Experiment_table.md`](Calibration_Experiment_table.md)의 Table 6에 있다.
 
-### A2 strict-none vs A3 FK-fixed — historical 진단
-
-```bash
-python3 CP_A2_strict_none.py \
-  --root_folder data/session \
-  --intrinsics_dir intrinsics \
-  --calib_dir data/session/calib_out \
-  --test_sets 0,4,6,12 \
-  --num_inits 5 \
-  --max_nfev 300 \
-  --out_dir CP_result/session01/main/A2_strict_none
-```
-
-A2는 set별 cube pose를 visual-only 초기값에서 자유변수로 풀며 FK residual과
-post-correction을 전혀 사용하지 않는다. A3는 동일 관측·optimizer에서 cube pose만
-aligned FK에 고정한다. 다만 이 독립 script는 canonical backend 추출 전 historical
-diagnostic이며, 핵심표의 A2/A3는 이제 7행 runner의 공통 backend 결과만 사용한다.
-종료조건 미도달 시 단일 오차값을 핵심표 값으로 채택하지 않는다.
-
 ### D1 — FK 고정 × 잔차 보정 2×2 (`CP_D1_fk_correction_2x2.py`)
 
 "cube pose를 FK로 고정하고 예측 단계에서 잔차를 보정하는 구성이 최선인가"를 **동일
@@ -337,7 +313,7 @@ PYTHONPATH= python3 CP_D1_fk_correction_2x2.py \
 
 **Split은 위치(set) 단위 leave-one-out 13 fold다.** 잔차 보정은 공간적 일반화 주장이므로
 모든 위치가 train 에 들어가는 이벤트 split 으로는 검증할 수 없다. 이 split 의 역할은
-`CP_ablation_schema.POSITION_HOLDOUT_ROLE` 에 따라 **`FK-proxy` 전용**이다. Held-out 위치의
+과거 schema의 position-holdout 계약에 따라 **`FK-proxy` 전용**이다. Held-out 위치의
 캡처 이벤트는 board 관측까지 양쪽 arm 에서 동일하게 제외하고, FK artifact 도 fold 마다 train
 위치만으로 재추정한다(이벤트 누수는 assert 로 차단).
 

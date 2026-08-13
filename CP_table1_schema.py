@@ -1,4 +1,4 @@
-"""Canonical condition schema for the seven-row calibration ablation.
+"""Canonical method schema and comparison contract for Table 1.
 
 Robot FK ``T_base_gripper`` is a common kinematic backbone in every condition.
 The pose-source fields below describe only whether a target pose is fixed from

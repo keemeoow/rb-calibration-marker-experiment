@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Fair seven-row real-data ablation with a shared reprojection backend.
+"""Run the A0/A1/A2/A3/B1/B2/B3 Table 1 ablation on one shared backend.
 
-The runner implements the contract in ``CP_ablation_schema.py``:
+The runner implements the contract in ``CP_table1_schema.py``:
 
 * all rows share robot FK as the hand-eye kinematic backbone;
 * ``seq`` is eih-only fitting followed by an e2h-only camera fit, with an
@@ -33,10 +33,7 @@ from scipy.spatial.transform import Rotation
 
 import CP_common as cp
 import Step3_calibration as s3
-from CP_A2_strict_none import (
-    align_fk_from_train,
-)
-from CP_ablation_schema import (
+from CP_table1_schema import (
     EVALUATION_COMPARISON_CONTRACT,
     FK_ALIGNMENT_SHARED_ROWS,
     MAIN_ABLATION_CONDITIONS,
@@ -79,6 +76,28 @@ from calibration_reprojection_backend import (
     state_transform,
     variable_keys,
 )
+
+
+def align_fk_from_train(meta: dict, train_sets: Sequence[int],
+                        visual_cube_init: Dict[int, np.ndarray]):
+    """Estimate the cube-center-to-tag-object transform from training sets only."""
+    raw_all = s3.load_nominal_set_cube_transforms(meta)
+    raw_train = {int(s): raw_all[int(s)] for s in train_sets if int(s) in raw_all}
+    estimated_train = {
+        int(s): visual_cube_init[int(s)]
+        for s in train_sets
+        if int(s) in visual_cube_init
+    }
+    delta, _, diagnostics = s3.estimate_set_cube_prior_alignment(
+        raw_train, estimated_train)
+    if delta is None:
+        raise RuntimeError("train-only FK/object-frame alignment failed")
+    aligned_all = {
+        int(s): np.asarray(transform, dtype=np.float64)
+        @ np.asarray(delta, dtype=np.float64)
+        for s, transform in raw_all.items()
+    }
+    return aligned_all, diagnostics
 
 
 def _jsonable(value: Any) -> Any:

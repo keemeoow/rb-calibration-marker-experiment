@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Export blind-session target predictions from one frozen calibration method.
+"""Export blind-session target predictions from one frozen Table 1 method.
 
-The output schema is consumed by ``CP_final_external_gt_eval.py``.  No external
+The output schema is consumed by ``CP_table1_external_gt_eval.py``.  No external
 GT is read here: predictions are produced only from frozen calibration
 transforms, measured blind RGB corners, robot FK and frozen intrinsics.
 """
@@ -17,7 +17,7 @@ import numpy as np
 
 import CP_common as cp
 import Step3_calibration as s3
-from CP_ablation_7row import detect_observations
+from CP_table1_ablation import detect_observations
 from calibration_path_evaluation import solve_observed_pose
 from calibration_reprojection_backend import PoseState
 from calibration_runtime_utils import load_intrinsics_with_depth_scale

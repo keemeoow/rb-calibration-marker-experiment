@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-CP_common.py — CP_C1/C2/C3 비교실험이 공유하는 로더·기하·지표 유틸.
+CP_common.py — Step3와 Table 1 실험이 공유하는 로더·기하·지표 유틸.
 
 캡처 세션(meta.json + 이미지)에서 관측을 읽고, SE(3) 기하/정합/지표를 계산하는
-실험-무관 하위 계층. C1/C2/C3 진입 파일과 보조 진단 스크립트가 모두 이 모듈을 쓴다.
-(과거에는 CP_Step3_compare_calibrartion.py 안에 함께 있었으나 여기로 물리 분리했다.)
+실험-무관 하위 계층. Step3와 Table 1 runner가 동일한 좌표계 구현을 쓰도록 한다.
 """
 
 from __future__ import annotations
@@ -1251,11 +1250,11 @@ def reprojection_errors(
 # ══════════════════════════════════════════════════════════════════════════════
 # 공유 고정-카메라 solver — 03(pose-consistency) / 04(direct reprojection)
 # ------------------------------------------------------------------------------
-# 예전에는 이 두 최적화기가 CP_C3 안에만 있었고, Step3 의 고정-카메라 등록은
+# 예전에는 이 두 최적화기가 과거 C3 실험에만 있었고, Step3 의 고정-카메라 등록은
 # closed-form robust SE(3) 평균(= C3 의 02_pnp_robust_se3)에서 멈췄다. 실측 비교
 # (data/session)에서 04(재투영오차 직접 최소화)가 재투영 RMSE 를 9.31→5.51px(-41%),
 # median 1.48→0.79px(-47%) 로 낮춰 픽셀 정합이 가장 좋았다. 그래서 세 스크립트
-# (Step3 / CP_C1 / CP_C3)가 모두 같은 solver 를 쓰도록 여기로 끌어올린다.
+# Step3와 Table 1이 모두 같은 solver를 쓰도록 여기로 끌어올렸다.
 #
 # 두 최적화기 모두 게이지(ref_cam)를 항등으로 고정한 cam-ref 프레임에서 풀고,
 # 호출부가 목적에 맞는 최적화기와 초기값을 선택한다.

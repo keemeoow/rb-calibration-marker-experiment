@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Session-paired external-GT evaluation for the final calibration claim.
+"""Session-paired external-GT evaluation for the Table 1 calibration claim.
 
 The input manifest contains independent GT and one prediction file per method
 and session.  The runner computes TRE, rotation geodesic error, optional

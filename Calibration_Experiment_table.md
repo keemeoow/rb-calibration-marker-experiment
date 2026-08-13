@@ -33,9 +33,9 @@
 
 | 기여 | 제안 내용 | 핵심 검증 | session02-late의 현재 결과 | 현재 판정 |
 | --- | --- | --- | --- | --- |
-| **C1. 통합 로봇 기준 다중 카메라 보정** | 여러 고정 카메라와 손목 카메라를 공유 표적 기반의 하나의 최적화에서 공동 등록 | `B1→A4` | 홀드아웃 전체 재투영 RMSE `−0.0098 px`, 카메라 간 위치 불일치 `−0.5819 mm`, 고정↔손목 경로 위치 불일치 `−0.1701 mm` | 내부 지표의 소폭 개선만 확인. 독립 외부 GT 전에는 기여 입증 불가 |
+| **C1. 통합 로봇 기준 다중 카메라 보정** | 여러 고정 카메라와 손목 카메라를 공유 표적 기반의 하나의 최적화에서 공동 등록 | `B1→A4` | 홀드아웃 전체 재투영 RMSE `−0.0097 px`, 카메라 간 위치 불일치 `−0.5697 mm`, 고정↔손목 경로 위치 불일치 `−0.1657 mm` | 내부 지표의 소폭 개선만 확인. 독립 외부 GT 전에는 기여 입증 불가 |
 | **C2. 파지 가능한 다면 마커 큐브** | 평면 보드를 넘어 여러 카메라와 로봇 조작이 공유하는 3차원 강체 표적 제공 | 주 비교 `B3→A2`; 보조 비교 `A0→A1` | 공통 보드 재투영 오차가 각각 `+0.0209 px`, `+0.0274 px`로 개선되지 않음 | 현재 안정 구간에서는 정확도·등록률 이득 미확인. 관측 범위와 외부 GT 평가 필요 |
-| **C3. 불확실성 인지 정기구학 기반 등록** | FK를 공분산 가중 강건 soft constraint로 영상과 융합 | `A2→A3→A4a→A4b→A4` | hard-FK(A3)는 전체 재투영 `−0.6157 px`, 카메라 간 위치 불일치 `−2.2955 mm`이나 고정↔손목 경로는 `+0.7211 mm` 악화. A4는 A2 대비 `−0.0124 px` | 실측 `Σ_FK`가 아닌 임시값을 쓴 preflight이므로 최종 기여 미입증 |
+| **C3. 불확실성 인지 정기구학 기반 등록** | FK를 공분산 가중 강건 soft constraint로 영상과 융합 | `A2→A3→A4a→A4b→A4` | hard-FK(A3)는 전체 재투영 `−0.6157 px`, 카메라 간 위치 불일치 `−2.2955 mm`이나 고정↔손목 경로는 `+0.7211 mm` 악화. Simulation-matched A4는 A2 대비 `−0.0195 px` | 실측 `Σ_FK`가 아닌 고정 prior를 쓴 preflight이므로 최종 기여 미입증 |
 | **C4. 실제 로봇 시스템 검증** | 재투영 오차를 넘어 독립 외부 GT와 실제 조작 작업으로 유효성 검증 | `TRE_t`, `e_R`, ADD/ADD-S, 작업 오차·파지 성공률 | 독립 외부 GT와 blind task 결과 없음 | 미평가 |
 
 따라서 현재 논문에서 안전하게 말할 수 있는 범위는 **“통합 보정, 다면 큐브, 불확실성 기반 FK 융합을
@@ -63,7 +63,6 @@
 | `r_FK` | FK 잔차 | FK 예측 자세와 시각 기반 큐브 자세 사이의 6차원 차이 |
 | `Σ_FK` | FK 공분산 | FK 위치·회전 오차의 크기와 축 간 상관관계를 나타내는 6×6 행렬 |
 | `ρ(·)` | 강건 손실 함수 | 큰 이상치의 영향을 줄이는 Huber 또는 soft-L1 함수 |
-| `λ` | 고정 FK 가중치 | 공분산 대신 쓰는 사전 고정된 soft-FK 제약 강도 |
 | `E_visual`, `E_FK` | 영상 비용, FK 비용 | 각각 raw-corner 재투영 잔차 비용과 FK 자세 잔차 비용 |
 | `RMSE` | 평균제곱근오차 | 오차 제곱의 평균에 제곱근을 취한 값; 낮을수록 좋음 |
 | `TRE_t` | 표적 위치 등록오차 | 외부 GT와 예측 표적 중심 사이의 3차원 거리(mm) |
@@ -87,7 +86,7 @@
 - Session02 안정 구간의 공통 홀드아웃 분할에서 영상 전용 통합 보정은 순차 보정 대비 전체 재투영
   RMSE를 0.0113 px 줄였다. 차이는 작으며 외부 정확도 근거는 아니다.
 - 공분산 기반 강건 soft-FK와 공정 B1/B2 비교군은 구현·실행됐다. 다만 실측 `Σ_FK`가 없어
-  3 mm / 0.3 deg 등방성 임시값을 쓴 **software 예비실험(preflight)** 결과다.
+  Simulation과 동일하게 동결한 2 mm / 0.3 deg 등방성 prior를 쓴 **software 예비실험(preflight)** 결과다.
 - A5 6-DoF correction과 독립 외부 GT 평가는 아직 없다. 따라서 `TRE_t`, `e_R`, ADD/ADD-S와
   절대 3D 정확도 우열은 판정할 수 없다.
 - 현재 평가지표 설계는 보완 후 충분하지만, session02에서 실제 계산된 내부 진단 지표만으로는 네 기여를
@@ -101,24 +100,44 @@
 
 - `seq`: eye-in-hand와 eye-to-hand를 순차적으로 풀고 앞 단계 결과를 동결한다.
 - `U-BA`: 고정·손목 카메라, hand-eye, target pose를 하나의 pixel-level bundle adjustment에서 푼다.
-- `hard-FK`: cube pose를 FK pose에 고정한다.
-- `soft-FK`: cube pose를 자유변수로 두고 covariance-weighted robust FK factor를 추가한다.
+- `none`(`A2`): cube pose를 자유변수로 두고 FK factor를 넣지 않는다.
+- `fixed`(`A3`): cube pose를 FK pose에 고정하고 최적화 변수에서 제외한다.
+- `factor`(`A4`, `B1`, `B2`): cube pose를 자유변수로 두고 whitening된 robust FK factor를 추가한다.
+- `corr`(Simulation의 구 비교군): visual-only 보정 뒤 위치에만 Ridge 후보정을 적용한다. 회전을 보정하지
+  않으므로 Table 1의 train-only 6자유도 correction 후보 `A5`와 같은 방법으로 취급하지 않는다.
 - `correction`: calibration 이후 held-out target pose 예측에만 적용한다. Calibration transform은 바꾸지 않는다.
 
-제안 soft-FK residual은 다음을 기본형으로 한다.
+실데이터 코드의 FK 모드·잔차·기본 상수는 `Simulation/core/methods.py`와 같은 계약을 사용한다.
 
 ```text
-r_FK = Log(T_FK^-1 T_cube)
-E_FK = rho(r_FK^T Sigma_FK^-1 r_FK)
+Delta_FK = inverse(T_cube) T_FK
+r_FK = [RotVec(R(Delta_FK)), t(Delta_FK)]
+w_FK = L^-1 r_FK,  Sigma_FK = L L^T
+E_FK = sum_i rho(w_FK,i^2; Huber f_scale=3)
 ```
 
-여기서 `r_FK`는 FK 예측과 큐브 자세 사이의 6차원 자세 잔차, `Log`는 강체변환을 회전 3축과 이동
-3축의 벡터로 바꾸는 로그 사상, `Σ_FK^-1`은 FK 공분산의 역행렬(정보행렬), `ρ`는 이상치 영향을
-줄이는 강건 손실 함수다. 따라서 불확실성이 큰 FK 방향은 약하게, 신뢰도가 높은 방향은 강하게 반영한다.
+`r_FK` 순서는 `[rx, ry, rz, tx, ty, tz]`, 단위는 rad와 m다. 실측 공분산 파일이 없을 때는
+Simulation의 동결 상수 `sigma_R=0.30 deg`, `sigma_t=2.0 mm`를 사용하며 whitening 후 각 성분에
+Huber `f_scale=3.0`을 적용한다. 이 값은 CLI에서 바꿀 수 없다. 실측 반복측정으로 preregistered
+6×6 `Σ_FK`가 제공되면 같은 whitening 원리를 축 간 상관관계까지 확장한다.
 
-`Sigma_FK`와 FK-factor robust-loss scale은 별도 반복측정 또는 training-only inner validation에서
-정하고 test에서는 동결한다. 기존 상수 가중치 `lambda=3 px/mm` 결과는 **A4a fixed-weight soft-anchor
-선행 실험**이며 최종 covariance-weighted robust A4 결과가 아니다.
+### Simulation FK와 실데이터 FK의 차이 및 정렬 결과
+
+| 항목 | Simulation | 변경 전 실데이터 코드 | 현재 실데이터 코드 |
+| --- | --- | --- | --- |
+| FK 모드 | `none/fixed/factor/corr` | hard-FK가 변수 고정으로 분산되고 factor 내부 모드가 `fixed_probe/covariance` | `A2/A3/A4 = none/fixed/factor`; `corr`는 구 위치-only 비교군으로 명시 |
+| FK 잔차 | `inverse(T_cube) T_FK`의 rotvec+상대 병진 | `Log(inverse(T_FK) T_cube)`의 full SE(3) tangent | Simulation과 같은 방향·성분 정의 |
+| 기본 FK 불확실성 | `2 mm / 0.30 deg` | `3 mm / 0.30 deg` CLI placeholder | `2 mm / 0.30 deg` 동결 |
+| 강건화 | whitening 후 각 잔차 성분에 Huber `3.0` | 6차원 블록 전체에 Huber `2.5` | whitening 후 각 성분에 Huber `3.0` |
+| A4a 보조 상수 | 없음 | `3 px/mm`, probe lever `29.5 mm` | 제거; Simulation 대각 공분산의 linear factor |
+| 영상 항 | PnP pose residual | raw-corner pixel residual | raw-corner pixel residual 유지 |
+
+마지막 행은 의도적으로 같게 만들지 않은 부분이다. Simulation은 합성 PnP pose를 관측으로 만들지만 실제
+실험은 저장 RGB의 corner를 직접 최적화하므로, 영상 residual 단위와 frontend는 서로 다르다. FK pose를
+cube에 넣는 방식, FK residual, fallback 불확실성, Huber 규칙은 동일하다.
+
+Confirmatory 실행의 `Sigma_FK`는 별도 반복측정에서 정하고 test에서는 동결한다. Simulation 기본 prior는
+software preflight 전용이며 실측 공분산을 대신하지 않는다.
 
 A2와 A4는 다음 목적함수 차이 하나만 허용한다.
 
@@ -168,13 +187,13 @@ Main Table에는 최종 A4만 유지하고, A4 내부 기여는 아래 supplemen
 
 | 방법 번호 | FK 잔차 형태 | FK 가중 방식 | FK 손실 함수 | 검증 목적 | 필수 짝 비교 |
 | --- | --- | --- | --- | --- | --- |
-| A4a | 연성 제약(`soft`) | 고정 등방성 가중치 `λ` | 제곱 손실 | 강제 제약을 연성 제약으로 바꾸는 효과 | `A3→A4a` |
+| A4a | 연성 제약(`soft`) | Simulation 동결 등방성 공분산(`2 mm / 0.30 deg`) | 제곱 손실 | 강제 제약을 연성 제약으로 바꾸는 효과 | `A3→A4a` |
 | A4b | 연성 제약(`soft`) | FK 정보행렬 `Σ_FK^-1` | 제곱 손실 | 공분산 whitening(축별 불확실성 정규화)의 추가 효과 | `A4a→A4b` |
-| **A4c = A4** | 연성 제약(`soft`) | FK 정보행렬 `Σ_FK^-1` | 사전 고정 강건 손실 | FK 이상치에 대한 강건화 효과 | `A4b→A4c` |
+| **A4c = A4** | 연성 제약(`soft`) | FK 정보행렬 `Σ_FK^-1` | 원소별 Huber(`f_scale=3`) | FK 이상치에 대한 강건화 효과 | `A4b→A4c` |
 
 추가 confirmatory contrast는 `A2→A4`(최종 FK factor 전체 효과), `B1→A4`(independent→joint),
-`A4→A5`(calibration을 고정한 correction 추가 효과)로 유지한다. A4a의 `lambda`도 test 결과가 아니라
-training-only inner validation 또는 사전 물리 기준으로 정한다.
+`A4→A5`(calibration을 고정한 correction 추가 효과)로 유지한다. 실측 공분산이 없는 preflight에서는
+A4a와 A4b가 같은 대각 공분산을 사용하므로 두 결과가 같고, `A4a→A4b` 효과는 판정하지 않는다.
 
 ## Classical hand-eye baselines
 
@@ -379,10 +398,10 @@ A4 대비 translation, rotation, tail, failure/coverage의 같은 계약을 통�
 | A1 | 3/3 | 3.1267 / 2.5103 / 4.5317 | 13.7546 / 1.2193 | 4.2459 / 1.0239 | 순차 보정의 공통 영상 전처리 결과 |
 | A2 | 3/3 | 3.1154 / 2.5038 / 4.5109 | 13.1276 / 1.1910 | 4.0693 / 1.0385 | 영상만 사용하는 통합 보정 기준선 |
 | A3 | 3/3 | **2.4997** / 2.4952 / **2.5136** | **10.8320** / **1.0602** | 4.7904 / 1.1893 | 픽셀·카메라 간 불일치 최저; 외부 GT 우위는 미검증 |
-| A4 예비실험 | 3/3 | 3.1030 / 2.5038 / 4.4758 | 13.0590 / 1.1901 | 4.0396 / 1.0316 | 임시 공분산 진단만 허용 |
+| A4 예비실험 | 3/3 | 3.0959 / 2.5038 / 4.4556 | 13.0413 / 1.1899 | 4.0330 / 1.0313 | Simulation 동결 prior 진단만 허용 |
 | A5 | 미실행 | — | — | — | 6자유도 보정·독립 GT label 없음 |
-| B1 예비실험 | 3/3 | 3.1128 / 2.5101 / 4.4927 | 13.6410 / 1.2158 | 4.2097 / 1.0186 | A4와 동일한 임시 공분산 사용 |
-| B2 예비실험 | 3/3 | 4.4938 / — / 4.4938 | 11.9911 / 1.2833 | **3.8443** / **0.9315** | 큐브만 사용; A4와 동일한 임시 공분산 사용 |
+| B1 예비실험 | 3/3 | 3.1057 / 2.5100 / 4.4724 | 13.6110 / 1.2157 | 4.1987 / 1.0184 | A4와 동일한 Simulation prior 사용 |
+| B2 예비실험 | 3/3 | 4.4759 / — / 4.4759 | 11.9161 / 1.2866 | **3.8215** / **0.9311** | 큐브만 사용; A4와 동일한 Simulation prior 사용 |
 | B3 | 3/3 | 2.4829 / 2.4829 / — | — | — | 보드만 사용하는 통합 보정 진단 완료 |
 
 사용 데이터와 평가 계약은 다음과 같다.
@@ -400,8 +419,8 @@ A4 대비 translation, rotation, tail, failure/coverage의 같은 계약을 통�
 - 공통 path mask: SHA-256 `4339c33d283052a80ba07f715f1091e17b344179dbc9018c6f929a9948f9fc80`,
   9 cross-camera pairs와 3 eye-to-eye units. 출력값에 따른 pose gate나 outlier 제거는 없다.
 - 공통 solver: raw-corner pixel backend, `soft_l1`, `f_scale=2 px`, 최대 300 evaluations,
-  3 multi-start. A4/B1/B2는 실측 파일 대신 진단용 `sigma_t=3 mm`, `sigma_R=0.3 deg`,
-  FK Huber scale 2.5를 썼다.
+  3 multi-start. A4/B1/B2는 실측 파일 대신 Simulation과 동일하게 동결한 `sigma_t=2 mm`,
+  `sigma_R=0.3 deg`, FK Huber `f_scale=3.0`을 썼다.
 
 주요 짝 차이(`Δ`, 변화량)는 `후자 − 전자`이며 음수일수록 해당 오차가 개선된 것이다.
 
@@ -410,9 +429,9 @@ A4 대비 translation, rotation, tail, failure/coverage의 같은 계약을 통�
 | A0→A1 | 보드 재투영 RMSE | +0.0274 px | 이 subset에서는 둘 다 고정 카메라 3대 등록; 큐브 관측성 이득 없음 |
 | A1→A2 | 전체 재투영 RMSE | −0.0113 px | 통합 최적화 효과는 있으나 매우 작음 |
 | A2→A3 | 전체 재투영 / `e_cross` 위치 / `e_e2e` 위치 | −0.6157 px / −2.2955 mm / +0.7211 mm | hard-FK는 픽셀·고정 카메라 간 일관성 개선, 고정↔손목 경로는 악화 |
-| A2→A4 | 전체 재투영 / `e_cross` 위치 / `e_e2e` 위치 | −0.0124 px / −0.0685 mm / −0.0297 mm | 임시 공분산을 쓴 soft-FK 이득은 미미 |
-| B1→A4 | 전체 재투영 / `e_cross` 위치 / `e_e2e` 위치 | −0.0098 px / −0.5819 mm / −0.1701 mm | 통합 최적화의 내부지표 이득은 작음 |
-| B2→A4 | 큐브 재투영 / `e_cross` 위치 / `e_e2e` 위치 | −0.0180 px / +1.0680 mm / +0.1953 mm | 보드 추가 시 픽셀은 소폭 개선되나 경로 위치 일관성은 악화 |
+| A2→A4 | 전체 재투영 / `e_cross` 위치 / `e_e2e` 위치 | −0.0195 px / −0.0863 mm / −0.0363 mm | Simulation prior를 쓴 soft-FK 이득은 미미 |
+| B1→A4 | 전체 재투영 / `e_cross` 위치 / `e_e2e` 위치 | −0.0097 px / −0.5697 mm / −0.1657 mm | 통합 최적화의 내부지표 이득은 작음 |
+| B2→A4 | 큐브 재투영 / `e_cross` 위치 / `e_e2e` 위치 | −0.0203 px / +1.1252 mm / +0.2115 mm | 보드 추가 시 픽셀은 소폭 개선되나 경로 위치 일관성은 악화 |
 | B3→A2 | 보드 재투영 RMSE | +0.0209 px | 큐브 추가가 보드 픽셀 적합도를 개선하지 않음 |
 
 전체 원시 결과와 per-camera 값은
@@ -461,6 +480,22 @@ scale 가드가 걸려 있다.
   삼으므로 이는 순환 논증이며, k의 물리적 확정 근거로 사용하지 않는다.
 
 ## 실행 계약
+
+### Table 1 코드 구성
+
+Table 1 방법은 방법별 파일로 복제하지 않고, 비교 공정성을 위해 역할별 공통 모듈로 구성한다.
+
+| 코드 파일 | 역할 | 포함 방법 |
+| --- | --- | --- |
+| `CP_table1_schema.py` | 행 정의, 자유변수, freeze 경계, 비교 계약 | A0–A4, B1–B3 |
+| `CP_table1_ablation.py` | 공통 관측·초기화·pixel solver·sanity와 기본 ablation 실행 | A0, A1, A2, A3, B1, B2, B3 |
+| `CP_table1_fk_ablation.py` | FK-factor 분해와 공정 비교 실행 | A2, A3, A4a, A4b, A4, B1, B2 |
+| `CP_table1_blind_predict.py` | 동결된 방법별 blind pose 예측 생성 | 선택한 Table 1 방법 |
+| `CP_table1_external_gt_eval.py` | session-paired 외부 GT 및 통계 평가 | 선택한 방법과 baseline |
+| `CP_common.py` | Step3와 Table 1이 공유하는 좌표계·기하 유틸 | 공통 |
+
+방법별로 solver 파일을 따로 만들지 않는다. A2/A3/A4/B1/B2가 동일 frontend와 solver budget을
+공유한다는 계약을 코드 구조에서도 강제하기 위해, 방법 차이는 schema와 runner의 분기 함수로만 표현한다.
 
 ### 촬영 단계 강제사항
 
@@ -579,7 +614,7 @@ Simulation 결과는 실제 외부-GT 결과를 대신하지 않는다.
 1. Block-aware gate·host-clock sync·safe-pose executor는 코드 반영 완료. 기존 데이터 replay와 저속
    physical dry-run으로 threshold/경로 검증
 2. Target-ROI sharpness·clipping·marker-edge gate를 Step2 저장 조건에 구현하고 카메라별 threshold 고정
-3. A2/A3/A4a/A4b/A4 공통 pixel backend와 fair B1/B2는 `CP_final_methods.py`에 구현 완료. 실측 covariance와
+3. A2/A3/A4a/A4b/A4 공통 pixel backend와 fair B1/B2는 `CP_table1_fk_ablation.py`에 구현 완료. 실측 covariance와
    첫 자동 번호 engineering-pilot session으로 production 검증
 4. Blind prediction exporter와 external-GT hierarchical evaluator는 구현 완료. 실제 GT schema·failure
    logging으로 end-to-end 검증
