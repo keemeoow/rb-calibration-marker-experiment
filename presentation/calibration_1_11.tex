@@ -163,7 +163,7 @@
 \begin{frame}{1.4 구성 1: eye-in-hand (카메라가 손에 붙음)}
   카메라를 로봇 손목에 장착 $\rightarrow$ 로봇이 움직이면 카메라도 함께 움직임
   \vfill
-  \begin{block}{보는 경로}
+  \begin{block}{물체를 보는 경로}
     \centering
     베이스 $\rightarrow$ 손 $\rightarrow$ 카메라 $\rightarrow$ 물체
   \end{block}
@@ -192,13 +192,13 @@
   \end{columns}
   \vfill
   \centering
-  카메라가 물체에 가까이 갈 수 있음. 대신 한 번에 좁은 범위만 봄
+  물체에 가까이 다가가 볼 수 있어 정밀함. 대신 한 번에 보이는 범위가 좁음
 \end{frame}
 
 \begin{frame}{1.5 구성 2: eye-to-hand (카메라가 밖에 고정)}
   카메라를 작업대에 고정 $\rightarrow$ 로봇이 움직여도 카메라는 그대로
   \vfill
-  \begin{block}{보는 경로}
+  \begin{block}{물체를 보는 경로}
     \centering
     베이스 $\rightarrow$ 카메라 $\rightarrow$ 물체
     \qquad {\small(손을 거치지 않음. 한 칸 짧다)}
@@ -218,8 +218,9 @@
       \begin{block}{어떻게 푸는가}
         \begin{minipage}[t][20mm][t]{\linewidth}
           \begin{itemize}
-            \item 로봇 손에 마커를 들려 여러 자세로 움직임
-            \item 마커 위치를 로봇도 알고 카메라도 봄 $\rightarrow$ 맞춰봄
+            \item 로봇 손에 마커를 붙이고 여러 자세로 움직임
+            \item 같은 마커를 로봇은 계산으로, 카메라는 사진으로 파악
+              $\rightarrow$ 두 값을 맞춤
           \end{itemize}
         \end{minipage}
       \end{block}
@@ -227,38 +228,39 @@
   \end{columns}
   \vfill
   \centering
-  작업 공간 전체를 봄. 대신 멀어서 정밀도가 떨어지고 로봇에 가려짐
+  작업 공간 전체를 한눈에 봄. 대신 거리가 멀어 정밀도가 낮고, 로봇 팔에 가려지기도 함
 \end{frame}
 
 \begin{frame}{1.6 구성 3: eye-to-hand 여러 대}
   가림과 사각지대를 줄이려고 고정 카메라를 여러 대 설치
   \vfill
-  \begin{alertblock}{순진한 방법: 카메라마다 따로 캘리브레이션}
-    카메라 $0$은 카메라 $0$대로, 카메라 $1$은 카메라 $1$대로 각각 품\\
+  \begin{alertblock}{카메라를 한 대씩 따로 캘리브레이션하면}
+    각 카메라는 나름대로 맞게 나오지만 \textbf{서로 조금씩 어긋남}\\
     $\rightarrow$ 같은 물체를 두고 \textbf{서로 다른 좌표}를 말하게 됨 (1.3절)
   \end{alertblock}
   \vfill
-  \begin{block}{그래서 한꺼번에 푼다}
+  \begin{block}{그래서 필요한 것}
     \begin{itemize}
       \item 모든 카메라가 \textbf{같은 물체를 동시에} 보게 함
-      \item 모두가 같은 답을 말하도록 카메라 위치들을 \textbf{함께} 조정
-      \item 새로 생기는 미지수: \textbf{그때 물체가 어디 있었는가}
+      \item 모두가 같은 답을 말하도록 카메라 위치를 \textbf{한꺼번에} 조정
+      \item 이때 새로 생기는 미지수: \textbf{그때 물체가 어디 있었는가}
     \end{itemize}
   \end{block}
   \vfill
   \centering
-  {\small 카메라를 따로 세우면 어긋남이 남는다 $\rightarrow$ 묶어서 세워야 한다}
+  {\small 한 대씩 맞추면 어긋난 채로 남음 $\rightarrow$ 전부 함께 맞춰야 함}
 \end{frame}
 
 \begin{frame}{1.7 구성 4: 여기에 eye-in-hand까지 추가}
   고정 카메라 여러 대 \textbf{+} 손목 카메라 하나 = 이 프로젝트의 구성
   \vfill
-  \begin{block}{손목 카메라를 왜 더하는가}
+  \begin{block}{왜 손목 카메라를 더하는가}
     \begin{itemize}
       \item 로봇과 함께 움직이며 \textbf{여러 각도에서} 같은 물체를 봄
-      \item 고정 카메라 A와 B가 서로 안 보여도,
-        손목 카메라가 양쪽을 차례로 방문 $\rightarrow$ \textbf{둘을 이어주는 다리}
-      \item 물체에 가까이 가서 찍으므로 정밀한 관측을 보탬
+      \item 고정 카메라 A와 B가 겹쳐 보는 곳이 없어도,
+        손목 카메라는 A 앞에서도 찍고 B 앞에서도 찍음\\
+        $\rightarrow$ \textbf{두 카메라를 잇는 연결 고리}가 됨
+      \item 물체에 가까이 가서 찍으므로 \textbf{더 정밀한 관측}이 추가됨
     \end{itemize}
   \end{block}
   \vfill
