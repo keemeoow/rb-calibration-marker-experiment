@@ -665,20 +665,20 @@
   \end{block}
   \vfill
   \textbf{9.2 목적함수}
-  {\small
+
+  8장 식의 세 번째 자리에 넣는 값
   \[
-    \min_{\{\T{B}{C_i}\},\ \T{G}{C_g},\ \{\T{B}{O,s}\}}
-    \ \ \mathcal{E}_{\mathrm{vis}}
-    \left(
-      \{\T{B}{C_i}\},\ \T{G}{C_g},\ \{\T{B}{O,s}\}
-    \right)
+    \T{B}{\Oref_s}\;=\;\T{B}{O,s}
+    \qquad\text{(자유변수)}
   \]
-  }
   \vfill
   \begin{itemize}
-    \item 세 번째 자리에 \textbf{자유변수} $\{\T{B}{O,s}\}$ 를 넣음
-    \item 그 값이 $\min$ 아래에도 그대로 있음
-      $\rightarrow$ \textbf{큐브 자세까지 함께 찾는다}는 뜻
+    \item 큐브 자세를 미리 정해주지 않고 \textbf{찾아야 할 값}으로 남겨둠
+    \item $\mathcal{E}_{\mathrm{vis}}$ 를 최소화하며 찾는 값은
+      \textbf{세 덩어리}
+      \begin{itemize}
+        \item $\{\T{B}{C_i}\}$, \quad $\T{G}{C_g}$, \quad $\{\T{B}{O,s}\}$
+      \end{itemize}
   \end{itemize}
 \end{frame}
 
@@ -721,15 +721,16 @@
 \end{frame}
 
 \begin{frame}{10.2 목적함수}
-  {\small
+  8장 식의 세 번째 자리에 넣는 값
   \[
-    \min_{\{\T{B}{C_i}\},\ \T{G}{C_g}}
-    \ \ \mathcal{E}_{\mathrm{vis}}
-    \left(
-      \{\T{B}{C_i}\},\ \T{G}{C_g},\ \{\T{B}{\Ofk_s}\}
-    \right)
+    \T{B}{\Oref_s}\;=\;\T{B}{\Ofk_s}
+    \qquad\text{(상수. 못 박음)}
   \]
-  }
+  \begin{itemize}
+    \item 최소화하며 찾는 값은 \textbf{두 덩어리}:
+      \ $\{\T{B}{C_i}\}$, \quad $\T{G}{C_g}$
+    \item 9.2절과 달리 큐브 자세가 빠짐 $\rightarrow$ 미지수가 줄어듦
+  \end{itemize}
   \vfill
   완전히 펼치면
   {\footnotesize
@@ -749,12 +750,6 @@
     \end{aligned}
   \]
   }
-  \vfill
-  \begin{itemize}
-    \item 세 번째 자리에 \textbf{raw FK 값} $\{\T{B}{\Ofk_s}\}$ 를 넣음
-    \item 9.2절과 달리 그 값이 $\min$ 아래에는 \textbf{없음}
-      $\rightarrow$ 못 박혀서 움직이지 못함
-  \end{itemize}
 \end{frame}
 
 \begin{frame}{10.3 왜 FK 오차가 카메라로 전파되는가}
@@ -1293,19 +1288,15 @@
 \end{frame}
 
 \begin{frame}{11.8 단계 7: anchor 고정 후 최종 refinement}
-  확정된 $\T{B}{\Oanc_s}$ 를 고정 anchor로 사용
-  {\small
+  8장 식의 세 번째 자리에 넣는 값
   \[
-    \min_{\{\T{B}{C_i}\},\ \T{G}{C_g}}
-    \ \ \mathcal{E}_{\mathrm{vis}}
-    \left(
-      \{\T{B}{C_i}\},\ \T{G}{C_g},\ \{\T{B}{\Oanc_s}\}
-    \right)
+    \T{B}{\Oref_s}\;=\;\T{B}{\Oanc_s}
+    \qquad\text{(상수. 못 박음)}
   \]
-  }
   \begin{itemize}
-    \item 10.2절 \texttt{Fixed-FK}와 \textbf{글자 하나까지 같은 형태}
-    \item 다른 것은 세 번째 자리에 넣은 값뿐:
+    \item 최소화하며 찾는 값은 \textbf{두 덩어리}:
+      \ $\{\T{B}{C_i}\}$, \quad $\T{G}{C_g}$ \quad (10.2절과 동일)
+    \item 다른 것은 넣은 값뿐:
       raw FK $\T{B}{\Ofk_s}$ 가 아니라 검산을 거친 $\T{B}{\Oanc_s}$
   \end{itemize}
   \vfill
