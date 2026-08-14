@@ -351,6 +351,44 @@ def get_capture_set_index(cap: dict) -> Optional[int]:
         return None
 
 
+def parse_set_index_spec(spec: Optional[str]) -> List[int]:
+    """Parse comma-separated set indices and inclusive ranges such as ``5-13``."""
+    text = str(spec or "").strip()
+    if not text:
+        return []
+    output = set()
+    for token in text.replace(";", ",").split(","):
+        token = token.strip()
+        if not token:
+            continue
+        if "-" in token:
+            parts = token.split("-")
+            if len(parts) != 2 or not all(part.strip() for part in parts):
+                raise ValueError(f"Invalid set range: {token!r}")
+            start, stop = (int(part.strip()) for part in parts)
+            if stop < start:
+                raise ValueError(f"Descending set range is not allowed: {token!r}")
+            output.update(range(start, stop + 1))
+        else:
+            output.add(int(token))
+    return sorted(output)
+
+
+def filter_meta_by_set_indices(meta: dict,
+                               include_sets: Optional[str]) -> Tuple[dict, List[int]]:
+    """Return a shallow metadata copy containing only the requested set indices."""
+    selected = parse_set_index_spec(include_sets)
+    if not selected:
+        return meta, []
+    selected_set = set(selected)
+    filtered = dict(meta)
+    filtered["captures"] = [
+        cap for cap in meta.get("captures", [])
+        if get_capture_set_index(cap) in selected_set
+    ]
+    return filtered, selected
+
+
 def get_capture_set_cube_center_transform_raw(cap: dict) -> Optional[np.ndarray]:
     raw = cap.get("set_cube_center_6dof")
     if not isinstance(raw, list) or len(raw) != 6:

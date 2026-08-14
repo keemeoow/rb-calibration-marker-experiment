@@ -1,14 +1,17 @@
-"""Pixel-level bundle adjustment with an optional, independently robust FK factor.
+"""Pixel-level bundle adjustment with a Simulation-compatible FK factor.
 
 The visual term is identical whether the FK factor is disabled (A2) or enabled
 (A4).  Visual and FK losses are converted to explicit least-squares residuals,
 so SciPy's global ``loss`` option cannot accidentally apply one loss to both
-terms.  The final A4 factor is
+terms.  As in ``Simulation/core/methods.py``, the final A4 factor is
 
-    r = Log(T_fk^-1 T_cube)
-    E = rho(r.T Sigma^-1 r)
+    r = pose_residual(T_cube, T_fk)
+    w = L^-1 r,  Sigma = L L^T
+    E = sum_i rho(w_i^2; f_scale=3)
 
-with twist order ``[rx, ry, rz, tx, ty, tz]`` and SI units (rad, metre).
+with residual order ``[rx, ry, rz, tx, ty, tz]`` and SI units (rad, metre).
+The fixed fallback covariance and Huber threshold intentionally match the
+frozen Simulation constants: 0.30 degree, 2.0 mm, and 3 sigma.
 """
 
 from __future__ import annotations
@@ -39,6 +42,18 @@ from calibration_reprojection_backend import (
 
 _LOSSES = {"linear", "huber", "soft_l1"}
 
+# Keep these names and values synchronized with Simulation/core/methods.py.
+# They are frozen protocol constants, not per-run tuning knobs.
+SIGMA_FK_DEG = 0.30
+SIGMA_FK_MM = 2.0
+HUBER_F_SCALE = 3.0
+
+FK_MODE_NONE = "none"
+FK_MODE_FIXED = "fixed"
+FK_MODE_FACTOR = "factor"
+FK_MODE_CORR = "corr"
+FK_MODES = frozenset({FK_MODE_NONE, FK_MODE_FIXED, FK_MODE_FACTOR, FK_MODE_CORR})
+
 
 def _rho(z: np.ndarray, loss: str) -> np.ndarray:
     """SciPy-compatible rho(z), excluding the common 1/2 cost factor."""
@@ -66,41 +81,22 @@ def robustify_elementwise(values: np.ndarray, loss: str, scale: float) -> np.nda
     return values * ratio
 
 
-def robustify_block(values: np.ndarray, loss: str, scale: float) -> np.ndarray:
-    """Robustify one vector block as rho(||values||^2 / scale^2)."""
-    if loss not in _LOSSES or float(scale) <= 0:
-        raise ValueError("invalid robust loss or scale")
-    values = np.asarray(values, dtype=np.float64).reshape(-1)
-    if loss == "linear":
-        return values.copy()
-    z = float(np.dot(values, values) / float(scale) ** 2)
-    if z <= 1e-15:
-        return values.copy()
-    return values * float(np.sqrt(_rho(np.asarray([z]), loss)[0] / z))
+def fk_pose_residual(estimated: np.ndarray, target: np.ndarray) -> np.ndarray:
+    """Match Simulation's pose residual: ``inv(estimated) @ target``.
 
-
-def se3_log(transform: np.ndarray) -> np.ndarray:
-    """SE(3) logarithm in ``[rotation-vector(rad), translation-twist(m)]`` order."""
-    transform = np.asarray(transform, dtype=np.float64)
-    if transform.shape != (4, 4) or not np.all(np.isfinite(transform)):
-        raise ValueError("SE(3) transform must be a finite 4x4 matrix")
-    omega = Rotation.from_matrix(transform[:3, :3]).as_rotvec()
-    theta = float(np.linalg.norm(omega))
-    skew = np.array([
-        [0.0, -omega[2], omega[1]],
-        [omega[2], 0.0, -omega[0]],
-        [-omega[1], omega[0], 0.0],
-    ], dtype=np.float64)
-    if theta < 1e-7:
-        v_inverse = np.eye(3) - 0.5 * skew + (1.0 / 12.0) * (skew @ skew)
-    else:
-        coefficient = (
-            1.0 / theta ** 2
-            - (1.0 + np.cos(theta)) / (2.0 * theta * np.sin(theta))
-        )
-        v_inverse = np.eye(3) - 0.5 * skew + coefficient * (skew @ skew)
-    velocity = v_inverse @ transform[:3, 3]
-    return np.concatenate([omega, velocity]).astype(np.float64)
+    This deliberately uses the relative-frame translation directly instead of
+    the translation part of the full SE(3) logarithm.  That is the convention
+    used by ``Simulation/core/se3.py::se3_residual``.
+    """
+    estimated = np.asarray(estimated, dtype=np.float64)
+    target = np.asarray(target, dtype=np.float64)
+    if (estimated.shape != (4, 4) or target.shape != (4, 4)
+            or not np.all(np.isfinite(estimated))
+            or not np.all(np.isfinite(target))):
+        raise ValueError("FK poses must be finite 4x4 matrices")
+    error = inv_T(estimated) @ target
+    rotation = Rotation.from_matrix(error[:3, :3]).as_rotvec()
+    return np.concatenate([rotation, error[:3, 3]]).astype(np.float64)
 
 
 def validate_covariance(covariance: np.ndarray) -> np.ndarray:
@@ -116,7 +112,7 @@ def validate_covariance(covariance: np.ndarray) -> np.ndarray:
 
 
 def diagonal_covariance(translation_std_mm: float, rotation_std_deg: float) -> np.ndarray:
-    """Construct a shared diagonal covariance in the module's SI twist units."""
+    """Construct a shared diagonal covariance in SI pose-residual units."""
     t = float(translation_std_mm) / 1000.0
     r = np.deg2rad(float(rotation_std_deg))
     if t <= 0.0 or r <= 0.0:
@@ -126,42 +122,22 @@ def diagonal_covariance(translation_std_mm: float, rotation_std_deg: float) -> n
 
 @dataclass(frozen=True)
 class FKFactorSpec:
-    """Configuration for A2/A4a/A4b/A4c.
+    """Simulation-compatible FK mode and factor loss.
 
-    ``mode='none'`` is A2. ``mode='fixed_probe'`` is the legacy-compatible
-    A4a fixed-weight quadratic anchor. ``mode='covariance'`` is A4b/A4c.
+    ``none`` leaves cube poses free, ``fixed`` removes them from the variable
+    manifest, and ``factor`` leaves them free and adds the whitened FK factor.
+    ``corr`` is a post-calibration baseline and therefore is not solved here.
     """
 
-    mode: str = "none"
-    loss: str = "linear"
-    robust_scale: float = 1.0
-    fixed_lambda_px_per_mm: float = 0.0
-    probe_lever_mm: float = 29.5
+    mode: str = FK_MODE_NONE
+    loss: str = "huber"
+    robust_scale: float = HUBER_F_SCALE
 
     def validate(self) -> None:
-        if self.mode not in {"none", "fixed_probe", "covariance"}:
+        if self.mode not in {FK_MODE_NONE, FK_MODE_FIXED, FK_MODE_FACTOR}:
             raise ValueError(f"unknown FK factor mode {self.mode!r}")
         if self.loss not in _LOSSES or float(self.robust_scale) <= 0.0:
             raise ValueError("invalid FK robust loss configuration")
-        if self.mode == "fixed_probe":
-            if self.loss != "linear":
-                raise ValueError("A4a fixed-probe factor must remain quadratic")
-            if self.fixed_lambda_px_per_mm <= 0.0 or self.probe_lever_mm <= 0.0:
-                raise ValueError("A4a requires positive lambda and probe lever")
-
-
-def _probe_points(lever_mm: float) -> np.ndarray:
-    lever = float(lever_mm) / 1000.0
-    return np.asarray([
-        [lever, 0.0, 0.0], [-lever, 0.0, 0.0],
-        [0.0, lever, 0.0], [0.0, -lever, 0.0],
-        [0.0, 0.0, lever], [0.0, 0.0, -lever],
-    ], dtype=np.float64)
-
-
-def _transform_points(transform: np.ndarray, points: np.ndarray) -> np.ndarray:
-    transform = np.asarray(transform, dtype=np.float64)
-    return points @ transform[:3, :3].T + transform[:3, 3]
 
 
 class FactorizedFKProblem:
@@ -197,23 +173,21 @@ class FactorizedFKProblem:
             for key, value in fk_targets.items()
         }
         self.fk_spec = fk_spec
+        cube_variable_keys = [key for key in self.visual.variable_keys if key[0] == "cube"]
+        if fk_spec.mode == FK_MODE_FIXED and cube_variable_keys:
+            raise ValueError("mode='fixed' requires cube poses to be absent from variable_keys")
         self.factor_keys = [
             key for key in self.visual.variable_keys
             if key[0] == "cube" and int(key[1]) in self.fk_targets
-        ] if fk_spec.mode != "none" else []
+        ] if fk_spec.mode == FK_MODE_FACTOR else []
         self.whiteners = {}
-        if fk_spec.mode == "covariance":
+        if fk_spec.mode == FK_MODE_FACTOR:
             for _, set_index in self.factor_keys:
                 if int(set_index) not in fk_covariances:
                     raise ValueError(f"FK covariance missing for set {set_index}")
                 covariance = validate_covariance(fk_covariances[int(set_index)])
                 self.whiteners[int(set_index)] = np.linalg.inv(np.linalg.cholesky(covariance))
-        self.probe = _probe_points(fk_spec.probe_lever_mm)
-        self.factor_rows_per_key = 0
-        if fk_spec.mode == "fixed_probe":
-            self.factor_rows_per_key = int(self.probe.size)
-        elif fk_spec.mode == "covariance":
-            self.factor_rows_per_key = 6
+        self.factor_rows_per_key = 6 if fk_spec.mode == FK_MODE_FACTOR else 0
 
     @property
     def n_params(self) -> int:
@@ -245,23 +219,16 @@ class FactorizedFKProblem:
         for _, set_index in self.factor_keys:
             estimated = state.cubes[int(set_index)]
             target = self.fk_targets[int(set_index)]
-            if self.fk_spec.mode == "fixed_probe":
-                delta_mm = (
-                    _transform_points(estimated, self.probe)
-                    - _transform_points(target, self.probe)
-                ) * 1000.0
-                block = float(self.fk_spec.fixed_lambda_px_per_mm) * delta_mm.reshape(-1)
-            elif self.fk_spec.mode == "covariance":
-                tangent = se3_log(inv_T(target) @ estimated)
-                block = self.whiteners[int(set_index)] @ tangent
-            else:
-                raise RuntimeError("factor block requested with mode=none")
+            if self.fk_spec.mode != FK_MODE_FACTOR:
+                raise RuntimeError("factor block requested without mode=factor")
+            residual = fk_pose_residual(estimated, target)
+            block = self.whiteners[int(set_index)] @ residual
             blocks.append((int(set_index), np.asarray(block, dtype=np.float64)))
         return blocks
 
     def factor_residual(self, x: np.ndarray) -> np.ndarray:
         chunks = [
-            robustify_block(block, self.fk_spec.loss, self.fk_spec.robust_scale)
+            robustify_elementwise(block, self.fk_spec.loss, self.fk_spec.robust_scale)
             for _, block in self.factor_raw_blocks(x)
         ]
         return np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.float64)
@@ -352,6 +319,8 @@ def solve_factorized_fk(
             "fk_mode": fk_spec.mode,
             "fk_loss": fk_spec.loss,
             "fk_robust_scale": float(fk_spec.robust_scale),
+            "fk_residual": "inv(T_cube) @ T_fk: [rotvec_rad, relative_translation_m]",
+            "fk_robustification": "elementwise_after_covariance_whitening",
             "scipy_global_loss": "linear",
             "reason": "visual and FK M-estimators are encoded separately",
         },
@@ -372,7 +341,7 @@ def solve_factorized_fk(
         "fk_factor": {
             "active": bool(factor_blocks),
             "sets": [int(set_index) for set_index, _ in factor_blocks],
-            "raw_mahalanobis_or_weighted_probe_norm": {
+            "raw_whitened_residual_norm": {
                 str(set_index): float(np.linalg.norm(block))
                 for set_index, block in factor_blocks
             },

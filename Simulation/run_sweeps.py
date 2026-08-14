@@ -9,7 +9,7 @@ CPU 병렬. 시뮬의 본질(노이즈 늘려가며 각 지표 평가)을 완전
 held-out: seed 마다 여러 (train,test) 조합을 순회(--pairs 로 조합 수 제한)해 평균.
 지표: N_reg, e_X_mm, e_X_deg, e_task_mm, e_task_deg, gTc_mm, e_cross_mm, e_reproj_px, bTf_mm.
 """
-import sys, os, argparse, json, itertools
+import sys, os, argparse, json
 from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

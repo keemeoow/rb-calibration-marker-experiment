@@ -6,7 +6,7 @@ CPU 병렬. 곡선: EXP1(corr) / EXP4(none) / EXP7(fixed) / EXP3(큐브만).
   python run_figA.py --seeds 20 --workers 40 --dump results/tables/figA.json
 그림: python viz_figA.py
 """
-import sys, os, argparse, json, itertools
+import sys, os, argparse, json
 from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

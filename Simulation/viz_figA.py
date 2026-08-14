@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Fig A — 코너 노이즈 강건성 곡선 (run_figA.py 의 JSON 에서 렌더)."""
-import sys, os, json, argparse
+import os, json, argparse
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt

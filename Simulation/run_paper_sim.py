@@ -4,7 +4,7 @@
 약식 프로토콜(10 sets × 6 eih + gripped 40, ~38% 비율). GT 기준 지표.
   python run_paper_sim.py --seeds 4 --workers 12
 """
-import sys, os, argparse, json, itertools
+import sys, os, argparse, json
 from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

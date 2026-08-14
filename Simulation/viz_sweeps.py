@@ -6,7 +6,7 @@ dataviz 원칙 적용: 색맹안전(Okabe-Ito), y축 캡(붕괴는 주석), Ours
   python viz_sweeps.py --json results/tables/sweep_corner.json
   python viz_sweeps.py --json results/tables/sweep_fk.json
 """
-import sys, os, json, argparse
+import os, json, argparse
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")

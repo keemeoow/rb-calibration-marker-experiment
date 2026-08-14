@@ -1,16 +1,17 @@
 # Historical experiment provenance
 
-이 폴더는 과거 C1/C2/C3, 7행 ablation, fixed-weight soft-anchor 결과를 삭제하지 않고 추적하기 위한
-manifest 계층이다. 기존 스크립트와 결과는 현재 경로에 그대로 두어 README 링크와 import를 깨뜨리지
-않는다. `manifest.json`의 SHA-256은 2026-08-06 작업 트리에서 확인한 내용이다.
+이 폴더는 과거 C1/C2/C3, 7행 ablation, fixed-weight soft-anchor 결과의 provenance 기록이다.
+과거 실행 스크립트는 Table 1 중심 정리 과정에서 삭제됐으며, `manifest.json`의 SHA-256은
+2026-08-06 당시 작업 트리를 식별하기 위한 역사적 값이다.
 
 새 최종 실험의 진입점은 다음과 같다.
 
-- `CP_final_methods.py`: A2/A3/A4a/A4b/A4 및 fair B1
-- `CP_blind_pose_predict.py`: GT를 읽지 않는 blind pose prediction
-- `CP_final_external_gt_eval.py`: session-first paired hierarchical external-GT 평가
+- `CP_table1_ablation.py`: A0/A1/A2/A3/B1/B2/B3 공통 backend
+- `CP_table1_fk_ablation.py`: A2/A3/A4a/A4b/A4 및 fair B1/B2
+- `CP_table1_blind_predict.py`: GT를 읽지 않는 blind pose prediction
+- `CP_table1_external_gt_eval.py`: session-first paired hierarchical external-GT 평가
 
-아래 과거 파일은 새 runner가 완전히 대체되고 논문 provenance archive가 생성될 때까지 삭제하지 않는다.
+아래 과거 파일은 이미 삭제됐으며 이름과 hash만 `manifest.json`에 provenance로 남긴다.
 
 - `CP_C1_unified_vs_independent.py`
 - `CP_C2_cube_vs_board.py`
