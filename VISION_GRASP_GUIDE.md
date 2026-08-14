@@ -360,13 +360,37 @@ AprilTag 큐브를 마커 하나(id 4)로만 재봤더니 base z가 **17mm** 어
 
 | 내용 | 위치 |
 |---|---|
+| **이 문서의 계산을 그대로 하는 스크립트** | **`grasp_target.py`** |
 | 그리퍼 오프셋 정의 | `server/c1.py:42-57` |
 | 그립/놓기 높이 | `server/c1.py:69-72` |
 | 로봇 자세 규약 구현 | `live_marker_pose.py:50-78` |
 | 실시간 측정 스크립트 | `live_marker_pose.py` |
 | 캘리브레이션 방식 설명 | `CALIBRATION_EXPLANATION_LATEX.md` |
 
-`live_marker_pose.py`는 pyrealsense2가 설치된 환경에서만 돈다.
+`grasp_target.py`는 numpy만 있으면 돈다. 5장의 계산과 7장의 검산을 그대로 한다.
+
+```bash
+python3 grasp_target.py \
+    --obj "-35.7 30.0 608.9 -28.7 -55.5 -151.8" --cam cam1 \
+    --size 30 \
+    --flange "-253.48 474.21 148.84 -115.00 0.00 180.00"
+```
+
+주요 옵션이다.
+
+| 옵션 | 뜻 | 기본값 |
+|---|---|---|
+| `--cam` | 물체 자세의 기준 좌표계. `cam0/cam1/cam3/base` | `cam1` |
+| `--euler` | 물체 회전의 오일러 순서. `--intrinsic` 로 내재 지정 | `xyz` 외재 |
+| `--size` | `"높이"` 또는 `"가로 세로 높이"` | 필수 |
+| `--grip_depth` | 윗면에서 얼마나 아래를 물지 | 높이/2 (중심) |
+| `--symmetry` | 단면 회전 대칭. 정사각 90, 직사각 180 | `90` |
+| `--tool` | 명령에 쓸 settool 값 | `115.5` |
+| `--table` | 검산에 쓸 테이블 높이 | `-30.57` |
+
+테이블 검산에 실패하면 종료코드 2를 낸다. 자동화할 때 여기서 멈추면 된다.
+
+`live_marker_pose.py`는 AprilTag 큐브 전용이고 pyrealsense2가 설치된 환경에서만 돈다.
 
 ```bash
 /home/sstone/anaconda3/envs/ur3-eye-to-hand/bin/python live_marker_pose.py \
