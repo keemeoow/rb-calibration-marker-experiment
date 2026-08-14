@@ -39,11 +39,22 @@ CUBE_GRIP_DEPTH_MM = 2.0
 # fingertip 은 윗면보다 GRIP_DEPTH 아래이므로, 중심은 fingertip 보다 이만큼 "아래"다.
 CUBE_CENTER_OFFSET_Z = CUBE_SIZE_MM / 2.0 - CUBE_GRIP_DEPTH_MM  # 27.5mm
 
-TOOL_GRIPPER_Z = 150.0 # 컨트롤러 settool 값(펜던트 Pos→TCP = 150.0mm)과 일치.
+# ── tool 오프셋: "모션용"과 "기록용"을 분리한다 ──────────────────────────────
+#
+# TOOL_GRIPPER_Z 는 로봇이 실제로 움직일 때 쓰는 tool3 값이다. 절대 바꾸지 말 것.
+# PLACE_TCP_Z_MM(-5.2) 도, 웨이포인트 파일의 capture_tcp 도 전부 이 150.0 규약으로
+# 기록돼 있어서, 여기를 내리면 같은 명령이 그만큼 아래를 가리켜 그리퍼가 테이블을
+# 긁는다. 모션 경로는 이 값 위에서 검증된 상태 그대로 둔다.
+TOOL_GRIPPER_Z = 150.0 # 컨트롤러 settool 값(펜던트 Pos→TCP = 150.0mm)과 일치. [모션 전용]
+#
+# 반면 캘리브레이션에 들어가는 값은 "물리적으로 맞는" 기준이어야 한다. fingertip 까지의
+# 실제 오프셋은 115.5mm 다(교시 파일 place_tcp 를 역산하면 114.99mm). 이 값은 tool4
+# 정의에만 쓰이고 tool4 는 측정 전용이므로, 바꿔도 로봇 경로에는 영향이 없다.
+TOOL_FINGERTIP_Z = 115.5  # [기록 전용] fingertip 까지의 실제 오프셋
 # 큐브 중심은 fingertip 보다 아래 = 플랜지에서 더 먼 쪽이므로 tool 오프셋은 "더한다".
 # (뺄셈은 중심을 fingertip 위로 놓아 부호가 뒤집힌다 — 윗면을 잡는 이 그리퍼에서는
 #  큐브가 TCP 아래에 매달리므로 물리적으로 불가능한 배치였다.)
-TOOL_CUBE_CENTER_Z = TOOL_GRIPPER_Z + CUBE_CENTER_OFFSET_Z  # 177.5mm
+TOOL_CUBE_CENTER_Z = TOOL_FINGERTIP_Z + CUBE_CENTER_OFFSET_Z  # 143.0mm [기록 전용]
 
 # 그립/놓기가 일어나는 TCP 높이(base frame, mm). 모든 set 에서 이 높이로 강제한다.
 #
@@ -172,10 +183,26 @@ def get_tcp():
 
 
 def get_cube_center():
+    """큐브 중심 포즈 [기록 전용]. tool4 = 플랜지 + TOOL_CUBE_CENTER_Z(143.0)."""
     rb.changetool(4)
     tcp = rb.getpos().pos2list()[:6]
     rb.changetool(3)
     return tcp
+
+
+def get_flange_pose():
+    """플랜지 포즈 [기록 전용]. tool1 = 오프셋 0.
+
+    캘리브레이션(eye-in-hand)의 FK 기준을 플랜지로 쓰기 때문에, PC 로 보내는
+    gripper 포즈는 tool 오프셋이 섞이지 않은 플랜지여야 한다. tool 오프셋은
+    hand-eye X 에 흡수되므로 여기서 더하면 이중 계산이 된다.
+
+    읽기만 하고 곧바로 tool3 으로 되돌린다 — 모션은 계속 tool3(150.0) 위에서 돈다.
+    """
+    rb.changetool(1)
+    pose = rb.getpos().pos2list()[:6]
+    rb.changetool(3)
+    return pose
 
 
 def send_teach(conn, kind, data):
@@ -461,18 +488,23 @@ def do_capture(conn, capture_index, set_cube_center=None, set_index=None,
       A_placement  : cube released on table (set_cube_center anchor, method (a))
       B_eyetohand  : cube rigidly gripped, robot sweeps (eye-to-hand, method (b))
     """
+    # tcp(tool3) 는 모션 규약 값이다. 화면 표시와 티칭 기록(capture_tcp)에만 쓴다 —
+    # 그 값이 나중에 웨이포인트가 되어 로봇을 움직이므로 기준을 바꾸면 안 된다.
     tcp = get_tcp()
-    cube_tcp = get_cube_center()
+    # 캘리브레이션에 들어가는 두 값만 물리 기준으로 읽는다.
+    flange = get_flange_pose()      # tool1: eye-in-hand FK 기준
+    cube_tcp = get_cube_center()    # tool4: 플랜지 + 143.0
     joints = get_joints()
     print ''
     print '*** CAPTURE {} (block={} gripped={} grasp={}) ***'.format(
         capture_index, capture_block, cube_gripped, grasp_id)
-    print '  fingertip:    {}'.format(fmt6(tcp))
-    print '  cube center:  {}'.format(fmt6(cube_tcp))
+    print '  fingertip:    {}  (tool3, 모션 기준)'.format(fmt6(tcp))
+    print '  flange:       {}  (tool1, 캘리브 기록)'.format(fmt6(flange))
+    print '  cube center:  {}  (tool4, 캘리브 기록)'.format(fmt6(cube_tcp))
 
     msg = {
         "command": "capture",
-        "capture_gripper_pose_6dof": tcp,
+        "capture_gripper_pose_6dof": flange,
         "capture_cube_center_6dof": cube_tcp,
         "capture_robot_joints_6dof": joints,
         "capture_index": capture_index,
