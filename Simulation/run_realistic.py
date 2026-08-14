@@ -5,7 +5,7 @@
 "현실 노이즈 하에서 ours-B가 유지되나?"
   python run_realistic.py --seeds 3 --workers 12
 """
-import sys, os, argparse, json, itertools
+import sys, os, argparse, json
 from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

@@ -63,7 +63,7 @@ import numpy as np
 from camera import RealSenseCamera
 from apriltag_cube import AprilTagCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt
 from charuco_utils import CharucoTarget
-from config import CubeConfig, CharucoBoardConfig, get_default_cube_config
+from config import CharucoBoardConfig, get_default_cube_config
 from calibration_runtime_utils import resolve_cube_config_for_run
 from capture_detection_utils import detect_cube_markers_in_frame, marker_roi_quality
 from capture_gate import evaluate_capture_gate, resolve_camera_storage
@@ -597,7 +597,6 @@ def estimate_per_marker_poses(
             sol_idx = int(cand["solution_index"])
             rvec = cand["rvec"]
             tvec = cand["tvec"]
-            proj = cand["proj2"].reshape(-1, 1, 2)
             err_px = cand["err"]
             err_mean = float(cand["err_mean"])
             T_cam_cube = cand["T_C_O"]

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """sets_sweep.json → 촬영 셋 수 vs e_task 곡선 (대표 4방식). 표도 markdown 반환."""
 import os, json
-import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt

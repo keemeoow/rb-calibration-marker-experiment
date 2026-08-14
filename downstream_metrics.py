@@ -1,5 +1,4 @@
 import os
-from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 
 import cv2

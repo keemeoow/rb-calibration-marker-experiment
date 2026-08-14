@@ -4,7 +4,7 @@ gripped 효과 집중 실험 — 실제 프로토콜(13 sets × 13 eih + gripped
 4방법 × gripped{0, 130} × 대표조건 4개. "gripped 넣으면 얼마나 좋아지나 + 순위 바뀌나".
   python run_gripped_effect.py --seeds 5 --workers 12
 """
-import sys, os, argparse, json, itertools
+import sys, os, argparse, json
 from concurrent.futures import ProcessPoolExecutor
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
