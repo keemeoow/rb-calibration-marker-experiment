@@ -26,7 +26,7 @@ def _job(a):
     """(cfg_idx, seed, axis, level, n_sets, n_events, train_size, pairs, (intr,outl))."""
     ci, seed, axis, level, n_sets, n_events, train_size, pairs, ba = a
     from core.scene import SimScene
-    from core.experiment import calibrate, _splits_for_seed
+    from core.experiment import calibrate
     from core.metrics import eval_model
     cfg = ALL[ci]
     intr, outl = ba                                  # 배경 노이즈(intrinsic, outlier)
@@ -46,14 +46,18 @@ def _job(a):
         kw["sigma_px"] = level
     sc = SimScene(**kw)
     out = {k: [] for k in KEYS}
-    # held-out: seed 별로 뽑은 (train,test) 조합 순회
-    for test in _splits_for_seed(sc.sets, seed, pairs):
+    n = 0
+    # held-out: 여러 (train,test) 조합 순회
+    for test in itertools.combinations(sc.sets, 2):
         train = [s for s in sc.sets if s not in test][:train_size]
         model, W = calibrate(sc, cfg, train)
         res = eval_model(sc, model, train, list(test), W=W)
         for k in KEYS:
             if res.get(k) is not None:
                 out[k].append(res[k])
+        n += 1
+        if n >= pairs:
+            break
     return (ci, level), out
 
 

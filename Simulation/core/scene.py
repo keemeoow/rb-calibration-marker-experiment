@@ -21,7 +21,7 @@ import os
 import numpy as np
 from .se3 import inv_T, rand_se3, rot_axis_angle, look_at
 from .targets import CubeTarget, BoardTarget
-from .project import observe, DEFAULT_K
+from .project import observe, DEFAULT_K, REAL_CAM_INTR
 
 
 # 모든 씬이 공유하는 타깃 기하 (한 번만 생성)
@@ -30,6 +30,8 @@ _BOARD = BoardTarget()
 
 # 실측 카메라 배치 (CP_result/C1 에서 추출, 높이 ~0.2m 거의 수평 하향 10°)
 _REAL = np.load(os.path.join(os.path.dirname(__file__), "real_setup", "real_cameras.npz"))
+_LAYOUT_PATH = os.path.join(os.path.dirname(__file__), "real_setup",
+                            "real_layout_session02.npz")
 _REAL_BTF = _REAL["bTf"]           # (3,4,4) base←camera
 _REAL_CENTER = _REAL["center"]     # 작업공간(큐브) 중심
 
@@ -37,20 +39,31 @@ _REAL_CENTER = _REAL["center"]     # 작업공간(큐브) 중심
 class SimScene:
     def __init__(self, seed=0, n_fixed_cams=3, n_sets=8, n_events_per_set=6,
                  sigma_px=0.3, fk_noise_mm=0.0, fk_noise_deg=0.0,
-                 intrinsic_err=0.0, outlier_rate=0.0,
+                 fk_sys_mm=0.0, fk_sys_deg=0.0,
+                 intrinsic_err=0.0, outlier_rate=0.0, outlier_px=15.0,
+                 fk_slip_sets=0, fk_slip_mm=0.0, fk_slip_deg=0.0,
+                 fk_sys_res_ratio=0.4,
+                 corner_bias_px=0.0, outlier_focus_cam=None,
+                 max_cams_per_set=None,
+                 intrinsic_jitter=0.0, use_real_layout=False,
                  cam_radius_m=0.35, cam_height_m=0.35,
                  incidence_max_deg=75.0, use_real_cameras=True,
-                 cam_downtilt_deg=27.0, n_gripped_events=0, robust_pnp=True):
+                 cam_downtilt_deg=27.0, n_gripped_events=0):
         rng = np.random.default_rng(seed)
         self.rng = rng
         self.sigma_px = sigma_px
         self.incidence_max_deg = incidence_max_deg
         self.outlier_rate = outlier_rate
+        self.outlier_px = outlier_px
         self.intrinsic_err = intrinsic_err
-        # robust_pnp 는 씬(프론트엔드) 속성 → 모든 캘리브 방법이 동일 조건에서 비교됨.
-        self.robust_pnp = bool(robust_pnp)
-        self.fk_noise_mm = float(fk_noise_mm)
-        self.fk_noise_deg = float(fk_noise_deg)
+        # 코너 검출 계통오차: 카메라마다 고정된 픽셀 편향(방향은 카메라별 무작위, 크기 동일)
+        self.corner_bias_px = float(corner_bias_px)
+        # 이상치 계통오차: 한 카메라에만 이상치가 몰리는 경우
+        self.outlier_focus_cam = outlier_focus_cam
+        # 내부파라미터 랜덤오차: 프레임마다 초점거리가 흔들림
+        self.intrinsic_jitter = float(intrinsic_jitter)
+        # 세트마다 몇 대의 고정 카메라가 보는지 제한(현장에서 가림이 있는 경우)
+        self.max_cams_per_set = max_cams_per_set
 
         # ---- 고정 카메라 배치 ----
         # use_real_cameras=True: 실측 위치(높이 ~0.2m) 사용. 단, 저장된 캘리브 행렬의
@@ -58,7 +71,30 @@ class SimScene:
         #   실측 카메라 *위치*는 유지하고 광축이 작업공간 중심을 향하되 하향각을
         #   cam_downtilt_deg(기본 27°)로 맞춘다 → 평면 보드가 부분적으로 보임.
         # False: 이상적 원형 look-at 배치 (개발/디버그용).
-        if use_real_cameras:
+        if use_real_layout:
+            # ── session02 실측 배치를 참값으로 사용 ──────────────
+            #   카메라 자세, 큐브 자세, 로봇 이동을 전부 실제 값으로 심는다.
+            #   출처: Step3_calibration.py 를 session02 에 돌린 결과.
+            L = np.load(_LAYOUT_PATH)
+            self.real_layout = True
+            self.fixed_cam_ids = [int(c) for c in L["cam_ids"]]
+            self.bTf = {ci: L["bTf"][i].copy()
+                        for i, ci in enumerate(self.fixed_cam_ids)}
+            self.gTc = L["gTc"].copy()
+            self.sets = [int(x) for x in L["sets"]]
+            self.bTo = {int(s): L["bTo"][i].copy()
+                        for i, s in enumerate(self.sets)}
+            center = L["bTo"][:, :3, 3].mean(axis=0)
+            self.bTboard = np.eye(4)
+            self.bTboard[:3, 3] = center.copy()
+            self.events, self.event_set, self.bTg = [], {}, {}
+            for e, (M, s) in enumerate(zip(L["bTg"], L["event_set"])):
+                self.bTg[e] = M.copy()
+                self.event_set[e] = int(s)
+                self.events.append(e)
+            self.set_events = {s: [e for e in self.events if self.event_set[e] == s]
+                               for s in self.sets}
+        elif use_real_cameras:
             center = _REAL_CENTER.copy()
             self.fixed_cam_ids = list(range(len(_REAL_BTF)))
             self.bTf = {}
@@ -82,92 +118,163 @@ class SimScene:
                                          cam_radius_m * np.sin(th),
                                          cam_height_m + rng.uniform(-0.02, 0.02)])
                 self.bTf[ci] = look_at(pos, center)
-        self.sets = list(range(n_sets))
+        if not use_real_layout:
+            self.sets = list(range(n_sets))
 
         # 핸드아이 gTc: 카메라가 그리퍼 축에 대략 정렬(작은 오프셋).
-        self.gTc = rand_se3(rng, t_range_m=0.05, ang_range_deg=20.0)
+        if not use_real_layout:
+            self.gTc = rand_se3(rng, t_range_m=0.05, ang_range_deg=20.0)
         # 보드: 테이블에 고정 (윗면 +Z 위로)
-        self.bTboard = np.eye(4)
-        self.bTboard[:3, 3] = center.copy()
+        if not use_real_layout:
+            self.bTboard = np.eye(4)
+            self.bTboard[:3, 3] = center.copy()
         # 큐브: set 마다 재배치. 실물처럼 "테이블에 앉은" 자세(윗면 위, yaw 자유 + 작은 틸트).
-        self.bTo = {}
-        for s in self.sets:
-            yaw = rng.uniform(-np.pi, np.pi)
-            Ryaw = rot_axis_angle(np.array([0, 0, 1.0]), yaw)
-            ax = rng.normal(size=3); ax[2] = 0; ax /= (np.linalg.norm(ax) + 1e-12)
-            Rtilt = rot_axis_angle(ax, np.deg2rad(rng.uniform(-15, 15)))
-            T = np.eye(4)
-            T[:3, :3] = Rtilt @ Ryaw
-            T[:3, 3] = center + np.array([rng.uniform(-0.1, 0.1),
-                                          rng.uniform(-0.1, 0.1),
-                                          rng.uniform(0.0, 0.05)])
-            self.bTo[s] = T
+        if not use_real_layout:
+            self.bTo = {}
+            for s in self.sets:
+                yaw = rng.uniform(-np.pi, np.pi)
+                Ryaw = rot_axis_angle(np.array([0, 0, 1.0]), yaw)
+                ax = rng.normal(size=3); ax[2] = 0
+                ax /= (np.linalg.norm(ax) + 1e-12)
+                Rtilt = rot_axis_angle(ax, np.deg2rad(rng.uniform(-15, 15)))
+                T = np.eye(4)
+                T[:3, :3] = Rtilt @ Ryaw
+                T[:3, 3] = center + np.array([rng.uniform(-0.1, 0.1),
+                                              rng.uniform(-0.1, 0.1),
+                                              rng.uniform(0.0, 0.05)])
+                self.bTo[s] = T
 
         # ---- 로봇 그리퍼 자세 bTg (event 마다). 카메라가 중심을 바라보게 look-at → bTg 역산 ----
-        self.events, self.event_set, self.bTg = [], {}, {}
-        eid = 0
-        for s in self.sets:
-            for _ in range(n_events_per_set):
-                cam_pos = center + np.array([rng.uniform(-0.12, 0.12),
-                                             rng.uniform(-0.12, 0.12),
-                                             rng.uniform(0.30, 0.45)])
-                look = center + rng.uniform(-0.03, 0.03, size=3)
-                self.bTg[eid] = look_at(cam_pos, look) @ inv_T(self.gTc)
-                self.event_set[eid] = s
-                self.events.append(eid)
-                eid += 1
-        self.set_events = {s: [e for e in self.events if self.event_set[e] == s]
-                           for s in self.sets}
+        if not use_real_layout:
+            self.events, self.event_set, self.bTg = [], {}, {}
+            eid = 0
+            for s in self.sets:
+                for _ in range(n_events_per_set):
+                    cam_pos = center + np.array([rng.uniform(-0.12, 0.12),
+                                                 rng.uniform(-0.12, 0.12),
+                                                 rng.uniform(0.30, 0.45)])
+                    look = center + rng.uniform(-0.03, 0.03, size=3)
+                    self.bTg[eid] = look_at(cam_pos, look) @ inv_T(self.gTc)
+                    self.event_set[eid] = s
+                    self.events.append(eid)
+                    eid += 1
+            self.set_events = {s: [e for e in self.events if self.event_set[e] == s]
+                               for s in self.sets}
 
-        # ---- 로봇 FK 큐브 위치 (fk_cube). 완벽=GT, 옵션 노이즈(Fig B) ----
+        # ---- 로봇 FK 큐브 위치 (fk_cube). 완벽=GT, 옵션 노이즈 ----
+        #   두 종류:
+        #   (1) fk_sys_*  : systematic 편향 (실측 FK 성격) = **상수 rigid 오정렬**(모든 set 동일:
+        #       real 의 180° flip + 37mm 오프셋 대응) + **소량 per-set 잔차**. 상수부는 vision 으로
+        #       추정한 T_delta_avg 로 de-bias 하면 제거됨(=Ours corr). 잔차는 남음(실측 dt 1~6mm).
+        #   (2) fk_noise_*: random(제로평균) 섭동 — 학습·de-bias 불가한 순수 잡음 (대조 sweep).
+        fk_sys = None
+        if fk_sys_mm > 0 or fk_sys_deg > 0:
+            rs = np.random.default_rng(5000 + seed)
+            bvec = rs.normal(size=3); bvec /= (np.linalg.norm(bvec) + 1e-12)
+            ax_s = rs.normal(size=3); ax_s /= (np.linalg.norm(ax_s) + 1e-12)
+            # Step3 assumes raw_fk @ T_delta == visual for every set. Generate
+            # systematic error in exactly that right-multiplied local-frame form.
+            T_delta = np.eye(4)
+            T_delta[:3, 3] = bvec * (fk_sys_mm / 1000.0)
+            T_delta[:3, :3] = rot_axis_angle(ax_s, np.deg2rad(fk_sys_deg))
+            # per-set 잔차 std (de-bias 후 남음). 실측 session02 는 계통 40.9mm 에
+            # 잔차 3.5mm 로 비율이 0.086 이었다. 기본 0.4 는 예전 가정값이다.
+            res_std = (fk_sys_mm / 1000.0) * float(fk_sys_res_ratio)
+            fk_sys = (T_delta, res_std)
         self.fk_cube = {}
         for s in self.sets:
             T = self.bTo[s].copy()
-            if fk_noise_mm > 0 or fk_noise_deg > 0:
+            if fk_sys is not None:                             # systematic = 상수 + per-set 잔차
+                T_delta, res_std = fk_sys
+                T = T @ inv_T(T_delta)                         # raw @ delta = true
+                T[:3, 3] = T[:3, 3] + rng.normal(0, res_std, 3)   # per-set 잔차 (제거 불가)
+            if fk_noise_mm > 0 or fk_noise_deg > 0:            # random (제로평균)
                 ax = rng.normal(size=3); ax /= (np.linalg.norm(ax) + 1e-12)
                 dR = rot_axis_angle(ax, np.deg2rad(rng.normal(0, fk_noise_deg)))
                 T[:3, :3] = dR @ T[:3, :3]
                 T[:3, 3] = T[:3, 3] + rng.normal(0, fk_noise_mm / 1000, 3)
             self.fk_cube[s] = T
 
-        # ---- 카메라별 부정확 intrinsic (K_pnp) — intrinsic 캘리브 오차 모델 ----
-        #   참값 DEFAULT_K/DIST 로 투영하지만 PnP 는 카메라마다 고정 섭동된 K_pnp 를 씀
-        #   → 위치의존 systematic 편향(FK 후보정이 학습 가능). 그리퍼는 키 'g'.
-        self.K_pnp = {}
+        # ---- 특정 세트만 크게 어긋나는 경우 (큐브가 그리퍼 안에서 미끄러짐) ----
+        #   상수 de-bias 로는 제거되지 않고 그 세트에만 남는 오차. gate 가 잡아내야 하는 대상.
+        self.fk_slip_sets = []
+        if fk_slip_sets > 0 and (fk_slip_mm > 0 or fk_slip_deg > 0):
+            rslip = np.random.default_rng(9000 + seed)
+            pick = rslip.choice(len(self.sets),
+                                size=min(int(fk_slip_sets), len(self.sets)),
+                                replace=False)
+            self.fk_slip_sets = sorted(int(self.sets[i]) for i in pick)
+            for s in self.fk_slip_sets:
+                ax = rslip.normal(size=3); ax /= (np.linalg.norm(ax) + 1e-12)
+                d = rslip.normal(size=3); d /= (np.linalg.norm(d) + 1e-12)
+                T = self.fk_cube[s].copy()
+                T[:3, :3] = rot_axis_angle(ax, np.deg2rad(fk_slip_deg)) @ T[:3, :3]
+                T[:3, 3] = T[:3, 3] + d * (fk_slip_mm / 1000.0)
+                self.fk_cube[s] = T
+
+        # ---- 카메라별 개별 실측 intrinsic ----
+        #   real 은 카메라마다 K 가 다름(평균 하나 아님). sim 고정캠 0/1/2 → real cam 0/1/3,
+        #   그리퍼('g') → real cam2 (REAL_CAM_INTR). 참값(K_true/dist_true)으로 투영하고,
+        #   PnP 는 캘리브 오차(intrinsic_err) 만큼 섭동된 K_pnp/dist_pnp 를 씀.
+        SIM_TO_REAL = {0: 0, 1: 1, 2: 3, "g": 2}     # sim 카메라 키 → 실측 cam 인덱스
+        self.K_true, self.dist_true = {}, {}
+        self.K_pnp, self.dist_pnp = {}, {}
         rk = np.random.default_rng(9000 + seed)
         cam_keys = list(self.fixed_cam_ids) + ["g"]
         for ck in cam_keys:
-            Kp = DEFAULT_K.copy()
-            if intrinsic_err > 0:
-                # 초점거리·주점을 상대오차(intrinsic_err)만큼 섭동
+            ri = SIM_TO_REAL.get(ck, 0)
+            Kt = REAL_CAM_INTR[ri]["K"].copy()           # 참값 = 실측 개별 K
+            dt = REAL_CAM_INTR[ri]["dist"].copy()
+            self.K_true[ck] = Kt; self.dist_true[ck] = dt
+            Kp = Kt.copy()
+            if intrinsic_err > 0:                        # 캘리브 오차(참값 대비 섭동)
                 Kp[0, 0] *= 1 + rk.normal(0, intrinsic_err)
                 Kp[1, 1] *= 1 + rk.normal(0, intrinsic_err)
-                Kp[0, 2] += rk.normal(0, intrinsic_err * 100)   # 주점 px
+                Kp[0, 2] += rk.normal(0, intrinsic_err * 100)
                 Kp[1, 2] += rk.normal(0, intrinsic_err * 100)
             self.K_pnp[ck] = Kp
+            self.dist_pnp[ck] = dt.copy()                # dist 는 실측 그대로(계측 신뢰)
+
+        # ---- 코너 검출 계통 편향: 카메라마다 방향은 다르고 크기는 같다 ----
+        self._corner_bias = {}
+        if self.corner_bias_px > 0:
+            rb = np.random.default_rng(11000 + seed)
+            for ck in cam_keys:
+                th = rb.uniform(0, 2 * np.pi)
+                self._corner_bias[ck] = (self.corner_bias_px * np.cos(th),
+                                         self.corner_bias_px * np.sin(th))
 
         # ---- 코너 수준 관측 생성 ----
-        #   obs_* : PnP pose (캘리브 입력).  raw_* : 같은 키의 원본 2D 코너 관측 dict
-        #   (재투영 평가용 — 방법별로 재생성하지 않고 씬이 한 번만 만들어 공유 → 공정).
         self.obs_fix_cube, self.obs_fix_board = {}, {}
         self.obs_grip_cube, self.obs_grip_board = {}, {}
-        self.raw_fix_cube, self.raw_fix_board = {}, {}
-        self.raw_grip_cube, self.raw_grip_board = {}, {}
         self.reproj = {}
+        self.corn = {}      # (id(store), key) -> (obj_rig3d, img2d_noisy, cam_key) : held-out 픽셀 재투영(③)용
         orng = np.random.default_rng(7000 + seed)
+        # 세트별로 관측하는 고정 카메라를 제한할 수 있다.
+        vis_rng = np.random.default_rng(13000 + seed)
+        cams_for_set = {}
+        for s in self.sets:
+            if self.max_cams_per_set is None:
+                cams_for_set[s] = list(self.fixed_cam_ids)
+            else:
+                k = min(int(self.max_cams_per_set), len(self.fixed_cam_ids))
+                pick = vis_rng.choice(len(self.fixed_cam_ids), size=k, replace=False)
+                cams_for_set[s] = [self.fixed_cam_ids[i] for i in sorted(pick)]
+        self.cams_for_set = cams_for_set
+
         for ci in self.fixed_cam_ids:
             for s in self.sets:
+                if ci not in cams_for_set[s]:
+                    continue
                 self._obs(_CUBE, inv_T(self.bTf[ci]) @ self.bTo[s],
-                          self.obs_fix_cube, (ci, s), orng, ci, self.raw_fix_cube)
+                          self.obs_fix_cube, (ci, s), orng, ci)
                 self._obs(_BOARD, inv_T(self.bTf[ci]) @ self.bTboard,
-                          self.obs_fix_board, (ci, s), orng, ci, self.raw_fix_board)
+                          self.obs_fix_board, (ci, s), orng, ci)
         for e in self.events:
             s = self.event_set[e]
             base_g = inv_T(self.bTg[e] @ self.gTc)
-            self._obs(_CUBE, base_g @ self.bTo[s], self.obs_grip_cube, e, orng, "g",
-                      self.raw_grip_cube)
-            self._obs(_BOARD, base_g @ self.bTboard, self.obs_grip_board, e, orng, "g",
-                      self.raw_grip_board)
+            self._obs(_CUBE, base_g @ self.bTo[s], self.obs_grip_cube, e, orng, "g")
+            self._obs(_BOARD, base_g @ self.bTboard, self.obs_grip_board, e, orng, "g")
 
         # ---- gripped 캡처: 로봇이 큐브를 들고 넓게 회전, 고정 카메라가 관측 ----
         #   고전적 eye-to-hand: 큐브가 그리퍼에 강체(gripper_cube_X)로 붙어 이동.
@@ -179,7 +286,6 @@ class SimScene:
         self.bTg_grip = {}
         self.cube_grip = {}                              # ge -> 큐브 pose(base) 진값
         self.obs_fix_cube_grip = {}                      # (ci, ge) -> 고정카메라 관측
-        self.raw_fix_cube_grip = {}
         geid = 10000
         for _ in range(int(n_gripped_events)):
             Tc = np.eye(4)                               # 큐브를 들어 넓게 회전(여러 면 노출)
@@ -193,19 +299,29 @@ class SimScene:
             self.gripped_events.append(geid)
             for ci in self.fixed_cam_ids:
                 self._obs(_CUBE, inv_T(self.bTf[ci]) @ Tc,
-                          self.obs_fix_cube_grip, (ci, geid), orng, ci,
-                          self.raw_fix_cube_grip)
+                          self.obs_fix_cube_grip, (ci, geid), orng, ci)
             geid += 1
 
-    def _obs(self, target, T_gt, store, key, rng, cam_key, raw_store=None):
-        """3D 코너 투영→픽셀노이즈(+outlier)→robust PnP(부정확 K_pnp). 미검출이면 저장 안 함.
-        raw_store 에는 원본 2D 코너 관측 dict 을 같은 키로 보관(재투영 평가용)."""
+    def _obs(self, target, T_gt, store, key, rng, cam_key):
+        """3D 코너 투영→픽셀노이즈(+outlier)→PnP(부정확 K_pnp). 미검출이면 저장 안 함."""
+        # 이상치 계통오차: 지정 카메라에만 몰아준다(다른 카메라는 이상치 없음).
+        orate = self.outlier_rate
+        if self.outlier_focus_cam is not None:
+            orate = self.outlier_rate if cam_key == self.outlier_focus_cam else 0.0
+        # 내부파라미터 랜덤오차: PnP 가 쓰는 K 를 프레임마다 흔든다.
+        K_pnp = self.K_pnp[cam_key]
+        if self.intrinsic_jitter > 0:
+            K_pnp = K_pnp.copy()
+            K_pnp[0, 0] *= 1 + rng.normal(0, self.intrinsic_jitter)
+            K_pnp[1, 1] *= 1 + rng.normal(0, self.intrinsic_jitter)
         r = observe(target, T_gt, sigma_px=self.sigma_px,
                     incidence_max_deg=self.incidence_max_deg, rng=rng,
-                    K_pnp=self.K_pnp[cam_key], outlier_rate=self.outlier_rate,
-                    robust_pnp=self.robust_pnp)
+                    K=self.K_true[cam_key], dist=self.dist_true[cam_key],
+                    K_pnp=K_pnp, dist_pnp=self.dist_pnp[cam_key],
+                    outlier_rate=orate, outlier_px=self.outlier_px,
+                    corner_bias_px=self._corner_bias.get(cam_key, (0.0, 0.0)))
         if r is not None:
-            store[key] = r["T"]
-            if raw_store is not None:
-                raw_store[key] = r
-            self.reproj[(id(store), key)] = r["reproj_px"]
+            T_est, ncorner, reproj, obj, img = r
+            store[key] = T_est
+            self.reproj[(id(store), key)] = reproj
+            self.corn[(id(store), key)] = (obj, img, cam_key)

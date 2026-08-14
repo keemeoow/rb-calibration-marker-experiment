@@ -27,30 +27,32 @@ STYLE = {
 ORDER = ["EXP4", "EXP5", "EXP2", "EXP3", "EXP7", "EXP6", "EXP1"]
 COLLAPSE = {"EXP6"}
 AXES = [("sigma", "marker corner sigma (px)"), ("sys", "systematic intrinsic err"),
-        ("fk", "FK error (mm, random)"), ("outl", "outlier rate")]
+        ("fk_sys", "systematic FK error (mm)"), ("outl", "outlier rate")]
 
 
-def _cap(blob, keys):
+def _cap(blob, keys, metric):
     mx = 0.0
     for name in STYLE:
         if name in COLLAPSE:
             continue
-        ys = [blob["results"][k][name]["e_task_mm"] for k in keys]
+        ys = [blob["results"][k][name].get(metric) for k in keys]
         ys = [y for y in ys if y is not None]
         if ys:
             mx = max(mx, max(ys))
     return mx * 1.2 if mx > 0 else 1.0
 
 
-def fig_A(blob):
+def fig_A(blob, metric="e_task_mm", ylabel="e_task (mm, GT)", save="fig_paperA_sweeps",
+          title="Figure A. e_task (GT) vs noise, 7 methods"):
+    """지표 sweep 4패널 (metric 파라미터화). EXP6 등 발산은 off-scale 주석."""
     lay = blob["layout"]["figA"]
     fig, axs = plt.subplots(1, 4, figsize=(19, 5))
     for ax, (axis, xlabel) in zip(axs, AXES):
         levels = lay[axis]["levels"]; keys = lay[axis]["keys"]
-        cap = _cap(blob, keys); off = []
+        cap = _cap(blob, keys, metric); off = []
         for name in ORDER:
             col, ls, lw, mk, lab = STYLE[name]
-            ys = [blob["results"][k][name]["e_task_mm"] for k in keys]
+            ys = [blob["results"][k][name].get(metric) for k in keys]
             xs = [x for x, y in zip(levels, ys) if y is not None]
             yv = [y for y in ys if y is not None]
             if not yv:
@@ -61,7 +63,7 @@ def fig_A(blob):
             ax.plot(xs, yv, color=col, ls=ls, lw=lw, marker=mk, ms=6, zorder=z,
                     label=lab, alpha=1.0 if name == "EXP1" else 0.85)
         ax.set_ylim(0, cap)
-        ax.set_xlabel(xlabel, fontsize=9); ax.set_ylabel("e_task (mm, GT)", fontsize=9)
+        ax.set_xlabel(xlabel, fontsize=9); ax.set_ylabel(ylabel, fontsize=9)
         ax.set_title(xlabel.split("(")[0].strip(), fontsize=11, fontweight="bold", loc="left")
         ax.text(1.0, 1.015, "(lower is better)", transform=ax.transAxes, fontsize=8,
                 color="#2a8a55", ha="right", va="bottom", fontweight="bold")
@@ -76,12 +78,13 @@ def fig_A(blob):
     fig.legend(handles=handles, loc="upper center", ncol=7, frameon=False, fontsize=9.5,
                bbox_to_anchor=(0.5, 1.07))
     m = blob["meta"]
-    fig.suptitle(f"Figure A. e_task (GT) vs noise, 7 methods  ({m['protocol']}, {m['seeds']} seeds)",
+    fig.suptitle(f"{title}  ({m['protocol']}, {m['seeds']} seeds, median)",
                  y=1.12, fontsize=13, fontweight="bold")
     fig.tight_layout(rect=[0, 0, 1, 1.0])
     os.makedirs(FIG, exist_ok=True)
-    out = os.path.join(FIG, "fig_paperA_sweeps.png")
+    out = os.path.join(FIG, save + ".png")
     fig.savefig(out, dpi=130, bbox_inches="tight"); print(f"[저장] {out}")
+    plt.close(fig)
 
 
 def fig_B(blob):
@@ -126,20 +129,37 @@ def tables(blob):
     METH = blob["methods"]; LAB = dict(zip(METH, blob["method_labels"]))
     # 표 1: realistic 조건, 지표별
     rk = lay["table"]["realistic"]
-    lines = ["## 표 1 — 시뮬 · 현실 종합 조건 (GT)\n",
-             f"*{blob['meta']['protocol']}, {blob['meta']['seeds']} seeds. sigma0.3 + 계통2% + FK≈0 + 오검출5%.*",
-             "*EXP6(-cube)은 e_X/reproj/cross 붕괴 → e_task 낮은 건 그리퍼예측 착시(캘리브 실패).*\n",
-             "| 방법 | e_task mm | e_task deg | e_X mm | **cam→base 병진 mm (bTf)** | reproj px | cross mm |",
+    mm = blob["meta"]
+    lines = ["## 표 1 — 시뮬 · 현실 종합 조건 (median, GT)\n",
+             f"*{mm['protocol']}, {mm['seeds']} seeds × {mm.get('splits','?')} splits, 대표값=median. "
+             f"실측노이즈: σ0.2 + 계통0.5% + FK≈0 + 오검출2%@2px.*",
+             "*발산%: e_task>100mm(수렴 실패) 비율. reproj_raw: held-out 픽셀 재투영(방법별·FK무관, 논문 주지표).*",
+             "*핵심: 통합 4방법(EXP1/3/4/7)은 task·정합 모두 동률. 차이는 통합 vs 독립(EXP2/5)·큐브유무(EXP6).*\n",
+             "| 방법 | e_task mm | e_X mm | **e_rel mm** 상대정합 | **reproj_raw px** held-out | cross mm | 발산% |",
              "|---|--:|--:|--:|--:|--:|--:|"]
     for m in METH:
         r = R[rk][m]
         def g(k): return f"{r[k]:.2f}" if r.get(k) is not None else "—"
-        lines.append(f"| {m} {LAB[m]} | {g('e_task_mm')} | {g('e_task_deg')} | "
-                     f"{g('e_X_mm')} | {g('bTf_mm')} | {g('e_reproj_px')} | {g('e_cross_mm')} |")
-    # 표 1b: e_task 조건별
+        dv = r.get("_diverge")
+        dvs = f"{dv*100:.0f}%" if dv is not None else "—"
+        lines.append(f"| {m} {LAB[m]} | {g('e_task_mm')} | {g('e_X_mm')} | {g('e_rel_mm')} | "
+                     f"{g('e_reproj_raw_px')} | {g('e_cross_mm')} | {dvs} |")
+    # 표 1c: FK 없음 vs 있음 (핵심 — FK 보정의 가치)
+    r0 = lay["table"]["realistic"]; r1 = lay["table"]["realistic_sysfk"]
+    lines += ["\n## 표 1c — FK 없음 vs FK 있음(systematic 6.6mm 실측) (median e_task mm)\n",
+              "*같은 realistic 조건에서 FK 오차만 추가. FK 보정(corr)이 systematic FK 를 얼마나 잡나.*\n",
+              "| 방법 | FK 없음 | FK 있음 | Δ(있음−없음) |", "|---|--:|--:|--:|"]
+    for m in METH:
+        a = R[r0][m].get("e_task_mm"); b = R[r1][m].get("e_task_mm")
+        if a is None or b is None:
+            lines.append(f"| {m} {LAB[m]} | — | — | — |"); continue
+        lines.append(f"| {m} {LAB[m]} | {a:.2f} | {b:.2f} | {b-a:+.2f} |")
+    # 표 1b: e_task 조건별 (systematic vs random FK 분리)
     lines += ["\n## 표 1b — 시뮬 · 조건별 e_task (mm, GT)\n",
-              "| 방법 | 이상적 | 현실종합 | +FK오차 | +오검출 |", "|---|--:|--:|--:|--:|"]
-    order = ["ideal", "realistic", "fk_err", "outlier"]
+              "*FK_sys=systematic(학습가능·보정대상), FK_rand=random(학습불가·대조).*\n",
+              "| 방법 | 이상적 | 현실(FK없음) | 현실+FK_sys | FK_sys격리 | FK_rand격리 | +오검출 |",
+              "|---|--:|--:|--:|--:|--:|--:|"]
+    order = ["ideal", "realistic", "realistic_sysfk", "fk_sys", "fk_rand", "outlier"]
     for m in METH:
         vals = []
         for c in order:
@@ -153,4 +173,11 @@ def tables(blob):
 
 if __name__ == "__main__":
     blob = json.load(open(os.path.join(TBL, "paper_sim.json")))
-    fig_A(blob); fig_B(blob); tables(blob)
+    # e_task sweep (실전 성능) + 정합/재투영 sweep (논문 기여: 통합 vs 독립)
+    fig_A(blob, "e_task_mm", "e_task (mm, GT)", "fig_paperA_sweeps",
+          "Figure A. e_task (GT) vs noise, 7 methods")
+    fig_A(blob, "e_rel_mm", "e_rel (mm) — 카메라 상대정합", "fig_paperA2_rel",
+          "Figure A2. relative extrinsic (registration) vs noise")
+    fig_A(blob, "e_reproj_raw_px", "reproj_raw (px) — held-out 픽셀", "fig_paperA3_reproj",
+          "Figure A3. held-out pixel reprojection vs noise")
+    fig_B(blob); tables(blob)

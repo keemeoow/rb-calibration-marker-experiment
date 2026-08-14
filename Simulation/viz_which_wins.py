@@ -21,15 +21,14 @@ FIG = os.path.join(os.path.dirname(__file__), "results", "figures")
 STYLE = {
     "fixed": ("#56B4E9", "-.", 1.8, "X", "fixed-FK"),
     "noFK":  ("#D55E00", "--", 1.8, "v", "no-FK"),
-    "oursA": ("#009E73", "-",  1.9, "^", "ours-A (λ=0)"),
-    "oursB": ("#0072B2", "-",  3.0, "o", "ours-B (λ=0.5)"),
+    "ours":  ("#0072B2", "-",  3.0, "o", "ours (de-bias + gate)"),
 }
-ORDER = ["fixed", "noFK", "oursA", "oursB"]     # oursB 마지막(위)
+ORDER = ["fixed", "noFK", "ours"]     # ours 마지막(위)
 
 
 def _cap(curves, key, exclude_hi=True):
     """관심 방법(ours/fixed) 최대의 1.25배를 y캡으로. no-FK 폭주는 축 밖."""
-    base = ["fixed", "oursA", "oursB"] if exclude_hi else list(STYLE)
+    base = ["fixed", "ours"] if exclude_hi else list(STYLE)
     mx = 0.0
     for n in base:
         ys = [y for y in curves[n][key] if y is not None]
@@ -53,9 +52,9 @@ def _plot_panel(ax, blob, key, title, unit, cap=None):
         if np.median(yv) > cap:
             offscale.append((lab, col, max(yv)))
             continue
-        z = 6 if n == "oursB" else 3
+        z = 6 if n == "ours" else 3
         ax.plot(xs, yv, color=col, ls=ls, lw=lw, marker=mk, ms=6, zorder=z,
-                label=lab, alpha=1.0 if n == "oursB" else 0.9, clip_on=True)
+                label=lab, alpha=1.0 if n == "ours" else 0.9, clip_on=True)
     ax.set_ylim(0, cap)
     ax.set_title(title, fontsize=11, fontweight="bold", loc="left")
     ax.set_xlabel(blob["xlabel"], fontsize=9)
@@ -81,7 +80,7 @@ def fig_sweeps():
         _plot_panel(ax, blob, "e_task_mm", title, "mm")
     # 공용 범례
     handles = [plt.Line2D([0], [0], color=STYLE[n][0], ls=STYLE[n][1],
-               lw=(3 if n == "oursB" else 1.9), marker=STYLE[n][3], ms=7,
+               lw=(3 if n == "ours" else 1.9), marker=STYLE[n][3], ms=7,
                label=STYLE[n][4]) for n in ORDER]
     fig.legend(handles=[h for h in handles], loc="upper center", ncol=4,
                frameon=False, fontsize=10.5, bbox_to_anchor=(0.5, 1.06))
@@ -145,7 +144,7 @@ def fig_metrics():
         for ci, (key, mt, unit) in enumerate(METS):
             _plot_panel(axs[ri][ci], blob, key, f"{atitle} · {mt}", unit)
     handles = [plt.Line2D([0], [0], color=STYLE[n][0], ls=STYLE[n][1],
-               lw=(3 if n == "oursB" else 1.9), marker=STYLE[n][3], ms=7,
+               lw=(3 if n == "ours" else 1.9), marker=STYLE[n][3], ms=7,
                label=STYLE[n][4]) for n in ORDER]
     fig.legend(handles=handles, loc="upper center", ncol=4, frameon=False,
                fontsize=11, bbox_to_anchor=(0.5, 1.02))
