@@ -19,6 +19,7 @@
 \usepackage{booktabs}
 \usepackage{array}
 \usepackage{tabularx}
+\usepackage{graphicx}
 
 \usetheme{Madrid}
 \usecolortheme{whale}
@@ -292,6 +293,23 @@
   \end{alertblock}
 \end{frame}
 
+\begin{frame}{1.9 전체 시스템 구성과 그림 표기}
+  \centering
+  \includegraphics[
+    height=0.64\textheight,
+    trim=0 106bp 0 0,
+    clip
+  ]{cube_in_hand_calibration_setup.png}
+
+  \vspace{1mm}
+  {\scriptsize
+    그림의 $F_i,\,E,\,C$는 본문에서 각각 $C_i,\,C_g,\,O$로 표기한다.\par
+    그림의 $\T{B}{G}$는 본문의 $\T{B}{G,e}$에 해당하며,
+    $\T{G}{C}$는 그리퍼--파지 큐브 사이의 고정 관계이다.\par
+    $W$는 보드 좌표계이며, 이후 캘리브레이션 식에는 사용하지 않는다.
+  }
+\end{frame}
+
 %==================================================================
 \section{2. 좌표계 기호}
 %==================================================================
@@ -527,22 +545,31 @@
   \vfill
   \begin{block}{}
     \centering
-    앞의 둘은 출발점이 \textbf{카메라}, 마지막은 출발점이 \textbf{베이스}\\
-    $\rightarrow$ 그대로는 서로 이어붙일 수 없음 (6장에서 연결)
+    앞의 둘은 \textbf{큐브 $O$에서 카메라로}, 마지막은
+    \textbf{그리퍼 $G$에서 베이스 $B$로} 옮기는 변환\\
+    $\rightarrow$ 출발ㆍ도착 좌표계가 달라 그대로는 이어붙일 수 없음 (6장에서 연결)
   \end{block}
 \end{frame}
 
 \begin{frame}{4.3 FK란}
   FK = Forward Kinematics = \textbf{순기구학}
   \vfill
-  \begin{itemize}
-    \item 입력: 각 관절이 몇 도 꺾여 있는지 + 링크 길이 등 설계값
-    \item 출력: 손끝이 베이스 기준 어디에 어떤 방향으로 있는지
-  \end{itemize}
-  \vfill
-  \begin{block}{중요한 점}
-    카메라 없이 \textbf{로봇 자신의 관절 센서만으로} 얻는 값
-  \end{block}
+  \begin{columns}[c]
+    \begin{column}{0.46\textwidth}
+      \begin{itemize}
+        \item 입력: 각 관절이 몇 도 꺾여 있는지 + 링크 길이 등 설계값
+        \item 출력: 손끝이 베이스 기준 어디에 어떤 방향으로 있는지
+      \end{itemize}
+      \vspace{4mm}
+      \begin{block}{중요한 점}
+        카메라 없이 \textbf{로봇 자신의 관절 센서만으로} 얻는 값
+      \end{block}
+    \end{column}
+    \begin{column}{0.50\textwidth}
+      \centering
+      \includegraphics[width=\linewidth]{fk.png}
+    \end{column}
+  \end{columns}
 \end{frame}
 
 %==================================================================
@@ -890,16 +917,21 @@
 \begin{frame}{9.2 장점과 주의점}
   \begin{block}{장점}
     \begin{itemize}
-      \item raw FK의 계통오차가 캘리브레이션에 직접 들어오지 않음
+      \item 큐브 자세를 raw FK 값에 고정하지 않음
+        $\rightarrow$ \textbf{큐브 FK prior 오차}가 추가로 들어오지 않음
     \end{itemize}
   \end{block}
+  \vfill
+  \begin{alertblock}{\texttt{No-FK}가 ``FK를 전혀 쓰지 않는다''는 뜻은 아님}
+    손목 카메라 관측을 베이스로 옮길 때는 이벤트별 로봇 자세
+    $\T{B}{G,e}$를 사용한다. 사용하지 않는 것은
+    \textbf{큐브 자세를 고정하는 FK prior}이다.
+  \end{alertblock}
   \vfill
   \begin{block}{주의점}
     \begin{itemize}
       \item 세트마다 $6$자유도인 $\T{B}{O,s}$ 가 추가 $\rightarrow$ 미지수 증가
       \item 카메라 연결이나 로봇 움직임이 부족하면 전체 좌표계의 gauge가 흔들릴 수 있음
-      \item $\T{B}{G,e}$ \textbf{는 사용함}.
-        큐브 FK prior $\T{B}{\Ofk_s}$ 만 사용하지 않음
     \end{itemize}
   \end{block}
 \end{frame}
@@ -913,13 +945,20 @@
     로봇 FK가 알려준 큐브 자세를 정답으로 간주 $\rightarrow$ 움직이지 못하게 고정
   \end{block}
   \vfill
-  raw FK가 말하는 큐브 자세: $\T{B}{\Ofk_s}$
+  \textbf{raw FK가 말하는 큐브 자세를 만드는 식}
+  \[
+    \T{B}{\Ofk_s}
+    =
+    \T{B}{G,e_s}\,\T{G}{O}
+  \]
   \begin{itemize}
-    \item 카메라를 전혀 쓰지 않고 로봇의 관절 센서만으로 얻는 큐브 자세
-    \item 좌표계 이름에 $\mathrm{fk}$를 붙여 vision이 말하는 큐브와 구분
+    \item $e_s$: 세트 $s$의 큐브 자세를 기록한 로봇 이벤트
+    \item $\T{B}{G,e_s}$: 관절값과 로봇 모델로 계산한 그리퍼 자세
+    \item $\T{G}{O}$: \textbf{미리 알아야 하는 그리퍼--큐브 고정 변환}
   \end{itemize}
   \vfill
-  기준 자세를 여기에 못 박음
+  따라서 관절값만으로는 큐브 자세가 나오지 않으며,
+  알려진 $\T{G}{O}$가 함께 필요하다. Fixed-FK는 이 값을 기준 자세로 고정한다.
   \[
     \T{B}{\Oref_s}=\T{B}{\Ofk_s}
   \]
@@ -1058,9 +1097,10 @@
   \vfill
   \begin{block}{\texttt{No-FK}와 비교}
     \begin{itemize}
-      \item \texttt{No-FK}: 오염원이 카메라 하나뿐
-      \item \texttt{Fixed-FK}: FK 오차와 카메라 오차가 모두
-        $\T{B}{C_i}$, $\T{G}{C_g}$ 로 유입
+      \item \texttt{No-FK}: 이벤트별 로봇 자세 $\T{B}{G,e}$는 사용하지만,
+        큐브 자세를 FK prior에 고정하지 않음
+      \item \texttt{Fixed-FK}: 위 경로에 \textbf{큐브 FK prior 오차}가 하나 더 추가되어
+        $\T{B}{C_i}$, $\T{G}{C_g}$ 로 흡수될 수 있음
     \end{itemize}
   \end{block}
 \end{frame}
@@ -1570,9 +1610,13 @@
 
 %==================================================================
 % 11장을 빼고 발표할 때의 마무리. 10장이 문제 제기로 끝나므로
-% 여기서 두 방식을 정리하고 현재 선택을 밝힌다.
+% 여기서는 두 방식의 차이만 정리한다.
 %==================================================================
 \ifcorrectedfk\else
+%==================================================================
+\section{11. 정리}
+%==================================================================
+
 \begin{frame}{11. 정리: 두 방식의 비교}
   \begin{center}
     \small
@@ -1582,23 +1626,13 @@
       \midrule
       큐브 자세 $\T{B}{\Oref_s}$ & 자유변수 & raw FK에 고정 \\
       미지수 개수 & 많음 (세트마다 $6$개 추가) & 적음 \\
-      raw FK 오차 & 들어오지 않음 & $\T{B}{C_i}$, $\T{G}{C_g}$ 로 유입 \\
+      이벤트별 로봇 자세 $\T{B}{G,e}$ & 사용 & 사용 \\
+      큐브 자세 FK prior & 사용하지 않음 & 사용 \\
+      큐브 FK prior 오차 & 추가되지 않음 & 카메라 변환으로 유입 가능 \\
       카메라 계통오차 & 들어옴 & 들어옴 \\
-      오염원 & \textbf{하나} & \textbf{둘} \\
       \bottomrule
     \end{tabular}
   \end{center}
-  \vfill
-  \begin{alertblock}{현재 선택}
-    \begin{itemize}
-      \item FK가 정확하다고 보장할 수 없고,
-        틀려도 잔차로는 확인되지 않음 (10.4절)
-      \item $\rightarrow$ 오염원이 하나뿐인 \texttt{No-FK}를 기준으로 삼음
-    \end{itemize}
-  \end{alertblock}
-  \vfill
-  \centering
-  {\small raw FK를 보정해서 쓰는 방식은 검증 진행 중 $\rightarrow$ 별도 발표}
 \end{frame}
 \fi
 

@@ -1,496 +1,407 @@
-# 비교 대상 방법 정리 (SOTA baselines)
+# Multi-camera–robot calibration: 비교 방법 사전 안내
 
-> Version: 2.0 · 기준일: 2026-08-13
-> 대상 독자: 비교 실험을 맡은 학부연구생
-> 우리 제안 방법(A/B 계열)과 우위 판정 기준은 `SOTA_Claim_Protocol.md` 참조
+## 1. Overview
 
----
+- **연구 목표: multi-camera–robot calibration**
+  - 여러 카메라를 로봇 base 좌표계에 등록
+  - 고정 카메라와 wrist camera를 하나의 robot workcell 안에서 함께 calibration
+  - 카메라에서 측정한 물체 pose를 로봇이 사용할 수 있는 좌표로 변환
 
-## 0. 이 문서를 읽는 법
+- **우리 시스템의 구성**
+  - 작업 공간에 설치된 고정 카메라 여러 대
+  - 로봇 손목에 설치된 wrist camera 한 대
+  - 로봇이 잡은 marker cube와 작업대의 calibration board 사용
+  - 여러 카메라의 관측을 하나의 최적화 문제로 결합
 
-우리가 만든 캘리브레이션 방법이 **기존 방법보다 정말 나은지** 확인하려면,
-기존 방법을 **같은 데이터로 직접 돌려서** 비교해야 한다.
-이 문서는 그 "기존 방법" 10가지가 각각 무엇이고 어떻게 돌리는지 정리한 것이다.
+- **Hand–eye calibration과의 관계**
+  - Hand–eye calibration: 전체 문제를 구성하는 기본 calibration 관계
+  - Robot-world/hand–eye calibration: 로봇과 외부 카메라의 관계를 추정하는 주요 formulation
+  - Multi-camera–robot calibration: 여러 관계를 함께 다루는 이 연구의 system-level 목표
+  - 관련 논문 검색 및 baseline 분류에는 `hand–eye`, `robot-world/hand–eye` 용어를 그대로 사용
 
-**논문을 다 읽을 필요는 없다.** 각 방법마다 아래 세 가지만 알면 실험은 돌아간다.
+- **우리 방법의 핵심**
+  - 카메라별 독립 calibration이 아닌 multi-camera joint calibration
+  - PnP pose만 맞추는 방식이 아닌 raw corner 기반 pixel-level optimization
+  - Robot FK를 완전히 정확한 값으로 고정하지 않고 불확실성을 고려
+  - 여러 카메라가 관측한 cube pose를 shared latent variable로 사용
 
-1. 이 방법이 **무엇을 입력받아 무엇을 내놓는가**
-2. 이 방법이 **무엇을 가정하는가** (= 무엇을 못 하는가)
-3. **어떻게 실행하는가** (OpenCV 한 줄인가, 남의 저장소를 돌려야 하는가)
+- **비교 실험에서 확인할 질문**
+  1. 카메라별 독립 calibration보다 multi-camera joint calibration이 정확한가?
+  2. FK를 고정하는 방식보다 FK uncertainty를 고려하는 방식이 정확한가?
 
-자기가 맡은 방법의 논문만 초록 수준으로 보면 된다.
-Tsai를 맡은 사람이 Calib3R 논문을 읽을 이유는 없다.
+- 세부 기여 및 성능 판정 기준: [`SOTA_Claim_Protocol.md`](SOTA_Claim_Protocol.md)
 
-### 용어 주의
+## 2. 기본 용어
 
-이 문서에서 **고전 방법(C 계열)을 "SOTA"라고 부르지 않는다.**
-오래된 방법은 "기준선(baseline)"이지 최신 기술이 아니다.
-반대로 **출판연도가 최신이라는 이유만으로 실험 셋업이 다른 방법을 경쟁자로 취급하지도 않는다.**
-비교는 "같은 조건에서 같은 일을 하는 방법"끼리만 의미가 있다.
+### 2.1 카메라 설치 방식
 
----
+| 구성 | 설명 |
+| --- | --- |
+| eye-in-hand | 카메라가 로봇 손목에 부착되어 함께 움직이는 구성 |
+| eye-to-hand | 카메라가 작업 공간에 고정되어 로봇을 바라보는 구성 |
 
-## 1. 먼저 알아야 할 개념 세 가지
+- 우리 시스템: eye-in-hand와 eye-to-hand가 함께 있는 mixed configuration
+- 기존 방법의 일반적인 제약
+  - 한 가지 설치 방식만 지원
+  - 카메라 한 대만 지원
+  - 여러 카메라에 각각 실행한 뒤 결과를 조합해야 하는 경우가 많음
 
-### 1.1 hand-eye calibration이란
+### 2.2 `AX=XB`와 `AX=ZB`
 
-로봇은 **자기 손이 어디 있는지**를 알고(관절 센서 → FK),
-카메라는 **물체가 어디 있는지**를 안다(사진 → PnP).
-그런데 두 값의 기준이 달라서 그대로는 못 합친다.
+- **`AX=XB`**
+  - 로봇의 motion과 카메라에서 관측한 motion 사용
+  - 하나의 고정 변환 `X` 추정
+  - 고전적인 hand–eye calibration의 대표 형태
 
-**둘 사이의 고정된 변환을 찾는 것**이 hand-eye calibration이다.
-이 변환만 알면 카메라가 본 위치를 로봇이 갈 수 있는 좌표로 바꿀 수 있다.
+- **`AX=ZB`**
+  - Hand–eye와 robot-world 관계에 해당하는 두 변환 동시 추정
+  - `AX=XB`보다 우리 문제 설정에 가까운 형태
 
-### 1.2 카메라를 어디에 두는가 — 두 가지 구성
+- **주의점**
+  - 논문마다 `X`, `Y`, `Z`의 정의가 다를 수 있음
+  - 문자보다 각 변환의 출발 좌표계와 도착 좌표계를 확인해야 함
 
-| 구성 | 카메라 위치 | 찾는 것 | 다른 이름 |
+### 2.3 Pose-level과 pixel-level
+
+- **Pose-level**
+  - 영상의 marker corner로 PnP pose를 먼저 계산
+  - 계산된 camera/target pose와 robot pose 사이의 오차 최소화
+  - 고전적인 hand–eye 방법에서 주로 사용
+
+- **Pixel-level**
+  - 검출된 corner의 pixel 좌표를 직접 사용
+  - 예측 corner와 관측 corner 사이의 reprojection error 최소화
+  - Bundle adjustment 계열에서 주로 사용
+
+- **비교에서의 의미**
+  - Pose-level 방법: 기본 baseline
+  - Multi-camera pixel-level 방법: 우리 방법과 더 가까운 직접 비교 대상
+
+## 3. 비교 후보
+
+| 구분 | 방법 | 핵심 특징 | 공개 구현 |
 | --- | --- | --- | --- |
-| **eye-in-hand** | 로봇 손목에 부착 | 손 ↔ 카메라 | eye-on-hand |
-| **eye-to-hand** | 작업대에 고정 | 로봇 베이스 ↔ 카메라 | eye-on-base |
-
-**같은 것을 다른 이름으로 부르는 경우가 많으니 문서마다 확인해야 한다.**
-OpenCV와 easy_handeye는 `eye-in-hand` / `eye-on-base`라고 쓴다.
-
-우리 프로젝트는 **고정 카메라 여러 대 + 손목 카메라 하나**를 같이 쓴다(mixed 구성).
-아래 방법 대부분은 **둘 중 하나만** 지원한다. 그래서 비교가 까다롭다.
-
-### 1.3 `AX=XB` 와 `AX=ZB` — 방법을 가르는 축
-
-이 두 식이 방법을 나누는 가장 큰 기준이다. 표기는 문헌마다 다르다
-(`AX=YB`, `AX=ZB`는 같은 문제를 가리킨다).
-
-**`AX=XB`** — 미지수 **하나**
-
-로봇을 두 자세로 움직였을 때,
-`A` = 로봇 손이 움직인 양, `B` = 카메라가 움직인 양, `X` = 손-카메라 변환.
-"손이 이만큼 움직였으면 카메라도 이만큼 움직여야 한다"는 관계를 여러 쌍 모아 `X`를 푼다.
-
-- 최소 3자세 필요. 단, **회전축이 서로 평행하면 안 된다.**
-- 카메라가 세상 어디에 있는지는 **안 구한다.**
-
-**`AX=ZB`** — 미지수 **둘**
-
-`X`(손-카메라)와 `Z`(로봇 베이스-물체) 를 **동시에** 구한다.
-
-- 우리 문제에 더 가깝다. 우리도 카메라 위치와 물체 위치를 같이 찾기 때문.
-- **공정한 비교 상대는 `AX=XB`가 아니라 `AX=ZB` 계열이다.**
-
-### 1.4 자세 단위 vs 픽셀 단위
-
-| | 무엇을 최소화 | 특징 |
-| --- | --- | --- |
-| **pose-level** | 자세끼리의 차이 | PnP로 먼저 자세를 뽑고 그 자세들을 맞춤 |
-| **pixel-level** | 코너 재투영오차 | 사진의 코너를 직접 씀. bundle adjustment 계열 |
-
-C 계열과 D1은 pose-level, D2·D3는 pixel-level이다.
-우리 방법은 pixel-level이라 **D3가 가장 가까운 비교 대상**이다.
-
----
-
-## 2. 비교군 한눈에 보기
-
-| ID | 방법 | 연도 | 계열 | 카메라 여러 대 | 픽셀 단위 | FK 불확실성 모델 | 실행 난이도 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| C1 | Tsai–Lenz | 1989 | classical `AX=XB` | 아니오 | 아니오 | 없음 | ★ OpenCV 한 줄 |
-| C2 | Park–Martin | 1994 | classical `AX=XB` | 아니오 | 아니오 | 없음 | ★ OpenCV 한 줄 |
-| C3 | Horaud | 1995 | classical `AX=XB` | 아니오 | 아니오 | 없음 | ★ OpenCV 한 줄 |
-| C4 | Daniilidis | 1999 | dual quaternion | 아니오 | 아니오 | 없음 | ★ OpenCV 한 줄 |
-| D1 | Shah | 2013 | robot-world `AX=ZB` | 아니오 | 아니오 | 없음 | ★ OpenCV 한 줄 |
-| D2 | Tabb–Ahmad Yousef | 2017 | iterative `AX=ZB` | 지원 | 설정에 따름 | 없음 | ★★★ 외부 코드 |
-| D3 | Allegro et al. | 2024 | multi-camera 재투영 | **예** | **예** | robot pose를 고정 입력 | ★★★ 외부 코드 · **최우선** |
-| D4 | Calib3R | 2025 | targetless 3D foundation | 예 | 2D/3D 항 | robot motion 항 | ★★★★ GPU · 조건부 |
-| D5 | Ha | 2023 | probabilistic `AX=ZB` | 아니오 | 아니오 | **측정별 noise 모델** | ★★★ 외부 코드 |
-| D6 | Ulrich–Hillemann | 2024 | uncertainty-aware | 아니오 | 설정에 따름 | **robot pose 보정** | ★★★ |
-
-`FK 불확실성 모델 = 없음`은 **"로봇이 알려준 자세를 그냥 정답으로 받아들인다"**는 뜻이다.
-어떤 형태의 noise 처리도 전혀 없다는 뜻은 아니다.
-
-**어디부터 시작할까**
-`★` 다섯 개(C1–C4, D1)는 OpenCV 함수 호출이라 하루면 다 돌린다. **여기부터 시작한다.**
-`★★★` 은 남의 저장소를 우리 데이터 형식으로 바꿔 넣어야 해서 대부분의 시간이 여기 든다.
-
----
-
-## 3. C 계열 — 고전 hand-eye (OpenCV 내장)
-
-네 방법 모두 **같은 함수, 다른 옵션**이다. 입력도 출력도 같다.
-
-```python
-import cv2
-
-R_cam2gripper, t_cam2gripper = cv2.calibrateHandEye(
-    R_gripper2base, t_gripper2base,   # 로봇 FK에서 얻은 손 자세들
-    R_target2cam,   t_target2cam,     # PnP에서 얻은 타깃 자세들
-    method=cv2.CALIB_HAND_EYE_TSAI,   # ← 여기만 바꾸면 C1~C4
-)
-```
-
-사용 가능한 `method` 상수:
-`CALIB_HAND_EYE_TSAI` / `_PARK` / `_HORAUD` / `_ANDREFF` / `_DANIILIDIS`
-(우리 비교군은 이 중 네 개를 쓴다. Andreff는 저장소 코드에서 초기값으로만 사용 중)
-
-### 실행 시 가장 흔한 실수
-
-이 네 가지에서 시간을 날리는 경우가 거의 전부다. **에러 없이 돌아가고 그럴듯한 숫자가 나오므로
-틀린 줄도 모른다.**
-
-| 실수 | 결과 |
-| --- | --- |
-| `R_gripper2base` 자리에 `base2gripper`를 넣음 (**방향 반대**) | 조용히 틀린 값 |
-| mm와 m을 섞어 씀 | 1000배 틀리거나, 미묘하게만 틀림 |
-| 회전축이 거의 평행한 자세만 수집 | 해가 불안정 |
-| eye-in-hand용 입력을 eye-to-hand에 그대로 씀 | 구성마다 넣는 변환이 다름 |
-
-**확인 방법:** 시뮬레이션(`CP_synthetic_7row.py`)은 정답을 알고 있다.
-거기서 먼저 돌려 정답이 나오는지 보고 실데이터로 간다.
-
-### C1. Tsai–Lenz (1989)
-
-가장 전통적인 `AX=XB` 방법. 회전을 먼저 풀고 그 결과로 이동을 푸는 **순차 방식**이다.
-
-- 역할: 가장 오래된 기준선
-- 실행: `method=cv2.CALIB_HAND_EYE_TSAI`
-- 한계: 카메라 한 대씩 따로 풀며, 픽셀 단위 목적함수가 아니다.
-- 문헌: [Tsai and Lenz, 1989](https://doi.org/10.1109/70.34770)
-
-### C2. Park–Martin (1994)
-
-Lie group과 matrix logarithm으로 `AX=XB`를 푼다. Tsai와 **회전 표현 방식이 다르다.**
-
-- 역할: 같은 문제를 다른 수학으로 푸는 고전 기준선
-- 실행: `method=cv2.CALIB_HAND_EYE_PARK`
-- 한계: C1과 동일 (pose-level, 카메라 개별 solve)
-
-### C3. Horaud–Dornaika (1995)
-
-회전 표현과 해법이 또 다른 고전 `AX=XB` 방법.
-
-- 역할: **고전 solver를 무엇으로 고르느냐에 따른 성능 폭**을 확인하는 용도
-- 실행: `method=cv2.CALIB_HAND_EYE_HORAUD`
-- 한계: 우리 방식의 픽셀 단위 joint BA와 목적함수가 다르다.
-
-### C4. Daniilidis (1999)
-
-dual quaternion으로 **회전과 이동을 하나의 식에서 동시에** 다룬다.
-C1–C3이 회전을 먼저 풀고 이동을 나중에 푸는 것과 대비된다.
-
-- 역할: simultaneous closed-form 계열의 대표
-- 실행: `method=cv2.CALIB_HAND_EYE_DANIILIDIS`
-- 주의: **모든 노이즈 조건에서 다른 고전 방법보다 낫다고 가정하지 않는다.**
-- 문헌: [Daniilidis, 1999](https://www.cis.upenn.edu/~kostas/mypub.dir/ijrr99.pdf)
-
-### C 계열 보고 규칙
-
-**C1–C4를 모두 실행한 뒤**, 동일한 외부 GT에서 가장 좋았던 것을 `best classical`로 표시한다.
-
-> 결과를 본 다음에 한 방법만 골라 보고하지 않는다.
-
-넷 다 돌려놓고 우리에게 유리한 하나만 싣는 것은 **cherry-picking**이며,
-리뷰에서 가장 먼저 지적당하는 지점이다.
-
----
-
-## 4. D1. Shah (2013) — robot-world까지 같이 푼다
-
-`AX=ZB` 문제를 **닫힌 형태(closed-form)** 로 푼다.
-Kronecker product와 SVD를 써서 두 미지수를 한 번에 구한다.
-
-```python
-R_base2world, t_base2world, R_gripper2cam, t_gripper2cam = cv2.calibrateRobotWorldHandEye(
-    R_world2cam, t_world2cam,
-    R_base2gripper, t_base2gripper,
-    method=cv2.CALIB_ROBOT_WORLD_HAND_EYE_SHAH,
-)
-```
-
-- 역할: **`AX=ZB` 계열의 기준선.** C 계열보다 우리 문제에 가깝다
-- FK 취급: 입력된 robot pose를 최적화 중에 **고치지 않는다**(고정 입력)
-- 문헌: [Shah, 2013](https://www.nist.gov/publications/solving-robot-worldhand-eye-calibration-problem-using-kronecker-product)
-
-> 문헌마다 두 번째 미지수를 `Y` 또는 `Z`로 쓴다. 같은 것이다.
-
----
-
-## 5. D2. Tabb & Ahmad Yousef (2017) — 반복 최적화, 카메라 여러 대
-
-`AX=ZB`를 **닫힌 형태가 아니라 반복 최적화**로 푼다.
-여러 cost 함수와 회전 표현을 비교하고, **카메라 여러 대(hand-multiple-eye)로 확장**한다.
-
-- 역할: 반복 최적화 기준선이자 **multi-eye 지원 기준선**
-- 실행: 저자 공개 [코드 저장소](https://github.com/amy-tabb/RWHEC-Tabb-AhmadYousef)
-- 입력: 저자 형식으로 변환한 **동일한** board 관측과 robot pose
-- 문헌: [Tabb and Ahmad Yousef, 2017](https://arxiv.org/abs/1907.12425)
-
-### 공정성 규칙
-
-- 공개된 cost variant 중 무엇을 쓸지는 **training 데이터 안에서만** 정하고, test에서는 고정한다.
-- **논문에 없는 임의의 robustification이나 후처리를 추가하지 않는다.**
-  추가 구현이 꼭 필요하면 원 방법과 `+refinement` 변형을 **별도 행으로** 보고한다.
-
-남의 방법을 우리 입맛에 맞게 고쳐놓고 "그래도 우리가 이겼다"고 하면 비교가 무효다.
-
----
-
-## 6. D3. Allegro et al. (2024) — 가장 가까운 비교 대상 · **최우선**
-
-**우리 셋업과 가장 비슷한 공개 구현이다.** 여기에 시간을 가장 많이 써야 한다.
-
-calibration board와 로봇 움직임을 써서 **여러 카메라의 자세를 함께 최적화**한다.
-공통 board-to-end-effector 변환과 카메라 간 일관성을 이용하며,
-**재투영오차를 최소화**한다 — 우리와 같은 방식이다.
-
-- 역할: **가장 가까운 최신 multi-camera 기준선**
-- 우리와의 핵심 차이: 둘 다 joint 재투영 최적화를 쓰지만,
-  우리는 cube pose에 **covariance-weighted robust FK factor**를 둔다
-- 공식 구현: [Multi-Camera-Hand-Eye-Calibration](https://github.com/davidea97/Multi-Camera-Hand-Eye-Calibration)
-- 문헌: [Allegro et al., 2024](https://arxiv.org/abs/2406.11392)
-
-### 적용 규칙
-
-- Board-on-EE 세션에서 **모든 고정 카메라가 가능한 한 동시에** board를 관측한다.
-- 원 구현의 intrinsics / image / robot-pose / config 형식을 그대로 쓴다.
-- 원 방법이 직접 지원하지 않는 **mixed eye-in-hand + eye-to-hand 전체 구성을
-  억지로 한 번의 실행에 밀어넣지 않는다.**
-- 지원 가능한 카메라 subset의 정확도와 **전체 시스템 coverage를 분리해 보고**한다.
-- 저자 기본값 변경, 버그 수정, adapter patch는 **commit hash와 함께 기록**한다.
-
-### 표현 주의
-
-Allegro를 **"hand-eye 분야 유일한 최신 SOTA"라고 쓰지 않는다.**
-이 실험에서의 정의는 `가장 가까운 공개 multi-camera 기준선`이다.
-
----
-
-## 7. D4. Calib3R (2025) — 마커 없이 (조건부)
-
-체커보드나 마커 **없이** 일반 RGB 장면만으로 캘리브레이션한다.
-3D foundation model로 pointmap을 만들고, 로봇 움직임과 합쳐
-metric scale 복원과 camera-to-robot 캘리브레이션을 **동시에** 수행한다.
-
-- 역할: **pattern-free 캘리브레이션의 최신 지점**
-- 공식 구현: [Calib3R](https://github.com/davidea97/Calib3R)
-- 문헌: [Allegro et al., 2025](https://arxiv.org/abs/2509.08813)
-- 자원: 논문 실험은 고성능 GPU를 쓴다. **하드웨어와 실행 시간을 따로 공개**한다.
-
-### 포함 조건 — 넷을 모두 만족할 때만 표에 넣는다
-
-1. 공식 환경을 재현하고 **제공된 예제로 정상 실행**된다.
-2. 우리 RGB sequence에 **충분한 texture, overlap, 시점 다양성**이 있다.
-3. 카메라 장착 방식과 robot-pose convention을 원 방법에 맞게 **매핑할 수 있다.**
-4. 캘리브레이션에 쓰지 않은 **동일한 외부 GT blind pose로 평가**할 수 있다.
-
-조건을 못 채우면 **실패를 숨기지 않고** 원인과 시도한 버전·환경을 기록한다.
-
-D4는 marker 기반 방법과 **입력 조건 자체가 다르므로**,
-순위 경쟁 대상이 아니라 `targetless의 편의성 ↔ 정확도 trade-off`로 따로 해석한다.
-
----
-
-## 8. D5 · D6 — FK 불확실성을 직접 다루는 방법
-
-**우리 방법의 핵심 주장과 가장 직접 부딪히는 두 방법이다.**
-"로봇 FK를 얼마나 믿을 것인가"를 이미 다루기 때문이다.
-
-### D5. Ha (2023) — 확률 기반 `AX=ZB`
-
-각 측정 `A_i`, `B_i`가 **서로 다른 noise 특성과 신뢰도**를 가진다는 점을 반영하는
-maximum-likelihood 프레임워크. 추정 결과의 **불확실성까지 함께 산출**한다.
-
-- 역할: pose 단위 covariance를 다루는 robot-world/hand-eye 기준선
-- 공식 구현: [probabilisticAXYB](https://github.com/hjhdog1/probabilisticAXYB)
-- 문헌: [Probabilistic Framework for Hand–Eye and Robot–World Calibration](https://doi.org/10.1109/TRO.2022.3214350)
-- 비교 제한: 원 방법은 **raw-corner multi-camera joint BA가 아니므로**,
-  중간 과정이 아니라 **공통 외부 GT 결과로만** 비교한다.
-
-### D6. Ulrich & Hillemann (2024) — 불확실성 인식 hand-eye
-
-산업용 로봇의 **absolute pose 불확실성을 명시적으로 모델링**하고,
-hand-eye 자세와 **보정된 robot pose를 함께 추정**한다.
-target 기반과 targetless 구성을 모두 지원하며 robot uncertainty 자체도 보고한다.
-
-- 역할: **우리 방법과 가장 직접 겹치는 uncertainty-aware 기준선**
-- 문헌: [Uncertainty-Aware Hand–Eye Calibration](https://doi.org/10.1109/TRO.2023.3330609)
-- 비교 제한: mixed multi-camera 전체 구성을 직접 지원하지 않으면,
-  지원 카메라 subset과 전체 coverage를 **분리해 보고**한다.
-
-### 실행하지 않지만 반드시 인용 — Strobl & Hirzinger (2006)
-
-SE(3) 확률 모델과 로봇의 이동/회전 정밀도 특성에 따른 weighting을 이용한
-maximum-likelihood hand-eye calibration을 제안했다.
-
-**covariance weighting의 역사적 출처이므로 반드시 인용한다.**
-"우리가 처음"이라고 쓰면 안 되는 이유가 이 논문이다.
-
-- 문헌: [Strobl & Hirzinger, *Optimal Hand-Eye Calibration*, 2006](https://doi.org/10.1109/IROS.2006.282250)
-
----
-
-## 9. 2026년 이후 최신 문헌 처리
-
-더 최신 논문(예: 2026년의 multi-camera robot-world/hand-eye dual-quaternion 계열)은
-**related work에서 검토**한다. 다만 아래를 **모두** 만족할 때만 실제 실험 행으로 올린다.
-
-- 논문과 알고리즘 세부가 충분히 공개됨
-- 우리 데이터의 frame convention으로 **모호하지 않게** 매핑 가능
-- reference implementation이 있거나 독립적으로 재현 가능한 절차가 있음
-- 동일한 외부 GT 평가가 가능함
-
-**출판연도만으로 D3를 대체하지 않는다.**
-
----
-
-## 10. 데이터 수집 규칙
-
-### 어떤 세션이 어떤 방법에 쓰이는가
-
-| 준비물 | 쓰는 방법 |
-| --- | --- |
-| Board-on-EE 세션 | 고정 카메라용 classical, D1 Shah, D2 Tabb, D3 Allegro |
-| eye-in-hand target 세션 | 손목 카메라용 classical 및 지원 방법 |
-| Cube+board 통합 세션 | 우리 방법 계열 |
-| texture 충분한 RGB sequence + robot pose | D4 Calib3R |
-| **캘리브레이션에 쓰지 않은 외부 GT blind pose** | **모든 방법의 공통 최종 평가** |
-
-### 촬영 최소 조건
-
-- 같은 카메라 설치 세션 안에서 **방법별 raw 입력을 최대한 공유**한다.
-- Board-on-EE는 **최소 20–30개**의 다양한 이동 및 roll/pitch/yaw 자세로 촬영한다.
-- 노출·게인·초점을 고정하고 **동일한 intrinsics**를 쓴다.
-- corner detection, raw RGB, timestamp, FK pose, visibility mask, config hash를 **모두 저장**한다.
-- 카메라를 **다시 설치한 독립 세션**을 반복한다.
-- train/test는 프레임이 아니라 **물리적 세션과 blind workspace pose 기준**으로 나눈다.
-
-마지막 항목이 중요하다. 같은 세션의 프레임을 train/test로 나누면
-**너무 쉬운 문제가 되어 모든 방법이 잘 나온다.**
-
----
-
-## 11. 공정하게 돌리기 위한 규칙
-
-### 모든 방법에 동일하게 고정할 것
-
-- raw 영상과 외부 GT blind pose
-- 카메라 intrinsics와 왜곡 모델
-- robot pose timestamp 동기화
-- classical 방법에 넣는 PnP pose
-- pixel 단위 방법에 넣는 corner detection
-- train/test 세션 분할
-- 허용되는 초기화 / multi-start 횟수
-- 실패 판정 기준과 시간 제한
-
-### 방법마다 달라도 되는 것
-
-- 원 논문이 요구하는 target 또는 targetless 입력
-- 원 구현의 목적함수와 parameterization
-- 저자가 권장한 hyperparameter
-- 필요한 dependency와 계산 하드웨어
-
-### 가장 중요한 한 줄
-
-> hyperparameter는 **training 안에서만** 정하고, test와 external-GT blind set에서는 **동결한다.**
-> **test 결과를 보고** method별 threshold, loss scale, 초기화를 **바꾸지 않는다.**
-
-한 번이라도 test를 보고 조정하면 그 이후 모든 숫자는 신뢰할 수 없다.
-
----
-
-## 12. 성능은 무엇으로 재는가
-
-### Primary — 최종 순위는 이것으로만 정한다
-
-| 지표 | 단위 | 정의 |
-| --- | --- | --- |
-| `TRE_t` | mm | 예측 자세와 **독립 외부 GT** 사이의 이동 오차 |
-| `e_R` | deg | 두 회전 사이의 각도 |
-| ADD 또는 ADD-S | mm | 작업 물체 모델 기준 자세 불일치 |
-
-ADD-S는 큐브의 대칭을 **작업상 같은 자세로 인정할 때만** 쓴다.
-대칭 집합은 **결과를 보기 전에** 확정한다.
-
-### Secondary
-
-P50/P95 `TRE_t`와 `e_R` · 카메라 등록 coverage `N_reg` ·
-세션/카메라/자세별 실패율 · 캘리브레이션 및 추론 실행 시간과 메모리 · 필요한 영상 수
-
-### Diagnostic only — **순위 판정에 쓰지 않는다**
-
-held-out 재투영오차 · 카메라 간 불일치 · 복원된 큐브 치수 오차 ·
-명령 대비 상대 이동 일관성 · FK-proxy 오차 · solver 수렴성과 condition number
-
-### 왜 재투영오차가 diagnostic으로 밀려났는가 — **꼭 이해할 것**
-
-일반적인 블로그와 튜토리얼은 **"재투영오차가 작으면 잘 된 것"** 이라고 말한다.
-**이 프로젝트에서는 그 통념이 성립하지 않는다.**
-
-카메라가 **일관되게** 치우쳐 있으면, 캘리브레이션 결과가 틀렸는데도
-자기 예측과 자기 사진은 잘 맞아서 **재투영오차가 0에 가깝게 나온다.**
-(발표자료 `presentation/calibration_1_11.pdf` 40쪽에 숫자 예시가 있다)
-
-그래서 **재투영오차만으로 방법을 비교하면 결론이 나오지 않는다.**
-순위는 **캘리브레이션에 쓰지 않은 외부 GT**로만 정한다.
-
-targetless인 D4에는 marker 재투영오차가 아예 정의되지 않는다는 점도
-공통 지표를 외부 GT로 두어야 하는 이유다.
-
-### 실습으로 확인하기
-
-말로 읽는 것보다 직접 보는 게 빠르다.
-정답을 아는 시뮬레이션(`CP_synthetic_7row.py`)에서 **변환 방향을 일부러 뒤집어** 보라.
-**재투영오차는 여전히 작은데 `e_t`는 커지는 것**을 직접 볼 수 있다.
-
----
-
-## 13. 결과 표 템플릿 (baseline 부분)
-
-| Method | Input | Cameras supported/evaluated | `TRE_t` mean [95% CI] ↓ | `TRE_t` P95 ↓ | `e_R` mean [95% CI] ↓ | ADD/ADD-S ↓ | Coverage ↑ | Failure ↓ | Time ↓ |
-| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| C1 Tsai | target + FK/PnP | — | — | — | — | — | — | — | — |
-| C2 Park | target + FK/PnP | — | — | — | — | — | — | — | — |
-| C3 Horaud | target + FK/PnP | — | — | — | — | — | — | — | — |
-| C4 Daniilidis | target + FK/PnP | — | — | — | — | — | — | — | — |
-| D1 Shah | target + FK/PnP | — | — | — | — | — | — | — | — |
-| D2 Tabb | target + FK/images | — | — | — | — | — | — | — | — |
-| D3 Allegro | board + FK + images | — | — | — | — | — | — | — | — |
-| D4 Calib3R | targetless RGB + FK | — | — | — | — | — | — | — | — |
-| D5 Ha probabilistic AXYB | target poses + robot poses/covariance | — | — | — | — | — | — | — | — |
-| D6 Uncertainty-Aware HEC | target/images + uncertain robot poses | — | — | — | — | — | — | — | — |
-
-`Cameras supported/evaluated`는 **반드시 채운다.**
-지원하지 못한 카메라를 빼고 얻은 낮은 오차와 전체 카메라 coverage를 **혼동하면 안 된다.**
-카메라 3대 중 1대만 쓰고 얻은 좋은 숫자는 3대를 모두 쓴 방법과 나란히 놓을 수 없다.
-
----
-
-## 14. 시작 순서 (권장)
-
-1. **`CP_metric_board_only.py` 실행** — C 계열과 우리 방법의 비교표가 이미 나온다. 숫자 하나를 재현하는 것이 첫 목표
-2. **`CP_synthetic_7row.py`로 시뮬레이션 실습** — 정답을 알고 있으므로 자기 이해를 검증할 수 있다. §12의 "일부러 틀리게 넣어보기"를 여기서 한다
-3. **C1–C4, D1 실행** — OpenCV 한 줄. §3의 실수 목록을 옆에 두고 확인
-4. **D3 Allegro** — 가장 중요하고 가장 오래 걸린다
-5. **D2, D5, D6** — 외부 저장소
-6. **D4 Calib3R** — §7의 포함 조건을 먼저 확인하고 판단
-
----
-
-## 15. 참고 문헌 및 구현
-
-- [Tsai & Lenz, *A New Technique for Fully Autonomous and Efficient 3D Robotics Hand/Eye Calibration*, 1989](https://doi.org/10.1109/70.34770)
-- [Daniilidis, *Hand-Eye Calibration Using Dual Quaternions*, 1999](https://www.cis.upenn.edu/~kostas/mypub.dir/ijrr99.pdf)
-- [Strobl & Hirzinger, *Optimal Hand-Eye Calibration*, 2006](https://doi.org/10.1109/IROS.2006.282250)
-- [Shah, *Solving the Robot-World/Hand-Eye Calibration Problem Using the Kronecker Product*, 2013](https://www.nist.gov/publications/solving-robot-worldhand-eye-calibration-problem-using-kronecker-product)
-- [Tabb & Ahmad Yousef, *Solving the Robot-World Hand-Eye(s) Calibration Problem with Iterative Methods*, 2017](https://arxiv.org/abs/1907.12425)
-  · [official code](https://github.com/amy-tabb/RWHEC-Tabb-AhmadYousef)
-- [Ha, *Probabilistic Framework for Hand–Eye and Robot–World Calibration*, 2023](https://doi.org/10.1109/TRO.2022.3214350)
-  · [official code](https://github.com/hjhdog1/probabilisticAXYB)
-- [Ulrich & Hillemann, *Uncertainty-Aware Hand–Eye Calibration*, 2024](https://doi.org/10.1109/TRO.2023.3330609)
-- [Allegro et al., *Multi-Camera Hand-Eye Calibration for Human-Robot Collaboration in Industrial Robotic Workcells*, 2024](https://arxiv.org/abs/2406.11392)
-  · [official code](https://github.com/davidea97/Multi-Camera-Hand-Eye-Calibration)
-- [Allegro et al., *Calib3R*, 2025](https://arxiv.org/abs/2509.08813)
-  · [official code](https://github.com/davidea97/Calib3R)
-
-### 보조 자료 (개념이 안 잡힐 때)
-
-- [OpenCV: Camera Calibration and 3D Reconstruction](https://docs.opencv.org/4.13.0/d9/d0c/group__calib3d.html) — `calibrateHandEye`, `calibrateRobotWorldHandEye` 파라미터 설명
-- [easy_handeye README](https://github.com/IFL-CAMP/easy_handeye) — eye-in-hand / eye-on-base 구성 설명
-- [다크프로그래머 — 카메라 캘리브레이션](https://darkpgmr.tistory.com/32) — 한국어. intrinsics, 왜곡, 핀홀 모델
-- [Cyrill Stachniss — Basics about Bundle Adjustment](https://www.youtube.com/watch?v=sobyKHwgB0Y) — D3와 우리 방법의 기반
+| Classical | Tsai–Lenz (1989) | 회전과 이동을 순차적으로 푸는 `AX=XB` | [OpenCV](https://github.com/opencv/opencv/blob/4.x/modules/calib3d/src/calibration_handeye.cpp) |
+| Classical | Park–Martin (1994) | Lie group을 이용한 `AX=XB` | [OpenCV](https://github.com/opencv/opencv/blob/4.x/modules/calib3d/src/calibration_handeye.cpp) |
+| Classical | Horaud–Dornaika (1995) | 다른 회전 표현을 사용하는 `AX=XB` | [OpenCV](https://github.com/opencv/opencv/blob/4.x/modules/calib3d/src/calibration_handeye.cpp) |
+| Classical | Andreff et al. (1999) | 회전과 이동을 동시에 추정하는 on-line formulation | [OpenCV](https://github.com/opencv/opencv/blob/4.x/modules/calib3d/src/calibration_handeye.cpp) |
+| Classical | Daniilidis (1999) | Dual quaternion 기반 simultaneous 방법 | [OpenCV](https://github.com/opencv/opencv/blob/4.x/modules/calib3d/src/calibration_handeye.cpp) |
+| Robot-world | Shah (2013) | `AX=ZB`의 두 변환을 closed-form으로 계산 | [OpenCV](https://github.com/opencv/opencv/blob/4.x/modules/calib3d/src/calibration_handeye.cpp) |
+| Iterative | Tabb & Ahmad Yousef (2017) | Robot-world/hand–eye(s)의 반복 최적화 | [GitHub](https://github.com/amy-tabb/RWHEC-Tabb-AhmadYousef) |
+| Multi-camera | Allegro et al. (2024) | 여러 카메라를 reprojection error로 함께 보정 | [GitHub](https://github.com/davidea97/Multi-Camera-Hand-Eye-Calibration) |
+| Uncertainty-aware | Ha (2023) | 측정별 noise와 covariance를 고려 | [GitHub](https://github.com/hjhdog1/probabilisticAXYB) |
+| Targetless | Calib3R (2025) | Marker 없이 RGB와 3D model 사용 | [GitHub](https://github.com/davidea97/Calib3R) |
+
+- **Baseline과 SOTA의 구분**
+  - Tsai–Lenz, Park–Martin, Horaud–Dornaika, Andreff, Daniilidis: 최신 방법이 아닌 고전 baseline
+  - 최신 논문이라도 입력과 설치 조건이 다르면 직접적인 경쟁 방법으로 보기 어려움
+  - 실제 비교 대상 선정 기준
+    - 우리 시스템에 적용 가능
+    - 공개 코드 또는 재현 가능한 구현 존재
+    - 동일한 외부 기준값으로 평가 가능
+
+## 4. 방법별 비교 관점
+
+### 4.1 고전 hand–eye 방법
+
+- 대상: Tsai–Lenz, Park–Martin, Horaud–Dornaika, Andreff, Daniilidis
+- 구현: OpenCV `calibrateHandEye`
+- 입력
+  - Robot FK pose
+  - Marker 관측에서 계산한 PnP pose
+- 특징
+  - 동일한 입력에 solver option만 변경하여 비교 가능
+  - 카메라별 독립 calibration
+  - Pose-level objective
+- 비교 역할
+  - 전통적인 calibration 성능의 기준선
+  - Multi-camera joint optimization의 효과를 확인하기 위한 비교군
+
+### 4.2 Shah (2013)
+
+- 문제 형태: robot-world/hand–eye `AX=ZB`
+- 방법: 두 미지 변환의 closed-form 추정
+- 특징
+  - `AX=XB`보다 우리 문제 설정에 가까움
+  - Robot pose를 고정 입력으로 사용
+  - Pose-level 방법
+- 비교 역할: Robot-world/hand–eye 계열의 기본 baseline
+
+### 4.3 Tabb & Ahmad Yousef (2017)
+
+- 문제 형태: robot-world/hand–eye(s)
+- 방법: 반복 최적화
+- 특징
+  - 여러 cost function과 rotation parameterization 제시
+  - Multi-eye 문제 지원
+  - 공개 코드의 입력 형식에 맞춘 data adapter 필요
+- 확인할 사항
+  - 우리 카메라 구성의 지원 범위
+  - 사용할 cost variant
+  - Pixel observation 사용 여부와 정확한 objective
+
+### 4.4 Allegro et al. (2024)
+
+- 입력
+  - Calibration board image
+  - Camera intrinsics
+  - Robot pose
+- 방법
+  - 여러 카메라의 pose를 함께 최적화
+  - Reprojection error 최소화
+- 비교 역할
+  - 우리 방법과 가장 가까운 공개 multi-camera baseline
+  - Multi-camera joint calibration 효과의 직접 비교 대상
+- 확인할 사항
+  - 고정 카메라와 wrist camera의 동시 지원 여부
+  - 지원하지 않는 카메라가 있을 경우 실제 평가 범위 명시
+  - 원 구현의 설정값 및 수정 사항 기록
+
+### 4.5 불확실성을 고려하는 방법
+
+- **Ha (2023)**
+  - 측정별 noise와 covariance를 반영하는 확률적 `AX=ZB`
+  - Pose-level uncertainty 처리의 비교 대상
+
+- **우리 방법과의 구분**
+  - FK uncertainty 자체를 최초 기여로 주장하지 않음
+  - 차별점
+    - Mixed eye-in-hand/eye-to-hand 구성
+    - Multi-camera pixel-level optimization
+    - Cube와 board 관측의 결합
+    - Shared latent cube pose에 대한 robust soft-FK factor
+
+### 4.6 Targetless 방법
+
+- 대상: Calib3R
+- 특징
+  - Calibration marker 불필요
+  - RGB sequence와 3D foundation model 사용
+- 우리 방법과의 차이
+  - 입력 조건 자체가 다름
+  - Marker 기반 방법과 동일한 조건의 직접 비교가 어려움
+- 비교 역할
+  - Targetless calibration의 편의성과 정확도 간 trade-off 확인
+  - 주된 순위 경쟁보다 참고 실험에 가까움
+
+## 5. 실제 데이터 적용 전 simulation 검증
+
+### 5.1 목적
+
+- SOTA method의 성능 순위 평가가 아닌 **구현 정확성 검증**
+- 확인할 항목
+  - 좌표계 방향과 transform chain
+  - 단위 변환
+  - Single-camera method의 camera별 반복 적용
+  - Multi-camera method의 shared variable 및 camera coupling
+  - 입력 adapter와 결과 변환 코드
+- 기본 합격 조건
+  - Noise가 없는 관측에서 ground-truth transform 복원
+  - 오차가 사전에 정한 numerical tolerance 이내
+  - 수치 연산 때문에 정확히 `0.0`일 필요는 없음
+
+### 5.2 Simulation 구성
+
+- **Calibration target**
+  - Cube를 사용하지 않고 board만 사용
+  - 실제 촬영에 사용할 board와 동일한 geometry 사용
+  - Board의 row/column 수, marker 또는 square 크기, marker 간격을 실제 단위로 입력
+  - Board frame의 원점과 축 방향을 명시
+
+- **Robot 및 camera ground truth**
+  - 고정 카메라별 extrinsic `T_base_camera_i`
+  - End-effector에 고정된 board transform `T_gripper_board`
+  - Pose별 robot FK `T_base_gripper(k)`
+  - 카메라별 intrinsic matrix와 distortion coefficient
+
+- **Synthetic observation 생성**
+  - Board의 3D corner를 transform chain으로 각 camera frame에 변환
+  - Camera intrinsic과 distortion model을 이용해 pixel로 projection
+  - 실제 field of view와 image resolution 밖의 corner는 제외
+  - 여러 카메라가 같은 robot pose에서 board를 관측하는 event 포함
+  - 전체 camera–event observation graph가 연결되도록 구성
+
+- **Robot trajectory**
+  - Translation과 roll/pitch/yaw가 모두 변하는 pose 사용
+  - 거의 같은 위치나 평행한 회전축만 반복하는 degenerate motion 방지
+  - Board가 영상의 중앙뿐 아니라 가장자리와 서로 다른 depth에서도 관측되도록 구성
+
+### 5.3 검증 순서
+
+1. **Exact-pose test**
+   - Ground-truth target pose와 robot pose를 solver에 직접 입력
+   - Calibration solver 자체와 transform convention 검증
+2. **Noiseless-pixel test**
+   - 정확한 board corner를 pixel로 projection
+   - PnP 및 data adapter를 포함한 전체 pipeline 검증
+3. **Randomized recovery test**
+   - Camera extrinsic, robot trajectory, solver initialization과 random seed 변경
+   - 특정 scene이나 초기값에서만 맞는 구현인지 확인
+   - 구현 자체의 사전 점검에만 사용하며, 방법 간 비교 실험에는 포함하지 않음
+4. **Realistic-noise test**
+   - Pixel noise, 일부 corner 누락, outlier, FK noise를 순서대로 추가
+   - 구현 검증 통과 후 robustness와 method별 성능 차이 확인
+
+### 5.4 Multi-camera 적용 확인
+
+- Single-camera baseline
+  - 동일한 synthetic data에서 카메라별로 각각 calibration
+  - 각 `T_base_camera_i`를 ground truth와 비교
+  - Camera별 결과를 robot base frame으로 조립하는 코드 검증
+
+- Multi-camera baseline
+  - 모든 camera observation을 하나의 문제에 입력
+  - Camera별 extrinsic과 공통 `T_gripper_board`를 함께 추정
+  - 카메라 사이의 relative transform도 ground truth와 비교
+  - 일부 event에서 특정 camera의 관측을 제거해도 연결된 observation graph에서 복원되는지 확인
+
+- **구분할 사항**
+  - 카메라별 single-camera solver를 여러 번 실행하는 것: multi-camera system에 대한 독립 적용
+  - Shared variable을 사용해 여러 카메라를 함께 최적화하는 것: joint multi-camera calibration
+  - 두 구현을 별도 baseline으로 구분
+
+### 5.5 이 simulation이 검증하는 범위
+
+- 충분한 범위
+  - Board-on-end-effector를 관측하는 고정 카메라 calibration
+  - 정지 board를 관측하는 wrist camera eye-in-hand calibration
+  - Single-camera baseline의 반복 적용과 결과 조립
+  - Board 기반 joint multi-camera calibration
+  - 좌표계, 단위, PnP, projection 및 adapter 구현
+
+- 포함되지 않는 범위
+  - Cube observation과 cube pose 추정
+  - Cube에 연결된 soft-FK factor
+  - Fixed camera와 wrist camera를 함께 묶는 전체 mixed-camera graph
+
+- 따라서 board-only simulation은 **첫 번째 구현 검증 단계로 충분**
+- 전체 시스템 검증에는 이후 eye-in-hand 또는 mixed-camera simulation이 별도로 필요
+- 기존 `CP_synthetic_7row.py`의 cube/FK ablation과는 목적을 분리
+- Marker를 사용하지 않는 Calib3R는 이 board-only 검증 대상에서 제외
+- Uncertainty-aware method는 noiseless recovery 통과 후 noise/covariance 조건에서 추가 검증
+- 공통 코드 및 adapter 형식: [`SOTA_Simulation/README.md`](SOTA_Simulation/README.md)
+
+### 5.6 공통 noise sweep
+
+- 모든 방법에서 아래 조건을 동일하게 사용
+  - Camera 배치와 ground truth 고정
+  - Eye-in-hand와 eye-to-hand는 서로 다른 robot trajectory 사용 가능
+  - 각 실험군에서는 모든 비교 알고리즘에 동일한 robot/board trajectory 사용
+  - Board geometry와 관측 event 수 고정
+  - Solver마다 동일한 관측과 동일한 noise sample 사용
+- 3D board-corner perception noise
+  - `0, 1, 3, 5 mm`
+  - Camera frame에서 관측된 각 board corner의 x/y/z 좌표에 Gaussian noise 적용
+  - 각 level은 corner 좌표축별 standard deviation을 의미
+  - Noisy corner로 rigid board pose를 다시 추정하므로 translation과 rotation error가 함께 발생
+  - 3D corner detector를 가정한 구현 stress test이며 RGB ChArUco의 pixel/PnP noise와 동일하지 않음
+- Calibration
+  - Wrist camera eye-in-hand calibration을 독립적으로 수행
+  - 각 fixed camera eye-to-hand calibration을 독립적으로 수행
+  - 결과를 robot base frame에 모아 camera별 extrinsic error 평가
+- 반복 평가
+  - 기본 30개 random seed 사용
+  - 같은 seed의 standard-normal sample을 noise level에 따라 scaling하는 paired comparison
+  - Mean, standard deviation, trial distribution 및 failure를 함께 저장
+- 주의
+  - 위 과정은 multi-camera system에 single-camera solver를 독립 적용하는 baseline
+  - Shared variable로 모든 camera를 동시에 푸는 joint multi-camera calibration과 구분
+- 실행 코드: [`SOTA_Simulation/tsai_noise_sweep.py`](SOTA_Simulation/tsai_noise_sweep.py)
+
+## 6. 비교 실험의 공통 원칙
+
+- 모든 방법에 최대한 동일하게 적용
+  - 촬영 데이터
+  - Camera intrinsics와 distortion model
+  - Robot pose 및 timestamp synchronization
+  - 외부 평가 데이터
+  - Train/validation/test split
+
+- 원 방법의 범위 유지
+  - 지원하지 않는 구성을 임의로 추가하지 않음
+  - 수정이 필요한 경우 원 방법과 수정 버전을 구분
+  - 원 논문에 없는 후처리 추가 시 별도 variant로 보고
+
+- Hyperparameter 관리
+  - Training/validation data에서 결정
+  - Test 결과 확인 후 변경 금지
+
+- Coverage와 failure 기록
+  - 실제 평가한 카메라 수와 구성 명시
+  - 지원하지 못한 카메라 명시
+  - 실패한 실행의 code version, 환경, 실패 원인 기록
+
+- 좌표계와 단위 확인
+  - `base→gripper`와 `gripper→base` 구분
+  - `target→camera`와 `camera→target` 구분
+  - mm와 m 혼용 방지
+  - 실제 데이터 적용 전 synthetic data로 convention 검증
+
+## 7. 성능 평가
+
+### Primary metrics
+
+- Calibration에 사용하지 않은 held-out pose로 평가
+- **Held-out chain error**
+  - 추정 extrinsic으로 held-out board 관측을 robot base frame에 변환
+  - Ground-truth board pose에 대한 translation [mm] 및 rotation [degree] error
+- **Camera pose accuracy**
+  - `wrist, cam0, cam1, cam3`의 extrinsic GT error
+  - Camera별 값과 동일 가중 system macro-average를 함께 보고
+- **Multi-camera registration consistency**
+  - 네 카메라에서 만들 수 있는 여섯 camera pair의 relative transform error
+  - Translation [mm] 및 rotation [degree]을 별도로 보고
+- **Held-out reprojection RMSE**
+  - Calibration에 사용하지 않은 pose의 모든 camera/board corner pixel RMSE
+- Translation, rotation, pixel error를 임의 가중합한 단일 score는 사용하지 않음
+- Simulation 실행 코드: [`SOTA_Simulation/opencv_multicam_evaluation.py`](SOTA_Simulation/opencv_multicam_evaluation.py)
+
+### 함께 보고할 항목
+
+- Mean 및 95% confidence interval
+- P50/P95 error
+- Failure rate
+- Camera registration coverage
+- 실행 시간과 필요한 영상 수
+
+### Diagnostic metrics
+
+- Held-out reprojection error
+- 카메라 간 pose inconsistency
+- 복원된 cube 치수 오차
+- Solver convergence 및 condition number
+
+- **주의점**
+  - Reprojection error는 구현 점검용 지표
+  - 작은 reprojection error가 정확한 외부 calibration을 보장하지 않음
+  - 최종 방법 순위는 독립된 external GT로 판단
+
+## 8. 논문과 구현을 확인할 항목
+
+1. **문제 정의**
+   - `AX=XB`, `AX=ZB` 또는 별도의 formulation
+2. **입력 데이터**
+   - Image, corner, PnP pose, robot FK, covariance 등
+3. **지원 구성**
+   - Eye-in-hand 또는 eye-to-hand
+   - Single-camera 또는 multi-camera
+4. **목적함수**
+   - Pose error, reprojection error 또는 probabilistic objective
+5. **Robot pose 처리**
+   - 고정된 값 또는 불확실한 관측
+6. **재현 가능성**
+   - 공개 코드
+   - Pretrained model
+   - Dependency와 hardware requirement
+   - 입력 형식 및 실행 예제
+
+## 참고 자료
+
+- [OpenCV hand–eye calibration documentation](https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html)
+- [Tsai & Lenz, 1989](https://doi.org/10.1109/70.34770)
+- [Daniilidis, 1999](https://www.cis.upenn.edu/~kostas/mypub.dir/ijrr99.pdf)
+- [Shah, 2013](https://www.nist.gov/publications/solving-robot-worldhand-eye-calibration-problem-using-kronecker-product)
+- [Tabb & Ahmad Yousef, 2017](https://arxiv.org/abs/1907.12425) · [code](https://github.com/amy-tabb/RWHEC-Tabb-AhmadYousef)
+- [Ha, 2023](https://doi.org/10.1109/TRO.2022.3214350) · [code](https://github.com/hjhdog1/probabilisticAXYB)
+- [Allegro et al., 2024](https://arxiv.org/abs/2406.11392) · [code](https://github.com/davidea97/Multi-Camera-Hand-Eye-Calibration)
+- [Calib3R](https://github.com/davidea97/Calib3R)
