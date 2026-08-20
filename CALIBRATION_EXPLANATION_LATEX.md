@@ -1,10 +1,38 @@
 # 멀티카메라 캘리브레이션 완전 설명서
 
+## 목차
+
+- [0. 발표를 한 문장으로 시작한다면](#toc-section-1)
+- [1. 왜 카메라마다 큐브의 좌표가 다를까?](#toc-section-2)
+- [2. 먼저 좌표계 기호를 정리한다](#toc-section-3)
+- [3. 변환행렬은 무엇인가?](#toc-section-4)
+- [4. 카메라가 실제로 측정하는 것은 무엇인가?](#toc-section-5)
+- [5. 우리가 찾아야 하는 미지수](#toc-section-6)
+- [6. 두 종류 카메라의 관측 경로](#toc-section-7)
+- [7. 두 자세가 얼마나 다른지 계산하는 방법](#toc-section-8)
+- [8. 모든 방법이 공유하는 기본 목적함수](#toc-section-9)
+- [9. 방법 1: no-FK(vision)](#toc-section-10)
+- [10. 방법 2: FK-fixed](#toc-section-11)
+- [11. 방법 3: corrected-FK](#toc-section-12)
+- [12. 세 FK 방식 비교](#toc-section-13)
+- [13. Unified 방식](#toc-section-14)
+- [14. Independent와 Separated 방식](#toc-section-15)
+- [15. Board-only, Cube-only, Both](#toc-section-16)
+- [16. 왜 전체 조합이 $18$개가 아니라 $14$개인가?](#toc-section-17)
+- [17. corrected-FK와 Ridge 출력 후보정은 다르다](#toc-section-18)
+- [18. 평가 지표를 해석하는 방법](#toc-section-19)
+- [19. 코드 흐름으로 다시 보기](#toc-section-20)
+- [20. 교수님께 설명할 때의 추천 순서](#toc-section-21)
+- [21. 최종 한 장 요약용 수식](#toc-section-22)
+- [22. 예상 질문과 짧은 답변](#toc-section-23)
+
 > 대상: 캘리브레이션을 처음 배우는 사람  
-> 목표: 이 문서만 읽고 `No-FK`, `Fixed-FK`, `Corrected-FK`, `Unified`, `Independent/Separated`, `Board-only`, `Cube-only`, `Both`를 수식으로 설명하기  
+> 목표: 이 문서만 읽고 `no-FK(vision)`, `FK-fixed`, `corrected-FK`, `Unified`, `Independent/Separated`, `Board-only`, `Cube-only`, `Both`를 수식으로 설명하기  
 > 표기 원칙: 모든 수학 변수와 기호는 Markdown LaTeX인 `$...$` 또는 `$$...$$` 안에 작성했다. 따라서 수식 부분을 그대로 복사할 수 있다.
 
 ---
+
+<a id="toc-section-1"></a>
 
 ## 0. 발표를 한 문장으로 시작한다면
 
@@ -19,6 +47,8 @@
 
 ---
 
+<a id="toc-section-2"></a>
+
 ## 1. 왜 카메라마다 큐브의 좌표가 다를까?
 
 카메라마다 자기 자신을 원점으로 사용하기 때문이다.
@@ -32,6 +62,8 @@
 따라서 모든 관측을 공통 기준인 로봇 베이스 좌표계 $B$로 옮겨야 한다.
 
 ---
+
+<a id="toc-section-3"></a>
 
 ## 2. 먼저 좌표계 기호를 정리한다
 
@@ -59,6 +91,8 @@ $$
 위 첨자 $A$는 도착 좌표계이고, 아래 첨자 $B$는 출발 좌표계다.
 
 ---
+
+<a id="toc-section-4"></a>
 
 ## 3. 변환행렬은 무엇인가?
 
@@ -157,6 +191,8 @@ $$
 
 ---
 
+<a id="toc-section-5"></a>
+
 ## 4. 카메라가 실제로 측정하는 것은 무엇인가?
 
 카메라는 이미지에서 보드나 큐브의 코너를 검출하고 PnP를 풀어서 다음 자세를 얻는다.
@@ -208,6 +244,8 @@ $\mathbf{G}_e$는 촬영 순간 그리퍼의 위치와 방향이다. 이것은 �
 
 ---
 
+<a id="toc-section-6"></a>
+
 ## 5. 우리가 찾아야 하는 미지수
 
 ### 5.1 고정 카메라 외부파라미터
@@ -237,6 +275,8 @@ $$
 우리 multi-cam calibration 에서 비교하는 세 FK 방식의 가장 큰 차이는 $\mathbf{O}_s$를 자유롭게 찾는지, FK 값에 고정하는지, 보정된 anchor에 고정하는지다.
 
 ---
+
+<a id="toc-section-7"></a>
 
 ## 6. 두 종류 카메라의 관측 경로
 
@@ -297,6 +337,8 @@ $$
 
 ---
 
+<a id="toc-section-8"></a>
+
 ## 7. 두 자세가 얼마나 다른지 계산하는 방법
 
 두 자세 $\mathbf{A}$와 $\mathbf{B}$의 상대변환은 다음과 같다.
@@ -354,6 +396,8 @@ $$
 $\boldsymbol{\omega}\in\mathbb{R}^{3}$은 회전오차이고, $\mathbf{v}\in\mathbb{R}^{3}$은 이동오차다.
 
 ---
+
+<a id="toc-section-9"></a>
 
 ## 8. 모든 방법이 공유하는 기본 목적함수
 
@@ -421,7 +465,9 @@ $\mathcal{E}_{\mathrm{vis}}$를 최소로 만드는 $\mathbf{C}_i$와 $\mathbf{X
 
 ---
 
-## 9. 방법 1: No-FK
+<a id="toc-section-10"></a>
+
+## 9. 방법 1: no-FK(vision)
 
 ### 9.1 쉬운 설명
 
@@ -461,7 +507,7 @@ $$
 | $\mathbf{O}_s$ | 그 자리를 채우는 자유변수 |
 | $\widehat{\mathbf{O}}_s$ | 최적화가 끝난 뒤 나온 추정 결과 |
 
-따라서 $\mathbf{Q}_s=\mathbf{O}_s$는 두 값이 같다는 뜻이 아니라, 기준 자리를 고정값이 아니라 자유변수로 채운다는 선언이다. `Fixed-FK`는 같은 자리를 FK 값으로 채운다.
+따라서 $\mathbf{Q}_s=\mathbf{O}_s$는 두 값이 같다는 뜻이 아니라, 기준 자리를 고정값이 아니라 자유변수로 채운다는 선언이다. `FK-fixed`는 같은 자리를 FK 값으로 채운다.
 
 셋 중 어느 것도 큐브의 진짜 자세는 아니다. 진짜 자세는 10.3절에서 $\mathbf{O}^{\mathrm{true}}_s$로 따로 표기한다.
 
@@ -470,11 +516,13 @@ $$
 - raw FK의 계통오차가 캘리브레이션에 직접 들어오지 않는다.
 - 대신 세트마다 $6$자유도인 $\mathbf{O}_s$가 추가되어 미지수가 많아진다.
 - 카메라 연결이나 로봇 움직임이 충분하지 않으면 전체 좌표계의 gauge가 흔들릴 수 있다.
-- `No-FK`도 $\mathbf{G}_e$는 사용한다. 큐브 FK prior $\mathbf{F}_s$만 사용하지 않는다.
+- `no-FK(vision)`도 $\mathbf{G}_e$는 사용한다. 큐브 FK prior $\mathbf{F}_s$만 사용하지 않는다.
 
 ---
 
-## 10. 방법 2: Fixed-FK
+<a id="toc-section-11"></a>
+
+## 10. 방법 2: FK-fixed
 
 ### 10.1 쉬운 설명
 
@@ -545,27 +593,29 @@ $$
 
 그런데 최적화는 $\mathbf{F}_s$를 움직일 수 없다. 따라서 남은 오차를 줄이기 위해 $\mathbf{C}_i$나 $\mathbf{X}$가 잘못 움직일 수 있다.
 
-Fixed-FK는 FK가 정확할 때 미지수가 적고 안정적이지만, FK에 공통적인 오정렬이 있으면 그 오차를 캘리브레이션 결과에 흡수시킬 위험이 있다.
+FK-fixed는 FK가 정확할 때 미지수가 적고 안정적이지만, FK에 공통적인 오정렬이 있으면 그 오차를 캘리브레이션 결과에 흡수시킬 위험이 있다.
 
 ### 10.4 카메라에도 계통오차가 있으면
 
 카메라도 내부파라미터나 왜곡 보정이 조금 틀리면 항상 같은 방향으로 치우친 $\mathbf{Z}$를 내놓는다. 예를 들어 큐브를 늘 $3\,\mathrm{mm}$ 멀리 있다고 보고하는 식이다.
 
-이 경우 Fixed-FK에서는 두 계통오차를 구분할 수 없다. $\mathbf{F}_s$가 고정되어 있으므로 어긋남은 전부 $\mathbf{C}_i$와 $\mathbf{X}$로 밀려 들어가는데, 그 어긋남 안에는 FK가 틀린 몫과 카메라가 틀린 몫이 섞여 있다. 최적화 입장에서 두 몫은 똑같이 생겼고, 어느 쪽 책임인지 판단할 정보가 목적함수 안에 없다. 결국 둘 다 캘리브레이션 결과에 흡수된다.
+이 경우 FK-fixed에서는 두 계통오차를 구분할 수 없다. $\mathbf{F}_s$가 고정되어 있으므로 어긋남은 전부 $\mathbf{C}_i$와 $\mathbf{X}$로 밀려 들어가는데, 그 어긋남 안에는 FK가 틀린 몫과 카메라가 틀린 몫이 섞여 있다. 최적화 입장에서 두 몫은 똑같이 생겼고, 어느 쪽 책임인지 판단할 정보가 목적함수 안에 없다. 결국 둘 다 캘리브레이션 결과에 흡수된다.
 
 더 곤란한 점은 이 상황에서 잔차가 오히려 작게 나온다는 것이다. $\mathbf{C}_i$가 카메라 편향만큼 반대로 움직이면 관측은 깔끔하게 설명되기 때문이다. 수렴은 잘 된 것처럼 보이지만 $\mathbf{C}_i$는 물리적 진짜 위치에서 벗어나 있다.
 
 ---
 
-## 11. 방법 3: Corrected-FK
+<a id="toc-section-12"></a>
+
+## 11. 방법 3: corrected-FK
 
 ### 11.1 가장 쉬운 설명
 
 raw FK를 무조건 믿지 않는다. 먼저 vision으로 큐브 자세를 계산하고, raw FK가 vision과 어떤 공통 차이를 갖는지 학습한다. 그 차이로 FK를 보정한 뒤, vision과 충분히 가까운 세트에서만 그 보정된 FK를 사용한다.
 
-### 11.2 단계 1: vision-only 초기 해
+### 11.2 단계 1: no-FK(vision) 초기 해
 
-먼저 No-FK 문제를 풀어 초기 카메라와 hand-eye를 구한다.
+먼저 no-FK(vision) 문제를 풀어 초기 카메라와 hand-eye를 구한다.
 
 $$
 \{\mathbf{C}^{(0)}_i\},\mathbf{X}^{(0)},\{\mathbf{O}^{(0)}_s\}
@@ -774,7 +824,7 @@ $$
 
 ### 11.8 단계 7: anchor를 고정하고 최종 refinement
 
-`Corrected-FK`는 만들어진 $\mathbf{A}_s$를 최종 단계에서 고정 anchor로 사용한다.
+`corrected-FK`는 만들어진 $\mathbf{A}_s$를 최종 단계에서 고정 anchor로 사용한다.
 
 $$
 \left\{
@@ -793,7 +843,7 @@ $$
 \right)
 $$
 
-즉, Corrected-FK는 단순히 목적함수에 약한 벌점 하나를 더하는 것과 다르다. vision 초기 해, FK 공통 정렬, gate 판정, anchor 확정, 고정 anchor refinement의 순서로 동작한다.
+즉, corrected-FK는 단순히 목적함수에 약한 벌점 하나를 더하는 것과 다르다. vision 초기 해, FK 공통 정렬, gate 판정, anchor 확정, 고정 anchor refinement의 순서로 동작한다.
 
 ### 11.9 아직 검증이 남은 부분
 
@@ -808,21 +858,25 @@ $$
 
 ---
 
+<a id="toc-section-13"></a>
+
 ## 12. 세 FK 방식 비교
 
 | 방법 | 공통 큐브 자세 $\mathbf{Q}_s$ | 큐브 자세의 상태 | 핵심 의미 |
 |---|---:|---|---|
-| `No-FK` | $\mathbf{Q}_s=\mathbf{O}_s$ | 자유변수 | FK를 사용하지 않고 vision 합의로 직접 찾음 |
-| `Fixed-FK` | $\mathbf{Q}_s=\mathbf{F}_s$ | raw FK에 고정 | FK를 정답으로 간주 |
-| `Corrected-FK` | $\mathbf{Q}_s=\mathbf{A}_s$ | 보정된 anchor에 고정 | vision으로 FK를 검증하고 통과한 세트만 사용 |
+| `no-FK(vision)` | $\mathbf{Q}_s=\mathbf{O}_s$ | 자유변수 | FK를 사용하지 않고 vision 합의로 직접 찾음 |
+| `FK-fixed` | $\mathbf{Q}_s=\mathbf{F}_s$ | raw FK에 고정 | FK를 정답으로 간주 |
+| `corrected-FK` | $\mathbf{Q}_s=\mathbf{A}_s$ | 보정된 anchor에 고정 | vision으로 FK를 검증하고 통과한 세트만 사용 |
 
 한 문장으로 요약하면 다음과 같다.
 
-- `No-FK`: 큐브 자세도 직접 찾는다.
-- `Fixed-FK`: 큐브 자세를 raw FK에 못 박는다.
-- `Corrected-FK`: raw FK를 vision으로 보정하고 gate를 통과한 세트에서만 사용한다.
+- `no-FK(vision)`: 큐브 자세도 직접 찾는다.
+- `FK-fixed`: 큐브 자세를 raw FK에 못 박는다.
+- `corrected-FK`: raw FK를 vision으로 보정하고 gate를 통과한 세트에서만 사용한다.
 
 ---
+
+<a id="toc-section-14"></a>
 
 ## 13. Unified 방식
 
@@ -878,11 +932,13 @@ $$
 \right\|_2^2
 $$
 
-$\mathcal{E}_{\mathrm{anchor}}$는 FK 방식에 따라 없거나, hard constraint로 대체되거나, 별도의 soft anchor로 사용될 수 있다. `Corrected-FK`에서는 $\mathbf{A}_s$를 고정한 refinement로 구현된다.
+$\mathcal{E}_{\mathrm{anchor}}$는 FK 방식에 따라 없거나, hard constraint로 대체되거나, 별도의 soft anchor로 사용될 수 있다. `corrected-FK`에서는 $\mathbf{A}_s$를 고정한 refinement로 구현된다.
 
 Unified의 핵심은 한쪽 관측이 $\mathbf{Q}_s$를 움직이면, 같은 $\mathbf{Q}_s$를 공유하는 다른 쪽의 $\mathbf{C}_i$와 $\mathbf{X}$도 영향을 받는다는 것이다. 즉 두 서브시스템이 정보를 교환한다.
 
 ---
+
+<a id="toc-section-15"></a>
 
 ## 14. Independent와 Separated 방식
 
@@ -919,7 +975,7 @@ $$
 \right\|_2^2
 $$
 
-Fixed-FK 또는 보정 anchor가 주어진 독립 방식에서는 카메라별로 다음 후보를 직접 만들 수 있다.
+FK-fixed 또는 보정 anchor가 주어진 독립 방식에서는 카메라별로 다음 후보를 직접 만들 수 있다.
 
 $$
 \mathbf{C}_{i,s}^{\mathrm{cand}}
@@ -939,7 +995,7 @@ $$
 \right)
 $$
 
-여기서 Fixed-FK이면 $\mathbf{Q}_s=\mathbf{F}_s$이고, Corrected-FK이면 $\mathbf{Q}_s=\mathbf{A}_s$다.
+여기서 FK-fixed이면 $\mathbf{Q}_s=\mathbf{F}_s$이고, corrected-FK이면 $\mathbf{Q}_s=\mathbf{A}_s$다.
 
 ### 14.3 단계 2: 그리퍼 카메라 서브시스템만 푼다
 
@@ -988,9 +1044,9 @@ $$
 \right)
 $$
 
-### 14.4 단계 3: No-FK 독립 방식의 두 결과를 정렬한다
+### 14.4 단계 3: no-FK(vision) 독립 방식의 두 결과를 정렬한다
 
-No-FK에서는 두 서브시스템이 서로 다른 큐브 합의를 만들 수 있다. 현재 시뮬레이션은 두 쪽이 예측한 큐브 중심을 이용하여 강체 정렬을 구한다.
+no-FK(vision)에서는 두 서브시스템이 서로 다른 큐브 합의를 만들 수 있다. 현재 시뮬레이션은 두 쪽이 예측한 큐브 중심을 이용하여 강체 정렬을 구한다.
 
 고정 카메라 쪽 세트 중심을 다음과 같이 둔다.
 
@@ -1082,6 +1138,8 @@ $$
 
 ---
 
+<a id="toc-section-16"></a>
+
 ## 15. Board-only, Cube-only, Both
 
 FK 방식과 별개로 어떤 타깃 관측을 사용할지도 선택한다.
@@ -1127,7 +1185,7 @@ $$
 \right\|_2^2
 $$
 
-보드는 로봇이 잡고 이동시키는 큐브 FK prior를 갖지 않는다. 따라서 이 프로젝트에서는 `Board-only + Fixed-FK`와 `Board-only + Corrected-FK`를 정의하지 않는다.
+보드는 로봇이 잡고 이동시키는 큐브 FK prior를 갖지 않는다. 따라서 이 프로젝트에서는 `Board-only + FK-fixed`와 `Board-only + corrected-FK`를 정의하지 않는다.
 
 ### 15.3 Both
 
@@ -1145,6 +1203,8 @@ $$
 
 ---
 
+<a id="toc-section-17"></a>
+
 ## 16. 왜 전체 조합이 $18$개가 아니라 $14$개인가?
 
 형식적으로는 다음 세 축이 있다.
@@ -1158,7 +1218,7 @@ $$
 =18
 $$
 
-하지만 `Board-only`에는 큐브 FK prior가 없으므로 `Fixed-FK`와 `Corrected-FK`를 사용할 수 없다.
+하지만 `Board-only`에는 큐브 FK prior가 없으므로 `FK-fixed`와 `corrected-FK`를 사용할 수 없다.
 
 제외되는 조합 수는 다음과 같다.
 
@@ -1179,11 +1239,13 @@ $$
 
 ---
 
-## 17. Corrected-FK와 Ridge 출력 후보정은 다르다
+<a id="toc-section-18"></a>
+
+## 17. corrected-FK와 Ridge 출력 후보정은 다르다
 
 이 둘은 자주 혼동되지만 서로 다른 단계다.
 
-### 17.1 Corrected-FK
+### 17.1 corrected-FK
 
 캘리브레이션 입력 쪽에서 raw FK 자세를 vision으로 정렬하고, gate와 blend를 거쳐 anchor $\mathbf{A}_s$를 만든다.
 
@@ -1257,6 +1319,8 @@ $$
 
 ---
 
+<a id="toc-section-19"></a>
+
 ## 18. 평가 지표를 해석하는 방법
 
 ### 18.1 시뮬레이션
@@ -1322,6 +1386,8 @@ $$
 
 ---
 
+<a id="toc-section-20"></a>
+
 ## 19. 코드 흐름으로 다시 보기
 
 아래 코드는 실제 구현을 이해하기 위한 축약 의사코드다.
@@ -1364,6 +1430,8 @@ else:
 
 ---
 
+<a id="toc-section-21"></a>
+
 ## 20. 교수님께 설명할 때의 추천 순서
 
 1. 카메라마다 자기 좌표계를 사용하므로 같은 큐브도 다른 좌표로 보인다고 설명한다.
@@ -1371,11 +1439,13 @@ else:
 3. 변환행렬 $\mathbf{T}$가 회전 $\mathbf{R}$과 이동 $\mathbf{t}$를 포함한다고 설명한다.
 4. 고정 카메라 경로 $\mathbf{C}_i\mathbf{Z}_{i,s}$와 그리퍼 카메라 경로 $\mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e}$를 설명한다.
 5. 두 경로가 같은 $\mathbf{Q}_s$에 도착하도록 오차를 최소화한다고 설명한다.
-6. $\mathbf{Q}_s$를 어떻게 정하는지가 `No-FK`, `Fixed-FK`, `Corrected-FK`의 차이라고 설명한다.
+6. $\mathbf{Q}_s$를 어떻게 정하는지가 `no-FK(vision)`, `FK-fixed`, `corrected-FK`의 차이라고 설명한다.
 7. 두 카메라 계열을 동시에 풀면 Unified이고, 따로 풀고 마지막에 정렬하면 Independent 또는 Separated라고 설명한다.
 8. 실데이터의 FK 기반 평가는 절대 정답이 아니라 proxy라는 점을 마지막에 분명히 말한다.
 
 ---
+
+<a id="toc-section-22"></a>
 
 ## 21. 최종 한 장 요약용 수식
 
@@ -1403,13 +1473,13 @@ else:
 ```latex
 \mathbf{Q}_s=
 \begin{cases}
-\mathbf{O}_s, & \text{No-FK},\\
-\mathbf{F}_s, & \text{Fixed-FK},\\
-\mathbf{A}_s, & \text{Corrected-FK}.
+\mathbf{O}_s, & \text{no-FK(vision)},\\
+\mathbf{F}_s, & \text{FK-fixed},\\
+\mathbf{A}_s, & \text{corrected-FK}.
 \end{cases}
 ```
 
-### Corrected-FK 핵심
+### corrected-FK 핵심
 
 ```latex
 \boldsymbol{\Delta}_s=\mathbf{F}_s^{-1}\mathbf{V}_s,
@@ -1460,19 +1530,21 @@ else:
 
 ---
 
+<a id="toc-section-23"></a>
+
 ## 22. 예상 질문과 짧은 답변
 
 ### 질문: 목적함수 안의 항들은 모두 행렬인가?
 
 $\mathbf{C}_i$, $\mathbf{Z}_{i,s}$, $\mathbf{G}_e$, $\mathbf{X}$, $\mathbf{Z}_{g,e}$, $\mathbf{Q}_s$는 모두 $4 \times 4$ 변환행렬이다. $\mathbf{r}(\cdot,\cdot)$ 또는 $\log(\cdot)$를 적용한 뒤에는 회전 $3$개와 이동 $3$개로 이루어진 $6$차원 벡터가 된다. 마지막의 $\|\cdot\|_2^2$가 그 벡터를 하나의 오차 숫자로 바꾼다.
 
-### 질문: No-FK는 로봇 FK를 전혀 쓰지 않는가?
+### 질문: no-FK(vision)는 로봇 FK를 전혀 쓰지 않는가?
 
 큐브 FK prior $\mathbf{F}_s$는 쓰지 않는다. 하지만 움직이는 그리퍼 카메라를 베이스에 연결하기 위한 촬영 순간 그리퍼 자세 $\mathbf{G}_e$는 사용한다.
 
-### 질문: Corrected-FK는 soft anchor인가?
+### 질문: corrected-FK는 soft anchor인가?
 
-아니다. gate를 통과한 세트는 corrected FK를 그대로 anchor로 삼고, 탈락한 세트는 vision 합의를 쓴다. 세트마다 전부 아니면 전무로 결정하며, 그렇게 만든 $\mathbf{A}_s$를 최종 refinement에서 고정한다. 목적함수에 벌점 항을 더하는 legacy soft-anchor 방식과는 다르다.
+아니다. gate를 통과한 세트는 corrected-FK를 그대로 anchor로 삼고, 탈락한 세트는 vision 합의를 쓴다. 세트마다 전부 아니면 전무로 결정하며, 그렇게 만든 $\mathbf{A}_s$를 최종 refinement에서 고정한다. 목적함수에 벌점 항을 더하는 legacy soft-anchor 방식과는 다르다.
 
 ### 질문: Independent와 Separated는 다른 방법인가?
 

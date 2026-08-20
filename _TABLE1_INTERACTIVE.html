@@ -1,0 +1,2693 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Session02 Table 1의 held-out 픽셀 재투영과 고정카메라 간 큐브 pose 일관성을 비교하는 대화형 탐색 화면">
+  <title>Table 1 Interactive — Calibration Ablation Explorer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #182027;
+      --muted: #667078;
+      --paper: #f5f3ed;
+      --surface: #fffdf8;
+      --surface-2: #eeece4;
+      --line: #d9d5ca;
+      --navy: #17324d;
+      --teal: #187f78;
+      --teal-soft: #dceeea;
+      --orange: #df744c;
+      --orange-soft: #f8e4d9;
+      --blue-soft: #dfeaf4;
+      --red: #9d3d36;
+      --shadow: 0 16px 44px rgba(28, 41, 49, 0.08);
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --radius-sm: 10px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 90% 0%, rgba(24, 127, 120, 0.11), transparent 30rem),
+        linear-gradient(180deg, #f8f7f2 0%, var(--paper) 38%, #efede6 100%);
+      font-family: Pretendard, "Noto Sans KR", "Apple SD Gothic Neo", Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+      min-height: 100vh;
+    }
+
+    button, input, select { font: inherit; }
+    button, select { cursor: pointer; }
+
+    .skip-link {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 100;
+      padding: 10px 14px;
+      color: white;
+      background: var(--navy);
+      border-radius: 8px;
+      transform: translateY(-150%);
+      transition: transform 160ms ease;
+    }
+
+    .skip-link:focus { transform: translateY(0); }
+
+    .page-header {
+      position: relative;
+      overflow: hidden;
+      padding: 56px clamp(20px, 5vw, 76px) 40px;
+      color: #f8fbfc;
+      background: var(--navy);
+    }
+
+    .page-header::after {
+      content: "";
+      position: absolute;
+      width: 420px;
+      height: 420px;
+      right: -120px;
+      bottom: -260px;
+      border: 1px solid rgba(255,255,255,.17);
+      border-radius: 50%;
+      box-shadow: 0 0 0 70px rgba(255,255,255,.035), 0 0 0 140px rgba(255,255,255,.025);
+      pointer-events: none;
+    }
+
+    .header-inner {
+      position: relative;
+      z-index: 1;
+      width: min(1460px, 100%);
+      margin: 0 auto;
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: #8fd8cf;
+      font-size: 0.76rem;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      max-width: 900px;
+      margin: 0;
+      font-size: clamp(2.2rem, 5vw, 4.9rem);
+      font-weight: 760;
+      letter-spacing: -0.055em;
+      line-height: 1.02;
+    }
+
+    .header-copy {
+      max-width: 760px;
+      margin: 20px 0 0;
+      color: #c8d5dd;
+      font-size: clamp(1rem, 1.5vw, 1.18rem);
+    }
+
+    .header-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+      margin-top: 26px;
+    }
+
+    .header-meta span {
+      padding: 7px 11px;
+      border: 1px solid rgba(255,255,255,.17);
+      border-radius: 999px;
+      color: #e7eff2;
+      background: rgba(255,255,255,.055);
+      font-size: .82rem;
+    }
+
+    .scope-warning {
+      width: min(1460px, calc(100% - 40px));
+      margin: -18px auto 26px;
+      position: relative;
+      z-index: 2;
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: start;
+      padding: 17px 20px;
+      color: #5d372a;
+      background: #fff4ea;
+      border: 1px solid #edc8b3;
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow);
+    }
+
+    .warning-mark {
+      display: grid;
+      place-items: center;
+      width: 28px;
+      height: 28px;
+      color: white;
+      background: var(--orange);
+      border-radius: 50%;
+      font-weight: 900;
+    }
+
+    .scope-warning strong { color: #442318; }
+
+    .app-shell {
+      display: grid;
+      grid-template-columns: minmax(250px, 310px) minmax(0, 1fr);
+      gap: 24px;
+      width: min(1460px, calc(100% - 40px));
+      margin: 0 auto 64px;
+      align-items: start;
+    }
+
+    .panel {
+      background: rgba(255, 253, 248, 0.92);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+    }
+
+    .controls {
+      position: sticky;
+      top: 18px;
+      padding: 22px;
+    }
+
+    .controls-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .controls-heading h2,
+    .section-heading h2,
+    .interpretation h2 {
+      margin: 0;
+      color: var(--navy);
+      font-size: 1.12rem;
+      letter-spacing: -0.025em;
+    }
+
+    .reset-button {
+      border: 0;
+      padding: 5px 0;
+      color: var(--teal);
+      background: transparent;
+      font-size: .82rem;
+      font-weight: 750;
+    }
+
+    .control-group + .control-group {
+      padding-top: 20px;
+      margin-top: 20px;
+      border-top: 1px solid var(--line);
+    }
+
+    .control-label {
+      display: block;
+      margin: 0 0 9px;
+      color: #46515a;
+      font-size: .78rem;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .choice-stack {
+      display: grid;
+      gap: 7px;
+    }
+
+    .choice-button {
+      width: 100%;
+      padding: 10px 12px;
+      text-align: left;
+      color: #46515a;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      transition: background 140ms ease, border-color 140ms ease, color 140ms ease, transform 140ms ease;
+    }
+
+    .choice-button:hover { background: var(--surface-2); }
+    .choice-button:active { transform: translateY(1px); }
+    .choice-button[aria-pressed="true"] {
+      color: var(--navy);
+      background: var(--teal-soft);
+      border-color: #a8d4cc;
+      font-weight: 760;
+    }
+
+    .choice-button small {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: .73rem;
+      font-weight: 500;
+    }
+
+    select, .search-input {
+      width: 100%;
+      min-height: 44px;
+      padding: 10px 12px;
+      color: var(--ink);
+      background: #fffefa;
+      border: 1px solid #cfcabf;
+      border-radius: var(--radius-sm);
+      outline: none;
+    }
+
+    select:focus, .search-input:focus, button:focus-visible {
+      outline: 3px solid rgba(24, 127, 120, .23);
+      outline-offset: 2px;
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+      padding: 4px;
+      background: var(--surface-2);
+      border-radius: 12px;
+    }
+
+    .segmented button {
+      min-height: 38px;
+      padding: 7px 9px;
+      color: var(--muted);
+      background: transparent;
+      border: 0;
+      border-radius: 9px;
+      font-size: .82rem;
+    }
+
+    .segmented button[aria-pressed="true"] {
+      color: var(--navy);
+      background: white;
+      box-shadow: 0 3px 10px rgba(29, 42, 48, .08);
+      font-weight: 780;
+    }
+
+    #viewButtons { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+    .check-row {
+      display: flex;
+      gap: 9px;
+      align-items: flex-start;
+      color: #4e5961;
+      font-size: .84rem;
+    }
+
+    .check-row input {
+      width: 18px;
+      height: 18px;
+      margin: 2px 0 0;
+      accent-color: var(--teal);
+    }
+
+    .main-content { min-width: 0; }
+
+    .results-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: end;
+      margin: 4px 2px 18px;
+    }
+
+    .results-header h2 {
+      margin: 0;
+      color: var(--navy);
+      font-size: clamp(1.45rem, 2vw, 2.1rem);
+      letter-spacing: -.04em;
+    }
+
+    .results-header p {
+      margin: 6px 0 0;
+      color: var(--muted);
+    }
+
+    .result-count {
+      flex: 0 0 auto;
+      color: var(--teal);
+      font-weight: 780;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .summary-card {
+      min-height: 132px;
+      padding: 20px;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+    }
+
+    .summary-card.highlight {
+      color: white;
+      background: var(--teal);
+      border-color: var(--teal);
+    }
+
+    .summary-label {
+      display: block;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: .75rem;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .highlight .summary-label { color: #cce8e4; }
+
+    .summary-value {
+      display: block;
+      font-size: clamp(1.45rem, 2vw, 2rem);
+      font-weight: 820;
+      letter-spacing: -.04em;
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .summary-detail {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: .8rem;
+    }
+
+    .summary-config {
+      display: block;
+      margin-top: 5px;
+      color: #bfe4df;
+      font-size: .68rem;
+      font-weight: 680;
+      line-height: 1.4;
+    }
+
+    .highlight .summary-detail { color: #dcf0ed; }
+
+    .interpretation {
+      padding: 23px 24px;
+      margin-bottom: 16px;
+      border-left: 5px solid var(--orange);
+    }
+
+    .interpretation-kicker {
+      margin: 0 0 5px;
+      color: var(--orange);
+      font-size: .75rem;
+      font-weight: 850;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+
+    .interpretation ul {
+      display: grid;
+      gap: 8px;
+      margin: 16px 0 0;
+      padding-left: 20px;
+      color: #46515a;
+    }
+
+    .interpretation strong { color: var(--navy); }
+
+    .conclusion-panel, .experiment-config-panel, .heldout-metrics-panel, .chart-panel, .cards-panel, .metric-definition-panel, .full-data-panel {
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+
+    .conclusion-lead {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 14px;
+      align-items: center;
+      padding: 17px 18px;
+      color: white;
+      background: var(--navy);
+      border-radius: var(--radius-md);
+    }
+
+    .conclusion-method {
+      display: grid;
+      place-items: center;
+      min-width: 64px;
+      min-height: 64px;
+      color: white;
+      background: var(--orange);
+      border-radius: 14px;
+      font-size: 1.5rem;
+      font-weight: 900;
+    }
+
+    .conclusion-lead p { margin: 0; }
+    .conclusion-lead strong { color: #9fe2d9; }
+    .conclusion-lead small { display: block; margin-top: 4px; color: #c7d5df; }
+    .conclusion-lead .conclusion-config { color: #9fe2d9; font-weight: 720; }
+
+    .conclusion-table-wrap { margin-top: 14px; }
+    .conclusion-table { min-width: 760px; }
+    .conclusion-table td:nth-child(2) { color: var(--navy); font-weight: 860; }
+    .conclusion-table td:last-child { color: var(--teal); font-weight: 820; font-variant-numeric: tabular-nums; }
+
+    .conclusion-reasons {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 9px;
+      margin-top: 14px;
+    }
+
+    .conclusion-reason {
+      padding: 13px 14px;
+      color: #4d5963;
+      background: #f8faff;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      font-size: .76rem;
+    }
+
+    .conclusion-reason strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--navy);
+      font-size: .8rem;
+    }
+
+    .conclusion-caveat {
+      padding-left: 10px;
+      margin: 12px 0 0;
+      color: var(--muted);
+      border-left: 3px solid var(--orange);
+      font-size: .72rem;
+    }
+
+    .config-axis-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .config-axis-card {
+      padding: 15px;
+      background: #f8faff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+    }
+
+    .config-axis-card h3 {
+      margin: 0 0 12px;
+      color: var(--navy);
+      font-size: .88rem;
+    }
+
+    .config-group + .config-group {
+      padding-top: 9px;
+      margin-top: 9px;
+      border-top: 1px solid #dde6f1;
+    }
+
+    .config-group-label {
+      color: #43546a;
+      font-size: .72rem;
+      font-weight: 800;
+    }
+
+    .config-methods {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      margin-top: 5px;
+    }
+
+    .config-method-chip {
+      display: inline-flex;
+      align-items: center;
+      min-height: 23px;
+      padding: 2px 7px;
+      color: #155e75;
+      background: #e6f7f5;
+      border: 1px solid #b8dfda;
+      border-radius: 999px;
+      font-size: .68rem;
+      font-weight: 820;
+    }
+
+    .config-matrix { min-width: 720px; }
+    .config-matrix td { vertical-align: middle; }
+
+    .config-none { color: #a5adb8; }
+
+    .dataset-summary {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin: -4px 0 14px;
+    }
+
+    .dataset-summary span {
+      display: inline-flex;
+      align-items: center;
+      min-height: 25px;
+      padding: 3px 8px;
+      color: #35516f;
+      background: #edf3fb;
+      border: 1px solid #d4e0ef;
+      border-radius: 999px;
+      font-size: .7rem;
+      font-weight: 760;
+    }
+
+    .full-data-note {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 9px;
+      align-items: start;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      color: #5d372a;
+      background: var(--orange-soft);
+      border: 1px solid #fdba8c;
+      border-radius: 9px;
+      font-size: .78rem;
+    }
+
+    .full-data-note strong { color: #4a250e; }
+    .full-data-note .warning-mark { width: 20px; height: 20px; font-size: .7rem; }
+    .matrix-table.full-data-matrix { min-width: 980px; }
+    .matrix-table.cross-target-matrix { min-width: 930px; }
+
+    .full-data-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 11px 0 0;
+      color: var(--muted);
+      font-size: .72rem;
+    }
+
+    .full-data-links a {
+      color: var(--teal);
+      font-weight: 760;
+      text-underline-offset: 3px;
+    }
+
+    .definition-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .definition-card {
+      padding: 16px;
+      color: #46515a;
+      background: #f8faff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+    }
+
+    .definition-card h3 {
+      margin: 0 0 7px;
+      color: var(--navy);
+      font-size: .94rem;
+    }
+
+    .definition-card p {
+      margin: 0;
+      font-size: .8rem;
+    }
+
+    .definition-card p + p { margin-top: 8px; }
+
+    .definition-formula {
+      display: block;
+      overflow-x: auto;
+      padding: 8px 10px;
+      color: var(--navy);
+      background: white;
+      border: 1px solid #dce5f1;
+      border-radius: 7px;
+      font-size: .76rem;
+      font-weight: 720;
+      white-space: nowrap;
+    }
+
+    .definition-note {
+      padding-left: 9px;
+      border-left: 3px solid var(--orange);
+    }
+
+    .selected-metric-guide {
+      padding: 17px 18px;
+      margin-top: 14px;
+      color: #324454;
+      background: #edf7f5;
+      border: 1px solid #b9ddd8;
+      border-radius: var(--radius-md);
+    }
+
+    .metric-guide-kicker {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--teal);
+      font-size: .68rem;
+      font-weight: 850;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    .selected-metric-guide h3 {
+      margin: 0;
+      color: var(--navy);
+      font-size: 1rem;
+    }
+
+    .selected-metric-guide p {
+      margin: 7px 0 0;
+      font-size: .8rem;
+    }
+
+    .metric-guide-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .metric-guide-meta span {
+      padding: 3px 8px;
+      color: #35516f;
+      background: white;
+      border: 1px solid #cbdedc;
+      border-radius: 999px;
+      font-size: .68rem;
+      font-weight: 760;
+    }
+
+    .metric-guide-counterpart {
+      padding-top: 9px;
+      margin-top: 10px !important;
+      border-top: 1px solid #c9dfdc;
+    }
+
+    .metric-glossary {
+      margin-top: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: #fff;
+    }
+
+    .metric-glossary summary {
+      padding: 12px 15px;
+      color: var(--navy);
+      cursor: pointer;
+      font-size: .82rem;
+      font-weight: 820;
+    }
+
+    .metric-glossary-content {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      padding: 0 14px 14px;
+    }
+
+    .glossary-scope {
+      min-width: 0;
+      padding: 13px;
+      background: #f8faff;
+      border: 1px solid #e0e7f0;
+      border-radius: 11px;
+    }
+
+    .glossary-scope > h3 {
+      margin: 0 0 10px;
+      color: var(--navy);
+      font-size: .86rem;
+    }
+
+    .glossary-group + .glossary-group {
+      padding-top: 10px;
+      margin-top: 10px;
+      border-top: 1px solid #dfe6ef;
+    }
+
+    .glossary-group h4 {
+      margin: 0 0 6px;
+      color: #526271;
+      font-size: .7rem;
+    }
+
+    .glossary-list {
+      display: grid;
+      gap: 6px;
+      margin: 0;
+    }
+
+    .glossary-item {
+      padding: 8px 9px;
+      background: white;
+      border: 1px solid #e1e7ee;
+      border-radius: 8px;
+    }
+
+    .glossary-item.selected {
+      background: #fff5eb;
+      border-color: #f4b684;
+    }
+
+    .glossary-item dt {
+      color: var(--navy);
+      font-size: .74rem;
+      font-weight: 820;
+    }
+
+    .glossary-item dt span {
+      color: var(--muted);
+      font-size: .66rem;
+      font-weight: 700;
+    }
+
+    .glossary-item dd {
+      margin: 3px 0 0;
+      color: #5a6570;
+      font-size: .7rem;
+      line-height: 1.45;
+    }
+
+    .metric-matrix + .metric-matrix {
+      padding-top: 18px;
+      margin-top: 18px;
+      border-top: 1px solid var(--line);
+    }
+
+    .matrix-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: baseline;
+      margin: 0 0 9px;
+    }
+
+    .matrix-heading h3 {
+      margin: 0;
+      color: var(--navy);
+      font-size: .9rem;
+    }
+
+    .matrix-heading p {
+      margin: 0;
+      color: var(--muted);
+      font-size: .72rem;
+    }
+
+    .matrix-table { min-width: 1320px; }
+    .matrix-table.heldout-matrix { min-width: 1320px; }
+    .matrix-table.train-matrix { min-width: 900px; }
+
+    .matrix-table thead tr:first-child th {
+      color: var(--navy);
+      background: #e7eef8;
+      text-align: center;
+      border-right: 1px solid #d1dceb;
+    }
+
+    .matrix-table thead tr:nth-child(2) th { text-align: right; }
+    .matrix-table thead tr:first-child th:first-child,
+    .matrix-table td:first-child {
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      background: white;
+      box-shadow: 1px 0 0 var(--line);
+    }
+
+    .matrix-table thead tr:first-child th:first-child {
+      z-index: 3;
+      background: #e7eef8;
+      text-align: left !important;
+    }
+
+    .matrix-table td:not(:first-child) { text-align: right; }
+    .matrix-table .selected-metric { background: #fff5eb; }
+    .matrix-table th.selected-metric { color: #a84200; }
+
+    .matrix-method {
+      min-width: 146px;
+      white-space: nowrap;
+    }
+
+    .metric-key {
+      display: block;
+      margin-top: 2px;
+      color: var(--muted);
+      font-size: .62rem;
+      font-weight: 650;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    .matrix-legend {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: .72rem;
+    }
+
+    .section-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: baseline;
+      margin-bottom: 20px;
+    }
+
+    .section-heading p {
+      margin: 0;
+      color: var(--muted);
+      font-size: .82rem;
+    }
+
+    .bar-chart {
+      display: grid;
+      gap: 12px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 48px minmax(0, 1fr) 100px;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .bar-method {
+      font-weight: 850;
+      color: var(--navy);
+    }
+
+    .bar-track {
+      height: 16px;
+      overflow: hidden;
+      background: var(--surface-2);
+      border-radius: 999px;
+    }
+
+    .bar-fill {
+      height: 100%;
+      min-width: 4px;
+      background: linear-gradient(90deg, var(--teal), #55aba1);
+      border-radius: inherit;
+      transition: width 260ms ease;
+    }
+
+    .bar-row.is-first .bar-fill { background: linear-gradient(90deg, var(--orange), #ef9a70); }
+
+    .bar-value {
+      text-align: right;
+      color: #43515b;
+      font-variant-numeric: tabular-nums;
+      font-size: .86rem;
+      font-weight: 720;
+    }
+
+    .table-scroll { overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 900px;
+    }
+
+    th {
+      padding: 10px 12px;
+      color: #68727a;
+      background: #f3f1ea;
+      border-bottom: 1px solid var(--line);
+      font-size: .72rem;
+      letter-spacing: .06em;
+      text-align: left;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 15px 12px;
+      border-bottom: 1px solid #e6e2d9;
+      vertical-align: middle;
+      font-size: .87rem;
+    }
+
+    tbody tr { transition: background 120ms ease; }
+    tbody tr:hover { background: #f8f6ef; }
+    tbody tr:last-child td { border-bottom: 0; }
+
+    .rank-number {
+      display: grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      color: var(--navy);
+      background: var(--blue-soft);
+      border-radius: 50%;
+      font-weight: 850;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .method-id {
+      color: var(--navy);
+      font-size: 1.05rem;
+      font-weight: 900;
+    }
+
+    .method-config-line {
+      display: block;
+      margin-top: 4px;
+      color: #446475;
+      font-size: .68rem;
+      font-weight: 720;
+      line-height: 1.45;
+      white-space: normal;
+    }
+
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      min-height: 23px;
+      padding: 3px 7px;
+      border-radius: 999px;
+      font-size: .68rem;
+      font-weight: 760;
+      white-space: nowrap;
+    }
+
+    .tag { color: #365765; background: var(--blue-soft); }
+
+    .metric-value {
+      color: var(--navy);
+      font-size: .98rem;
+      font-weight: 820;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+    }
+
+    .delta-best {
+      color: var(--muted);
+      font-size: .76rem;
+      white-space: nowrap;
+    }
+
+    .method-cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 13px;
+    }
+
+    .method-card {
+      position: relative;
+      padding: 20px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-md);
+      background: #fffefa;
+    }
+
+    .method-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 4px;
+      background: var(--teal);
+      border-radius: var(--radius-md) 0 0 var(--radius-md);
+    }
+
+    .method-card:first-child::before { background: var(--orange); }
+
+    .method-card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .method-card h3 {
+      margin: 0;
+      color: var(--navy);
+      font-size: 1.1rem;
+    }
+
+    .card-rank {
+      color: var(--muted);
+      font-size: .76rem;
+      font-weight: 800;
+    }
+
+    .method-card p {
+      margin: 8px 0 14px;
+      color: var(--muted);
+      font-size: .84rem;
+    }
+
+    .card-metric {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: end;
+      padding-top: 14px;
+      margin-top: 14px;
+      border-top: 1px solid #e5e1d8;
+    }
+
+    .card-metric span:first-child {
+      color: var(--muted);
+      font-size: .75rem;
+    }
+
+    .card-metric strong {
+      color: var(--navy);
+      font-size: 1.35rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .empty-state {
+      padding: 46px 20px;
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .source-footer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 4px 3px 0;
+      color: var(--muted);
+      font-size: .78rem;
+    }
+
+    .source-footer a {
+      color: var(--teal);
+      font-weight: 760;
+      text-decoration-thickness: 1px;
+      text-underline-offset: 3px;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    [hidden] { display: none !important; }
+
+    /* Compact navy/white dashboard refresh */
+    :root {
+      --ink: #172133;
+      --muted: #64748b;
+      --paper: #f4f7fb;
+      --surface: #ffffff;
+      --surface-2: #edf2f8;
+      --line: #d8e1ed;
+      --navy: #0b2343;
+      --teal: #1467d9;
+      --teal-soft: #e7f0ff;
+      --orange: #f97316;
+      --orange-soft: #fff0e5;
+      --blue-soft: #e7effb;
+      --red: #c92a2a;
+      --shadow: 0 8px 24px rgba(11, 35, 67, 0.07);
+      --radius-lg: 16px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+    }
+
+    body {
+      background: var(--paper);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .page-header {
+      padding: 14px clamp(16px, 4vw, 48px);
+      background: var(--navy);
+      border-bottom: 3px solid var(--teal);
+    }
+
+    .page-header::after { display: none; }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      width: min(1320px, 100%);
+    }
+
+    .header-title {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      min-width: 0;
+    }
+
+    .eyebrow {
+      margin: 0;
+      color: #a9caff;
+      font-size: .72rem;
+      font-weight: 720;
+      letter-spacing: .05em;
+      text-transform: none;
+      white-space: nowrap;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.15rem, 2vw, 1.42rem);
+      font-weight: 800;
+      letter-spacing: -.025em;
+      line-height: 1.15;
+      white-space: nowrap;
+    }
+
+    .header-meta {
+      justify-content: flex-end;
+      gap: 6px;
+      margin-top: 0;
+    }
+
+    .header-meta span {
+      padding: 4px 7px;
+      border-radius: 6px;
+      background: rgba(255,255,255,.06);
+      font-size: .68rem;
+      white-space: nowrap;
+    }
+
+    .scope-warning {
+      width: min(1320px, calc(100% - 32px));
+      margin: 12px auto;
+      gap: 9px;
+      align-items: center;
+      padding: 10px 13px;
+      color: #653315;
+      background: var(--orange-soft);
+      border-color: #fdba8c;
+      box-shadow: none;
+    }
+
+    .warning-mark { width: 22px; height: 22px; }
+    .scope-warning strong { color: #4a250e; }
+
+    .app-shell {
+      grid-template-columns: minmax(225px, 270px) minmax(0, 1fr);
+      gap: 16px;
+      width: min(1320px, calc(100% - 32px));
+      margin-bottom: 40px;
+    }
+
+    .panel { background: var(--surface); }
+    .controls { top: 12px; padding: 16px; }
+    .controls-heading { margin-bottom: 14px; }
+
+    .controls-heading h2,
+    .section-heading h2,
+    .interpretation h2 { font-size: 1rem; }
+
+    .control-group + .control-group { padding-top: 14px; margin-top: 14px; }
+    .control-label { margin-bottom: 7px; font-size: .7rem; }
+    .choice-stack { gap: 5px; }
+    .choice-button { padding: 8px 9px; }
+    .choice-button[aria-pressed="true"] { border-color: #9fc1ef; }
+    select, .search-input { min-height: 38px; padding: 8px 10px; background: white; border-color: #cbd7e6; }
+    select:focus, .search-input:focus, button:focus-visible { outline-color: rgba(20, 103, 217, .22); }
+    .segmented button { min-height: 33px; padding: 6px 8px; }
+    .check-row input { width: 16px; height: 16px; }
+
+    .results-header { margin: 2px 2px 11px; }
+    .results-header h2 { font-size: clamp(1.2rem, 1.7vw, 1.55rem); }
+    .results-header p { margin-top: 3px; }
+    .summary-grid { gap: 9px; margin-bottom: 11px; }
+    .summary-card { min-height: 92px; padding: 14px; }
+    .summary-card.highlight { background: var(--navy); border-color: var(--navy); }
+    .summary-label { margin-bottom: 7px; }
+    .summary-value { font-size: clamp(1.2rem, 1.7vw, 1.55rem); }
+    .summary-detail { margin-top: 5px; }
+
+    .interpretation { padding: 16px 18px; margin-bottom: 11px; border-left-width: 4px; }
+    .interpretation ul { gap: 6px; margin-top: 10px; }
+    .conclusion-panel, .experiment-config-panel, .heldout-metrics-panel, .chart-panel, .cards-panel, .metric-definition-panel, .full-data-panel { padding: 16px; margin-bottom: 11px; }
+    .section-heading { margin-bottom: 13px; }
+    .bar-chart { gap: 8px; }
+    .bar-row { grid-template-columns: 42px minmax(0, 1fr) 92px; gap: 9px; }
+    .bar-track { height: 12px; }
+    .bar-fill { background: linear-gradient(90deg, var(--teal), #50a2ff); }
+    .bar-row.is-first .bar-fill { background: linear-gradient(90deg, var(--orange), #ffb05c); }
+
+    .paper-figure-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .figure-panel {
+      min-width: 0;
+      margin: 0;
+    }
+
+    .figure-panel + .figure-panel {
+      padding-left: 18px;
+      border-left: 1px solid var(--line);
+    }
+
+    .figure-panel figcaption {
+      margin: 0 0 7px;
+      color: var(--navy);
+      font-size: .78rem;
+    }
+
+    .paper-plot { min-height: 230px; }
+
+    .paper-plot svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      overflow: visible;
+    }
+
+    .paper-plot text {
+      fill: var(--ink);
+      font-family: inherit;
+      font-size: 11px;
+    }
+
+    .paper-plot .chart-frame {
+      fill: #fff;
+      stroke: var(--line);
+      stroke-width: 1;
+    }
+
+    .paper-plot .grid-line { stroke: #e6edf6; stroke-width: 1; }
+    .paper-plot .zero-line { stroke: var(--navy); stroke-width: 1.4; }
+    .paper-plot .axis-tick { fill: var(--muted); font-size: 11px; }
+    .paper-plot .axis-title { fill: var(--navy); font-size: 11px; font-weight: 760; }
+    .paper-plot .row-label { fill: var(--navy); font-weight: 820; }
+    .paper-plot .value-label { fill: var(--ink); font-size: 11px; font-variant-numeric: tabular-nums; }
+    .paper-plot .lollipop-line { stroke: #9fb6d5; stroke-width: 2; }
+    .paper-plot .delta-line { stroke-width: 3; }
+    .paper-plot .delta-line.improved { stroke: var(--teal); }
+    .paper-plot .delta-line.worsened { stroke: var(--red); }
+    .paper-plot .delta-dot.improved { fill: var(--teal); }
+    .paper-plot .delta-dot.worsened { fill: var(--red); }
+    .paper-plot .complete-dot { fill: var(--teal); stroke: #fff; stroke-width: 1.5; }
+    .paper-plot .best-dot { fill: var(--orange); stroke: #fff; stroke-width: 1.5; }
+    .paper-plot .empty-plot { fill: var(--muted); font-size: 12px; text-anchor: middle; }
+
+    .figure-caption {
+      margin: 10px 0 0;
+      padding-top: 9px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      font-size: .72rem;
+      line-height: 1.5;
+    }
+
+    th { padding: 8px 9px; background: var(--surface-2); }
+    td { padding: 11px 9px; border-color: #e5ebf3; font-size: .82rem; }
+    tbody tr:hover { background: #f5f8fc; }
+    .rank-number { width: 26px; height: 26px; }
+    .method-id { font-size: .96rem; }
+    .tag { min-height: 21px; padding: 2px 6px; }
+    .metric-value { font-size: .9rem; }
+
+    .method-cards { gap: 9px; }
+    .method-card { padding: 15px; background: white; }
+    .method-card h3 { font-size: 1rem; }
+    .method-card p { margin: 6px 0 10px; }
+    .card-metric { padding-top: 10px; margin-top: 10px; border-color: #e5ebf3; }
+    .card-metric strong { font-size: 1.15rem; }
+
+    .interpretation-heading { align-items: flex-end; }
+    .interpretation-heading .interpretation-kicker { margin-bottom: 3px; }
+
+    .evidence-flow {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .evidence-row {
+      display: grid;
+      grid-template-columns: minmax(125px, .8fr) 28px minmax(125px, .8fr) minmax(250px, 1.45fr);
+      gap: 8px;
+      align-items: stretch;
+    }
+
+    .evidence-method,
+    .evidence-proof {
+      min-width: 0;
+      padding: 10px 11px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #f8faff;
+    }
+
+    .evidence-method span,
+    .evidence-proof > span:first-child {
+      display: block;
+      margin-bottom: 3px;
+      color: var(--muted);
+      font-size: .64rem;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    .evidence-method strong {
+      display: block;
+      color: var(--navy);
+      font-size: 1rem;
+      line-height: 1.2;
+    }
+
+    .evidence-method small {
+      display: block;
+      margin-top: 3px;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: .7rem;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .evidence-arrow {
+      display: grid;
+      place-items: center;
+      color: var(--teal);
+      font-size: 1.35rem;
+      font-weight: 900;
+    }
+
+    .evidence-proof {
+      border-left: 4px solid var(--teal);
+      background: white;
+    }
+
+    .evidence-proof.partial { border-left-color: var(--orange); }
+    .evidence-proof.unsupported { border-left-color: var(--red); }
+
+    .evidence-verdict {
+      display: inline-flex !important;
+      width: fit-content;
+      padding: 2px 6px;
+      color: #0b54b5 !important;
+      background: var(--teal-soft);
+      border-radius: 999px;
+      font-size: .64rem !important;
+    }
+
+    .evidence-proof.partial .evidence-verdict { color: #a84200 !important; background: var(--orange-soft); }
+    .evidence-proof.unsupported .evidence-verdict { color: #a51d1d !important; background: #ffe8e8; }
+
+    .evidence-proof strong {
+      display: block;
+      margin-top: 5px;
+      color: var(--ink);
+      font-size: .8rem;
+      line-height: 1.4;
+    }
+
+    .evidence-proof small {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: .72rem;
+      line-height: 1.4;
+    }
+
+    .interpretation-summary {
+      padding-top: 13px;
+      margin-top: 13px;
+      border-top: 1px solid var(--line);
+    }
+
+    .interpretation-summary h3 {
+      margin: 0;
+      color: var(--navy);
+      font-size: .86rem;
+    }
+
+    @media (max-width: 980px) {
+      .app-shell { grid-template-columns: 1fr; }
+      .controls { position: static; }
+      .choice-stack.contributions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .header-meta span:nth-child(-n+2) { display: none; }
+      .evidence-row { grid-template-columns: minmax(110px, .75fr) 24px minmax(110px, .75fr) minmax(210px, 1.35fr); }
+      .paper-figure-grid { grid-template-columns: 1fr; }
+      .figure-panel + .figure-panel { padding: 14px 0 0; border-left: 0; border-top: 1px solid var(--line); }
+      .definition-grid { grid-template-columns: 1fr; }
+      .metric-glossary-content { grid-template-columns: 1fr; }
+      .config-axis-grid { grid-template-columns: 1fr; }
+      .conclusion-reasons { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 720px) {
+      .page-header { padding: 11px 14px; }
+      .header-inner { align-items: flex-start; }
+      .header-title { display: block; }
+      .eyebrow { margin-top: 2px; }
+      .header-meta { display: none; }
+      .scope-warning, .app-shell { width: min(100% - 20px, 1320px); }
+      .scope-warning { grid-template-columns: auto 1fr; margin-top: 10px; }
+      .summary-grid { grid-template-columns: 1fr; }
+      .summary-card { min-height: 0; }
+      .method-cards { grid-template-columns: 1fr; }
+      .evidence-row { grid-template-columns: 1fr 24px 1fr; }
+      .evidence-proof { grid-column: 1 / -1; }
+      .bar-row { grid-template-columns: 42px minmax(0, 1fr) 84px; gap: 8px; }
+      .results-header { align-items: start; flex-direction: column; }
+      .choice-stack.contributions { grid-template-columns: 1fr; }
+      .conclusion-panel, .heldout-metrics-panel, .chart-panel, .cards-panel, .metric-definition-panel, .experiment-config-panel, .full-data-panel, .interpretation { padding: 14px; }
+      .conclusion-lead { grid-template-columns: 1fr; }
+      .matrix-heading { align-items: flex-start; flex-direction: column; }
+    }
+
+    @media print {
+      body { background: white; }
+      .page-header { padding: 24px; }
+      .scope-warning { margin: 12px auto; box-shadow: none; }
+      .app-shell { display: block; width: 100%; margin: 0; }
+      .controls { display: none; }
+      .panel, .summary-card { box-shadow: none; break-inside: avoid; }
+      .source-footer { margin-top: 18px; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#results">결과로 바로 이동</a>
+
+  <header class="page-header">
+    <div class="header-inner">
+      <div class="header-title">
+        <h1>Table 1 결과 탐색기</h1>
+        <p class="eyebrow">Session02 · 세트 5–12 · 고정 홀드아웃 분할</p>
+      </div>
+      <div class="header-meta" aria-label="실험 요약">
+        <span>학습 40 / 홀드아웃 8</span>
+        <span>다중 초기화 3회</span>
+        <span>24/24 수렴</span>
+      </div>
+    </div>
+  </header>
+
+  <aside class="scope-warning" aria-label="해석 주의사항">
+    <span class="warning-mark" aria-hidden="true">!</span>
+    <div>
+      <strong>이 화면의 순위는 내부 진단 순위입니다.</strong>
+      독립 외부 GT가 없으므로 재투영, <code>e_cross</code>, <code>e_e2e</code> 순위를 절대 3차원 정확도나
+      최종 우열로 해석할 수 없습니다. 아래 수치는 모두 동결된 변환을 사용한 held-out 평가입니다.
+    </div>
+  </aside>
+
+  <main class="app-shell" id="results">
+    <aside class="controls panel" aria-label="결과 필터">
+      <div class="controls-heading">
+        <h2>보기 설정</h2>
+        <button type="button" class="reset-button" id="resetButton">초기화</button>
+      </div>
+
+      <section class="control-group" aria-labelledby="contributionLabel">
+        <span class="control-label" id="contributionLabel">기여도별 보기</span>
+        <div class="choice-stack contributions" id="contributionButtons">
+          <button type="button" class="choice-button" data-contribution="all" aria-pressed="true">
+            전체 Table 1<small>실행 가능한 모든 행</small>
+          </button>
+          <button type="button" class="choice-button" data-contribution="C1" aria-pressed="false">
+            C1 · 순차·독립 vs 통합<small>순차·독립 / 통합</small>
+          </button>
+          <button type="button" class="choice-button" data-contribution="C2" aria-pressed="false">
+            C2 · 마커 종류<small>최적화 기여 / end-to-end 시스템</small>
+          </button>
+          <button type="button" class="choice-button" data-contribution="C3" aria-pressed="false">
+            C3 · FK 사용<small>no-FK(vision) / FK-fixed / corrected-FK</small>
+          </button>
+        </div>
+      </section>
+
+      <section class="control-group">
+        <label class="control-label" for="metricSelect">평가 지표별 보기</label>
+        <select id="metricSelect">
+          <optgroup label="대표 종합 · 카메라 간 픽셀">
+            <option value="crossViewPx" selected>카메라 간 양방향 픽셀 전이 · px</option>
+          </optgroup>
+          <optgroup label="교차 표적 · 공통 pose">
+            <option value="crossOverallPx">공통 전체 재투영 · px</option>
+            <option value="crossBoardPx">공통 보드 재투영 · px</option>
+            <option value="crossCubePx">공통 큐브 재투영 · px</option>
+          </optgroup>
+          <optgroup label="자체 Held-out · 표적별">
+            <option value="testBoardPx">Held-out 보드 재투영 · px</option>
+            <option value="testCubePx">Held-out 큐브 재투영 · px</option>
+          </optgroup>
+          <optgroup label="3D 경로 일관성 · mm">
+            <option value="crossT">고정카메라 간 큐브 위치 일관성 (e_cross)</option>
+            <option value="e2eT">고정↔손목+FK 경로 불일치 (e_e2e)</option>
+          </optgroup>
+        </select>
+      </section>
+
+      <section class="control-group">
+        <span class="control-label">실제 결과 정렬</span>
+        <div class="segmented" id="sortButtons">
+          <button type="button" data-sort="asc" aria-pressed="true">↑ 오름차순</button>
+          <button type="button" data-sort="desc" aria-pressed="false">↓ 내림차순</button>
+        </div>
+      </section>
+
+      <section class="control-group">
+        <span class="control-label">보기 방식</span>
+        <div class="segmented" id="viewButtons">
+          <button type="button" data-view="summary" aria-pressed="true">결론 요약</button>
+          <button type="button" data-view="rank" aria-pressed="false">그래프</button>
+          <button type="button" data-view="cards" aria-pressed="false">카드 비교</button>
+          <button type="button" data-view="all" aria-pressed="false">표만 보기</button>
+        </div>
+      </section>
+
+      <section class="control-group">
+        <label class="control-label" for="searchInput">방법 빠르게 찾기</label>
+        <input class="search-input" id="searchInput" type="search" placeholder="예: A4, 보드, corrected-FK" autocomplete="off">
+      </section>
+
+    </aside>
+
+    <div class="main-content">
+      <div class="results-header">
+        <div>
+          <h2 id="currentViewTitle">전체 Table 1</h2>
+          <p id="currentMetricTitle">내부 검증 종합 결론 · 선택 지표: 카메라 간 양방향 픽셀 전이</p>
+        </div>
+        <div class="result-count" id="resultCount" aria-live="polite">8 / 8 방법</div>
+      </div>
+
+      <section class="summary-grid" aria-label="현재 보기 요약">
+        <article class="summary-card highlight">
+          <span class="summary-label">성능상 최상</span>
+          <strong class="summary-value" id="bestValue">—</strong>
+          <span class="summary-detail" id="bestDetail">—</span>
+          <span class="summary-config" id="bestConfig">—</span>
+        </article>
+        <article class="summary-card">
+          <span class="summary-label">현재 첫 행</span>
+          <strong class="summary-value" id="firstValue">—</strong>
+          <span class="summary-detail" id="firstDetail">—</span>
+        </article>
+        <article class="summary-card">
+          <span class="summary-label">데이터 가용성</span>
+          <strong class="summary-value" id="availabilityValue">—</strong>
+          <span class="summary-detail" id="availabilityDetail">—</span>
+        </article>
+      </section>
+
+      <section class="conclusion-panel panel" id="conclusionPanel" aria-labelledby="conclusionTitle">
+        <div class="section-heading">
+          <h2 id="conclusionTitle">내부 검증 기준 종합 결론</h2>
+          <p>보기 방식 · 결론 요약</p>
+        </div>
+        <div class="conclusion-lead">
+          <div class="conclusion-method">A3</div>
+          <p>
+            현재 내부 진단에서 가장 강한 후보는 <strong>A3 · FK-fixed 통합 보정</strong>입니다.
+            <small>큐브와 보드를 모두 사용하는 방법끼리의 held-out 성능과 공통-pose 교차 검증을 종합한 잠정 결론입니다. FK 실측과 외부 GT 전에는 최종 방법으로 확정하지 않습니다.</small>
+            <small class="conclusion-config">(기여도1: 통합 / 기여도2: 큐브+보드 / 기여도3: FK-fixed)</small>
+          </p>
+        </div>
+        <div class="table-scroll conclusion-table-wrap">
+          <table class="conclusion-table">
+            <caption class="sr-only">내부 검증 지표별 가장 좋은 방법과 결과</caption>
+            <thead>
+              <tr><th scope="col">기준</th><th scope="col">가장 좋은 방법</th><th scope="col">결과</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>큐브+보드 방법 내 Held-out 보드 재투영</td><td>A3</td><td>2.4951 px</td></tr>
+              <tr><td>Held-out 큐브 재투영</td><td>A3</td><td>2.5136 px</td></tr>
+              <tr><td>공통-pose 교차 표적 전체</td><td>A3</td><td>1.7093 px</td></tr>
+              <tr><td>교차 표적 보드</td><td>A3</td><td>1.8537 px</td></tr>
+              <tr><td>교차 표적 큐브</td><td>A3</td><td>1.3514 px</td></tr>
+              <tr><td>카메라 간 양방향 픽셀 전이</td><td>A3</td><td>9.0609 px</td></tr>
+              <tr><td>고정카메라 간 큐브 위치 일관성</td><td>A3</td><td>10.8317 mm</td></tr>
+              <tr><td>고정↔손목+FK 경로 불일치</td><td>B2</td><td>3.8215 mm</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="conclusion-reasons" aria-label="A3를 선택하는 이유">
+          <article class="conclusion-reason"><strong>Held-out 일반화</strong>큐브와 보드를 모두 사용하는 방법 중 보드 및 큐브 재투영 오차가 가장 낮습니다.</article>
+          <article class="conclusion-reason"><strong>카메라 간 검증</strong>공통 pose 재투영과 측정-only 양방향 pixel-transfer에서 모두 가장 낮습니다.</article>
+          <article class="conclusion-reason"><strong>제약의 효과</strong>Train 오차는 A4보다 크지만 held-out 결과는 더 좋습니다. FK-fixed 제약이 과적합을 줄이는 정규화처럼 작동했을 가능성이 있습니다.</article>
+        </div>
+        <p class="conclusion-caveat"><strong>해석 제한:</strong> 전체 방법의 own-pose 보드 최소값은 A0/B3의 2.4829 px이며 A3의 2.4951 px가 전체 최저는 아닙니다. B2는 고정↔손목+FK 경로 불일치가 가장 낮지만 큐브만 사용합니다. 지표별 순위가 다르고 A4/B1/B2는 실측 FK covariance가 없는 preflight이므로, 이 결론은 외부 GT 정확도가 아닌 현재 내부 검증 범위에 한정됩니다.</p>
+      </section>
+
+      <section class="experiment-config-panel panel" aria-labelledby="experimentConfigTitle">
+        <div class="section-heading">
+          <h2 id="experimentConfigTitle">실험 구성 한눈에 보기</h2>
+          <p>기여도 1 · 기여도 2 · 기여도 3</p>
+        </div>
+        <div class="config-axis-grid">
+          <article class="config-axis-card">
+            <h3>① 기여도 1 · 순차·독립 vs 통합</h3>
+            <div id="solverClassification"></div>
+          </article>
+          <article class="config-axis-card">
+            <h3>② 기여도 2 · 마커 종류</h3>
+            <div id="targetClassification"></div>
+          </article>
+          <article class="config-axis-card">
+            <h3>③ 기여도 3 · FK 사용</h3>
+            <div id="fkClassification"></div>
+          </article>
+        </div>
+        <div class="matrix-heading">
+          <h3>방법별 구성표</h3>
+          <p>현재 기여도·검색 필터와 연동</p>
+        </div>
+        <div class="table-scroll">
+          <table class="config-matrix">
+            <caption class="sr-only">필터에 포함된 실험 방법의 기여도 1, 기여도 2, 기여도 3 구성</caption>
+            <thead>
+              <tr>
+                <th scope="col">방법</th>
+                <th scope="col">기여도 1<br>순차·독립 vs 통합</th>
+                <th scope="col">기여도 2<br>마커 종류</th>
+                <th scope="col">기여도 3<br>FK 사용</th>
+              </tr>
+            </thead>
+            <tbody id="experimentConfigBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="experiment-config-panel panel" aria-labelledby="markerSystemTitle">
+        <div class="section-heading">
+          <h2 id="markerSystemTitle">마커 시스템 end-to-end 비교</h2>
+          <p>조건별 초기화부터 분리 · 3/3 다중 초기화 수렴</p>
+        </div>
+        <div class="full-data-note">
+          <span class="warning-mark" aria-hidden="true">!</span>
+          <div><strong>해석 구분:</strong> 위 A0–B3 표는 동일한 all-marker 초기값에서 residual과 자유변수를 제거하는 <strong>최적화 단계 절제 실험</strong>입니다. 아래 표만 board-only, cube-only, board+cube를 각 마커로 초기화한 시스템 비교입니다. split·raw 검출·K/D·solver·seed·공통 held-out 338 corners는 같습니다.</div>
+        </div>
+        <div class="table-scroll">
+          <table class="matrix-table heldout-matrix">
+            <caption class="sr-only">마커별 초기화와 최종 목적함수를 모두 분리한 end-to-end 시스템 비교</caption>
+            <thead>
+              <tr>
+                <th scope="col">시스템</th>
+                <th scope="col">초기화 → 목적함수</th>
+                <th scope="col">수렴 / 등록</th>
+                <th scope="col">자체 Held-out<br><span class="metric-key">px · ↓</span></th>
+                <th scope="col">공통 전체 / 보드 / 큐브<br><span class="metric-key">px · ↓</span></th>
+                <th scope="col">카메라 간 픽셀 전이<br><span class="metric-key">px · ↓</span></th>
+                <th scope="col"><code>e_cross</code><br><span class="metric-key">mm / deg · ↓</span></th>
+                <th scope="col"><code>e_e2e</code><br><span class="metric-key">mm / deg · ↓</span></th>
+              </tr>
+            </thead>
+            <tbody id="markerSystemBody"></tbody>
+          </table>
+        </div>
+        <p class="definition-note">공통-target 수치는 내부 공통 pose 평가이며 외부 물리 GT가 아닙니다. Cube-only는 board-free train-only FK cube artifact로 hand-eye를 초기화하지만 최종 목적함수에는 FK factor가 없습니다. 현재 데이터에서는 board-only가 공통 픽셀 오차, cube-only가 두 경로 병진 불일치에서 각각 가장 낮아 단일 시스템의 전 지표 우위는 없습니다.</p>
+      </section>
+
+      <section class="metric-definition-panel panel" aria-labelledby="metricDefinitionTitle">
+        <div class="section-heading">
+          <h2 id="metricDefinitionTitle">지표의 기준</h2>
+          <p>재투영과 3D 위치 오차를 구분</p>
+        </div>
+        <div class="definition-grid">
+          <article class="definition-card">
+            <h3>“전체 재투영”은 무엇을 합치나?</h3>
+            <p>각 방법이 사용하는 모든 held-out 관측의 코너를 카메라 영상에 다시 투영한 뒤, 관측 코너와의 <strong>2D 픽셀 잔차를 한꺼번에 pooling</strong>한 component-wise RMSE입니다.</p>
+            <p class="definition-formula"><code>RMSE = √(Σ(Δu² + Δv²) / (2 × N코너))</code></p>
+            <p class="definition-note">보드 706코너와 큐브 228코너를 쓰는 방법은 총 934코너가 기준이며, board/cube RMSE의 단순 평균이 아닙니다. A0·B3는 보드만, B2는 큐브만 포함합니다. 모든 변환은 train에서 동결되고 test-time refit은 없습니다. 재투영 오차는 카메라 영상의 관측량인 px로만 보고합니다.</p>
+          </article>
+          <article class="definition-card">
+            <h3>고정↔손목+FK 경로 불일치 · mm</h3>
+            <p>동일 held-out event에서 <strong>고정카메라 묶음이 찾은 큐브 중심</strong>과 <strong>손목카메라+로봇 FK 경로가 찾은 큐브 중심</strong> 사이의 3D 거리 RMSE입니다.</p>
+            <p class="definition-formula"><code>√mean(‖t_fixed-avg − t_robot-FK+eih‖²)</code></p>
+            <p class="definition-note">현재 공통 mask가 지원하는 3개 event unit(sets 5·9·11) 기준의 <code>e_e2e</code> 병진값입니다. FK 경로가 들어가지만 FK를 정답으로 둔 오차가 아니며, 외부 GT가 없으므로 <strong>두 경로 사이의 내부 폐쇄 불일치</strong>로만 해석해야 합니다.</p>
+          </article>
+        </div>
+        <div class="full-data-note">
+          <span class="warning-mark" aria-hidden="true">!</span>
+          <div><strong>교수님 피드백 반영:</strong> 재투영 오차의 예측깊이 기반 mm 환산은 삭제하고 raw distorted-pixel RMSE만 남겼습니다. 모든 방법에 같은 338 corners를 적용한 공통-pose 평가와 함께, 카메라 A의 측정-only PnP cube pose를 카메라 B에 넘겨 실제 B 코너와 비교하는 9쌍·18방향 pixel-transfer를 공통 1차 지표로 계산합니다.</div>
+        </div>
+        <details class="metric-glossary">
+          <summary>교수님 피드백별 코드·데이터 답변</summary>
+          <div class="metric-glossary-content">
+            <p><strong>명칭:</strong> <code>e_cross</code>는 통상적인 고정카메라 간 큐브 위치 일관성입니다. 각 카메라의 PnP 큐브 pose를 base로 옮긴 뒤 모든 카메라 쌍의 큐브 중심 거리를 RMSE 집계합니다. FK·손목카메라·외부 GT는 쓰지 않습니다.</p>
+            <p><strong>공통 기준:</strong> 공통-pose 평가는 cam0·1·3, events 29·53·65, 18 observations/338 corners를 모든 8개 실행 방법에 동일하게 적용합니다. Pixel-transfer와 path 평가는 같은 held-out cube 관측에서 9 fixed-camera pairs/18 directions/3 fixed↔gripper units를 모든 방법에 적용하므로 A0/B3 값은 evaluation-only이며 학습에 큐브를 썼다는 뜻이 아닙니다.</p>
+            <p><strong>baseline 두 종류:</strong> 알고리즘 구성요소 비교인 A0–B3는 held-out을 제외한 동일 train-only reference state에서 시작하고 선언된 marker/FK/freeze treatment만 적용합니다. 따라서 −board/−cube는 목적함수에서의 제거를 뜻합니다. 마커 시스템 비교는 별도 end-to-end 표에서 각 modality로 초기화부터 다시 수행합니다. 두 실험 모두 split·K/D·raw 검출·solver·seed·공통 평가는 같습니다.</p>
+            <p><strong>Step3 동일성:</strong> Step3는 별도 최종 solver를 갖지 않고 Table 1 runner의 baseline-only 모드를 호출합니다. A3도 다른 통합 행과 같은 canonical corner solver를 직접 사용하며, FK cube pose만 freeze mask로 고정합니다.</p>
+            <p><strong>통합식:</strong> 카메라별 <code>K,D</code>는 상수로 고정하고 모든 카메라의 raw-corner pixel 잔차를 하나의 벡터로 쌓아 카메라·손목·공유 target pose를 동시에 최적화합니다. 별도 <code>e_cross</code> loss를 더하는 방식이 아니라 공유 target pose가 카메라 간 피드백을 만듭니다.</p>
+            <p><strong>아웃라이어:</strong> 본표 BA는 homography/RANSAC으로 corner를 삭제하지 않고 <code>soft_l1</code>, <code>f_scale=2 px</code>를 사용합니다. ChArUco 최소 4 corners, fixed cube 최소 8 corners, 손목 cube aspect gate가 frontend 고정 mask를 만듭니다. PnP RANSAC은 cube pose 초기화 경로에만 사용됩니다.</p>
+            <p><strong>A5:</strong> train-only 6-DoF correction과 독립 label이 없어 실행하지 않았습니다. A4/B1/B2도 실측 covariance 대신 2 mm/0.3° Simulation prior를 쓴 preflight입니다.</p>
+          </div>
+        </details>
+        <article class="selected-metric-guide" aria-live="polite">
+          <span class="metric-guide-kicker">현재 선택 지표</span>
+          <h3 id="selectedMetricGuideTitle">—</h3>
+          <p id="selectedMetricGuideMeaning">—</p>
+          <div class="metric-guide-meta" id="selectedMetricGuideMeta"></div>
+        </article>
+        <details class="metric-glossary">
+          <summary>전체 평가지표 설명 펼쳐보기</summary>
+          <div class="metric-glossary-content" id="metricGlossary"></div>
+        </details>
+      </section>
+
+      <section class="heldout-metrics-panel panel" aria-labelledby="heldoutMetricsTitle">
+        <div class="section-heading">
+          <h2 id="heldoutMetricsTitle">Held-out 평가 지표</h2>
+          <p id="heldoutMetricsSortNote">선택 지표 기준 오름차순</p>
+        </div>
+        <div class="dataset-summary" aria-label="Held-out 평가 조건">
+          <span>학습 40 / held-out 8</span>
+          <span>분할 seed 20260731</span>
+          <span>test-time refit 없음</span>
+          <span>표준 평가 + 양방향 픽셀 전이</span>
+          <span>동결된 기존 calibration</span>
+          <span>고정카메라 cam0·1·3 공통</span>
+          <span>전체 held-out 29·38·46·50·53·61·65·75</span>
+          <span>공통 fixed-camera 평가 29·53·65</span>
+        </div>
+        <div class="full-data-note">
+          <span class="warning-mark" aria-hidden="true">✓</span>
+          <div><strong>Held-out 평가 범위.</strong> 자체 Held-out은 8개 events에서 각 방법의 own pose를 사용합니다. 공통 표적 평가는 그중 fixed-camera 동시 관측이 있는 3개 events에서 동일한 train-only target pose를 사용합니다. 대표 지표는 공유 pose 없이 카메라 A의 측정-only PnP를 B로 옮기는 9쌍·18방향 pixel-transfer이며, 모든 방법에 같은 cube 관측을 적용합니다.</div>
+        </div>
+        <div class="table-scroll" id="heldoutMetricsMatrix"></div>
+        <p class="matrix-legend">주황색 열은 왼쪽 “평가 지표별 보기”에서 고른 정렬 기준입니다. —는 해당 방법의 구성에서 정의되지 않은 값입니다.</p>
+        <p class="full-data-links">
+          <span>검증 산출물:</span>
+          <a href="CP_result/session02/cross_target_evaluation/cross_target_evaluation.csv">CSV</a>
+          <a href="CP_result/session02/cross_target_evaluation/cross_target_evaluation.json">평가 계약 JSON</a>
+        </p>
+      </section>
+
+      <section class="chart-panel panel" id="chartPanel" aria-labelledby="chartTitle">
+        <div class="section-heading">
+          <h2 id="chartTitle">Figure 1 · 선택 지표 비교</h2>
+          <p>점=방법 · 주황색=현재 최상</p>
+        </div>
+        <div class="paper-figure-grid">
+          <figure class="figure-panel">
+            <figcaption><strong>(a)</strong> 방법별 절대값</figcaption>
+            <div class="paper-plot" id="methodPlot"></div>
+          </figure>
+          <figure class="figure-panel">
+            <figcaption><strong>(b)</strong> 공정 비교쌍 변화량</figcaption>
+            <div class="paper-plot" id="pairDeltaPlot"></div>
+          </figure>
+        </div>
+        <p class="figure-caption" id="figureCaption"></p>
+      </section>
+
+      <section class="cards-panel panel" id="cardsPanel" aria-labelledby="cardsTitle" hidden>
+        <div class="section-heading">
+          <h2 id="cardsTitle">방법별 카드 비교</h2>
+          <p>정렬 순서대로 핵심 조건과 값을 표시</p>
+        </div>
+        <div class="method-cards" id="methodCards"></div>
+        <div class="empty-state" id="cardsEmpty" hidden>현재 필터와 일치하는 방법이 없습니다.</div>
+      </section>
+
+      <section class="interpretation panel" aria-labelledby="interpretationTitle" aria-live="polite">
+        <div class="section-heading interpretation-heading">
+          <div>
+            <p class="interpretation-kicker">보기 연동 해석</p>
+            <h2 id="interpretationTitle">실험별 증거 흐름 · 무엇이 확인됐나</h2>
+          </div>
+          <p id="interpretationContext">현재 필터와 지표 기준</p>
+        </div>
+        <div class="evidence-flow" id="evidenceFlow"></div>
+        <div class="interpretation-summary">
+          <h3>현재 보기 결과 해석</h3>
+          <ul id="interpretationList"></ul>
+        </div>
+      </section>
+
+      <footer class="source-footer">
+        <span>수치 기준: 2026-08-19 baseline 계약·end-to-end 마커 비교 반영 · 분할 seed 20260731 · 소수점 4자리 · CSV 동기화 검사</span>
+        <span>
+          <a href="CP_result/session02/late_table1/TABLE1_RESULTS.md">해석 보고서</a> ·
+          <a href="CP_result/session02/late_table1/table1_results.csv">Held-out CSV</a> ·
+          <a href="CP_result/session02/cross_target_evaluation/cross_target_evaluation.csv">교차 표적 CSV</a> ·
+          <a href="CP_result/session02/marker_system_end_to_end/marker_system_end_to_end.csv">마커 시스템 CSV</a>
+        </span>
+      </footer>
+    </div>
+  </main>
+
+  <script>
+    "use strict";
+
+    const methods = [
+      {
+        id: "A0", name: "보드만 순차 보정", target: "보드", solver: "순차", fk: "no-FK(vision)",
+        contributions: ["C2"], runs: "3/3", nReg: 3,
+        trainOverallPx: 3.5745, trainBoardPx: 3.5745, trainCubePx: null,
+        testOverallPx: 2.4829, testBoardPx: 2.4829, testCubePx: null,
+        crossViewPx: 11.3422,
+        crossOverallPx: 1.8082, crossBoardPx: 1.8970, crossCubePx: 1.6029,
+        crossT: 14.0135, crossR: 1.1060, e2eT: 4.9059, e2eR: 1.2229
+      },
+      {
+        id: "A1", name: "큐브+보드 순차 보정", target: "큐브+보드", solver: "순차", fk: "no-FK(vision)",
+        contributions: ["C1", "C2"], runs: "3/3", nReg: 3,
+        trainOverallPx: 3.3980, trainBoardPx: 3.5657, trainCubePx: 2.7210,
+        testOverallPx: 3.1267, testBoardPx: 2.5103, testCubePx: 4.5317,
+        crossViewPx: 10.9179,
+        crossOverallPx: 1.9587, crossBoardPx: 1.8856, crossCubePx: 2.1058,
+        crossT: 13.7546, crossR: 1.2193, e2eT: 4.2459, e2eR: 1.0239
+      },
+      {
+        id: "A2", name: "no-FK(vision) 통합 보정", target: "큐브+보드", solver: "U-BA", fk: "no-FK(vision)",
+        contributions: ["C1", "C2", "C3"], runs: "3/3", nReg: 3,
+        trainOverallPx: 3.3981, trainBoardPx: 3.5699, trainCubePx: 2.7020,
+        testOverallPx: 3.1155, testBoardPx: 2.5038, testCubePx: 4.5113,
+        crossViewPx: 10.5265,
+        crossOverallPx: 1.9108, crossBoardPx: 1.8851, crossCubePx: 1.9645,
+        crossT: 13.1259, crossR: 1.1910, e2eT: 4.0685, e2eR: 1.0385
+      },
+      {
+        id: "A3", name: "FK-fixed 통합 보정", target: "큐브+보드", solver: "U-BA", fk: "FK-fixed",
+        contributions: ["C3"], runs: "3/3", nReg: 3,
+        trainOverallPx: 3.6477, trainBoardPx: 3.6063, trainCubePx: 3.7911,
+        testOverallPx: 2.4996, testBoardPx: 2.4951, testCubePx: 2.5136,
+        crossViewPx: 9.0609,
+        crossOverallPx: 1.7093, crossBoardPx: 1.8537, crossCubePx: 1.3514,
+        crossT: 10.8317, crossR: 1.0601, e2eT: 4.7905, e2eR: 1.1893
+      },
+      {
+        id: "A4", name: "corrected-FK 통합 보정 · Ours-core", target: "큐브+보드", solver: "U-BA", fk: "corrected-FK",
+        contributions: ["C1", "C2", "C3"], runs: "3/3", nReg: 3,
+        trainOverallPx: 3.3973, trainBoardPx: 3.5703, trainCubePx: 2.6958,
+        testOverallPx: 3.0959, testBoardPx: 2.5038, testCubePx: 4.4556,
+        crossViewPx: 10.4774,
+        crossOverallPx: 1.9052, crossBoardPx: 1.8835, crossCubePx: 1.9505,
+        crossT: 13.0413, crossR: 1.1899, e2eT: 4.0330, e2eR: 1.0313
+      },
+      {
+        id: "B1", name: "강건 독립 보정", target: "큐브+보드", solver: "독립", fk: "corrected-FK",
+        contributions: ["C1"], runs: "3/3", nReg: 3,
+        trainOverallPx: 3.3967, trainBoardPx: 3.5661, trainCubePx: 2.7115,
+        testOverallPx: 3.1057, testBoardPx: 2.5100, testCubePx: 4.4724,
+        crossViewPx: 10.8253,
+        crossOverallPx: 1.9470, crossBoardPx: 1.8837, crossCubePx: 2.0753,
+        crossT: 13.6109, crossR: 1.2157, e2eT: 4.1987, e2eR: 1.0184
+      },
+      {
+        id: "B2", name: "큐브만 통합 보정", target: "큐브", solver: "U-BA", fk: "corrected-FK",
+        contributions: ["C2"], runs: "3/3", nReg: 3,
+        trainOverallPx: 2.6293, trainBoardPx: null, trainCubePx: 2.6293,
+        testOverallPx: 4.4759, testBoardPx: null, testCubePx: 4.4759,
+        crossViewPx: 9.2952,
+        crossOverallPx: 2.5281, crossBoardPx: 2.3287, crossCubePx: 2.9075,
+        crossT: 11.9161, crossR: 1.2866, e2eT: 3.8215, e2eR: 0.9311
+      },
+      {
+        id: "B3", name: "보드만 통합 보정", target: "보드", solver: "U-BA", fk: "no-FK(vision)",
+        contributions: ["C2"], runs: "3/3", nReg: 3,
+        trainOverallPx: 3.5745, trainBoardPx: 3.5745, trainCubePx: null,
+        testOverallPx: 2.4829, testBoardPx: 2.4829, testCubePx: null,
+        crossViewPx: 11.3398,
+        crossOverallPx: 1.8082, crossBoardPx: 1.8970, crossCubePx: 1.6030,
+        crossT: 14.0102, crossR: 1.1062, e2eT: 4.9051, e2eR: 1.2225
+      }
+    ];
+
+    const markerSystems = [
+      { system: "board_only", convergedRuns: 3, totalRuns: 3, nReg: 3, ownHeldoutPx: 2.482875923093791, commonOverallPx: 1.8083093504756225, commonBoardPx: 1.8969904943969558, commonCubePx: 1.6031863385851721, crossViewPx: 11.339696819648827, crossT: 14.010033996807584, crossR: 1.1061595055838025, e2eT: 4.904406494301374, e2eR: 1.2221977631154617 },
+      { system: "cube_only", convergedRuns: 3, totalRuns: 3, nReg: 3, ownHeldoutPx: 4.534649345616171, commonOverallPx: 2.5710466237744467, commonBoardPx: 2.3582644345569506, commonCubePx: 2.973883742279512, crossViewPx: 9.446207914085809, crossT: 12.146333519222877, crossR: 1.2720552868320663, e2eT: 3.9187705842893954, e2eR: 0.9426658528329638 },
+      { system: "board_cube", convergedRuns: 3, totalRuns: 3, nReg: 3, ownHeldoutPx: 3.1155489934221454, commonOverallPx: 1.9107982389305285, commonBoardPx: 1.885068535812252, commonCubePx: 1.9644702661585267, crossViewPx: 10.526490710779852, crossT: 13.1258921298247, crossR: 1.191049532131727, e2eT: 4.068494174164396, e2eR: 1.0384592423668881 }
+    ];
+
+    const metricDefinitions = {
+      testOverallPx: { label: "Test 전체 재투영", unit: "px", direction: "low", family: "heldout", meaning: "동결된 변환이 홀드아웃 2D 코너를 얼마나 잘 설명하는지 보여줍니다. 낮을수록 좋지만 절대 3D 정확도는 아닙니다." },
+      testBoardPx: { label: "Test 보드 재투영", unit: "px", direction: "low", family: "heldout", meaning: "홀드아웃 보드 코너의 2D 적합도입니다. 보드를 사용하지 않는 B2에는 정의되지 않습니다." },
+      testCubePx: { label: "Test 큐브 재투영", unit: "px", direction: "low", family: "heldout", meaning: "홀드아웃 큐브 코너의 2D 적합도입니다. 큐브를 사용하지 않는 A0·B3에는 정의되지 않습니다." },
+      crossViewPx: { label: "카메라 간 양방향 픽셀 전이", shortLabel: "픽셀 전이", unit: "px", direction: "low", family: "crossView", meaning: "카메라 A의 held-out 큐브 코너만으로 PnP한 cube pose를 보정된 A↔B 카메라 관계로 B에 옮겨 B의 실제 코너에 투영하고, A→B와 B→A를 모두 pooling한 RMSE입니다. FK·손목카메라·공유 target pose·외부 GT를 사용하지 않습니다." },
+      crossOverallPx: { label: "교차 표적 전체 재투영", shortLabel: "공통 전체", unit: "px", direction: "low", family: "crossTarget", meaning: "모든 방법을 동일한 train-only 공유 board/cube pose와 공통 held-out 고정카메라 코너에서 평가한 재투영 RMSE입니다. 보조 target pose는 동결되고 test-time refit은 없습니다." },
+      crossBoardPx: { label: "교차 표적 보드 재투영", shortLabel: "공통 보드", unit: "px", direction: "low", family: "crossTarget", meaning: "큐브만 방법을 포함해 모든 방법의 동결된 카메라 변환을 동일한 train-only 공유 board pose와 held-out board 코너로 평가합니다." },
+      crossCubePx: { label: "교차 표적 큐브 재투영", shortLabel: "공통 큐브", unit: "px", direction: "low", family: "crossTarget", meaning: "보드만 방법을 포함해 모든 방법의 동결된 카메라 변환을 동일한 train-only board-free FK cube pose와 held-out cube 코너로 평가합니다." },
+      crossT: { label: "고정카메라 간 큐브 위치 일관성", unit: "mm", direction: "low", family: "path", meaning: "각 고정카메라의 큐브 PnP pose를 base 좌표계로 옮긴 뒤 같은 event의 모든 카메라 쌍에서 큐브 중심 거리를 구해 RMSE한 표준 pose-consistency 지표입니다. FK·손목카메라·외부 GT는 사용하지 않습니다." },
+      crossR: { label: "e_cross 회전", unit: "deg", direction: "low", family: "path", meaning: "고정 카메라들이 같은 큐브에 대해 예측한 회전의 불일치입니다. 내부 정합 지표이며 외부 정확도가 아닙니다." },
+      e2eT: { label: "고정↔손목+FK 경로 불일치", shortLabel: "경로 불일치", unit: "mm", direction: "low", family: "cubePositionProxy", meaning: "동일 held-out event에서 고정 카메라 묶음과 손목카메라+로봇 FK 경로가 각각 찾은 큐브 중심 사이의 3D 거리 RMSE(e_e2e 병진)입니다. FK가 경로에 포함되지만 FK를 정답으로 둔 오차가 아니며 외부 GT 정확도도 아닙니다." },
+      e2eR: { label: "e_e2e 회전", unit: "deg", direction: "low", family: "path", meaning: "고정 카메라 경로와 손목 카메라+FK 경로 사이의 회전 불일치입니다. 내부 폐쇄오차 지표입니다." },
+      trainOverallPx: { label: "Train 전체 재투영", unit: "px", direction: "low", family: "train", meaning: "최적화에 사용한 학습 데이터의 적합 진단입니다. 방법의 일반화 성능이나 최종 순위를 정하는 지표로 사용하면 안 됩니다." },
+      trainBoardPx: { label: "Train 보드 재투영", unit: "px", direction: "low", family: "train", meaning: "학습 보드 코너 적합 진단입니다. B2에는 보드 관측이 없어 정의되지 않습니다." },
+      trainCubePx: { label: "Train 큐브 재투영", unit: "px", direction: "low", family: "train", meaning: "학습 큐브 코너 적합 진단입니다. A0·B3에는 큐브 관측이 없어 정의되지 않습니다." },
+      nReg: { label: "등록 고정 카메라 수", unit: "대", direction: "high", family: "registration", meaning: "평가 가능한 고정 카메라의 수입니다. 높을수록 좋지만 이번 실행에서는 모든 실행 행이 3대로 같아 방법을 구분하지 못합니다." }
+    };
+
+    const heldoutDisplayGroups = [
+      { label: "대표 종합", columns: [{ key: "crossViewPx", label: "카메라 간 픽셀 전이" }] },
+      {
+        label: "교차 표적 · 공통 pose",
+        columns: [
+          { key: "crossOverallPx", label: "공통 전체" },
+          { key: "crossBoardPx", label: "공통 보드" },
+          { key: "crossCubePx", label: "공통 큐브" }
+        ]
+      },
+      {
+        label: "자체 Held-out · 표적별",
+        columns: [
+          { key: "testBoardPx", label: "보드" },
+          { key: "testCubePx", label: "큐브" }
+        ]
+      },
+      {
+        label: "3D 경로 일관성",
+        columns: [
+          { key: "crossT", label: "고정카메라 간 큐브 위치 일관성" },
+          { key: "e2eT", label: "고정↔손목+FK 경로 불일치" }
+        ]
+      }
+    ];
+
+    const selectableMetricKeys = new Set(heldoutDisplayGroups.flatMap((group) => group.columns.map((column) => column.key)));
+
+    const configurationAxes = {
+      target: [
+        { label: "보드만", ids: ["A0", "B3"] },
+        { label: "큐브만", ids: ["B2"] },
+        { label: "큐브+보드", ids: ["A1", "A2", "A3", "A4", "B1"] }
+      ],
+      solver: [
+        { label: "순차·독립", ids: ["A0", "A1", "B1"] },
+        { label: "통합", ids: ["A2", "A3", "A4", "B2", "B3"] }
+      ],
+      fk: [
+        { label: "no-FK(vision)", ids: ["A0", "A1", "A2", "B3"] },
+        { label: "FK-fixed", ids: ["A3"] },
+        { label: "corrected-FK", ids: ["A4", "B1", "B2"] }
+      ]
+    };
+
+    const contributionDefinitions = {
+      all: {
+        title: "전체 Table 1",
+        interpretation: "전체 보기는 서로 다른 표적 부분집합과 FK 조건을 함께 포함합니다. 순위만 보지 말고 반드시 같은 정보량의 짝 비교를 확인해야 합니다.",
+        pairs: [["A2", "A3"], ["A2", "A4"]]
+      },
+      C1: {
+        title: "C1 · 순차·독립 vs 통합",
+        interpretation: "핵심은 순차→통합(A1→A2)과 독립→통합(B1→A4)입니다. B1과 A4는 같은 corrected-FK 정보량을 사용합니다.",
+        pairs: [["A1", "A2"], ["B1", "A4"]]
+      },
+      C2: {
+        title: "C2 · 마커 종류",
+        interpretation: "A0→A1, B3→A2, B2→A4는 동일 all-marker 초기값에서 목적함수의 마커 기여만 보는 최적화 단계 절제입니다. 실제 board-only / cube-only / board+cube 시스템 비교는 별도 end-to-end 표를 사용합니다.",
+        pairs: [["A0", "A1"], ["B3", "A2"], ["B2", "A4"]]
+      },
+      C3: {
+        title: "C3 · FK 사용",
+        interpretation: "A2(no-FK(vision)), A3(FK-fixed), A4(corrected-FK)의 FK 사용 방식을 비교합니다.",
+        pairs: [["A2", "A3"], ["A2", "A4"]]
+      }
+    };
+
+    const evidenceDefinitions = {
+      all: [
+        { from: "A1", to: "A2", tone: "partial", verdict: "부분 확인", claim: "순차 보정 대비 통합 최적화의 내부 지표 이득은 매우 작습니다." },
+        { from: "A2", to: "A3", tone: "partial", verdict: "혼합 결과", claim: "FK-fixed는 재투영·고정카메라 간 큐브 pose 일관성을 개선했지만 고정↔손목+FK 경로 불일치는 악화했습니다." },
+        { from: "A2", to: "A4", tone: "partial", verdict: "부분 확인", claim: "corrected-FK는 A2 대비 내부 지표가 소폭 개선됐습니다." }
+      ],
+      C1: [
+        { from: "A1", to: "A2", tone: "partial", verdict: "부분 확인", claim: "같은 no-FK(vision) 조건에서 통합 최적화의 내부 재투영 이득은 0.0113 px로 작습니다." },
+        { from: "B1", to: "A4", tone: "partial", verdict: "부분 확인", claim: "같은 corrected-FK 정보량에서 독립→통합의 내부 지표 이득은 작습니다." }
+      ],
+      C2: [
+        { from: "A0", to: "A1", fairMetric: "testBoardPx", tone: "unsupported", verdict: "최적화 단계 혼합", claim: "공통 초기값에서 cube residual을 추가하면 own-pose 보드는 0.0274 px 악화하지만 공통 e_cross/e_e2e 병진은 0.2590/0.6599 mm 개선합니다. End-to-end 시스템 효과로 해석하지 않습니다." },
+        { from: "B3", to: "A2", fairMetric: "testBoardPx", tone: "partial", verdict: "최적화 단계 혼합", claim: "공통 초기값에서 cube residual을 추가하면 own-pose 보드는 0.0209 px 악화하지만 공통 e_cross/e_e2e 병진은 0.8824/0.8351 mm 개선합니다. End-to-end 시스템 효과로 해석하지 않습니다." },
+        { from: "B2", to: "A4", fairMetric: "testCubePx", tone: "partial", verdict: "최적화 단계 혼합", claim: "공통 초기값에서 board residual을 추가하면 큐브 재투영은 0.0203 px 개선되지만 경로 위치 일관성은 악화합니다. End-to-end 시스템 효과로 해석하지 않습니다." }
+      ],
+      C3: [
+        { from: "A2", to: "A3", tone: "partial", verdict: "혼합 결과", claim: "FK-fixed는 재투영과 e_cross를 개선했지만 e_e2e 병진은 0.7211 mm 악화했습니다." },
+        { from: "A2", to: "A4", tone: "partial", verdict: "부분 확인", claim: "corrected-FK의 내부 지표 개선은 작습니다." },
+        { from: "A3", to: "A4", tone: "unsupported", verdict: "우위 미확인", claim: "현재 내부 재투영에서는 corrected-FK가 FK-fixed보다 우수하다는 근거가 나오지 않았습니다." }
+      ]
+    };
+
+    const state = {
+      contribution: "all",
+      metric: "crossViewPx",
+      sort: "asc",
+      view: "summary",
+      query: ""
+    };
+
+    const elements = {
+      contributionButtons: document.getElementById("contributionButtons"),
+      metricSelect: document.getElementById("metricSelect"),
+      sortButtons: document.getElementById("sortButtons"),
+      viewButtons: document.getElementById("viewButtons"),
+      searchInput: document.getElementById("searchInput"),
+      resetButton: document.getElementById("resetButton"),
+      currentViewTitle: document.getElementById("currentViewTitle"),
+      currentMetricTitle: document.getElementById("currentMetricTitle"),
+      resultCount: document.getElementById("resultCount"),
+      bestValue: document.getElementById("bestValue"),
+      bestDetail: document.getElementById("bestDetail"),
+      bestConfig: document.getElementById("bestConfig"),
+      firstValue: document.getElementById("firstValue"),
+      firstDetail: document.getElementById("firstDetail"),
+      availabilityValue: document.getElementById("availabilityValue"),
+      availabilityDetail: document.getElementById("availabilityDetail"),
+      selectedMetricGuideTitle: document.getElementById("selectedMetricGuideTitle"),
+      selectedMetricGuideMeaning: document.getElementById("selectedMetricGuideMeaning"),
+      selectedMetricGuideMeta: document.getElementById("selectedMetricGuideMeta"),
+      metricGlossary: document.getElementById("metricGlossary"),
+      targetClassification: document.getElementById("targetClassification"),
+      solverClassification: document.getElementById("solverClassification"),
+      fkClassification: document.getElementById("fkClassification"),
+      experimentConfigBody: document.getElementById("experimentConfigBody"),
+      interpretationContext: document.getElementById("interpretationContext"),
+      interpretationList: document.getElementById("interpretationList"),
+      evidenceFlow: document.getElementById("evidenceFlow"),
+      methodPlot: document.getElementById("methodPlot"),
+      pairDeltaPlot: document.getElementById("pairDeltaPlot"),
+      figureCaption: document.getElementById("figureCaption"),
+      conclusionPanel: document.getElementById("conclusionPanel"),
+      chartPanel: document.getElementById("chartPanel"),
+      cardsPanel: document.getElementById("cardsPanel"),
+      heldoutMetricsMatrix: document.getElementById("heldoutMetricsMatrix"),
+      heldoutMetricsSortNote: document.getElementById("heldoutMetricsSortNote"),
+      markerSystemBody: document.getElementById("markerSystemBody"),
+      methodCards: document.getElementById("methodCards"),
+      cardsEmpty: document.getElementById("cardsEmpty")
+    };
+
+    function isNumber(value) {
+      return typeof value === "number" && Number.isFinite(value);
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function formatValue(value, metric) {
+      if (!isNumber(value)) return "—";
+      if (metric.unit === "대") return `${value.toFixed(0)}대`;
+      return `${value.toFixed(4)} ${metric.unit}`;
+    }
+
+    function signed(value, unit) {
+      const prefix = value > 0 ? "+" : value < 0 ? "−" : "±";
+      return `${prefix}${Math.abs(value).toFixed(4)} ${unit}`;
+    }
+
+    function setPressed(container, dataName, value) {
+      container.querySelectorAll("button").forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset[dataName] === value));
+      });
+    }
+
+    function readStateFromUrl() {
+      const params = new URLSearchParams(window.location.search);
+      const contribution = params.get("c");
+      const metric = params.get("m");
+      const sort = params.get("s");
+      const view = params.get("v");
+      if (contributionDefinitions[contribution]) state.contribution = contribution;
+      if (metricDefinitions[metric] && selectableMetricKeys.has(metric)) state.metric = metric;
+      if (["asc", "desc"].includes(sort)) state.sort = sort;
+      if (["summary", "rank", "cards", "all"].includes(view)) state.view = view;
+      state.query = params.get("q") || "";
+    }
+
+    function writeStateToUrl() {
+      const params = new URLSearchParams();
+      if (state.contribution !== "all") params.set("c", state.contribution);
+      if (state.metric !== "crossViewPx") params.set("m", state.metric);
+      if (state.sort !== "asc") params.set("s", state.sort);
+      if (state.view !== "summary") params.set("v", state.view);
+      if (state.query) params.set("q", state.query);
+      const query = params.toString();
+      const next = `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`;
+      try {
+        window.history.replaceState(null, "", next);
+      } catch (_error) {
+        // 일부 브라우저의 file:// 보안 정책에서는 주소 상태 저장이 제한됩니다.
+        // 필터와 정렬 자체는 URL 갱신 없이도 그대로 동작합니다.
+      }
+    }
+
+    function filteredMethods() {
+      const query = state.query.trim().toLocaleLowerCase("ko");
+      return methods.filter((method) => {
+        if (state.contribution !== "all" && !method.contributions.includes(state.contribution)) return false;
+        if (!query) return true;
+        const haystack = [method.id, method.name, method.target, method.solver, method.fk, ...method.contributions].join(" ").toLocaleLowerCase("ko");
+        return haystack.includes(query);
+      });
+    }
+
+    function sortMethods(items, metricKey) {
+      return [...items].sort((a, b) => {
+        const av = a[metricKey];
+        const bv = b[metricKey];
+        if (!isNumber(av) && !isNumber(bv)) return a.id.localeCompare(b.id);
+        if (!isNumber(av)) return 1;
+        if (!isNumber(bv)) return -1;
+        const result = av - bv;
+        return state.sort === "asc" ? result : -result;
+      });
+    }
+
+    function performanceBest(items, metricKey, metric) {
+      const available = items.filter((item) => isNumber(item[metricKey]));
+      if (!available.length) return null;
+      return available.reduce((best, current) => {
+        if (metric.direction === "low") return current[metricKey] < best[metricKey] ? current : best;
+        return current[metricKey] > best[metricKey] ? current : best;
+      });
+    }
+
+    function contributionTags(method) {
+      return method.contributions.map((item) => `<span class="tag">${item}</span>`).join("");
+    }
+
+    function contribution1Label(method) {
+      return method.solver === "U-BA" ? "통합" : "독립";
+    }
+
+    function methodContributionSummary(method) {
+      return `(기여도1: ${contribution1Label(method)} / 기여도2: ${method.target} / 기여도3: ${method.fk})`;
+    }
+
+    function methodIdentity(method) {
+      return `<span class="method-id">${escapeHtml(method.id)}</span><span class="method-config-line">${escapeHtml(methodContributionSummary(method))}</span>`;
+    }
+
+    function displayColumnForKey(groups, key) {
+      return groups.flatMap((group) => group.columns).find((column) => column.key === key) || null;
+    }
+
+    function displayGlossaryScope(title, groups, definitions, selectedKey) {
+      const groupMarkup = groups.map((group) => {
+        const items = group.columns.map((column) => {
+          const definition = definitions[column.key];
+          const selected = column.key === selectedKey ? " selected" : "";
+          return `<div class="glossary-item${selected}"><dt>${escapeHtml(column.label)} <span>(${escapeHtml(definition.unit)})</span></dt><dd>${escapeHtml(definition.meaning)}</dd></div>`;
+        }).join("");
+        return `<section class="glossary-group"><h4>${escapeHtml(group.label)}</h4><dl class="glossary-list">${items}</dl></section>`;
+      }).join("");
+      return `<section class="glossary-scope"><h3>${escapeHtml(title)}</h3>${groupMarkup}</section>`;
+    }
+
+    function renderMetricGuide(metricKey) {
+      const metric = metricDefinitions[metricKey];
+      const familyLabels = {
+        heldout: "표준 Held-out",
+        crossView: "카메라 간 상대 픽셀",
+        crossTarget: "교차 표적 Held-out",
+        cubePositionProxy: "고정↔손목+FK 경로 불일치",
+        path: "내부 경로 일관성",
+        registration: "등록 지원량"
+      };
+
+      const displayUnit = metric.unit;
+      elements.selectedMetricGuideTitle.textContent = `${metric.label} (${displayUnit})`;
+      elements.selectedMetricGuideMeaning.textContent = metric.meaning;
+      elements.selectedMetricGuideMeta.innerHTML = [
+        `단위 ${displayUnit}`,
+        metric.direction === "low" ? "낮을수록 좋음" : "높을수록 좋음",
+        familyLabels[metric.family] || "평가 지표"
+      ].map((label) => `<span>${escapeHtml(label)}</span>`).join("");
+      elements.metricGlossary.innerHTML =
+        displayGlossaryScope("주요 Held-out 기준", heldoutDisplayGroups, metricDefinitions, metricKey);
+    }
+
+    function renderConfigurationAxis(container, groups, visibleIds) {
+      const content = groups.map((group) => {
+        const ids = group.ids.filter((id) => visibleIds.has(id));
+        if (!ids.length) return "";
+        const chips = ids.map((id) => `<span class="config-method-chip">${escapeHtml(id)}</span>`).join("");
+        return `<div class="config-group"><div class="config-group-label">${escapeHtml(group.label)}</div><div class="config-methods">${chips}</div></div>`;
+      }).join("");
+      container.innerHTML = content || `<span class="config-none">현재 필터에 해당 방법이 없습니다.</span>`;
+    }
+
+    function renderExperimentConfig(items) {
+      const visibleIds = new Set(items.map((method) => method.id));
+      renderConfigurationAxis(elements.solverClassification, configurationAxes.solver, visibleIds);
+      renderConfigurationAxis(elements.targetClassification, configurationAxes.target, visibleIds);
+      renderConfigurationAxis(elements.fkClassification, configurationAxes.fk, visibleIds);
+
+      elements.experimentConfigBody.innerHTML = items.map((method) => {
+        return `<tr>
+          <td>${methodIdentity(method)}</td>
+          <td>${escapeHtml(contribution1Label(method))}</td>
+          <td>${escapeHtml(method.target)}</td>
+          <td>${escapeHtml(method.fk)}</td>
+        </tr>`;
+      }).join("");
+    }
+
+    function denseRanks(sorted, metricKey) {
+      let rank = 0;
+      let lastValue = null;
+      return sorted.map((method) => {
+        const value = method[metricKey];
+        if (!isNumber(value)) return null;
+        if (lastValue === null || Math.abs(value - lastValue) > 1e-10) rank += 1;
+        lastValue = value;
+        return rank;
+      });
+    }
+
+    function contrastSentence(fromId, toId, metricKey, metric, visibleIds) {
+      if (!visibleIds.has(fromId) || !visibleIds.has(toId)) return null;
+      const from = methods.find((item) => item.id === fromId);
+      const to = methods.find((item) => item.id === toId);
+      if (!from || !to || !isNumber(from[metricKey]) || !isNumber(to[metricKey])) return null;
+      const delta = to[metricKey] - from[metricKey];
+      const improved = metric.direction === "low" ? delta < 0 : delta > 0;
+      const unchanged = Math.abs(delta) < 1e-10;
+      const verdict = unchanged ? "동일" : improved ? "개선" : "악화";
+      return `<strong>${fromId}→${toId}</strong> 변화량은 ${signed(delta, metric.unit)}로 ${verdict}입니다.`;
+    }
+
+    function evidenceMetricLine(item, metricKey, metric, visibleIds) {
+      if (!visibleIds.has(item.from) || !visibleIds.has(item.to)) {
+        return "현재 검색 필터에서 비교쌍 일부가 숨겨졌습니다.";
+      }
+      const from = methods.find((method) => method.id === item.from);
+      const to = methods.find((method) => method.id === item.to);
+      const useDeclaredFairMetric = Boolean(item.fairMetric) && metric.family !== "crossTarget";
+      const evidenceMetricKey = useDeclaredFairMetric ? item.fairMetric : metricKey;
+      const evidenceMetric = metricDefinitions[evidenceMetricKey] || metric;
+      if (!from || !to || !isNumber(from[evidenceMetricKey]) || !isNumber(to[evidenceMetricKey])) {
+        return `선택 지표(${evidenceMetric.label})는 한쪽 또는 양쪽 방법에 정의되지 않았습니다.`;
+      }
+      const delta = to[evidenceMetricKey] - from[evidenceMetricKey];
+      const improved = evidenceMetric.direction === "low" ? delta < 0 : delta > 0;
+      const unchanged = Math.abs(delta) < 1e-10;
+      const verdict = unchanged ? "동일" : improved ? "개선" : "악화";
+      const prefix = useDeclaredFairMetric && item.fairMetric !== metricKey ? "공정 대표 지표" : "선택 지표";
+      const suffix = useDeclaredFairMetric && item.fairMetric !== metricKey ? " · 표적 구성이 다른 선택 지표는 증명 판정에서 제외" : "";
+      return `${prefix}(${evidenceMetric.label}): ${formatValue(from[evidenceMetricKey], evidenceMetric)} → ${formatValue(to[evidenceMetricKey], evidenceMetric)} · ${signed(delta, evidenceMetric.unit)} (${verdict})${suffix}`;
+    }
+
+    function renderEvidenceFlow(items, metricKey, metric) {
+      const visibleIds = new Set(items.map((item) => item.id));
+      const rows = evidenceDefinitions[state.contribution] || [];
+      elements.evidenceFlow.innerHTML = rows.map((item) => {
+        const from = methods.find((method) => method.id === item.from);
+        const to = methods.find((method) => method.id === item.to);
+        return `
+          <article class="evidence-row">
+            <div class="evidence-method">
+              <span>비교 기준</span>
+              <strong>${escapeHtml(item.from)}</strong>
+              <small title="${escapeHtml(from?.name || "")}">${escapeHtml(from?.name || "방법 정보 없음")}</small>
+            </div>
+            <div class="evidence-arrow" aria-hidden="true">→</div>
+            <div class="evidence-method">
+              <span>적용 방법</span>
+              <strong>${escapeHtml(item.to)}</strong>
+              <small title="${escapeHtml(to?.name || "")}">${escapeHtml(to?.name || "방법 정보 없음")}</small>
+            </div>
+            <div class="evidence-proof ${escapeHtml(item.tone)}">
+              <span class="evidence-verdict">${escapeHtml(item.verdict)}</span>
+              <strong>${escapeHtml(item.claim)}</strong>
+              <small>${escapeHtml(evidenceMetricLine(item, metricKey, metric, visibleIds))}</small>
+            </div>
+          </article>`;
+      }).join("");
+      const viewLabel = state.view === "summary" ? "결론 요약" : state.view === "rank" ? "그래프" : state.view === "cards" ? "카드 비교" : "표만 보기";
+      elements.interpretationContext.textContent = `${contributionDefinitions[state.contribution].title} · ${metric.label} · ${viewLabel}`;
+    }
+
+    function renderInterpretation(items, sorted, metricKey, metric, best) {
+      const definition = contributionDefinitions[state.contribution];
+      const visibleIds = new Set(items.map((item) => item.id));
+      const available = items.filter((item) => isNumber(item[metricKey]));
+      const undefinedCount = items.length - available.length;
+      const points = [definition.interpretation, metric.meaning];
+
+      if (metric.direction === "low" && state.sort === "desc") {
+        points.push("<strong>내림차순 경고:</strong> 오차 지표를 큰 값부터 보고 있으므로 현재 첫 행은 최상 방법이 아니라 가장 큰 오차입니다.");
+      } else if (metric.direction === "low") {
+        points.push("오차 지표를 오름차순으로 보고 있어 현재 첫 행과 성능상 최상 방법이 일치합니다.");
+      } else if (state.sort === "asc") {
+        points.push("<strong>오름차순 경고:</strong> 등록 카메라 수는 높을수록 좋으므로 현재 첫 행은 성능상 최상이 아닐 수 있습니다.");
+      } else {
+        points.push("등록 카메라 수를 내림차순으로 보고 있어 높은 값이 먼저 표시됩니다.");
+      }
+
+      if (best) {
+        points.push(`현재 필터에서 성능상 최상은 <strong>${best.id}</strong> (${formatValue(best[metricKey], metric)})입니다. 이 표현은 선택 지표 안에서만 유효합니다.`);
+      }
+
+      definition.pairs.forEach((pair) => {
+        const sentence = contrastSentence(pair[0], pair[1], metricKey, metric, visibleIds);
+        if (sentence) points.push(sentence);
+      });
+
+      if (undefinedCount > 0) {
+        points.push(`${undefinedCount}개 방법은 구성상 선택 지표가 정의되지 않아 순위 계산에서 제외됩니다.`);
+      }
+
+      elements.interpretationList.innerHTML = points.map((point) => `<li>${point}</li>`).join("");
+    }
+
+    function chartWidth(element) {
+      return Math.max(280, Math.round(element.clientWidth || 520));
+    }
+
+    function paddedExtent(values, symmetric = false) {
+      const min = Math.min(...values);
+      const max = Math.max(...values);
+      if (symmetric) {
+        const bound = Math.max(Math.abs(min), Math.abs(max), 1e-9) * 1.18;
+        return [-bound, bound];
+      }
+      const spread = max - min;
+      const pad = spread > 1e-12 ? spread * 0.12 : Math.max(Math.abs(max) * 0.1, 0.5);
+      return [Math.max(0, min - pad), max + pad];
+    }
+
+    function linearTicks(min, max, count = 5) {
+      if (count <= 1 || Math.abs(max - min) < 1e-12) return [min];
+      return Array.from({ length: count }, (_, index) => min + (max - min) * index / (count - 1));
+    }
+
+    function chartNumber(value, span) {
+      const magnitude = Math.max(Math.abs(value), Math.abs(span));
+      if (magnitude >= 100) return value.toFixed(0);
+      if (magnitude >= 10) return value.toFixed(1);
+      return value.toFixed(2);
+    }
+
+    function renderMethodPlot(sorted, metricKey, metric, best) {
+      const available = sorted.filter((item) => isNumber(item[metricKey]));
+      const width = chartWidth(elements.methodPlot);
+      if (!available.length) {
+        elements.methodPlot.innerHTML = `<svg viewBox="0 0 ${width} 230" role="img" aria-label="선택 지표 결과 없음"><text class="empty-plot" x="${width / 2}" y="115">선택 지표의 가용 결과가 없습니다.</text></svg>`;
+        return;
+      }
+      const margin = { top: 42, right: 18, bottom: 66, left: 58 };
+      const height = 330;
+      const plotWidth = Math.max(100, width - margin.left - margin.right);
+      const plotHeight = height - margin.top - margin.bottom;
+      const [domainMin, domainMax] = paddedExtent(available.map((item) => item[metricKey]));
+      const span = domainMax - domainMin;
+      const scaleY = (value) => margin.top + (domainMax - value) / span * plotHeight;
+      const stepX = plotWidth / available.length;
+      const ticks = linearTicks(domainMin, domainMax, 5);
+      const direction = metric.direction === "low" ? "낮을수록 좋음 ↓" : "높을수록 좋음 ↑";
+      const grid = ticks.map((tick) => {
+        const y = scaleY(tick);
+        return `<line class="grid-line" x1="${margin.left}" y1="${y}" x2="${margin.left + plotWidth}" y2="${y}"/><text class="axis-tick" x="${margin.left - 8}" y="${y + 4}" text-anchor="end">${chartNumber(tick, span)}</text>`;
+      }).join("");
+      const columns = available.map((method, index) => {
+        const x = margin.left + stepX * (index + 0.5);
+        const y = scaleY(method[metricKey]);
+        const baselineY = margin.top + plotHeight;
+        const isBest = best?.id === method.id;
+        const dotClass = isBest ? "best-dot" : "complete-dot";
+        const valueY = y < margin.top + 18 ? y + 18 : y - 9;
+        return `<line class="lollipop-line" x1="${x}" y1="${baselineY}" x2="${x}" y2="${y}"/><circle class="${dotClass}" cx="${x}" cy="${y}" r="5.5"><title>${escapeHtml(method.id)} ${formatValue(method[metricKey], metric)}</title></circle><text class="value-label" x="${x}" y="${valueY}" text-anchor="middle">${chartNumber(method[metricKey], span)}</text><text class="row-label" x="${x}" y="${baselineY + 22}" text-anchor="middle">${escapeHtml(method.id)}</text>`;
+      }).join("");
+      elements.methodPlot.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="methodPlotTitle methodPlotDesc"><title id="methodPlotTitle">${escapeHtml(metric.label)} 방법별 절대값</title><desc id="methodPlotDesc">현재 필터의 방법을 가로축에 두고 선택 지표 절대값을 세로축으로 비교한 점-막대 그래프</desc><text class="axis-title" x="${margin.left}" y="17">${escapeHtml(metric.label)} (${escapeHtml(metric.unit)})</text><text class="axis-title" x="${margin.left + plotWidth}" y="17" text-anchor="end">${direction}</text><rect class="chart-frame" data-chart-frame x="${margin.left}" y="${margin.top}" width="${plotWidth}" height="${plotHeight}"/>${grid}${columns}<text class="axis-title" data-axis="x" x="${margin.left + plotWidth / 2}" y="${height - 8}" text-anchor="middle">방법</text></svg>`;
+    }
+
+    function renderPairDeltaPlot(items, metricKey, metric) {
+      const visibleIds = new Set(items.map((item) => item.id));
+      const pairRows = (evidenceDefinitions[state.contribution] || []).map((item) => {
+        const from = methods.find((method) => method.id === item.from);
+        const to = methods.find((method) => method.id === item.to);
+        const pairMetricKey = item.fairMetric && metric.family !== "crossTarget" ? item.fairMetric : metricKey;
+        const pairMetric = metricDefinitions[pairMetricKey] || metric;
+        if (!visibleIds.has(item.from) || !visibleIds.has(item.to) || !from || !to || !isNumber(from[pairMetricKey]) || !isNumber(to[pairMetricKey])) return null;
+        const rawDelta = to[pairMetricKey] - from[pairMetricKey];
+        const benefitDelta = pairMetric.direction === "low" ? -rawDelta : rawDelta;
+        return { ...item, pairMetric, rawDelta, benefitDelta };
+      }).filter(Boolean);
+      const width = chartWidth(elements.pairDeltaPlot);
+      if (!pairRows.length) {
+        elements.pairDeltaPlot.innerHTML = `<svg viewBox="0 0 ${width} 230" role="img" aria-label="공정 비교쌍 결과 없음"><rect class="chart-frame" data-chart-frame x="48" y="28" width="${Math.max(200, width - 78)}" height="150"/><text class="empty-plot" x="${width / 2}" y="104">계산 가능한 비교쌍이 없습니다.</text><text class="empty-plot" x="${width / 2}" y="124">현재 검색 필터와 지표 지원 범위를 확인하세요.</text></svg>`;
+        return;
+      }
+      const margin = { top: 42, right: 18, bottom: 66, left: 58 };
+      const height = 330;
+      const plotWidth = Math.max(100, width - margin.left - margin.right);
+      const plotHeight = height - margin.top - margin.bottom;
+      const [domainMin, domainMax] = paddedExtent(pairRows.map((row) => row.benefitDelta), true);
+      const span = domainMax - domainMin;
+      const scaleY = (value) => margin.top + (domainMax - value) / span * plotHeight;
+      const zeroY = scaleY(0);
+      const stepX = plotWidth / pairRows.length;
+      const ticks = linearTicks(domainMin, domainMax, 5);
+      const grid = ticks.map((tick) => {
+        const y = scaleY(tick);
+        const lineClass = Math.abs(tick) < 1e-12 ? "zero-line" : "grid-line";
+        return `<line class="${lineClass}" x1="${margin.left}" y1="${y}" x2="${margin.left + plotWidth}" y2="${y}"/><text class="axis-tick" x="${margin.left - 8}" y="${y + 4}" text-anchor="end">${chartNumber(tick, span)}</text>`;
+      }).join("");
+      const columns = pairRows.map((row, index) => {
+        const x = margin.left + stepX * (index + 0.5);
+        const y = scaleY(row.benefitDelta);
+        const changeClass = row.benefitDelta >= 0 ? "improved" : "worsened";
+        const valueY = row.benefitDelta >= 0 ? y - 9 : y + 18;
+        return `<line class="delta-line ${changeClass}" x1="${x}" y1="${zeroY}" x2="${x}" y2="${y}"/><circle class="delta-dot ${changeClass}" cx="${x}" cy="${y}" r="5"><title>${escapeHtml(row.from)}→${escapeHtml(row.to)} ${signed(row.rawDelta, row.pairMetric.unit)}</title></circle><text class="value-label" x="${x}" y="${valueY}" text-anchor="middle">${row.benefitDelta >= 0 ? "+" : "−"}${chartNumber(Math.abs(row.benefitDelta), span)}</text><text class="row-label" x="${x}" y="${margin.top + plotHeight + 22}" text-anchor="middle">${escapeHtml(row.from)}→${escapeHtml(row.to)}</text>`;
+      }).join("");
+      const unit = pairRows.every((row) => row.pairMetric.unit === pairRows[0].pairMetric.unit) ? pairRows[0].pairMetric.unit : "지표 단위";
+      elements.pairDeltaPlot.innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-labelledby="pairPlotTitle pairPlotDesc"><title id="pairPlotTitle">공정 비교쌍 성능 방향 변화량</title><desc id="pairPlotDesc">비교쌍을 가로축에 두고 0보다 위면 개선, 아래면 악화인 변화량 그래프</desc><text class="axis-title" x="${margin.left}" y="17">성능 방향 변화량 (${escapeHtml(unit)})</text><text class="axis-title" x="${margin.left + plotWidth}" y="17" text-anchor="end">개선 ↑ · 악화 ↓</text><rect class="chart-frame" data-chart-frame x="${margin.left}" y="${margin.top}" width="${plotWidth}" height="${plotHeight}"/>${grid}${columns}<text class="axis-title" data-axis="x" x="${margin.left + plotWidth / 2}" y="${height - 8}" text-anchor="middle">비교쌍</text></svg>`;
+    }
+
+    function renderPaperFigure(sorted, items, metricKey, metric, best) {
+      renderMethodPlot(sorted, metricKey, metric, best);
+      renderPairDeltaPlot(items, metricKey, metric);
+      const fairNote = metric.family === "crossTarget"
+        ? " 모든 방법에 동일한 train-only 공유 target pose와 공통 held-out fixed-camera 코너를 사용했습니다."
+        : state.contribution === "C2" ? " C2 비교쌍은 공통 보드 또는 공통 큐브 성분만 사용했습니다." : "";
+      elements.figureCaption.textContent = `Figure 1. ${contributionDefinitions[state.contribution].title}에서 ${metric.label}을 비교합니다. (a)는 세로축 절대값, (b)는 0 기준 세로 변화량이며 위쪽이 개선입니다.${fairNote} 독립 세션 불확실성이 없어 오차막대와 신뢰구간은 표시하지 않았습니다.`;
+    }
+
+    function renderCards(sorted, metricKey, metric) {
+      const ranks = denseRanks(sorted, metricKey);
+      elements.methodCards.innerHTML = sorted.map((method, index) => `
+        <article class="method-card">
+          <div class="method-card-head">
+            <div>
+              <h3>${method.id}</h3>
+              <span class="method-config-line">${escapeHtml(methodContributionSummary(method))}</span>
+            </div>
+            <span class="card-rank">${ranks[index] === null ? "순번 없음" : `정렬 #${ranks[index]}`}</span>
+          </div>
+          <div class="card-metric">
+            <span>${escapeHtml(metric.label)}</span>
+            <strong>${escapeHtml(formatSelectedMetricValue(method, metricKey))}</strong>
+          </div>
+        </article>`).join("");
+      elements.cardsEmpty.hidden = sorted.length > 0;
+    }
+
+    function displayMetricValue(item, column, definitions) {
+      const definition = definitions[column.key];
+      return isNumber(item[column.key])
+        ? `${item[column.key].toFixed(definition.integer ? 0 : 4)} ${definition.unit}`
+        : "—";
+    }
+
+    function formatSelectedMetricValue(item, metricKey) {
+      const column = displayColumnForKey(heldoutDisplayGroups, metricKey);
+      return column ? displayMetricValue(item, column, metricDefinitions) : formatValue(item[metricKey], metricDefinitions[metricKey]);
+    }
+
+    function renderHeldoutMetrics(sorted, metric) {
+      const container = elements.heldoutMetricsMatrix;
+      if (!sorted.length) {
+        container.innerHTML = `<div class="empty-state">현재 필터와 일치하는 방법이 없습니다.</div>`;
+        return;
+      }
+      const groupHeadings = heldoutDisplayGroups.map((group) =>
+        `<th scope="colgroup" colspan="${group.columns.length}">${escapeHtml(group.label)}</th>`
+      ).join("");
+      const metricHeadings = heldoutDisplayGroups.flatMap((group) => group.columns).map((column) => {
+        const definition = metricDefinitions[column.key];
+        const selected = state.metric === column.key ? " selected-metric" : "";
+        return `<th scope="col" class="${selected}" title="${escapeHtml(definition.meaning)}">${escapeHtml(column.label)}<span class="metric-key">${escapeHtml(definition.unit)} · ↓</span></th>`;
+      }).join("");
+      const rows = sorted.map((method) => {
+        const cells = heldoutDisplayGroups.flatMap((group) => group.columns).map((column) => {
+          const selected = state.metric === column.key ? " selected-metric" : "";
+          return `<td class="${selected}"><span class="metric-value">${escapeHtml(displayMetricValue(method, column, metricDefinitions))}</span></td>`;
+        }).join("");
+        return `<tr><td class="matrix-method">${methodIdentity(method)}</td>${cells}</tr>`;
+      }).join("");
+      container.innerHTML = `
+        <table class="matrix-table heldout-matrix">
+          <caption class="sr-only">${escapeHtml(contributionDefinitions[state.contribution].title)}의 주요 Held-out 평가 기준</caption>
+          <thead>
+            <tr><th scope="col" rowspan="2">방법</th>${groupHeadings}</tr>
+            <tr>${metricHeadings}</tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      const selectedColumn = displayColumnForKey(heldoutDisplayGroups, state.metric);
+      elements.heldoutMetricsSortNote.textContent = `${selectedColumn?.label || metric.label} 기준 ${state.sort === "asc" ? "오름차순" : "내림차순"}`;
+    }
+
+    function renderMarkerSystems() {
+      const labels = {
+        board_only: ["Board-only", "board → board"],
+        cube_only: ["Cube-only", "cube → cube"],
+        board_cube: ["Board+Cube", "board+cube → board+cube"]
+      };
+      const triple = (item) => ["Overall", "Board", "Cube"]
+        .map((suffix) => item[`common${suffix}Px`].toFixed(4))
+        .join(" / ");
+      elements.markerSystemBody.innerHTML = markerSystems.map((item) => {
+        const [label, path] = labels[item.system];
+        return `<tr>
+          <td class="matrix-method"><span class="method-id">${escapeHtml(label)}</span></td>
+          <td>${escapeHtml(path)}</td>
+          <td>${item.convergedRuns}/${item.totalRuns} · ${item.nReg}대</td>
+          <td><span class="metric-value">${item.ownHeldoutPx.toFixed(4)}</span></td>
+          <td><span class="metric-value">${triple(item)}</span></td>
+          <td><span class="metric-value">${item.crossViewPx.toFixed(4)}</span></td>
+          <td><span class="metric-value">${item.crossT.toFixed(4)} / ${item.crossR.toFixed(4)}</span></td>
+          <td><span class="metric-value">${item.e2eT.toFixed(4)} / ${item.e2eR.toFixed(4)}</span></td>
+        </tr>`;
+      }).join("");
+    }
+
+    function render() {
+      const metricKey = state.metric;
+      const metric = metricDefinitions[metricKey];
+      const items = filteredMethods();
+      const sorted = sortMethods(items, metricKey);
+      const available = items.filter((item) => isNumber(item[metricKey]));
+      const best = performanceBest(items, metricKey, metric);
+      const firstAvailable = sorted.find((item) => isNumber(item[metricKey])) || null;
+
+      setPressed(elements.contributionButtons, "contribution", state.contribution);
+      setPressed(elements.sortButtons, "sort", state.sort);
+      setPressed(elements.viewButtons, "view", state.view);
+      elements.metricSelect.value = state.metric;
+      elements.searchInput.value = state.query;
+
+      elements.currentViewTitle.textContent = contributionDefinitions[state.contribution].title;
+      const metricDirection = metric.direction === "low" ? "낮을수록 좋음" : "높을수록 좋음";
+      elements.currentMetricTitle.textContent = state.view === "summary"
+        ? `내부 검증 종합 결론 · 선택 지표: ${metric.label}`
+        : state.view === "all"
+          ? `표만 보기 · 행 정렬: ${metric.label} · ${metricDirection}`
+          : `${metric.label} · ${metricDirection}`;
+      elements.resultCount.textContent = `${items.length} / ${methods.length} 방법`;
+
+      elements.bestValue.textContent = best ? best.id : "—";
+      elements.bestDetail.textContent = best ? formatSelectedMetricValue(best, metricKey) : "가용 결과 없음";
+      elements.bestConfig.textContent = best ? methodContributionSummary(best) : "—";
+      elements.firstValue.textContent = firstAvailable ? firstAvailable.id : "—";
+      elements.firstDetail.textContent = firstAvailable ? `${formatSelectedMetricValue(firstAvailable, metricKey)} · ${state.sort === "asc" ? "오름차순" : "내림차순"}` : "가용 결과 없음";
+      elements.availabilityValue.textContent = `${available.length} / ${items.length}`;
+      elements.availabilityDetail.textContent = `선택 지표 값 ${available.length}개`;
+
+      renderMetricGuide(metricKey);
+      renderExperimentConfig(items);
+      renderInterpretation(items, sorted, metricKey, metric, best);
+      renderEvidenceFlow(items, metricKey, metric);
+      renderPaperFigure(sorted, items, metricKey, metric, best);
+      renderCards(sorted, metricKey, metric);
+      renderHeldoutMetrics(sorted, metric);
+      renderMarkerSystems();
+
+      const rankView = state.view === "rank";
+      const cardsView = state.view === "cards";
+      elements.conclusionPanel.hidden = state.view !== "summary";
+      elements.chartPanel.hidden = !rankView;
+      elements.cardsPanel.hidden = !cardsView;
+      writeStateToUrl();
+    }
+
+    elements.contributionButtons.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-contribution]");
+      if (!button) return;
+      state.contribution = button.dataset.contribution;
+      render();
+    });
+
+    elements.metricSelect.addEventListener("change", () => {
+      state.metric = elements.metricSelect.value;
+      state.sort = metricDefinitions[state.metric].direction === "high" ? "desc" : "asc";
+      render();
+    });
+
+    elements.sortButtons.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-sort]");
+      if (!button) return;
+      state.sort = button.dataset.sort;
+      render();
+    });
+
+    elements.viewButtons.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-view]");
+      if (!button) return;
+      state.view = button.dataset.view;
+      render();
+    });
+
+    elements.searchInput.addEventListener("input", () => {
+      state.query = elements.searchInput.value;
+      render();
+    });
+
+    elements.resetButton.addEventListener("click", () => {
+      Object.assign(state, {
+        contribution: "all",
+        metric: "crossViewPx",
+        sort: "asc",
+        view: "summary",
+        query: ""
+      });
+      render();
+    });
+
+    readStateFromUrl();
+    render();
+  </script>
+</body>
+</html>

@@ -1,5 +1,14 @@
 # Calibration Simulation — 7-Experiment Ablation
 
+## 목차
+
+- [7개 실험 (확정 리스트)](#toc-section-1)
+- [실행](#toc-section-2)
+- [지표 (Table 2a 열)](#toc-section-3)
+- [폴더 구조](#toc-section-4)
+- [노이즈 모델](#toc-section-5)
+- [알려진 한계 (논문에 명시할 것)](#toc-section-6)
+
 멀티카메라(eye-to-hand) + 그리퍼카메라(eye-in-hand) + 큐브/보드 캘리브레이션을 **순수 SE(3)
 기하 시뮬레이션**(렌더링 없음, ground-truth 보유)으로 검증한다. **자체 완결 패키지** — 부모
 저장소에 의존하지 않는다(numpy + scipy 만 필요).
@@ -9,6 +18,8 @@
 
 ---
 
+<a id="toc-section-1"></a>
+
 ## 7개 실험 (확정 리스트)
 
 기본 = **EXP1 (Ours)** = 통합 BA + 큐브+보드 + **공분산 가중 robust FK factor**.
@@ -16,24 +27,25 @@
 
 | # | FK | 캘리브 | 마커 | 의미 |
 |---|---|---|---|---|
-| **EXP1★** | factor | 통합 | 큐브+보드 | **Ours (기본)** |
-| EXP2 | factor | 따로 | 큐브+보드 | −통합 |
-| EXP3 | factor | 통합 | 큐브만 | −보드 |
-| EXP4 | 안씀(none) | 통합 | 큐브+보드 | −FK |
-| EXP5 | 안씀 | 따로 | 큐브+보드 | −FK −통합 |
-| EXP6 | 안씀 | 통합 | 보드만 | −큐브 |
-| EXP7 | 고정(fixed) | 통합 | 큐브+보드 | FK 하드 고정 대조 |
-| EXP8 | corr | 통합 | 큐브+보드 | 구 방식(Ridge 후보정) 비교군 |
+| **EXP1★** | corrected-FK (`factor`) | 통합 | 큐브+보드 | **Ours (기본)** |
+| EXP2 | corrected-FK (`factor`) | 따로 | 큐브+보드 | −통합 |
+| EXP3 | corrected-FK (`factor`) | 통합 | 큐브만 | −보드 |
+| EXP4 | no-FK(vision) (`none`) | 통합 | 큐브+보드 | −FK |
+| EXP5 | no-FK(vision) (`none`) | 따로 | 큐브+보드 | −FK −통합 |
+| EXP6 | no-FK(vision) (`none`) | 통합 | 보드만 | −큐브 |
+| EXP7 | FK-fixed (`fixed`) | 통합 | 큐브+보드 | raw FK 고정 대조 |
+| EXP8 | corrected-FK (`corr`) | 통합 | 큐브+보드 | 구 방식(Ridge 후보정) 비교군 |
 
 제약: **보드만 + FK 는 불가**(보드는 로봇이 위치를 모름 = FK 없음).
 
-### FK 사용방식 4-값
-- **none**   : 큐브를 미지수로 추정 (FK 미사용)
-- **fixed**  : 큐브 = FK 상수로 하드 고정 → 카메라·gTc 만 최적화
-- **factor** : 큐브는 자유, FK 를 **BA 안의 공분산 가중 robust 잔차 블록**으로 추가 (**Ours**).
+### FK 표시 구분 3개와 내부 코드 모드
+
+- **no-FK(vision)** (`none`): 큐브를 미지수로 추정하고 cube-pose FK를 사용하지 않는다.
+- **FK-fixed** (`fixed`): 큐브를 raw FK 상수로 고정하고 카메라·gTc만 최적화한다.
+- **corrected-FK** (`factor`, `corr`): FK를 보정해 사용한다. 현재 주 방법인 `factor`는 큐브를 자유변수로 두고 FK를 **BA 안의 공분산 가중 robust 잔차 블록**으로 추가한다.
   sigma_FK(2.0mm / 0.30°)·Huber f_scale 은 `core/methods.py` 모듈 상수로 **전 실험 동결**.
   회전까지 함께 구속되며, FK 가 크게 틀린 set 은 Huber 가 자동으로 감쇠한다.
-- **corr**   : none 으로 캘리브 후 예측 **위치만** [1,x,y] Ridge 로 후보정 (구 방식, 비교군).
+- `corr`는 no-FK(vision)으로 캘리브레이션한 뒤 예측 **위치만** [1,x,y] Ridge로 후보정하는 corrected-FK의 구 비교군이다.
   회전을 보정하지 않아 "3D pose calibration" 으로 설명하기 어렵다.
 
 ### 공정성 규약 (모든 방법에 동일 적용)
@@ -45,6 +57,8 @@
 4. **관측이 없는 카메라는 미지수에서 제외** → N_reg 가 정직해진다.
 
 ---
+
+<a id="toc-section-2"></a>
 
 ## 실행
 
@@ -65,6 +79,8 @@ python run_all.py --seeds 20 --dump results/tables/table2a.json
 > seed 당 holdout 조합 수를 제한한다(기본 3). 통계는 seed 수로 확보.
 
 ---
+
+<a id="toc-section-3"></a>
 
 ## 지표 (Table 2a 열)
 
@@ -95,7 +111,7 @@ python run_all.py --seeds 20 --dump results/tables/table2a.json
 - **FK factor → bTf/gTc/e_task 개선**: EXP1 vs EXP4
 - **보드 → bTf 개선**: EXP1 vs EXP3
 - **통합 → gTc/e_cross 개선**: EXP1 vs EXP2
-- **factor vs fixed**: FK 가 정확하면 비슷, FK 가 부정확해질수록 factor 가 우세 (EXP1 vs EXP7)
+- **corrected-FK vs FK-fixed**: FK가 정확하면 비슷하고, FK가 부정확해질수록 corrected-FK가 우세하다 (EXP1 vs EXP7).
 - **큐브 → 커버리지**: 이 카메라 배치에서 보드만으로는 고정 카메라 일부가 등록되지 않는다 (EXP6 의 N_reg)
 
 ### 통계 규약
@@ -104,6 +120,8 @@ split 을 먼저 평균한 뒤 seed 간 통계를 낸다. Ours 대비 **paired b
 보고하며, **CI 전체가 0 보다 커야**(다른방법 − Ours > 0) "Ours 가 유의하게 우수"라고 말한다.
 
 ---
+
+<a id="toc-section-4"></a>
 
 ## 폴더 구조
 
@@ -123,15 +141,19 @@ Simulation/
 
 ---
 
+<a id="toc-section-5"></a>
+
 ## 노이즈 모델
 
 - **systematic** : 타깃 base 위치 (x,y) 에 선형 의존하는 편향 (움직이는 큐브에서 나타남;
-  FK 후보정이 학습). 실제 검출오차의 지배성분(렌즈왜곡·intrinsic 잔차 등).
+  corrected-FK가 학습). 실제 검출오차의 지배성분(렌즈왜곡·intrinsic 잔차 등).
 - **jitter** : 매 관측 독립 가우시안 검출 지터 (보드·큐브 공통, 항상). 고정 보드도 현실적
   노이즈를 갖게 함.
 - **fk_noise** : 로봇 FK 큐브 prior 에 SE(3) 섭동 (Fig B: FK 부정확 모델). `SimScene(fk_noise_mm=)`.
 
 ---
+
+<a id="toc-section-6"></a>
 
 ## 알려진 한계 (논문에 명시할 것)
 

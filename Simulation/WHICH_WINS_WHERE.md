@@ -1,10 +1,21 @@
 # 어떤 조건에서 어떤 방법이 이기나 — 4방법 시뮬레이션 비교
 
+## 목차
+
+- [TL;DR](#toc-section-1)
+- [1. 실험 셋업](#toc-section-2)
+- [2. 승자 히트맵](#toc-section-3)
+- [3. Sweep 곡선 (각 축 격리)](#toc-section-4)
+- [4. corrected-FK (A) vs corrected-FK (B) — 약한 anchor가 항상 낫다](#toc-section-5)
+- [5. 실데이터와의 일치](#toc-section-6)
+- [6. 결론 및 권고](#toc-section-7)
+- [재현](#toc-section-8)
+
 > ## ⚠️ 이 문서의 수치는 **구버전(불공정) 코드로 산출된 것이라 폐기 대상**입니다
 >
 > 2026-08-06 공정성 수정으로 아래가 모두 바뀌었습니다. **재산출 전까지 인용하지 마세요.**
 >
-> 1. **GT 누출 제거** — no-FK 비교군까지 초기화에 `fk_cube`(FK)와 `bTboard`(GT 보드)를
+> 1. **GT 누출 제거** — no-FK(vision) 비교군까지 초기화에 `fk_cube`(FK)와 `bTboard`(GT 보드)를
 >    썼고, board-only 핸드아이는 잔차에 GT 보드를 직접 넣었습니다. 이제 모든 방법이
 >    GT·FK 를 쓰지 않는 동일한 모션 기반 초기화(`_bootstrap_visual`)를 씁니다.
 > 2. **재투영 열이 방법별 성능이 아니었음** — 프론트엔드 PnP 자체 잔차(`reproj_seed`)를
@@ -24,17 +35,21 @@
 > 자세한 규약은 [README.md](README.md) 참조.
 
 
-**FK 사용 방식 4가지**(fixed-FK / no-FK / ours-A / ours-B)를 **FK 오차 × 카메라 노이즈(랜덤·계통)** 조건에서
+**FK 표시 구분 3가지**(no-FK(vision) / FK-fixed / corrected-FK)를 사용하되, corrected-FK는 A/B 두 세부형으로 나누어 **FK 오차 × 카메라 노이즈(랜덤·계통)** 조건에서
 전수 비교하여, "각 조건에서 held-out 큐브 예측(e_task)이 가장 낮은 방법"을 구했다.
+
+<a id="toc-section-1"></a>
 
 ## TL;DR
 
-- **fixed-FK**는 **FK가 정확하고 카메라 계통노이즈가 0인 이상적 코너에서만** 최고다.
-- **ours-B**는 **카메라 계통노이즈가 조금이라도(≥1%) 있으면 거의 전 영역에서 최고**다.
-- 실제 카메라 인지 오차는 계통적(intrinsic·왜곡·검출 편향)이므로, **현실 조건에서는 ours-B가 사실상 항상 최고**다.
-- **ours-A(anchor=0)가 ours-B(anchor=0.5)를 이긴 경우는 시뮬 36개 조건 중 0개** — 약한 anchor가 항상 안전하게 낫다.
+- **FK-fixed**는 **FK가 정확하고 카메라 계통노이즈가 0인 이상적 코너에서만** 최고다.
+- **corrected-FK (B)**는 **카메라 계통노이즈가 조금이라도(≥1%) 있으면 거의 전 영역에서 최고**다.
+- 실제 카메라 인지 오차는 계통적(intrinsic·왜곡·검출 편향)이므로, **현실 조건에서는 corrected-FK (B)가 사실상 항상 최고**다.
+- **corrected-FK (A, anchor=0)가 corrected-FK (B, anchor=0.5)를 이긴 경우는 시뮬 36개 조건 중 0개** — 약한 anchor가 항상 안전하게 낫다.
 
 ---
+
+<a id="toc-section-2"></a>
 
 ## 1. 실험 셋업
 
@@ -49,13 +64,13 @@
 
 | 방법 | 1차: 큐브 FK를 | 2차 보정 | anchor λ |
 |---|---|---|---|
-| **fixed-FK** | 하드 고정 | ✗ | (하드) |
-| **no-FK** | 안 씀(자유변수) | ✗ | 0 |
-| **ours-A** | 안 씀(자유, anchor=0) | ✓ | 0 |
-| **ours-B** | soft anchor | ✓ | 0.5 |
+| **FK-fixed** | 하드 고정 | ✗ | (하드) |
+| **no-FK(vision)** | 안 씀(자유변수) | ✗ | 0 |
+| **corrected-FK (A)** | 보정 전 자유변수(anchor=0) | ✓ | 0 |
+| **corrected-FK (B)** | 보정 전 soft anchor | ✓ | 0.5 |
 
-- **ours-A vs no-FK 차이** = 2차 FK 잔차보정 유무
-- **ours-A vs ours-B 차이** = 1차 soft anchor(λ) 유무
+- **corrected-FK (A) vs no-FK(vision) 차이** = 2차 FK 잔차보정 유무
+- **corrected-FK (A) vs corrected-FK (B) 차이** = 1차 soft anchor(λ) 유무
 - 세 방법 모두 eye-in-hand FK(`bTg`)는 공통 사용(gauge 앵커). 차이는 **큐브 위치 FK(`fk_cube`)를 어떻게 쓰나**.
 
 ### 조건 축
@@ -69,21 +84,25 @@
 
 ---
 
+<a id="toc-section-3"></a>
+
 ## 2. 승자 히트맵
 
 ![승자 히트맵](results/figures/fig_ww_grid.png)
 
 | FK오차 ↓ \ 계통노이즈 → | **0** | 1% | 2% | 3% |
 |---|---|---|---|---|
-| **16mm** | no-FK | **ours-B** | **ours-B** | **ours-B** |
-| **8mm** | fixed-FK | **ours-B** | **ours-B** | **ours-B** |
-| **4mm** | fixed-FK | **ours-B** | **ours-B** | **ours-B** |
-| **2mm** | fixed-FK | **ours-B** | **ours-B** | **ours-B** |
-| **0mm** | fixed-FK | **ours-B** | **ours-B** | **ours-B** |
+| **16mm** | no-FK(vision) | **corrected-FK (B)** | **corrected-FK (B)** | **corrected-FK (B)** |
+| **8mm** | FK-fixed | **corrected-FK (B)** | **corrected-FK (B)** | **corrected-FK (B)** |
+| **4mm** | FK-fixed | **corrected-FK (B)** | **corrected-FK (B)** | **corrected-FK (B)** |
+| **2mm** | FK-fixed | **corrected-FK (B)** | **corrected-FK (B)** | **corrected-FK (B)** |
+| **0mm** | FK-fixed | **corrected-FK (B)** | **corrected-FK (B)** | **corrected-FK (B)** |
 
-→ **계통노이즈 열(≥1%)은 전부 ours-B.** fixed-FK는 **계통노이즈=0인 맨 왼쪽 열에서만** 승리.
+→ **계통노이즈 열(≥1%)은 전부 corrected-FK (B).** FK-fixed는 **계통노이즈=0인 맨 왼쪽 열에서만** 승리.
 
 ---
+
+<a id="toc-section-4"></a>
 
 ## 3. Sweep 곡선 (각 축 격리)
 
@@ -93,40 +112,42 @@
 
 | e_task (mm) | fk=0 | 1 | 2 | 4 | 8 | 16 |
 |---|---|---|---|---|---|---|
-| fixed-FK | **0.52** | **0.64** | **0.87** | **1.44** | **2.68** | 5.25 |
-| no-FK | 2.97 | 2.97 | 2.97 | 2.97 | 2.97 | **2.97** |
-| ours-A | 0.78 | 1.32 | 2.26 | 4.30 | 8.48 | 16.91 |
-| ours-B | 0.61 | 1.20 | 2.17 | 4.24 | 8.44 | 16.87 |
+| FK-fixed | **0.52** | **0.64** | **0.87** | **1.44** | **2.68** | 5.25 |
+| no-FK(vision) | 2.97 | 2.97 | 2.97 | 2.97 | 2.97 | **2.97** |
+| corrected-FK (A) | 0.78 | 1.32 | 2.26 | 4.30 | 8.48 | 16.91 |
+| corrected-FK (B) | 0.61 | 1.20 | 2.17 | 4.24 | 8.44 | 16.87 |
 
-**카메라가 완벽하면 fixed-FK 승.** FK가 극단(16mm)이면 no-FK가 앞선다.
+**카메라가 완벽하면 FK-fixed 승.** FK가 극단(16mm)이면 no-FK(vision)가 앞선다.
 
 ### (2) 계통 카메라노이즈 sweep — FK 완벽
 
 | e_task (mm) | 0 | 0.5% | 1% | 2% | 3% |
 |---|---|---|---|---|---|
-| fixed-FK | **0.52** | 14.37 | 27.93 | 45.30 | 60.16 |
-| no-FK | 2.97 | 27.91 | 41.55 | 76.64 | 73.56 |
-| ours-A | 0.78 | 6.27 | 11.02 | 24.36 | 38.66 |
-| ours-B | 0.61 | **5.69** | **9.50** | **23.77** | **36.50** |
+| FK-fixed | **0.52** | 14.37 | 27.93 | 45.30 | 60.16 |
+| no-FK(vision) | 2.97 | 27.91 | 41.55 | 76.64 | 73.56 |
+| corrected-FK (A) | 0.78 | 6.27 | 11.02 | 24.36 | 38.66 |
+| corrected-FK (B) | 0.61 | **5.69** | **9.50** | **23.77** | **36.50** |
 
-**fixed-FK가 0.5→60mm로 붕괴**, ours-B가 매 지점 최저. **계통오차엔 ours 압도.**
+**FK-fixed가 0.5→60mm로 붕괴**, corrected-FK (B)가 매 지점 최저. **계통오차엔 ours 압도.**
 
 ### (3) 랜덤 픽셀 sweep — FK 완벽
 
 | e_task (mm) | 0.3 | 0.5 | 1.0 | 1.5 | 2.0 |
 |---|---|---|---|---|---|
-| fixed-FK | **0.52** | **1.03** | **2.35** | 7.88 | 14.70 |
-| no-FK | 2.97 | 5.72 | 12.81 | 29.96 | 41.03 |
-| ours-A | 0.78 | 1.43 | 3.27 | 5.68 | 8.61 |
-| ours-B | 0.61 | 1.16 | 2.63 | **4.78** | **7.57** |
+| FK-fixed | **0.52** | **1.03** | **2.35** | 7.88 | 14.70 |
+| no-FK(vision) | 2.97 | 5.72 | 12.81 | 29.96 | 41.03 |
+| corrected-FK (A) | 0.78 | 1.43 | 3.27 | 5.68 | 8.61 |
+| corrected-FK (B) | 0.61 | 1.16 | 2.63 | **4.78** | **7.57** |
 
-저노이즈는 fixed, **1px 넘으면 ours-B 역전**(변동성엔 보정+자유큐브가 유리).
+저노이즈는 FK-fixed, **1px 넘으면 corrected-FK (B) 역전**(변동성엔 보정+자유큐브가 유리).
 
 전체 지표(gTc/e_X/reproj)는 [fig_ww_metrics.png](results/figures/fig_ww_metrics.png) 참고.
 
 ---
 
-## 4. ours-A vs ours-B — 약한 anchor가 항상 낫다
+<a id="toc-section-5"></a>
+
+## 4. corrected-FK (A) vs corrected-FK (B) — 약한 anchor가 항상 낫다
 
 시뮬 36개 조건 전수 비교:
 
@@ -136,11 +157,13 @@
 | 계통노이즈 | 16.22 | **15.21** | 1.00mm |
 | 랜덤px | 3.95 | **3.35** | 0.60mm |
 
-**ours-A가 ours-B를 이긴 경우: 0 / 36.** 카메라가 깨끗할 땐 거의 동률(0.09mm)이지만, 노이즈가 있으면 B가 확실히 낫다.
+**corrected-FK (A)가 corrected-FK (B)를 이긴 경우: 0 / 36.** 카메라가 깨끗할 땐 거의 동률(0.09mm)이지만, 노이즈가 있으면 B가 확실히 낫다.
 
 **이유(bias-variance)**: soft anchor는 정규화다. 카메라 노이즈로 흔들리는 큐브 추정의 **분산을 줄이는 이득**과, 부정확한 FK로 당겨 **편향을 더하는 손해**가 상충한다. **λ=0.5는 약해서 손해는 미미하고 이득은 챙기므로** 항상 A 이상. (이론적으로 FK가 극단적으로 나쁘고 카메라가 완벽하면 A가 앞설 수 있으나, 테스트 범위에선 미관측.)
 
 ---
+
+<a id="toc-section-6"></a>
 
 ## 5. 실데이터와의 일치
 
@@ -148,28 +171,32 @@
 
 | anchor λ | held-out e_task (down+fk) |
 |---|---|
-| 0 (ours-A) | 2.59 mm |
-| **0.5 (ours-B)** | **2.06 mm** ← 최저 |
+| 0 (corrected-FK (A)) | 2.59 mm |
+| **0.5 (corrected-FK (B))** | **2.06 mm** ← 최저 |
 | 5.0 (실코드 기본) | 3.41 mm |
 
 - 실데이터도 **λ≈0.5가 최적**, λ=0(A)보다 나음 → 시뮬과 일치.
 - (앞서 "A가 B를 이겼다"고 본 실험은 B의 λ가 5.0이라 과한 경우였다. λ=0.5면 B가 A를 이긴다.)
-- 실측 카메라 reproj rms 0.24–0.32px에 **계통 성분**(intrinsic·왜곡)이 있으므로, 히트맵상 **계통노이즈 열 = ours-B 영역**에 해당.
+- 실측 카메라 reproj rms 0.24–0.32px에 **계통 성분**(intrinsic·왜곡)이 있으므로, 히트맵상 **계통노이즈 열 = corrected-FK (B) 영역**에 해당.
 
 ---
+
+<a id="toc-section-7"></a>
 
 ## 6. 결론 및 권고
 
 | 방법 | 이기는 조건 | 실제 해당? |
 |---|---|---|
-| **fixed-FK** | FK 정확 **&** 카메라 계통노이즈 0 | ✗ (이상적 코너뿐) |
-| **ours-B** | 계통노이즈 존재(현실) → 거의 전 영역 | ✅ |
-| **no-FK** | FK 극단 오차 + 카메라 완벽 | ✗ (극단 코너) |
+| **FK-fixed** | FK 정확 **&** 카메라 계통노이즈 0 | ✗ (이상적 코너뿐) |
+| **corrected-FK (B)** | 계통노이즈 존재(현실) → 거의 전 영역 | ✅ |
+| **no-FK(vision)** | FK 극단 오차 + 카메라 완벽 | ✗ (극단 코너) |
 
-- **논문 메시지**: 완벽 FK·이상 카메라에서는 fixed-FK로 충분하나, 실제 시스템의 **FK 오차 + 카메라 계통노이즈** 아래에서 fixed는 붕괴하고, **ours(soft anchor + 잔차보정)만이 전 조건에서 강건**하다.
+- **논문 메시지**: 완벽 FK·이상 카메라에서는 FK-fixed로 충분하나, 실제 시스템의 **FK 오차 + 카메라 계통노이즈** 아래에서 FK-fixed는 붕괴하고, **corrected-FK(soft anchor + 잔차보정)만이 전 조건에서 강건**하다.
 - **실용 권고**: anchor는 **작게(λ≈0.5)**. 실코드 기본값 5.0은 최적을 지나쳐 있으니 하향 검토 권장.
 
 ---
+
+<a id="toc-section-8"></a>
 
 ## 재현
 

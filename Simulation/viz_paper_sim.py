@@ -126,7 +126,11 @@ def tables(blob):
     METH = blob["methods"]; LAB = dict(zip(METH, blob["method_labels"]))
     # 표 1: realistic 조건, 지표별
     rk = lay["table"]["realistic"]
-    lines = ["## 표 1 — 시뮬 · 현실 종합 조건 (GT)\n",
+    lines = ["## 목차\n",
+             "- [표 1 — 시뮬 · 현실 종합 조건 (GT)](#toc-section-1)",
+             "- [표 1b — 시뮬 · 조건별 e_task (mm, GT)](#toc-section-2)\n",
+             '<a id="toc-section-1"></a>\n',
+             "## 표 1 — 시뮬 · 현실 종합 조건 (GT)\n",
              f"*{blob['meta']['protocol']}, {blob['meta']['seeds']} seeds. sigma0.3 + 계통2% + FK≈0 + 오검출5%.*",
              "*EXP6(-cube)은 e_X/reproj/cross 붕괴 → e_task 낮은 건 그리퍼예측 착시(캘리브 실패).*\n",
              "| 방법 | e_task mm | e_task deg | e_X mm | **cam→base 병진 mm (bTf)** | reproj px | cross mm |",
@@ -137,7 +141,8 @@ def tables(blob):
         lines.append(f"| {m} {LAB[m]} | {g('e_task_mm')} | {g('e_task_deg')} | "
                      f"{g('e_X_mm')} | {g('bTf_mm')} | {g('e_reproj_px')} | {g('e_cross_mm')} |")
     # 표 1b: e_task 조건별
-    lines += ["\n## 표 1b — 시뮬 · 조건별 e_task (mm, GT)\n",
+    lines += ['\n<a id="toc-section-2"></a>\n',
+              "## 표 1b — 시뮬 · 조건별 e_task (mm, GT)\n",
               "| 방법 | 이상적 | 현실종합 | +FK오차 | +오검출 |", "|---|--:|--:|--:|--:|"]
     order = ["ideal", "realistic", "fk_err", "outlier"]
     for m in METH:

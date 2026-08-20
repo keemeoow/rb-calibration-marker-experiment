@@ -43,9 +43,9 @@ import argparse
 import numpy as np
 import cv2
 
-from camera import RealSenseCamera
-from charuco_utils import CharucoTarget
-from config import CharucoBoardConfig
+from capture_pipeline.camera import RealSenseCamera
+from calibration_pipeline.charuco import CharucoTarget
+from calibration_pipeline.config import CharucoBoardConfig
 
 # ---------------------------------------------------------------------------
 # 보정 헬퍼
