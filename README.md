@@ -57,17 +57,17 @@ python3 Run_calibration_comparison.py table1 \
 
 | 기호 | 의미 | 최적화 여부 |
 | --- | --- | --- |
-| (T^B_{C_i}) | 고정카메라 (i)에서 robot base로의 외부 파라미터 | 조건에 따라 자유변수 |
-| (T^G_C) | gripper에서 eye-in-hand 카메라로의 Hand–Eye transform | 조건에 따라 자유변수 |
-| (T^B_G(e)) | event (e)의 robot FK가 제공한 base–gripper transform | 모든 조건에서 고정 입력 |
-| (T^B_{mathrm{board}}) | 작업공간에 고정된 ChArUco board pose | board 조건에서 자유변수 |
-| (T^B_{mathrm{cube}}(s)) | 배치 set (s)의 cube pose | vision 추정, FK 고정 또는 FK factor |
-| (K_i,D_i) | 카메라 (i)의 intrinsic과 distortion | 사전 보정 후 항상 고정 |
+| $T^B_{C_i}$ | 고정카메라 $i$에서 robot base로의 외부 파라미터 | 조건에 따라 자유변수 |
+| $T^G_C$ | gripper에서 eye-in-hand 카메라로의 Hand–Eye transform | 조건에 따라 자유변수 |
+| $T^B_G(e)$ | event $e$의 robot FK가 제공한 base–gripper transform | 모든 조건에서 고정 입력 |
+| $T^B_{\mathrm{board}}$ | 작업공간에 고정된 ChArUco board pose | board 조건에서 자유변수 |
+| $T^B_{\mathrm{cube}}(s)$ | 배치 set $s$의 cube pose | vision 추정, FK 고정 또는 FK factor |
+| $(K_i,D_i)$ | 카메라 $i$의 intrinsic과 distortion | 사전 보정 후 항상 고정 |
 
 중요한 용어 규칙은 다음과 같다.
 
-- `vision` 또는 `no-FK`는 **robot FK 전체를 사용하지 않는다는 뜻이 아니다.** Eye-in-hand 카메라 pose (T^B_G(e)T^G_C)를 만들기 위해 robot FK는 모든 조건에서 사용한다.
-- `vision`, `FK-fixed`, `corrected-FK`의 차이는 배치된 cube pose (T^B_{mathrm{cube}}(s))를 어떤 방식으로 다루는지에 대한 차이다.
+- `vision` 또는 `no-FK`는 **robot FK 전체를 사용하지 않는다는 뜻이 아니다.** Eye-in-hand 카메라 pose $T^B_G(e)T^G_C$를 만들기 위해 robot FK는 모든 조건에서 사용한다.
+- `vision`, `FK-fixed`, `corrected-FK`의 차이는 배치된 cube pose $T^B_{\mathrm{cube}}(s)$를 어떤 방식으로 다루는지에 대한 차이다.
 - board는 robot에 부착된 물체가 아니므로 `FK-fixed board`라는 조건은 물리적으로 정의하지 않는다.
 
 ## 3. 입력 데이터
@@ -76,10 +76,10 @@ python3 Run_calibration_comparison.py table1 \
 
 | 단계 | 입력 | 출력 |
 | --- | --- | --- |
-| Step1 | 연결된 RealSense 장치 | `intrinsics/cam*.npz`의 factory (K,D), depth scale |
+| Step1 | 연결된 RealSense 장치 | `intrinsics/cam*.npz`의 factory $(K,D)$, depth scale |
 | Step1b | ChArUco board 영상 | 재보정된 `cam*.npz`, 기존 factory 값 backup |
 
-비교실험에서는 이 (K,D)를 다시 최적화하지 않는다. 조건 간 intrinsic 자유도가 달라지는 것을 방지하기 위해 모든 행에서 상수로 고정한다.
+비교실험에서는 이 $(K,D)$를 다시 최적화하지 않는다. 조건 간 intrinsic 자유도가 달라지는 것을 방지하기 위해 모든 행에서 상수로 고정한다.
 
 ### 3.2 Step2의 입력과 출력
 
@@ -88,7 +88,7 @@ Step2는 다음 정보를 같은 capture event 단위로 저장한다.
 - 고정카메라와 eye-in-hand 카메라의 RGB/depth 영상
 - cube AprilTag와 ChArUco board 검출 provenance
 - `event_id`, `set_index`, `gripper_cam_idx`
-- robot pose (T^B_G(e)) 또는 대응 6-DoF FK
+- robot pose $T^B_G(e)$ 또는 대응 6-DoF FK
 - cube를 파지한 경우 `cube_gripped`, `grasp_id`
 - cube geometry/configuration과 카메라별 저장 성공 여부
 
@@ -143,8 +143,8 @@ cube/board raw corner 검출
 - marker 종류: `board` 또는 `cube`
 - camera와 event ID
 - cube의 경우 set ID
-- target 좌표계의 3D corner (mathbf X_n)
-- native distorted image의 실제 2D corner (mathbf u_n)
+- target 좌표계의 3D corner $\mathbf X_n$
+- native distorted image의 실제 2D corner $\mathbf u_n$
 
 board와 cube 모두 최종 solver에는 PnP pose가 아니라 **3D corner–2D pixel 대응점**으로 들어간다.
 
@@ -165,7 +165,7 @@ PnP는 최종 결과를 직접 결정하는 backend가 아니라 초기값과 �
 
 ### 5.1 관측별 PnP
 
-측정 corner만으로 (T^{C_i}_{O})를 계산한다.
+측정 corner만으로 $T^{C_i}_{O}$를 계산한다.
 
 - planar board: `SOLVEPNP_IPPE`
 - non-planar cube: `SOLVEPNP_ITERATIVE`
@@ -181,7 +181,7 @@ Eye-in-hand board PnP와 robot FK를 이용해 다음 OpenCV Hand–Eye 후보�
 - Horaud
 - Daniilidis
 
-각 후보로 여러 event의 board base pose를 만들고 robust SE(3) 평균 및 pose dispersion을 계산한다. 가장 일관된 후보가 (T^G_C)와 (T^B_{mathrm{board}}) 초기값으로 선택된다.
+각 후보로 여러 event의 board base pose를 만들고 robust SE(3) 평균 및 pose dispersion을 계산한다. 가장 일관된 후보가 $T^G_C$와 $T^B_{\mathrm{board}}$ 초기값으로 선택된다.
 
 ### 5.3 Cube pose와 고정카메라 초기화
 
@@ -189,9 +189,9 @@ Eye-in-hand board PnP와 robot FK를 이용해 다음 OpenCV Hand–Eye 후보�
 
 고정카메라 초기값은 다음 변환 체인에서 얻는다.
 
-\[
+$$
 T^B_{C_i}=T^B_O\left(T^{C_i}_O\right)^{-1}
-\]
+$$
 
 board와 cube에서 얻은 후보를 카메라별로 robust SE(3) 평균한다. 이 값들은 모든 Table 1 조건의 공통 출발점일 뿐 최종 결과가 아니다.
 
@@ -199,49 +199,49 @@ board와 cube에서 얻은 후보를 카메라별로 robust SE(3) 평균한다. 
 
 A3/A4/B1/B2가 공유하는 FK cube artifact는 다음 관계를 train eye-in-hand cube corner만으로 정렬한다.
 
-\[
+$$
 T^B_G(e)T^G_C T^C_O(e)
 =T^B_{\mathrm{FK,cube,raw}}(s)T^{\mathrm{FK,cube}}_O
-\]
+$$
 
-board, 고정카메라 관측, held-out event는 사용하지 않는다. PnP/Hand–Eye 또는 global (AX=ZB)는 초기화에만 쓰고, artifact의 최종 정렬은 eye-in-hand cube raw-corner 재투영으로 다시 최적화한다.
+board, 고정카메라 관측, held-out event는 사용하지 않는다. PnP/Hand–Eye 또는 global $AX=ZB$는 초기화에만 쓰고, artifact의 최종 정렬은 eye-in-hand cube raw-corner 재투영으로 다시 최적화한다.
 
 ## 6. 최종 재투영 최적화 원리
 
 ### 6.1 고정카메라 관측
 
-고정카메라 (i)가 target (O)를 본 경우 예측 transform은 다음과 같다.
+고정카메라 $i$가 target $O$를 본 경우 예측 transform은 다음과 같다.
 
-\[
+$$
 \hat T^{C_i}_{O}=\left(T^B_{C_i}\right)^{-1}T^B_O
-\]
+$$
 
 ### 6.2 Eye-in-hand 관측
 
-event (e)의 eye-in-hand 카메라 pose는 robot FK와 Hand–Eye로 결정된다.
+event $e$의 eye-in-hand 카메라 pose는 robot FK와 Hand–Eye로 결정된다.
 
-\[
+$$
 T^B_C(e)=T^B_G(e)T^G_C
-\]
+$$
 
 따라서 target 예측은 다음과 같다.
 
-\[
+$$
 \hat T^C_O(e)=\left(T^B_G(e)T^G_C\right)^{-1}T^B_O
-\]
+$$
 
 ### 6.3 Pixel residual
 
-카메라별로 고정된 (K_i,D_i)를 이용해 3D corner를 distorted image에 투영한다.
+카메라별로 고정된 $(K_i,D_i)$를 이용해 3D corner를 distorted image에 투영한다.
 
-\[
+$$
 \hat{\mathbf u}_{i,e,n}
 =\pi\!\left(K_i,D_i,\hat T^{C_i}_{O}(e)\mathbf X_n\right)
-\]
+$$
 
-\[
+$$
 \mathbf r_{i,e,n}=\hat{\mathbf u}_{i,e,n}-\mathbf u_{i,e,n}
-\]
+$$
 
 모든 선택된 board/cube, eih/e2h corner residual을 하나의 벡터로 쌓아 최적화한다. 기본 solver는 다음과 같다.
 
@@ -260,19 +260,19 @@ T^B_C(e)=T^B_G(e)T^G_C
 
 1단계는 eye-in-hand 관측만 사용한다.
 
-\[
+$$
 \min_{T^G_C,T^B_O}
 \sum_{(e,n)\in\mathrm{eih}}\sum_{k\in\{u,v\}}
 \rho\!\left(r_{e,n,k}\right)
-\]
+$$
 
 2단계에서는 1단계의 Hand–Eye와 target pose를 완전히 고정하고 고정카메라만 푼다.
 
-\[
+$$
 \min_{T^B_{C_1},\ldots,T^B_{C_m}}
 \sum_{i=1}^{m}\sum_{(e,n)\in\mathrm{e2h}_i}\sum_{k\in\{u,v\}}
 \rho\!\left(r_{i,e,n,k}\right)
-\]
+$$
 
 target과 Hand–Eye가 고정되어 카메라별 residual block은 수학적으로 분리된다. e2h 결과가 eih 변수로 되돌아가는 alternating pass는 없다.
 
@@ -280,35 +280,35 @@ target과 Hand–Eye가 고정되어 카메라별 residual block은 수학적으
 
 eih와 e2h residual을 하나의 문제에 넣고 모든 선언된 자유변수를 동시에 갱신한다.
 
-\[
+$$
 \min_{\{T^B_{C_i}\},T^G_C,\{T^B_O\}}
 \left[
 \sum_{(e,n)\in\mathrm{eih}}\sum_{k\in\{u,v\}}\rho(r_{e,n,k})
 +\sum_i\sum_{(e,n)\in\mathrm{e2h}_i}\sum_{k\in\{u,v\}}\rho(r_{i,e,n,k})
 \right]
-\]
+$$
 
 공유 target pose와 Hand–Eye가 두 관측 경로를 연결하므로 고정카메라 관측이 Hand–Eye/target 추정에 피드백된다. `e_cross`는 이 목적함수의 항이 아니라 최적화 후 독립적으로 계산하는 평가지표다.
 
 ## 8. A0~A5/B1~B3 비교실험
 
-모든 실행 가능한 행은 동일한 train/test split, (K,D), raw detection, solver option, seed와 train-only reference state에서 시작한다. 행별로 바뀌는 것은 marker residual, cube pose 처리, 자유변수 freeze mask뿐이다.
+모든 실행 가능한 행은 동일한 train/test split, $(K,D)$, raw detection, solver option, seed와 train-only reference state에서 시작한다. 행별로 바뀌는 것은 marker residual, cube pose 처리, 자유변수 freeze mask뿐이다.
 
 | ID | 입력 marker | 최적화 | Cube pose 처리 | 자유변수 | 핵심 출력/질문 |
 | --- | --- | --- | --- | --- | --- |
-| A0 | board | 순차 `seq` | cube 없음 | 1단계 (T^G_C,T^B_{board}), 2단계 (T^B_{C_i}) | board-only optimization baseline |
-| A1 | board+cube | 순차 `seq` | vision 자유변수 | 1단계 (T^G_C,T^B_{board},T^B_{cube}(s)), 2단계 (T^B_{C_i}) | 같은 순차법에서 cube residual 추가 효과 |
-| A2 | board+cube | 통합 `U` | vision 자유변수 | (T^B_{C_i},T^G_C,T^B_{board},T^B_{cube}(s)) | vision-only 통합 효과 |
-| A3 | board+cube | 통합 `U` | board-free aligned FK pose로 hard fixed | (T^B_{C_i},T^G_C,T^B_{board}) | cube를 정확한 상수로 둘 때의 효과 |
+| A0 | board | 순차 `seq` | cube 없음 | 1단계 $T^G_C,T^B_{\mathrm{board}}$, 2단계 $T^B_{C_i}$ | board-only optimization baseline |
+| A1 | board+cube | 순차 `seq` | vision 자유변수 | 1단계 $T^G_C,T^B_{\mathrm{board}},T^B_{\mathrm{cube}}(s)$, 2단계 $T^B_{C_i}$ | 같은 순차법에서 cube residual 추가 효과 |
+| A2 | board+cube | 통합 `U` | vision 자유변수 | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}},T^B_{\mathrm{cube}}(s)$ | vision-only 통합 효과 |
+| A3 | board+cube | 통합 `U` | board-free aligned FK pose로 hard fixed | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}}$ | cube를 정확한 상수로 둘 때의 효과 |
 | A4 | board+cube | 통합 `U` | covariance-whitened soft FK factor | A2와 같음 | vision과 FK 불확실성을 함께 쓰는 효과 |
 | A5 | 미정 | 미실행 | 독립 실측 6-DoF correction label 필요 | 아직 정의하지 않음 | A4와 동일 baseline만 예약, 현재 `not_run` |
 | B1 | board+cube | 순차 `seq` | A4와 동일 soft FK factor | 1단계 Hand–Eye/board/cube, 2단계 camera별 | 같은 FK factor에서 통합 효과 검증 |
-| B2 | cube | 통합 `U` | A4와 동일 soft FK factor | (T^B_{C_i},T^G_C,T^B_{cube}(s)) | 같은 FK factor에서 board residual 제거 효과 |
-| B3 | board | 통합 `U` | cube 없음 | (T^B_{C_i},T^G_C,T^B_{board}) | vision 통합 조건에서 cube residual 제거 효과 |
+| B2 | cube | 통합 `U` | A4와 동일 soft FK factor | $T^B_{C_i},T^G_C,T^B_{\mathrm{cube}}(s)$ | 같은 FK factor에서 board residual 제거 효과 |
+| B3 | board | 통합 `U` | cube 없음 | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}}$ | vision 통합 조건에서 cube residual 제거 효과 |
 
 ### 8.1 A0 — Board·순차 baseline
 
-- 입력: board corner, (K,D), robot FK
+- 입력: board corner, $(K,D)$, robot FK
 - 초기화: board PnP → 여러 Hand–Eye 후보 → robust SE(3) 선택
 - 최적화: eih board로 Hand–Eye/board를 푼 후 고정, e2h board로 고정카메라만 계산
 - 출력: board 기반 camera/Hand–Eye transform, train/test board px
@@ -339,7 +339,7 @@ eih와 e2h residual을 하나의 문제에 넣고 모든 선언된 자유변수�
 - 입력: A2 입력 + aligned FK target + set별 6×6 FK covariance
 - 최적화: cube pose는 자유변수로 유지하면서 visual residual에 FK factor를 추가
 
-\[
+$$
 \mathbf r_{\mathrm{FK},s}
 =L_s^{-1}
 \begin{bmatrix}
@@ -347,7 +347,7 @@ eih와 e2h residual을 하나의 문제에 넣고 모든 선언된 자유변수�
 \operatorname{trans}\!\left((T^B_{cube}(s))^{-1}\bar T^B_{cube,FK}(s)\right)
 \end{bmatrix},
 \quad \Sigma_s=L_sL_s^T
-\]
+$$
 
 FK factor에는 Huber loss를 적용한다. `--fk_covariance_json`이 없으면 고정 Simulation prior를 사용하는 preflight이며 confirmatory 결과로 해석하지 않는다.
 
@@ -381,7 +381,7 @@ python3 Run_calibration_comparison.py marker-system \
 | `cube_only` | cube만 | cube만 | cameras, Hand–Eye, cube poses |
 | `board_cube` | board+cube | board+cube | cameras, Hand–Eye, board/cube poses |
 
-세 시스템은 split, raw detection, (K,D), solver, seed와 held-out 평가 population을 공유하지만 초기값은 modality별로 별도 생성한다. cube-only는 board-free train-only FK artifact로 Hand–Eye를 초기화하지만, 최종 목적함수에는 FK factor가 없다.
+세 시스템은 split, raw detection, $(K,D)$, solver, seed와 held-out 평가 population을 공유하지만 초기값은 modality별로 별도 생성한다. cube-only는 board-free train-only FK artifact로 Hand–Eye를 초기화하지만, 최종 목적함수에는 FK factor가 없다.
 
 출력은 각 시스템의 own-marker held-out px와 모든 시스템에 공통인 board+cube target px, `e_cross`, pixel transfer, `e_e2e`다. 외부 GT가 아니므로 절대 정확도 주장은 할 수 없다.
 
@@ -404,11 +404,11 @@ python3 Run_calibration_comparison.py cross-target \
 
 ### 11.1 Train reprojection RMSE px
 
-\[
+$$
 e_{\mathrm{train}}^{px}
 =\sqrt{\frac{1}{2N}\sum_{n=1}^{N}
 \left((\hat u_n-u_n)^2+(\hat v_n-v_n)^2\right)}
-\]
+$$
 
 - solver가 사용한 train corner에서 계산
 - 최적화가 제대로 수렴했는지 보는 diagnostic
@@ -426,19 +426,19 @@ e_{\mathrm{train}}^{px}
 
 각 고정카메라가 자기 영상 corner만으로 cube PnP를 독립 계산한다.
 
-\[
+$$
 T^{B,(i)}_{cube}=T^B_{C_i}T^{C_i}_{cube,\mathrm{PnP}}
-\]
+$$
 
-카메라 pair (i,j)에 대해 다음을 계산하고 모든 사전 고정 pair에서 RMSE를 낸다.
+카메라 pair $(i,j)$에 대해 다음을 계산하고 모든 사전 고정 pair에서 RMSE를 낸다.
 
-\[
+$$
 e^{t}_{ij}=\|\mathbf t_i-\mathbf t_j\|_2\,[\mathrm{mm}]
-\]
+$$
 
-\[
+$$
 e^{R}_{ij}=\left\|\log\left(R_i^TR_j\right)\right\|_2\,[\mathrm{deg}]
-\]
+$$
 
 이 mm는 재투영 오차를 mm로 변환한 값이 아니라 두 카메라가 예측한 cube 중심 사이의 실제 좌표 거리다. robot FK, gripper camera, nominal cube 정답, 외부 GT는 사용하지 않는다. 따라서 일반적인 고정카메라 간 위치/회전 일관성 지표이지만 절대 정확도는 아니다.
 
@@ -446,10 +446,10 @@ e^{R}_{ij}=\left\|\log\left(R_i^TR_j\right)\right\|_2\,[\mathrm{deg}]
 
 카메라 A의 측정 corner로 얻은 cube PnP pose를 추정된 카메라 상대관계로 B에 옮긴 뒤 B의 실제 측정 corner와 비교한다.
 
-\[
+$$
 T^{C_B}_{cube}
 =\left(T^B_{C_B}\right)^{-1}T^B_{C_A}T^{C_A}_{cube,\mathrm{PnP}}
-\]
+$$
 
 A→B와 B→A를 모두 계산한다. FK나 공유 cube 정답 없이 카메라 간 상대 보정을 px 도메인에서 평가하는 지표다.
 
@@ -457,8 +457,8 @@ A→B와 B→A를 모두 계산한다. FK나 공유 cube 정답 없이 카메라
 
 같은 held-out cube에 대해 다음 두 경로를 비교한다.
 
-- 고정카메라 경로: 여러 (T^B_{C_i}T^{C_i}_{cube,\mathrm{PnP}})의 robust SE(3) 평균
-- 손목카메라 경로: (T^B_G(e)T^G_C T^C_{cube,\mathrm{PnP}})
+- 고정카메라 경로: 여러 $T^B_{C_i}T^{C_i}_{\mathrm{cube},\mathrm{PnP}}$의 robust SE(3) 평균
+- 손목카메라 경로: $T^B_G(e)T^G_C T^C_{\mathrm{cube},\mathrm{PnP}}$
 
 translation mm와 SO(3) rotation deg RMSE를 보고한다. robot FK가 포함되므로 전체 변환 체인의 내부 일관성 지표이며 외부 GT 정확도는 아니다.
 
@@ -473,7 +473,7 @@ translation mm와 SO(3) rotation deg RMSE를 보고한다. robot FK가 포함되
 
 물리 정확도는 calibration과 분리된 blind 데이터에서만 평가한다.
 
-1. `blind-predict`: GT를 읽지 않고 각 방법의 (T^B_{cube}) 예측 저장
+1. `blind-predict`: GT를 읽지 않고 각 방법의 $T^B_{\mathrm{cube}}$ 예측 저장
 2. GT 잠금 해제
 3. `external-gt`: TRE mm, rotation deg, P95, failure rate 등을 paired hierarchical bootstrap으로 비교
 
