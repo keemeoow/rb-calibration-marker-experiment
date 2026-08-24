@@ -335,6 +335,7 @@ def verify_markdown(main: dict[str, dict[str, str]], marker: dict[str, dict[str,
 def verify_cross(main: dict[str, dict[str, str]], cross: dict[str, dict[str, str]]) -> None:
     if set(cross) != set(main) - {"A5"}:
         raise AssertionError("Cross-target CSV method set mismatch")
+    populations = set()
     for method, row in cross.items():
         for main_key, cross_key in CROSS_KEYS.items():
             assert_same(
@@ -344,10 +345,17 @@ def verify_cross(main: dict[str, dict[str, str]], cross: dict[str, dict[str, str
             f"e_cross alias {method}",
             number(row["fixed_camera_cube_position_consistency_rmse_mm_mean"]),
             number(row["common_path_e_cross_translation_rmse_mm_mean"]), 9)
-        if (int(float(row["n_cross_pairs"])) != 9
-                or int(float(row["n_cross_view_directions"])) != 18
-                or int(float(row["n_e2e_units"])) != 3):
-            raise AssertionError(f"{method}: path population mismatch")
+        population = (
+            int(float(row["n_cross_pairs"])),
+            int(float(row["n_cross_view_directions"])),
+            int(float(row["n_e2e_units"])),
+        )
+        populations.add(population)
+        if (population[0] <= 0 or population[1] != 2 * population[0]
+                or population[2] <= 0):
+            raise AssertionError(f"{method}: invalid path population {population}")
+    if len(populations) != 1:
+        raise AssertionError("methods do not share one path population")
 
 
 def load_authenticated_baseline(path: Path) -> dict:
@@ -359,6 +367,31 @@ def load_authenticated_baseline(path: Path) -> dict:
         raise AssertionError("canonical shared baseline hash mismatch")
     if payload.get("heldout_information_used") is not False:
         raise AssertionError("canonical baseline used held-out information")
+    provenance = payload.get("source_data_provenance", {})
+    file_entries = [provenance.get("meta_json", {})]
+    file_entries.extend(provenance.get("intrinsics", {}).values())
+    if provenance.get("pose_convention_manifest"):
+        file_entries.append(provenance["pose_convention_manifest"])
+    for entry in file_entries:
+        source = Path(str(entry.get("path", "")))
+        expected_source_hash = str(entry.get("sha256", ""))
+        if (not source.is_file()
+                or hashlib.sha256(source.read_bytes()).hexdigest()
+                != expected_source_hash):
+            raise AssertionError(f"canonical result is stale: source changed: {source}")
+    implementation = provenance.get("implementation_sha256", {})
+    if not implementation:
+        raise AssertionError("canonical baseline lacks implementation provenance")
+    for relative, expected_source_hash in implementation.items():
+        source = ROOT / relative
+        if (not source.is_file()
+                or hashlib.sha256(source.read_bytes()).hexdigest()
+                != expected_source_hash):
+            raise AssertionError(
+                f"canonical result is stale: implementation changed: {relative}")
+    populations = provenance.get("observation_populations", {})
+    if set(populations) != {"eligible", "train", "heldout"}:
+        raise AssertionError("canonical baseline lacks observation provenance")
     return payload
 
 
@@ -373,10 +406,37 @@ def verify_json_contracts() -> None:
         raise AssertionError("unified result contains obsolete or missing main rows")
     if result["protocol"]["shared_train_only_baseline"]["sha256"] != baseline_sha:
         raise AssertionError("unified result does not authenticate canonical baseline")
+    if (result["protocol"].get("source_data_provenance")
+            != baseline.get("source_data_provenance")):
+        raise AssertionError("unified result source provenance differs from baseline")
+    pose_convention = result["protocol"].get("pose_convention", {})
+    if pose_convention.get("status") != "normalized_and_validated":
+        raise AssertionError("canonical Table 1 pose convention was not normalized")
+    if baseline.get("pose_convention") != pose_convention:
+        raise AssertionError("unified result pose convention differs from baseline")
+    for name, payload in (("cross-target", cross), ("marker-system", marker)):
+        if (payload.get("protocol", {}).get("source_data_provenance")
+                != baseline.get("source_data_provenance")):
+            raise AssertionError(f"{name} source provenance differs from baseline")
+        if payload.get("protocol", {}).get("pose_convention") != pose_convention:
+            raise AssertionError(f"{name} pose convention differs from Table 1")
     if Path(result["protocol"]["shared_train_only_baseline"]["path"]).resolve() != SHARED_BASELINE:
         raise AssertionError("unified result points to a duplicate baseline")
     if result["protocol"].get("one_runner_for_all_executable_rows") is not True:
         raise AssertionError("Table 1 rows are not declared as one-runner output")
+    pnp_contract = result["protocol"].get("cube_detection", {}).get(
+        "quality_contract", {})
+    if (pnp_contract.get("selection_stage")
+            != "before_split_and_before_any_calibration_fit"
+            or pnp_contract.get("model_output_used") is not False
+            or pnp_contract.get("all_detected_corners_scored") is not True):
+        raise AssertionError("cube PnP quality mask is not a common pre-fit mask")
+    fk_contract = result["protocol"].get("fk_factor", {}).get(
+        "mathematical_contract", {})
+    if (fk_contract.get("cube_pose_is_optimization_variable") is not True
+            or fk_contract.get("hard_gate_or_pose_replacement") is not False
+            or fk_contract.get("external_ground_truth_used") is not False):
+        raise AssertionError("corrected-FK factor contract drift")
     mask_sha = result["protocol"]["model_independent_path_evaluation_mask"][
         "evaluation_mask_sha256"]
     cross_protocol = cross["protocol"]["common_path_evaluation"]

@@ -10,7 +10,7 @@
 - [4. 전체 파이프라인](#4-전체-파이프라인)
 - [5. PnP와 초기화의 역할](#5-pnp와-초기화의-역할)
 - [6. 최종 재투영 최적화 원리](#6-최종-재투영-최적화-원리)
-- [7. 독립과 통합 최적화의 차이](#7-독립과-통합-최적화의-차이)
+- [7. 순차와 통합 최적화의 차이](#7-순차와-통합-최적화의-차이)
 - [8. A0~A5/B1~B3 비교실험](#8-a0a5b1b3-비교실험)
 - [9. 마커 시스템 End-to-End 비교](#9-마커-시스템-end-to-end-비교)
 - [10. 공통 Cross-target 평가](#10-공통-cross-target-평가)
@@ -67,8 +67,17 @@ python3 Run_calibration_comparison.py table1 \
 중요한 용어 규칙은 다음과 같다.
 
 - `vision` 또는 `no-FK`는 **robot FK 전체를 사용하지 않는다는 뜻이 아니다.** Eye-in-hand 카메라 pose $T^B_G(e)T^G_C$를 만들기 위해 robot FK는 모든 조건에서 사용한다.
-- `vision`, `FK-fixed`, `corrected-FK`의 차이는 배치된 cube pose $T^B_{\mathrm{cube}}(s)$를 어떤 방식으로 다루는지에 대한 차이다.
+- `vision`, `FK-fixed`, `corrected-FK factor`의 차이는 배치된 cube pose $T^B_{\mathrm{cube}}(s)$를 자유변수로 둘지, train-only aligned FK에 고정할지, 또는 자유변수에 covariance-whitened FK factor를 연결할지의 차이다.
 - board는 robot에 부착된 물체가 아니므로 `FK-fixed board`라는 조건은 물리적으로 정의하지 않는다.
+
+`T^B_G(e)`의 $G$는 한 실행 안에서 반드시 같은 물리 frame이어야 한다. 현재 session02는 event 0--89가 tool3(150 mm TCP), event 90--95가 flange로 기록되어 있어, [`pose_convention_manifest.json`](data/session02/calib_train/pose_convention_manifest.json)으로 모두 flange 기준으로 정규화한다. cube-center 기록도 같은 manifest에서 legacy tool4 177.5 mm를 실제 tool4 143.0 mm 기준으로 바꾼다. 적용식은 강체 좌표변환
+
+$$
+T^B_{G,\mathrm{canonical}}
+=T^B_{G,\mathrm{reported}}T^{G,\mathrm{reported}}_{G,\mathrm{canonical}}
+$$
+
+이며 픽셀 잔차나 최적화 결과는 이 선택에 사용하지 않는다. 정규화 뒤에는 `inv(T_base_robot) @ T_base_capture_cube_center`가 한 종류인지, 같은 `set_index`의 cube-center가 5 mm/1° 안에서 정지해 있는지 검사하고 실패 시 계산을 중단한다. manifest 자체도 결과 provenance SHA-256에 포함된다.
 
 ## 3. 입력 데이터
 
@@ -97,6 +106,7 @@ Step2는 다음 정보를 같은 capture event 단위로 저장한다.
 ```text
 data/sessionNN/calib_train/
 ├── meta.json
+├── pose_convention_manifest.json  # 기록 frame이 섞인 세션만 필요
 └── ... RGB/depth images
 
 intrinsics/
@@ -165,11 +175,12 @@ PnP는 최종 결과를 직접 결정하는 backend가 아니라 초기값과 �
 
 ### 5.1 관측별 PnP
 
-측정 corner만으로 $T^{C_i}_{O}$를 계산한다.
+측정 corner만으로 $T^{C_i}_{O}$를 계산한다. 역할에 따라 두 계약을 구분한다.
 
-- planar board: `SOLVEPNP_IPPE`
-- non-planar cube: `SOLVEPNP_ITERATIVE`
-- 최소 4개 3D–2D 대응점 필요
+- 모든 방법이 공유하는 cube 입력 품질 마스크: planar support는 positive-depth `SOLVEPNP_IPPE` 후보 중 all-corner RMSE 최소 해, non-planar support는 `RANSAC-EPNP(+LM)` 초기화 후 all-corner RMSE 평가
+- 품질 판정: 검출된 모든 corner의 Euclidean pixel RMSE가 고정카메라 3 px, gripper 카메라 5 px 이하여야 하며 train/test split 전에 한 번만 적용
+- 초기화/경로평가: planar target은 `SOLVEPNP_IPPE`, non-planar cube는 `SOLVEPNP_ITERATIVE`
+- 모든 경우 최소 4개 3D–2D 대응점과 positive depth가 필요
 - 최종 Table 1 solver에서는 PnP pose residual을 쓰지 않고 raw pixel corner residual을 쓴다.
 
 ### 5.2 Board 기반 Hand–Eye 초기화
@@ -254,9 +265,9 @@ $$
 
 최종 단계에는 PnP 평균, pose-consistency 후처리 또는 Ridge 보정이 없다. RANSAC으로 결과가 나쁜 관측을 사후 제거하지도 않는다. 검출 품질과 PnP-validity 기반 공통 mask는 모델 fitting 전에 고정하고, 최적화 중 이상치 영향은 공통 `soft_l1` loss로 제한한다.
 
-## 7. 독립과 통합 최적화의 차이
+## 7. 순차와 통합 최적화의 차이
 
-### 7.1 독립/순차 방식 `seq`
+### 7.1 순차 방식 `seq`
 
 1단계는 eye-in-hand 관측만 사용한다.
 
@@ -349,7 +360,7 @@ $$
 \quad \Sigma_s=L_sL_s^T
 $$
 
-FK factor에는 Huber loss를 적용한다. `--fk_covariance_json`이 없으면 고정 Simulation prior를 사용하는 preflight이며 confirmatory 결과로 해석하지 않는다.
+FK factor에는 Huber loss를 적용한다. `--fk_covariance_json`이 없으면 고정 Simulation prior를 사용하는 preflight이며 confirmatory 결과로 해석하지 않는다. 실측 파일은 측정 source와 estimator가 명시되어야 하고, full-rank 6D 표본 covariance의 수학적 최소 조건인 7회 이상의 독립 반복, 대칭성, positive-definiteness를 통과해야 한다.
 
 ### 8.6 A5 — 독립 correction label 대기
 
@@ -512,8 +523,8 @@ translation mm와 SO(3) rotation deg RMSE를 보고한다. robot FK가 포함되
 
 핵심 요약은 다음과 같다.
 
-- 통합 최적화의 개선 방향은 대체로 일관되지만 held-out primary px 개선폭은 작다.
-- A3는 full board+cube 조건의 pixel 및 `e_cross`에서 가장 좋지만 `e_e2e`는 악화되므로 물리 정확도의 최종 우승자로 확정할 수 없다.
+- 통합 최적화는 translation 계열을 일관되게 개선하지만 회전은 소폭 악화하고 held-out primary px 개선폭은 매우 작다.
+- A3는 full board+cube 조건의 자체 held-out pixel 및 inter-camera 지표에서 가장 좋지만 common px와 `e_e2e` 회전은 혼합되므로 물리 정확도의 최종 우승자로 확정할 수 없다.
 - Soft-FK 조건은 아직 Simulation prior 기반 preflight이며 실측 covariance 재실행이 필요하다.
 - Board와 cube는 서로 다른 지표를 개선하므로 marker-system의 절대 우승 조건도 아직 없다.
 
@@ -530,7 +541,7 @@ CP_result/sessionNN/late_table1/
 └── TABLE1_RESULTS.md
 ```
 
-- `shared_train_only_baseline.json`: split, solver, 관측 loader, 공통/행별 initial state와 SHA-256
+- `shared_train_only_baseline.json`: split, solver, 관측 loader, 공통/행별 initial state, meta/intrinsics/구현 파일 및 train/heldout 관측 population SHA-256
 - `shared_board_free_fk_cube.json`: board/held-out 미사용 FK–cube alignment provenance
 - `table1_methods.json`: 각 행·seed의 transforms, train/test px, path metrics, solver/Jacobian diagnostics
 - `table1_results.csv`: 논문/HTML용 요약 숫자의 canonical table
@@ -639,7 +650,7 @@ python3 tools/verify_e_cross_definition.py
 - [Session02 Table 1 결과와 비교별 해석](session02_result_table1.md)
 - [Table 1 결과 및 교수님 피드백 반영](CP_result/session02/late_table1/TABLE1_RESULTS.md)
 - [Interactive 결과](./_TABLE1_INTERACTIVE.html)
-- [독립/통합 수식 상세](CALIBRATION_PIPELINE.md)
+- [순차/통합 및 FK factor 수식 상세](CALIBRATION_EXPLANATION_LATEX.md)
 - [캘리브레이션 방법과 SOTA 설명](CALIBRATION_EXPLANATION_LATEX.md)
 - [Simulation 추후 수정 목록](Simulation/Simulation_TO_EDIT.md)
 

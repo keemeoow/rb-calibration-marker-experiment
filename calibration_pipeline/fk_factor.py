@@ -177,9 +177,24 @@ class FactorizedFKProblem:
         cube_variable_keys = [key for key in self.visual.variable_keys if key[0] == "cube"]
         if fk_spec.mode == FK_MODE_FIXED and cube_variable_keys:
             raise ValueError("mode='fixed' requires cube poses to be absent from variable_keys")
+        variable_sets = {int(key[1]) for key in cube_variable_keys}
+        target_sets = set(self.fk_targets)
+        covariance_sets = {int(key) for key in fk_covariances}
+        if fk_spec.mode == FK_MODE_FACTOR:
+            if not variable_sets:
+                raise ValueError("mode='factor' requires at least one free cube pose")
+            if target_sets != variable_sets:
+                raise ValueError(
+                    "FK factor target sets must exactly match free cube sets: "
+                    f"variables={sorted(variable_sets)}, targets={sorted(target_sets)}")
+            if covariance_sets != variable_sets:
+                raise ValueError(
+                    "FK covariance sets must exactly match free cube sets: "
+                    f"variables={sorted(variable_sets)}, "
+                    f"covariances={sorted(covariance_sets)}")
         self.factor_keys = [
             key for key in self.visual.variable_keys
-            if key[0] == "cube" and int(key[1]) in self.fk_targets
+            if key[0] == "cube"
         ] if fk_spec.mode == FK_MODE_FACTOR else []
         self.whiteners = {}
         if fk_spec.mode == FK_MODE_FACTOR:

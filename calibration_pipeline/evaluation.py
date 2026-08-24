@@ -91,6 +91,34 @@ def state_sha256(state: PoseState) -> str:
     return canonical_json_sha256(serialize_state(state))
 
 
+def observations_sha256(observations: Sequence[PixelObs]) -> str:
+    """Order-independent digest of the exact calibrated-corner population."""
+    records = []
+    for observation in observations:
+        record = hashlib.sha256()
+        identity = {
+            "marker": str(observation.marker),
+            "cam": int(observation.cam),
+            "event": int(observation.event),
+            "set_idx": (None if observation.set_idx is None
+                        else int(observation.set_idx)),
+            "grasp_idx": (None if observation.grasp_idx is None
+                          else int(observation.grasp_idx)),
+        }
+        record.update(json.dumps(
+            identity, sort_keys=True, separators=(",", ":")).encode("utf-8"))
+        for values in (observation.object_points, observation.image_points):
+            array = np.ascontiguousarray(values, dtype="<f8")
+            record.update(str(array.shape).encode("ascii"))
+            record.update(array.tobytes())
+        records.append(record.digest())
+    digest = hashlib.sha256()
+    digest.update(str(len(records)).encode("ascii"))
+    for record in sorted(records):
+        digest.update(record)
+    return digest.hexdigest()
+
+
 def pixel_reprojection_metrics(
     observations: Sequence[PixelObs],
     state: PoseState,

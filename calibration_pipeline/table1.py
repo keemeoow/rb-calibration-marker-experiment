@@ -37,6 +37,8 @@ from scipy.spatial.transform import Rotation
 
 from calibration_pipeline import se3 as cp
 from calibration_pipeline.schema import (
+    CORRECTED_FK_FACTOR_CONTRACT,
+    DEFAULT_SPLIT_SEED,
     EVALUATION_COMPARISON_CONTRACT,
     FK_ALIGNMENT_SHARED_ROWS,
     MAIN_ABLATION_CONDITIONS,
@@ -60,6 +62,7 @@ from calibration_pipeline.runtime import (
 )
 from calibration_pipeline.config import get_default_cube_config
 from calibration_pipeline.observations import load_cube_board_pixel_observations
+from calibration_pipeline.pose_convention import apply_pose_convention_manifest
 from calibration_pipeline.fk_alignment import estimate_board_free_fk_cube_artifact
 from calibration_pipeline.fk_factor import (
     FKFactorSpec,
@@ -96,11 +99,12 @@ from calibration_pipeline.evaluation import (
     canonical_json_sha256 as _canonical_json_sha256,
     jsonable as _jsonable,
     pixel_reprojection_metrics,
+    observations_sha256,
     serialize_state,
     state_sha256,
 )
 
-SHARED_BASELINE_SCHEMA = "table1_shared_train_only_baseline_v1"
+SHARED_BASELINE_SCHEMA = "table1_shared_train_only_baseline_v2"
 RUNNABLE_ROWS = ("A0", "A1", "A2", "A3", "A4", "B1", "B2", "B3")
 BASELINE_ROWS = RUNNABLE_ROWS + ("A5",)
 PENDING_ROWS = {
@@ -110,6 +114,96 @@ PENDING_ROWS = {
         "baseline": "same shared train-only reference state as A4",
     }
 }
+
+
+def _file_sha256(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def _observation_population_manifest(observations: Sequence[PixelObs]) -> dict:
+    return {
+        "sha256": observations_sha256(observations),
+        "observations": int(len(observations)),
+        "corners": int(sum(
+            len(np.asarray(observation.image_points).reshape(-1, 2))
+            for observation in observations)),
+        "events": sorted({int(observation.event) for observation in observations}),
+    }
+
+
+def _source_data_provenance(
+        args, camera_ids: Sequence[int], eligible_observations,
+        train_observations, heldout_observations) -> dict:
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    meta_path = os.path.abspath(os.path.join(args.root_folder, "meta.json"))
+    intrinsics = {}
+    for camera_id in sorted(int(value) for value in camera_ids):
+        path = os.path.abspath(os.path.join(
+            args.intrinsics_dir, f"cam{camera_id}.npz"))
+        intrinsics[str(camera_id)] = {
+            "path": path,
+            "sha256": _file_sha256(path),
+        }
+    source_names = (
+        "apriltag_cube.py", "charuco.py", "config.py", "cross_target.py",
+        "cube_detection.py", "evaluation.py", "fk_alignment.py",
+        "fk_factor.py", "marker_system.py", "observations.py",
+        "path_evaluation.py", "pose_convention.py", "reprojection.py",
+        "runtime.py", "schema.py", "se3.py", "table1.py",
+    )
+    implementation = {}
+    for name in source_names:
+        path = os.path.join(project_root, "calibration_pipeline", name)
+        implementation[os.path.relpath(path, project_root)] = _file_sha256(path)
+    provenance = {
+        "meta_json": {"path": meta_path, "sha256": _file_sha256(meta_path)},
+        "intrinsics": intrinsics,
+        "implementation_sha256": implementation,
+        "observation_populations": {
+            "eligible": _observation_population_manifest(eligible_observations),
+            "train": _observation_population_manifest(train_observations),
+            "heldout": _observation_population_manifest(heldout_observations),
+        },
+    }
+    pose_manifest_path = os.path.abspath(os.path.join(
+        args.root_folder, "pose_convention_manifest.json"))
+    if os.path.isfile(pose_manifest_path):
+        provenance["pose_convention_manifest"] = {
+            "path": pose_manifest_path,
+            "sha256": _file_sha256(pose_manifest_path),
+        }
+    return provenance
+
+
+def validate_source_data_provenance(provenance: Mapping) -> None:
+    """Fail closed when a stored artifact no longer matches files on disk."""
+    entries = [provenance.get("meta_json", {})]
+    entries.extend(provenance.get("intrinsics", {}).values())
+    if provenance.get("pose_convention_manifest"):
+        entries.append(provenance["pose_convention_manifest"])
+    for entry in entries:
+        path = str(entry.get("path", ""))
+        expected = str(entry.get("sha256", ""))
+        if not path or not expected or not os.path.isfile(path):
+            raise ValueError(f"source provenance file is unavailable: {path!r}")
+        if _file_sha256(path) != expected:
+            raise ValueError(f"stored result is stale: source file changed: {path}")
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    for relative, expected in provenance.get("implementation_sha256", {}).items():
+        path = os.path.join(project_root, str(relative))
+        if not os.path.isfile(path) or _file_sha256(path) != str(expected):
+            raise ValueError(
+                f"stored result is stale: calibration implementation changed: {relative}")
+    populations = provenance.get("observation_populations", {})
+    if set(populations) != {"eligible", "train", "heldout"}:
+        raise ValueError("source provenance lacks calibrated observation populations")
+    for name, manifest in populations.items():
+        if not str(manifest.get("sha256", "")):
+            raise ValueError(f"source provenance lacks {name} observation SHA-256")
 
 
 def filter_observations(observations: Sequence[PixelObs], condition: AblationCondition,
@@ -510,12 +604,19 @@ def load_fk_covariances(path: str, set_ids: Sequence[int]) -> Tuple[dict, dict]:
     source = str(payload.get("measurement_source", "")).strip()
     if not source or source.startswith("REPLACE_"):
         raise ValueError("FK covariance measurement_source is a placeholder")
+    estimator = str(payload.get("covariance_estimator", "")).strip()
+    if not estimator or estimator.startswith("REPLACE_"):
+        raise ValueError("FK covariance covariance_estimator is a placeholder")
     try:
         n_repeats = int(payload.get("n_repeats", 0))
     except (TypeError, ValueError):
         n_repeats = 0
-    if n_repeats < 3:
-        raise ValueError("FK covariance artifact needs at least three physical repeats")
+    # A sample covariance in d=6 dimensions has rank at most N-1.  Requiring
+    # N>=7 is therefore the mathematical minimum for a full-rank 6x6 estimate.
+    if n_repeats < 7:
+        raise ValueError(
+            "FK covariance artifact needs at least seven physical repeats "
+            "for a potentially full-rank 6D sample covariance")
     shared = payload.get("shared_covariance_6x6")
     per_set = payload.get("per_set_covariance_6x6", {})
     covariances = {}
@@ -529,8 +630,11 @@ def load_fk_covariances(path: str, set_ids: Sequence[int]) -> Tuple[dict, dict]:
         "path": os.path.abspath(path),
         "sha256": _sha256_file(path),
         "measurement_source": source,
+        "covariance_estimator": estimator,
         "n_repeats": n_repeats,
+        "minimum_repeats_for_full_rank_6d_covariance": 7,
         "confirmatory_ready": True,
+        "status": "confirmatory_measured_covariance",
     }
 
 
@@ -545,6 +649,7 @@ def preflight_fk_covariances(set_ids: Sequence[int]) -> Tuple[dict, dict]:
             "translation_std_mm": SIGMA_FK_MM,
             "rotation_std_deg": SIGMA_FK_DEG,
             "confirmatory_ready": False,
+            "status": "preflight_simulation_prior",
             "warning": (
                 "Simulation-matched covariance is a preflight prior, not measured "
                 "robot covariance"),
@@ -861,6 +966,8 @@ class PreparedAblationData:
     robot_T: dict
     train_obs: List[PixelObs]
     test_obs: List[PixelObs]
+    source_data_provenance: dict
+    pose_convention: dict
     path_evaluation_mask: dict
     board_gtc: np.ndarray
     board_initial: np.ndarray
@@ -882,6 +989,8 @@ def prepare_ablation_data(args) -> PreparedAblationData:
     if included_set_indices and not meta.get("captures"):
         raise RuntimeError(
             f"include_sets={args.include_sets!r} did not match any captures")
+    meta, pose_convention = apply_pose_convention_manifest(
+        args.root_folder, meta)
     all_cam_ids = sorted({int(ci) for cap in meta.get("captures", [])
                           for ci in cap.get("cams", {})})
     gripper = int(meta["gripper_cam_idx"])
@@ -901,6 +1010,8 @@ def prepare_ablation_data(args) -> PreparedAblationData:
     pool = [obs for obs in observations if obs.set_idx in eligible]
     train_obs = [obs for obs in pool if int(obs.event) in train_events]
     test_obs = [obs for obs in pool if int(obs.event) in test_events]
+    source_data_provenance = _source_data_provenance(
+        args, all_cam_ids, pool, train_obs, test_obs)
     common_fixed_cameras = sorted({
         int(obs.cam) for obs in test_obs
         if obs.marker == "cube" and int(obs.cam) != gripper
@@ -987,6 +1098,8 @@ def prepare_ablation_data(args) -> PreparedAblationData:
         robot_T=robot_T,
         train_obs=train_obs,
         test_obs=test_obs,
+        source_data_provenance=source_data_provenance,
+        pose_convention=pose_convention,
         path_evaluation_mask=path_evaluation_mask,
         board_gtc=board_gtc,
         board_initial=board_initial,
@@ -1037,8 +1150,12 @@ def build_shared_baseline_artifact(
             "exclude_gripped_cube": True,
             "fixed_cube_min_corners": 8,
             "image_scale": float(getattr(args, "image_scale", 1.0)),
+            "cube_pnp_quality_contract": data.cube_detection[
+                "quality_contract"],
         },
         "cube_config_source": data.cube_config_source,
+        "source_data_provenance": data.source_data_provenance,
+        "pose_convention": data.pose_convention,
         "fk_alignment_artifact_sha256": data.alignment_artifact[
             "artifact_sha256"],
         "scope_note": (
@@ -1059,6 +1176,7 @@ def validate_shared_baseline_artifact(payload: Mapping) -> None:
         raise ValueError("Table 1 shared-baseline SHA-256 mismatch")
     if payload.get("heldout_information_used") is not False:
         raise ValueError("shared baseline must exclude held-out information")
+    validate_source_data_provenance(payload.get("source_data_provenance", {}))
     if set(payload.get("row_reference_states", {})) != set(BASELINE_ROWS):
         raise ValueError("shared baseline must contain A0-A5/B1-B3 row states")
     if payload["row_reference_states"]["A5"] != payload["row_reference_states"]["A4"]:
@@ -1166,7 +1284,7 @@ def parse_args(argv=None):
         "--include_sets", default="",
         help="Use only these set_index values (comma list/ranges, e.g. 5-12).")
     parser.add_argument("--test_fraction", type=float, default=0.2)
-    parser.add_argument("--split_seed", type=int, default=20260729)
+    parser.add_argument("--split_seed", type=int, default=DEFAULT_SPLIT_SEED)
     parser.add_argument("--min_train_eih_cube_events", type=int, default=3)
     parser.add_argument("--num_inits", type=int, default=3)
     parser.add_argument("--init_translation_mm", type=float, default=5.0)
@@ -1286,6 +1404,8 @@ def main(argv=None, force_baseline_only: bool = False) -> None:
             "requested_set_filter": str(getattr(args, "include_sets", "")),
             "resolved_set_indices": split["eligible_sets"],
             "cube_config_source": cube_cfg_source,
+            "source_data_provenance": prepared.source_data_provenance,
+            "pose_convention": prepared.pose_convention,
             "primary_metric": PRIMARY_METRIC,
             "reprojection_metric_contract": REPROJECTION_METRIC_CONTRACT,
             "split": split,
@@ -1338,6 +1458,7 @@ def main(argv=None, force_baseline_only: bool = False) -> None:
                 "executable_consumers": list(RUNNABLE_ROWS),
             },
             "fk_factor": {
+                "mathematical_contract": CORRECTED_FK_FACTOR_CONTRACT,
                 "covariance": covariance_provenance,
                 "rows": ["A4", "B1", "B2"],
                 "loss": "huber",

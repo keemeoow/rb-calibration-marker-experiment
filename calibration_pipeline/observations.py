@@ -76,7 +76,7 @@ def load_cube_pixel_observations(root: str, meta: dict, cube,
                                  exclude_gripped: bool = True,
                                  fixed_min_corners: int = 8,
                                  image_scale: float = 1.0) -> Tuple[List[PixelObs], dict]:
-    detected, reason = detect_corner_observations(
+    detected, diagnostics = detect_corner_observations(
         root=root,
         meta=meta,
         cube=cube,
@@ -91,6 +91,12 @@ def load_cube_pixel_observations(root: str, meta: dict, cube,
         exclude_gripped=bool(exclude_gripped),
         image_scale=float(image_scale),
     )
+    selected = [
+        obs for obs in detected
+        if (int(obs.cam) == int(gripper_cam_idx)
+            or len(np.asarray(obs.object_points).reshape(-1, 3))
+            >= int(fixed_min_corners))
+    ]
     output = [PixelObs(
         marker="cube",
         cam=int(obs.cam),
@@ -99,10 +105,13 @@ def load_cube_pixel_observations(root: str, meta: dict, cube,
         object_points=np.asarray(obs.object_points, dtype=np.float64).reshape(-1, 3),
         image_points=np.asarray(obs.image_points, dtype=np.float64).reshape(-1, 2),
         grasp_idx=None if getattr(obs, "grasp_idx", None) is None else int(obs.grasp_idx),
-    ) for obs in detected
-        if (int(obs.cam) == int(gripper_cam_idx)
-            or len(np.asarray(obs.object_points).reshape(-1, 3)) >= int(fixed_min_corners))]
-    return output, reason
+    ) for obs in selected]
+    diagnostics = dict(diagnostics)
+    diagnostics["fixed_camera_min_corners"] = int(fixed_min_corners)
+    diagnostics["fixed_camera_min_corner_rejections"] = int(
+        len(detected) - len(selected))
+    diagnostics["final_observation_count"] = int(len(output))
+    return output, diagnostics
 
 
 def load_cube_board_pixel_observations(root: str, meta: dict, cube,

@@ -20,7 +20,22 @@ POSE_SOURCE_ESTIMATED = "estimated"
 POSE_SOURCE_FK_FIXED = "FK-fixed"
 POSE_SOURCE_FK_FACTOR = "corrected-FK-factor"
 POSE_SOURCE_ABSENT = "—"
+DEFAULT_SPLIT_SEED = 20260731
 _SOFT_ANCHOR_RE = re.compile(r"soft-anchor \(λ=(?:0|[1-9][0-9]*)(?:\.[0-9]+)?\)")
+
+CORRECTED_FK_FACTOR_CONTRACT = {
+    "aligned_pose": "T_fk_aligned_set = T_fk_raw_set @ Delta_train",
+    "delta_estimation": (
+        "board_free_training_eye_in_hand_cube_corner_reprojection"),
+    "cube_pose_is_optimization_variable": True,
+    "factor_residual": (
+        "r_set=[Log_SO3(R_cube^T R_fk_aligned), "
+        "translation(inv(T_cube)@T_fk_aligned)]"),
+    "whitening": "w_set=chol(Sigma_set)^(-1)@r_set",
+    "objective": "robust_visual_corner_residuals_plus_robust_whitened_FK_factors",
+    "hard_gate_or_pose_replacement": False,
+    "external_ground_truth_used": False,
+}
 
 
 @dataclass(frozen=True)
@@ -41,7 +56,7 @@ MAIN_ABLATION_CONDITIONS = (
     AblationCondition("A3", "cube+board", "U", "FK-fixed", "estimated", "Ours (full)"),
     AblationCondition(
         "A4", "cube+board", "U", "corrected-FK-factor", "estimated",
-        "Ours (corrected-FK)",
+        "Ours (corrected-FK factor)",
     ),
     AblationCondition(
         "B1", "cube+board", "seq", "corrected-FK-factor", "estimated",

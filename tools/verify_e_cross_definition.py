@@ -30,6 +30,7 @@ if str(ROOT) not in sys.path:
 from calibration_pipeline import table1  # noqa: E402
 from calibration_pipeline import cross_target as cross_eval  # noqa: E402
 from calibration_pipeline.apriltag_cube import inv_T  # noqa: E402
+from calibration_pipeline.schema import DEFAULT_SPLIT_SEED  # noqa: E402
 from calibration_pipeline.path_evaluation import (  # noqa: E402
     E_CROSS_CONTRACT,
     E_CROSS_PIXEL_TRANSFER_CONTRACT,
@@ -64,7 +65,7 @@ def preparation_args(args):
         calib_dir=args.calib_dir,
         include_sets=args.include_sets,
         test_fraction=0.2,
-        split_seed=20260731,
+        split_seed=DEFAULT_SPLIT_SEED,
         min_train_eih_cube_events=3,
         image_scale=1.0,
         num_inits=3,

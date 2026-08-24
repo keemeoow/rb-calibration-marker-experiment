@@ -302,7 +302,13 @@ def load_intrinsics_with_depth_scale(intrinsics_dir: str, cam_idx: int) -> Tuple
 
 def load_robot_pose_from_capture(cap: dict) -> Optional[np.ndarray]:
     T_base_gripper = None
-    if "robot_pose_matrix_4x4" in cap:
+    if "canonical_robot_pose_matrix_4x4" in cap:
+        try:
+            T_base_gripper = np.asarray(
+                cap["canonical_robot_pose_matrix_4x4"], dtype=np.float64)
+        except Exception:
+            T_base_gripper = None
+    if T_base_gripper is None and "robot_pose_matrix_4x4" in cap:
         try:
             T_base_gripper = np.asarray(cap["robot_pose_matrix_4x4"], dtype=np.float64)
         except Exception:
@@ -390,6 +396,14 @@ def filter_meta_by_set_indices(meta: dict,
 
 
 def get_capture_set_cube_center_transform_raw(cap: dict) -> Optional[np.ndarray]:
+    canonical = cap.get("canonical_set_cube_center_matrix_4x4")
+    if canonical is not None:
+        try:
+            transform = np.asarray(canonical, dtype=np.float64)
+            if transform.shape == (4, 4) and np.all(np.isfinite(transform)):
+                return transform
+        except Exception:
+            pass
     raw = cap.get("set_cube_center_6dof")
     if not isinstance(raw, list) or len(raw) != 6:
         return None

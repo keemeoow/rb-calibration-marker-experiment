@@ -165,11 +165,10 @@ def load_nominal_set_cube_transforms(meta: Dict[str, Any]) -> Dict[int, np.ndarr
         set_index = get_capture_set_index(capture)
         if set_index is None or set_index in transforms:
             continue
-        pose = _parse_pose6(get_capture_set_cube_center_transform_raw(capture))
-        if pose is None:
-            pose = _parse_pose6(capture.get("set_cube_center_6dof"))
-        if pose is not None:
-            transforms[int(set_index)] = _pose6_to_transform(pose)
+        transform = get_capture_set_cube_center_transform_raw(capture)
+        if transform is not None:
+            transforms[int(set_index)] = np.asarray(
+                transform, dtype=np.float64).reshape(4, 4)
     return transforms
 
 
@@ -180,7 +179,10 @@ def load_robot_poses_from_meta(meta: Dict[str, Any]) -> Dict[int, np.ndarray]:
         event = int(capture.get("event_id", -1))
         if event < 0:
             continue
-        transform = _parse_transform(capture.get("robot_pose_matrix_4x4"))
+        transform = _parse_transform(capture.get(
+            "canonical_robot_pose_matrix_4x4"))
+        if transform is None:
+            transform = _parse_transform(capture.get("robot_pose_matrix_4x4"))
         if transform is None:
             transform = _parse_transform(capture.get(
                 "capture_gripper_pose_matrix_4x4",

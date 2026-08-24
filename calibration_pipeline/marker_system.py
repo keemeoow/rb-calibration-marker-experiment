@@ -26,7 +26,7 @@ from typing import Mapping, Sequence
 import numpy as np
 
 from calibration_pipeline import table1
-from calibration_pipeline.schema import MARKER_COMPARISON_CONTRACT
+from calibration_pipeline.schema import DEFAULT_SPLIT_SEED, MARKER_COMPARISON_CONTRACT
 from calibration_pipeline.reprojection import PoseState
 from calibration_pipeline.evaluation import (
     common_target_observation_groups,
@@ -320,7 +320,7 @@ def parse_args(argv=None):
     parser.add_argument("--include_sets", default="5-12")
     parser.add_argument("--out_dir", default="CP_result/session02/marker_system_end_to_end")
     parser.add_argument("--test_fraction", type=float, default=0.2)
-    parser.add_argument("--split_seed", type=int, default=20260731)
+    parser.add_argument("--split_seed", type=int, default=DEFAULT_SPLIT_SEED)
     parser.add_argument("--min_train_eih_cube_events", type=int, default=3)
     parser.add_argument("--num_inits", type=int, default=3)
     parser.add_argument("--init_translation_mm", type=float, default=5.0)
@@ -362,6 +362,8 @@ def main(argv=None) -> None:
         "protocol": {
             "dataset": args.root_folder,
             "intrinsics_dir": args.intrinsics_dir,
+            "source_data_provenance": data.source_data_provenance,
+            "pose_convention": data.pose_convention,
             "split": data.split,
             "same_split_raw_detections_K_D_solver_seeds_and_evaluation": True,
             "initialization_policy": "marker_modality_specific_train_only",

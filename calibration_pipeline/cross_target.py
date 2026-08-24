@@ -21,6 +21,7 @@ import os
 import numpy as np
 
 from calibration_pipeline import table1
+from calibration_pipeline.schema import DEFAULT_SPLIT_SEED
 from calibration_pipeline.path_evaluation import (
     E_CROSS_CONTRACT,
     E_CROSS_PIXEL_TRANSFER_CONTRACT,
@@ -103,7 +104,7 @@ def write_outputs(result: dict, output_dir: str) -> None:
         json.dump(jsonable(result), handle, indent=2)
     fields = list(result["summary"][0])
     with open(os.path.join(output_dir, "cross_target_evaluation.csv"), "w", newline="") as handle:
-        writer = csv.DictWriter(handle, fieldnames=fields)
+        writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
         writer.writeheader()
         writer.writerows(result["summary"])
 
@@ -115,7 +116,7 @@ def parse_args(argv=None):
     parser.add_argument("--calib_dir", default="data/session02/calib_train/calib_out")
     parser.add_argument("--include_sets", default="5-12")
     parser.add_argument("--test_fraction", type=float, default=0.2)
-    parser.add_argument("--split_seed", type=int, default=20260731)
+    parser.add_argument("--split_seed", type=int, default=DEFAULT_SPLIT_SEED)
     parser.add_argument("--min_train_eih_cube_events", type=int, default=3)
     parser.add_argument("--image_scale", type=float, default=1.0)
     parser.add_argument("--num_inits", type=int, default=3)
@@ -187,6 +188,8 @@ def main(argv=None) -> None:
         "artifact_schema": "session02_common_heldout_evaluation_v3",
         "protocol": {
             "question": "frozen calibration transfer to shared held-out board and cube targets",
+            "source_data_provenance": prepared.source_data_provenance,
+            "pose_convention": prepared.pose_convention,
             "test_time_refit": False,
             "split": stored_split,
             "common_fixed_cameras": sorted(common_cameras),

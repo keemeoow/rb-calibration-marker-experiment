@@ -20,7 +20,9 @@ class CornerObservation:
     set_idx: Optional[int]
     object_points: np.ndarray
     image_points: np.ndarray
-    err_hint_px: float
+    pnp_reprojection_rmse_px: float
+    pnp_inlier_fraction: float
+    pnp_solver: str
     grasp_idx: Optional[int] = None
 
 
@@ -74,6 +76,111 @@ def _object_corners(cube: AprilTagCubeTarget,
     return None
 
 
+def _is_planar(object_points: np.ndarray) -> bool:
+    """Return whether the 3-D support is numerically confined to one plane."""
+    points = np.asarray(object_points, dtype=np.float64).reshape(-1, 3)
+    if len(points) < 4:
+        return True
+    singular_values = np.linalg.svd(
+        points - np.mean(points, axis=0), compute_uv=False)
+    scale = max(float(singular_values[0]), 1e-12)
+    return bool(float(singular_values[-1]) <= 1e-7 * scale)
+
+
+def _pnp_quality(
+    object_points: np.ndarray,
+    image_points: np.ndarray,
+    K: np.ndarray,
+    D: np.ndarray,
+    threshold_px: float,
+) -> Optional[Tuple[float, float, str]]:
+    """Estimate a measurement-only pose and score every detected corner.
+
+    Planar support uses IPPE and explicitly chooses the positive-depth solution
+    with the lowest all-corner error.  Non-planar support uses RANSAC only to
+    initialize the pose; acceptance is still based on the RMSE of *all* input
+    corners, so an outlier cannot disappear from the common quality mask.
+    """
+    obj = np.asarray(object_points, dtype=np.float64).reshape(-1, 3)
+    img = np.asarray(image_points, dtype=np.float64).reshape(-1, 2)
+    K = np.asarray(K, dtype=np.float64).reshape(3, 3)
+    D = np.asarray(D, dtype=np.float64)
+    threshold_px = float(threshold_px)
+    if (len(obj) < 4 or obj.shape[0] != img.shape[0]
+            or not np.all(np.isfinite(obj)) or not np.all(np.isfinite(img))
+            or not np.isfinite(threshold_px) or threshold_px <= 0.0):
+        return None
+
+    candidates = []
+    if _is_planar(obj):
+        try:
+            result = cv2.solvePnPGeneric(
+                obj, img, K, D, flags=cv2.SOLVEPNP_IPPE)
+            count, rvecs, tvecs = int(result[0]), result[1], result[2]
+            if count > 0:
+                candidates.extend(
+                    (np.asarray(rvec, dtype=np.float64).reshape(3, 1),
+                     np.asarray(tvec, dtype=np.float64).reshape(3, 1),
+                     "IPPE")
+                    for rvec, tvec in zip(rvecs, tvecs)
+                )
+        except cv2.error:
+            candidates = []
+    else:
+        try:
+            ok, rvec, tvec, inliers = cv2.solvePnPRansac(
+                obj, img, K, D,
+                iterationsCount=200,
+                reprojectionError=threshold_px,
+                confidence=0.999,
+                flags=cv2.SOLVEPNP_EPNP,
+            )
+            if ok:
+                solver = "RANSAC-EPNP"
+                if inliers is not None and len(inliers) >= 4:
+                    indices = np.asarray(inliers, dtype=np.int64).reshape(-1)
+                    try:
+                        rvec, tvec = cv2.solvePnPRefineLM(
+                            obj[indices], img[indices], K, D, rvec, tvec)
+                        solver += "+LM"
+                    except (AttributeError, cv2.error):
+                        pass
+                candidates.append((rvec, tvec, solver))
+        except cv2.error:
+            pass
+        if not candidates:
+            try:
+                has_sqpnp = hasattr(cv2, "SOLVEPNP_SQPNP")
+                fallback_flag = (
+                    cv2.SOLVEPNP_SQPNP if has_sqpnp else cv2.SOLVEPNP_EPNP)
+                ok, rvec, tvec = cv2.solvePnP(
+                    obj, img, K, D, flags=fallback_flag)
+                if ok:
+                    candidates.append((
+                        rvec, tvec, "SQPNP" if has_sqpnp else "EPNP"))
+            except cv2.error:
+                pass
+
+    scored = []
+    homogeneous = np.column_stack([obj, np.ones(len(obj), dtype=np.float64)])
+    for rvec, tvec, solver in candidates:
+        rotation, _ = cv2.Rodrigues(rvec)
+        transform = np.eye(4, dtype=np.float64)
+        transform[:3, :3] = rotation
+        transform[:3, 3] = np.asarray(tvec, dtype=np.float64).reshape(3)
+        depths = (transform @ homogeneous.T).T[:, 2]
+        if not np.all(np.isfinite(depths)) or np.any(depths <= 0.0):
+            continue
+        projected, _ = cv2.projectPoints(obj, rvec, tvec, K, D)
+        errors = np.linalg.norm(projected.reshape(-1, 2) - img, axis=1)
+        if not np.all(np.isfinite(errors)):
+            continue
+        rmse = float(np.sqrt(np.mean(np.square(errors))))
+        inlier_fraction = float(np.mean(errors <= threshold_px))
+        scored.append((rmse, inlier_fraction, solver))
+    return min(scored, key=lambda item: item[0]) if scored else None
+
+
 def detect_corner_observations(
     root: str,
     meta: Dict[str, Any],
@@ -88,15 +195,17 @@ def detect_corner_observations(
     min_aspect_gripper: float,
     exclude_gripped: bool = False,
     image_scale: float = 1.0,
-) -> Tuple[List[CornerObservation], str]:
-    """Detect native-pixel cube corners and explain an empty result."""
-    del K_map, D_map  # Detection is geometry-only; projection uses these later.
+) -> Tuple[List[CornerObservation], dict]:
+    """Detect native-pixel cube corners with one shared pre-fit PnP gate."""
     image_scale = float(image_scale)
     if not np.isfinite(image_scale) or image_scale <= 0.0:
         raise ValueError("image_scale must be finite and positive")
     observations: List[CornerObservation] = []
     images_read = images_missing = detections = 0
     object_corner_failures = aspect_rejections = 0
+    pnp_failures = pnp_error_rejections = 0
+    pnp_accepted_rmse = []
+    pnp_solver_counts: Dict[str, int] = {}
 
     for capture in meta.get("captures", []):
         event = int(capture.get("event_id", -1))
@@ -170,16 +279,33 @@ def detect_corner_observations(
                 image_points.append(ordered_points)
 
             if object_points:
+                object_array = np.concatenate(object_points, axis=0)
+                image_array = np.concatenate(image_points, axis=0)
+                max_error = (
+                    max_err_gripper if camera == gripper_cam_idx
+                    else max_err_fixed
+                )
+                pnp_quality = _pnp_quality(
+                    object_array, image_array, K_map[camera], D_map[camera],
+                    max_error)
+                if pnp_quality is None:
+                    pnp_failures += 1
+                    continue
+                pnp_rmse, pnp_inlier_fraction, pnp_solver = pnp_quality
+                if pnp_rmse > float(max_error):
+                    pnp_error_rejections += 1
+                    continue
+                pnp_accepted_rmse.append(float(pnp_rmse))
+                pnp_solver_counts[pnp_solver] = pnp_solver_counts.get(pnp_solver, 0) + 1
                 observations.append(CornerObservation(
                     cam=camera,
                     event=event,
                     set_idx=(int(set_index) if set_index is not None else None),
-                    object_points=np.concatenate(object_points, axis=0),
-                    image_points=np.concatenate(image_points, axis=0),
-                    err_hint_px=(
-                        max_err_gripper if camera == gripper_cam_idx
-                        else max_err_fixed
-                    ),
+                    object_points=object_array,
+                    image_points=image_array,
+                    pnp_reprojection_rmse_px=float(pnp_rmse),
+                    pnp_inlier_fraction=float(pnp_inlier_fraction),
+                    pnp_solver=str(pnp_solver),
                     grasp_idx=grasp,
                 ))
 
@@ -201,6 +327,45 @@ def detect_corner_observations(
             reason = (
                 "0 corner observations after filtering: "
                 f"{aspect_rejections} aspect-rejected, "
-                f"{object_corner_failures}/{detections} missing object corners"
+                f"{object_corner_failures}/{detections} missing object corners, "
+                f"{pnp_failures} PnP-invalid, "
+                f"{pnp_error_rejections} PnP-RMSE-rejected"
             )
-    return observations, reason
+    diagnostics = {
+        "status": "ok" if observations else "empty",
+        "reason": reason,
+        "quality_contract": {
+            "selection_stage": "before_split_and_before_any_calibration_fit",
+            "model_output_used": False,
+            "metric": "sqrt(mean_over_corners(||projected-measured||_2^2))",
+            "all_detected_corners_scored": True,
+            "max_rmse_px_by_role": {
+                "fixed": float(max_err_fixed),
+                "gripper": float(max_err_gripper),
+            },
+            "planar_solver": "IPPE_positive_depth_best_all_corner_RMSE",
+            "nonplanar_solver": (
+                "RANSAC_EPNP_plus_optional_LM_initialization_then_"
+                "all_corner_RMSE"),
+        },
+        "counts": {
+            "images_read": int(images_read),
+            "images_missing_or_unreadable": int(images_missing),
+            "detected_markers": int(detections),
+            "aspect_rejections": int(aspect_rejections),
+            "missing_object_corner_rejections": int(object_corner_failures),
+            "pnp_failures": int(pnp_failures),
+            "pnp_rmse_rejections": int(pnp_error_rejections),
+            "accepted_observations": int(len(observations)),
+        },
+        "accepted_pnp_rmse_px": {
+            "min": (float(np.min(pnp_accepted_rmse))
+                    if pnp_accepted_rmse else None),
+            "median": (float(np.median(pnp_accepted_rmse))
+                       if pnp_accepted_rmse else None),
+            "max": (float(np.max(pnp_accepted_rmse))
+                    if pnp_accepted_rmse else None),
+        },
+        "accepted_solver_counts": dict(sorted(pnp_solver_counts.items())),
+    }
+    return observations, diagnostics
