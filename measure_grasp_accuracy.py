@@ -62,6 +62,14 @@ IMAGES_DIR = os.path.join(OUT_DIR, "images")
 
 DEFAULT_ROBOT_IP = "192.168.0.23"
 
+# 처음 한 번은 이 값을 인지 대기 자세로 쓴다(2026-08-25 실측, 모든 카메라에서 큐브가
+# 보이는 자세). record-init 을 실행하거나 wizard 에서 다시 조그하면 덮어써진다.
+DEFAULT_INIT_POSE = {
+    "pose": [-92.81, 467.10, 284.88, -89.96, 0.00, 180.00],
+    "joints": [23.36, -15.54, -100.01, 0.00, -64.45, -156.68],
+    "recorded_at": "built-in default",
+}
+
 # ── 그립 기하 상수. grasp_target.py / server/c1.py 실측값과 동일하며 CLI 로 덮어쓸 수 있다. ──
 FINGERTIP_Z_MM = 115.5     # tool1(get_state) 판독값 -> 핑거팁. server/c1.py:53
 CUBE_SIDE_MM = 59.0        # calibration_pipeline/config.py CubeConfig.cube_side_m
@@ -176,8 +184,11 @@ def load_latest_gt(label: Optional[str]) -> dict:
 
 def load_init_pose() -> dict:
     if not os.path.exists(INIT_POSE_PATH):
-        raise SystemExit(f"[오류] 인지 대기 자세가 없다. 먼저 `record-init` 을 실행할 것: "
-                          f"{INIT_POSE_PATH}")
+        ensure_out_dir()
+        with open(INIT_POSE_PATH, "w") as f:
+            json.dump(DEFAULT_INIT_POSE, f, indent=2)
+        print(f"[안내] 저장된 인지 대기 자세가 없어 내장 기본값을 썼다: {INIT_POSE_PATH} "
+              f"(바꾸려면 `record-init` 실행)")
     with open(INIT_POSE_PATH) as f:
         return json.load(f)
 
@@ -460,8 +471,14 @@ def cmd_wizard(args):
         rb.ping()
     print("[0/4] 로봇 서버 연결 확인 완료.")
 
-    _pause("[1/4] 로봇을 '인지 대기 자세'(모든 카메라에서 큐브가 보일 자세)로 조그하세요.")
-    cmd_record_init(args)
+    init = load_init_pose()
+    print(f"[1/4] 인지 대기 자세 pose(mm/deg) = {['%.2f' % v for v in init['pose']]} "
+          f"({init.get('recorded_at')})")
+    ans = input("  이 자세를 그대로 쓸까요? 바꾸려면 로봇을 원하는 자세로 조그한 뒤 "
+                "n 을 입력 (Y/n): ").strip().lower()
+    if ans == "n":
+        _pause("로봇을 새 '인지 대기 자세'(모든 카메라에서 큐브가 보일 자세)로 조그하세요.")
+        cmd_record_init(args)
 
     _pause("[2/4] 로봇을 그립 자세로 조그한 뒤, 큐브의 눈금 중점을 그 그립 지점에 "
            "손으로 맞추세요 (그리퍼가 실제로 물 지점에 눈금 중앙이 오도록).")
