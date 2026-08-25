@@ -10,9 +10,12 @@
                       무는 지점에 오도록 맞춘 뒤, 이 명령으로 FK 를 읽어 그 순간의
                       "진짜" 큐브 중점을 base 좌표로 계산해 저장한다(정답값, GT).
     3) run-trial     init 자세로 이동 -> 카메라로 큐브 인지(AprilTag PnP) ->
-                      calibration_use.Calibration 으로 base 좌표 변환 -> 그 좌표를
-                      잡으러 이동 -> grip close -> 예측 중점과 GT 중점의 차이(mm)를
-                      계산해 기록한다. --n_trials 로 반복 가능.
+                      calibration_use.Calibration 으로 base 좌표 변환 -> 그 좌표 위
+                      안전거리(기본 5cm)까지 xy·회전만 이동 -> 5cm 수직 하강. 오차는
+                      "그립을 실제로 닫아서" 재는 게 아니라, 이 하강 지점(=계산된 좌표) 을
+                      GT 와 바로 비교해서 낸다 — 내려간 좌표 자체가 이미 측정값이므로 물체를
+                      건드릴 필요가 없다. (파지 가능성까지 보고 싶으면 --attempt_grip.)
+                      --n_trials 로 반복 가능 (블럭을 안 건드리므로 다시 놔줄 필요도 없다).
     4) report        trials.jsonl 을 모아 평균/표준편차/RMSE 를 낸다.
 
 좌표계·오프셋 규약은 grasp_target.py / server/c1.py 와 동일하다:
@@ -299,10 +302,17 @@ def run_one_trial(args, rb: ZeusClient, calib: Calibration, target: AprilTagCube
     rb.movel(approach_pose6, lin_speed=args.lin_speed)
     print(f"[trial {trial_idx}] 수직 하강")
     rb.movel(target_pose6, lin_speed=args.descend_speed)
-
-    held = rb.grip_holds_object(timeout_s=args.grip_timeout_s)
     reached_pose6 = rb.get_pose6()
-    print(f"[trial {trial_idx}] grip close -> {'물체 감지됨 (성공)' if held else '아무것도 안 잡힘 (실패)'}")
+
+    # 오차는 "예측 위치 vs GT" 두 좌표만으로 결정된다 — 실제로 그립을 닫아 물체를
+    # 건드릴 필요가 없다(내려간 지점 자체가 이미 그 측정값이다). 블럭을 안 건드리므로
+    # --n_trials 반복 사이에 다시 놔줄 필요도 없다. 그립 폭·충돌 등 물리적 파지 가능성까지
+    # 확인하고 싶을 때만 --attempt_grip 을 켠다.
+    held = None
+    if args.attempt_grip:
+        held = rb.grip_holds_object(timeout_s=args.grip_timeout_s)
+        print(f"[trial {trial_idx}] grip close -> "
+              f"{'물체 감지됨 (성공)' if held else '아무것도 안 잡힘 (실패)'}")
 
     error_mm = pred_center_mm - gt_center_mm
     error_norm_mm = float(np.linalg.norm(error_mm))
@@ -310,13 +320,17 @@ def run_one_trial(args, rb: ZeusClient, calib: Calibration, target: AprilTagCube
           f"dx {error_mm[0]:+.2f} dy {error_mm[1]:+.2f} dz {error_mm[2]:+.2f}  "
           f"|e| {error_norm_mm:.2f} mm")
 
-    lift_pose6 = reached_pose6.copy()
-    lift_pose6[2] += args.approach_z_mm
-    rb.movel(lift_pose6, lin_speed=args.lin_speed)
+    if args.attempt_grip:
+        # 아직 target_pose6(테이블 높이)에 있을 때 놓아야 한다 — 후퇴부터 하면 잡은 채로
+        # 5cm 위에서 손을 펴 물체를 떨어뜨리게 된다.
+        rb.grip("open", timeout_s=args.grip_timeout_s)
+    print(f"[trial {trial_idx}] 후퇴")
+    rb.movel(approach_pose6, lin_speed=args.lin_speed)
 
     record = {
         "trial_idx": trial_idx,
         "timestamp": now_iso(),
+        "attempted_grip": bool(args.attempt_grip),
         "held_object": held,
         "cam_diag": cam_diag,
         "tilt_deg": tilt_deg,
@@ -331,13 +345,6 @@ def run_one_trial(args, rb: ZeusClient, calib: Calibration, target: AprilTagCube
         "symmetry_deg": args.symmetry,
     }
     append_jsonl(TRIALS_PATH, record)
-
-    if args.auto_replace and trial_idx < args.n_trials:
-        print(f"[trial {trial_idx}] 다음 시도를 위해 같은 자리에 내려놓는다")
-        rb.movel(target_pose6, lin_speed=args.descend_speed)
-        rb.grip("open", timeout_s=args.grip_timeout_s)
-        rb.movel(approach_pose6, lin_speed=args.lin_speed)
-
     return record
 
 
@@ -349,10 +356,6 @@ def cmd_run_trial(args):
 
     calib = Calibration(calib_dir=args.calib_dir)
     target = AprilTagCubeTarget(get_default_cube_config())
-
-    if args.n_trials > 1 and not args.auto_replace:
-        raise SystemExit("[오류] --n_trials > 1 이면 --auto_replace 를 같이 줘야 한다 "
-                          "(매 시도 사이에 사람이 다시 놔줄 게 아니라면).")
 
     records = []
     with ZeusClient(args.robot_ip, args.robot_port) as rb:
@@ -374,10 +377,13 @@ def cmd_report(args):
         return
     err = np.array([r["error_xyz_mm"] for r in records])
     norm = np.array([r["error_norm_mm"] for r in records])
-    held = [r.get("held_object") for r in records]
+    gripped = [r for r in records if r.get("attempted_grip")]
 
     print(f"[report] {len(records)}회 시도  ({TRIALS_PATH})")
-    print(f"  물체 감지 성공 = {sum(1 for h in held if h)}/{len(held)}")
+    if gripped:
+        held = [r.get("held_object") for r in gripped]
+        print(f"  물체 감지 성공(--attempt_grip 한 시도만) = "
+              f"{sum(1 for h in held if h)}/{len(held)}")
     for i, axis in enumerate("xyz"):
         print(f"  {axis} 오차(mm)  평균 {err[:, i].mean():+7.2f}  표준편차 {err[:, i].std():6.2f}  "
               f"최대|값| {np.abs(err[:, i]).max():6.2f}")
@@ -415,7 +421,7 @@ def main():
     p.add_argument("--label", default="default")
     p.set_defaults(func=cmd_record_gt)
 
-    p = sub.add_parser("run-trial", help="인지->이동->grasp->오차계산 을 실행")
+    p = sub.add_parser("run-trial", help="인지->이동->오차계산 을 실행 (기본은 그립 안 함)")
     add_common_robot_args(p)
     add_geometry_args(p)
     p.add_argument("--calib_dir", default=os.path.join(HERE, "data/session02/calib_final_use"))
@@ -426,15 +432,18 @@ def main():
     p.add_argument("--frames", type=int, default=10)
     p.add_argument("--symmetry", type=float, default=90.0,
                    help="단면 회전 대칭 각도. 정사각 큐브는 90 (기본)")
-    p.add_argument("--approach_z_mm", type=float, default=80.0,
-                   help="목표 위 이만큼에서 먼저 xy·회전 정렬 후 수직 하강")
+    p.add_argument("--approach_z_mm", type=float, default=50.0,
+                   help="목표 위 이만큼(안전거리)에서 먼저 xy·회전 정렬 후 수직 하강. 기본 5cm")
     p.add_argument("--lin_speed", type=float, default=60.0)
     p.add_argument("--descend_speed", type=float, default=25.0)
     p.add_argument("--jnt_speed", type=float, default=15.0)
     p.add_argument("--grip_timeout_s", type=float, default=3.0)
+    p.add_argument("--attempt_grip", action="store_true",
+                   help="내려간 지점에서 실제로 grip close 까지 해본다(파지 가능성 확인용). "
+                        "기본은 안 함 — 오차는 내려간 좌표와 GT 비교만으로 나온다. 블럭을 "
+                        "건드리지 않으므로 이 옵션 없이는 --n_trials 반복 사이에 다시 놔줄 "
+                        "필요도 없다.")
     p.add_argument("--n_trials", type=int, default=1)
-    p.add_argument("--auto_replace", action="store_true",
-                   help="매 시도 뒤 같은 자리에 자동으로 내려놓고 다음 시도로 넘어간다")
     p.add_argument("--between_s", type=float, default=2.0)
     p.set_defaults(func=cmd_run_trial)
 
