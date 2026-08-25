@@ -2,11 +2,39 @@
 
 > 마커 큐브와 로봇 FK를 함께 쓰는 멀티카메라 캘리브레이션
 
+## 목차
+
+- [0. 발표를 한 문장으로 시작한다면](#toc-section-1)
+- [1. 왜 카메라마다 큐브의 좌표가 다를까?](#toc-section-2)
+- [2. 먼저 좌표계 기호를 정리한다](#toc-section-3)
+- [3. 변환행렬은 무엇인가?](#toc-section-4)
+- [4. 카메라가 실제로 측정하는 것은 무엇인가?](#toc-section-5)
+- [5. 우리가 찾아야 하는 미지수](#toc-section-6)
+- [6. 두 종류 카메라의 관측 경로](#toc-section-7)
+- [7. 두 자세가 얼마나 다른지 계산하는 방법](#toc-section-8)
+- [8. 모든 방법이 공유하는 기본 목적함수](#toc-section-9)
+- [9. 방법 1: no-FK(vision)](#toc-section-10)
+- [10. 방법 2: FK-fixed](#toc-section-11)
+- [11. 방법 3: corrected-FK](#toc-section-12)
+- [12. 세 FK 방식 비교](#toc-section-13)
+- [13. Unified 방식](#toc-section-14)
+- [14. Sequential(`seq`, `-Unified`) 방식](#toc-section-15)
+- [15. Board-only, Cube-only, Both](#toc-section-16)
+- [16. 왜 전체 조합이 $18$개가 아니라 $14$개인가?](#toc-section-17)
+- [17. corrected-FK와 Ridge 출력 후보정은 다르다](#toc-section-18)
+- [18. 평가 지표를 해석하는 방법](#toc-section-19)
+- [19. 코드 흐름으로 다시 보기](#toc-section-20)
+- [20. 교수님께 설명할 때의 추천 순서](#toc-section-21)
+- [21. 최종 한 장 요약용 수식](#toc-section-22)
+- [22. 예상 질문과 짧은 답변](#toc-section-23)
+
 > 대상: 캘리브레이션을 처음 배우는 사람  
-> 목표: 이 문서만 읽고 `No-FK`, `Fixed-FK`, `Corrected-FK`, `Unified`, `Independent/Separated`, `Board-only`, `Cube-only`, `Both`를 수식으로 설명하기  
+> 목표: 이 문서만 읽고 `no-FK(vision)`, `FK-fixed`, `corrected-FK factor`, `Unified`, `Sequential`, `Board-only`, `Cube-only`, `Both`를 실제 코드와 같은 수식으로 설명하기
 > 표기 원칙: 모든 수학 변수와 기호는 Markdown LaTeX인 `$...$` 또는 `$$...$$` 안에 작성했다. 따라서 수식 부분을 그대로 복사할 수 있다.
 
 ---
+
+<a id="toc-section-1"></a>
 
 ## 0. 발표를 한 문장으로 시작한다면
 
@@ -21,25 +49,9 @@
 
 ---
 
-## 1. 왜 로봇-카메라 캘리브레이션을 해야 할까?
+<a id="toc-section-2"></a>
 
-### 1.1 로봇과 카메라는 서로 다른 것을 안다
-
-로봇은 자기 몸에 대해서는 잘 안다. 관절이 몇 도 꺾여 있는지 알고 있으므로 손끝이 어디에 있는지 계산할 수 있다. 그러나 주변에 무엇이 어디 있는지는 전혀 모른다.
-
-카메라는 그 반대다. 물체가 어디 있는지 볼 수 있지만, 자기 렌즈 앞을 기준으로만 말한다. "내 앞 $60\,\mathrm{cm}$, 오른쪽으로 $10\,\mathrm{cm}$"라고 하는 식이다. 이 답을 로봇에게 그대로 전달하면 로봇은 팔을 어디로 뻗어야 할지 알 수 없다.
-
-즉 둘은 서로 다른 기준으로 말한다. 캘리브레이션은 그 사이의 번역기를 만드는 일이다. 카메라가 말한 위치를 로봇이 움직일 수 있는 좌표로 바꾸는 규칙을 찾는다.
-
-### 1.2 왜 중요한가
-
-인식이 아무리 정확해도 이 번역기가 틀어져 있으면 로봇은 엉뚱한 곳으로 간다.
-
-카메라가 물체를 $1\,\mathrm{mm}$ 오차로 찾아냈다고 하자. 그런데 카메라와 로봇 사이의 관계가 $10\,\mathrm{mm}$ 틀어져 있으면, 로봇이 실제로 가는 곳은 $10\,\mathrm{mm}$ 빗나간다. 인식 성능을 아무리 올려도 이 오차는 줄지 않는다.
-
-즉 캘리브레이션 정확도가 전체 시스템 정확도의 상한을 정한다.
-
-### 1.3 카메라가 여러 대면 문제가 하나 더 생긴다
+## 1. 왜 카메라마다 큐브의 좌표가 다를까?
 
 카메라마다 자기 자신을 원점으로 사용하기 때문이다.
 
@@ -64,6 +76,8 @@
 
 ---
 
+<a id="toc-section-3"></a>
+
 ## 2. 먼저 좌표계 기호를 정리한다
 
 | 기호 | 의미 |
@@ -76,6 +90,16 @@
 | $s$ | 큐브를 놓은 세트 번호 |
 | $e$ | 그리퍼 카메라 촬영 이벤트 번호 |
 | $s(e)$ | 이벤트 $e$가 속한 세트 번호 |
+
+여기서 $G$는 코드 전체에서 하나의 물리 frame이어야 한다. 서로 다른 날의 기록을 합칠 때 일부 event가 TCP, 일부 event가 flange 기준이면 하나의 $T^G_C$로 두 묶음을 동시에 설명할 수 없다. 기록 frame $G_r$를 canonical frame $G$로 바꾸는 알려진 강체변환을 $T^{G_r}_{G}$라 하면 먼저
+
+$$
+{}^B T_G(e)
+=
+{}^B T_{G_r}(e)\,{}^{G_r}T_G
+$$
+
+를 모든 event에 적용한다. cube-center tool frame도 같은 방식으로 정규화한다. 이 단계는 영상 또는 fitted calibration을 보지 않는 좌표계 변환이며, 최적화나 outlier 제거가 아니다. 현재 session02에서는 legacy tool3 150 mm $\rightarrow$ flange에 $-150$ mm, legacy cube-center tool4 177.5 mm $\rightarrow$ physical 143 mm에 $-34.5$ mm의 local-$z$ 우측변환을 적용한다. 변환 뒤 같은 set 11의 두 기록 묶음은 최대 $0.68\,\mathrm{mm}$, $0.00024^\circ$ 차이로 일치한다.
 
 이 문서에서는 다음과 같은 변환 표기를 사용한다.
 
@@ -90,6 +114,8 @@ $$
 위 첨자 $A$는 도착 좌표계이고, 아래 첨자 $B$는 출발 좌표계다.
 
 ---
+
+<a id="toc-section-4"></a>
 
 ## 3. 변환행렬은 무엇인가?
 
@@ -188,9 +214,13 @@ $$
 
 ---
 
+<a id="toc-section-5"></a>
+
 ## 4. 카메라가 실제로 측정하는 것은 무엇인가?
 
-카메라는 이미지에서 보드나 큐브의 코너를 검출하고 PnP를 풀어서 다음 자세를 얻는다.
+카메라가 직접 측정하는 값은 보드나 큐브의 **2차원 코너 픽셀**이다. 현재 실제 캘리브레이션 solver는 PnP 자세를 최종 잔차로 쓰지 않고, 알려진 3차원 코너를 영상에 투영한 raw distorted-pixel 재투영잔차를 최소화한다.
+
+PnP는 공통 입력 품질검사, 초기화, 평가용 관측 자세를 만드는 데만 사용한다. 이 구분은 중요하다. 최종 bundle adjustment가 PnP로 한번 압축된 6차원 자세가 아니라 모든 코너의 픽셀 정보를 직접 사용하기 때문이다.
 
 여기서 PnP는 Perspective-n-Point의 줄임말이다. 한 장의 사진만 가지고 물체가 카메라 기준으로 어디에 어떤 방향으로 놓여 있는지를 알아내는 방법이다.
 
@@ -203,7 +233,9 @@ PnP를 풀려면 두 가지가 필요하다.
 
 단, 카메라 내부파라미터를 미리 알고 있어야 한다. 내부파라미터란 초점거리와 이미지 중심처럼 3차원 점이 이미지의 어느 픽셀에 맺히는지를 정하는 카메라 자체의 값이다. 이 값은 캘리브레이션 이전에 따로 구해 둔다.
 
-정리하면 PnP의 출력이 곧 아래에서 정의하는 관측값 $\mathbf{Z}$이다. 즉 카메라 좌표계에서 본 물체의 자세다.
+아래의 $\mathbf{Z}$는 좌표 경로를 설명하기 위한 PnP 자세 표기다. 실제 최적화 목적함수는 8장에서 정의하는 코너 픽셀 $\mathbf{u}_{o,j}$를 사용한다.
+
+cube 관측의 PnP 품질 마스크는 train/test split과 모든 method fit보다 먼저 한 번만 계산한다. planar 관측은 IPPE의 positive-depth 후보 중 all-corner RMSE가 가장 작은 해를 쓰고, non-planar 관측은 RANSAC-EPNP로 초기화한다. 어느 경우든 **검출된 모든 코너**의 Euclidean pixel RMSE로 판정하며, 기본 상한은 고정 카메라 $3\,\mathrm{px}$, 그리퍼 카메라 $5\,\mathrm{px}$다. 특정 calibration 결과를 보고 관측을 빼지 않으므로 모든 비교 행이 같은 입력 마스크를 공유한다.
 
 ### 4.1 고정 카메라 관측
 
@@ -239,6 +271,8 @@ $\mathbf{G}_e$는 촬영 순간 그리퍼의 위치와 방향이다. 이것은 �
 
 ---
 
+<a id="toc-section-6"></a>
+
 ## 5. 우리가 찾아야 하는 미지수
 
 ### 5.1 고정 카메라 외부파라미터
@@ -265,9 +299,11 @@ $$
 {}^{B}\mathbf{T}_{O,s}
 $$
 
-우리 multi-cam calibration 에서 비교하는 세 FK 방식의 가장 큰 차이는 $\mathbf{O}_s$를 자유롭게 찾는지, FK 값에 고정하는지, 보정된 anchor에 고정하는지다.
+우리 multi-cam calibration 에서 비교하는 세 FK 방식의 가장 큰 차이는 $\mathbf{O}_s$를 vision으로만 자유롭게 찾는지, train-only 정렬 FK에 고정하는지, 또는 자유변수로 두되 정렬 FK의 공분산 인자를 추가하는지다.
 
 ---
+
+<a id="toc-section-7"></a>
 
 ## 6. 두 종류 카메라의 관측 경로
 
@@ -328,6 +364,8 @@ $$
 
 ---
 
+<a id="toc-section-8"></a>
+
 ## 7. 두 자세가 얼마나 다른지 계산하는 방법
 
 두 자세 $\mathbf{A}$와 $\mathbf{B}$의 상대변환은 다음과 같다.
@@ -386,34 +424,43 @@ $\boldsymbol{\omega}\in\mathbb{R}^{3}$은 회전오차이고, $\mathbf{v}\in\mat
 
 ---
 
+<a id="toc-section-9"></a>
+
 ## 8. 모든 방법이 공유하는 기본 목적함수
 
-세트 $s$의 공통 큐브 자세를 $\mathbf{Q}_s$라고 하자. 그러면 vision 관측의 전체 오차는 다음과 같다.
+물체 좌표계의 $j$번째 3차원 코너를 $\mathbf{p}_j$, 측정 픽셀을 $\mathbf{u}_{o,j}$, 내부파라미터와 왜곡을 포함한 투영함수를 $\pi(\mathbf{K},\mathbf{D},\cdot)$라 하자. 관측 $o$가 고정 카메라에서 왔다면 예측 픽셀은 다음과 같다.
 
 $$
-\begin{aligned}
+\widehat{\mathbf{u}}_{o,j}
+=
+\pi\!\left(
+\mathbf{K}_i,\mathbf{D}_i,
+\mathbf{C}_i^{-1}\mathbf{Q}_{s(o)}\mathbf{p}_j
+\right).
+$$
+
+그리퍼 카메라 관측이면 다음과 같다.
+
+$$
+\widehat{\mathbf{u}}_{o,j}
+=
+\pi\!\left(
+\mathbf{K}_g,\mathbf{D}_g,
+(\mathbf{G}_{e(o)}\mathbf{X})^{-1}
+\mathbf{Q}_{s(o)}\mathbf{p}_j
+\right).
+$$
+
+현재 기본 visual 목적함수는 native-pixel $u,v$ 성분에 `soft_l1`, $f_v=2\,\mathrm{px}$를 적용한다.
+
+$$
 \mathcal{E}_{\mathrm{vis}}
-\left(\{\mathbf{C}_i\},\mathbf{X},\{\mathbf{Q}_s\}\right)
-={}&
-\sum_{i,s}
-\left\|
-\mathbf{r}
+=
+\sum_{o,j}\sum_{q\in\{u,v\}}
+f_v^2\rho_{\mathrm{softL1}}
 \left(
-\mathbf{C}_i\mathbf{Z}_{i,s},
-\mathbf{Q}_s
-\right)
-\right\|_2^2
-\\
-&+
-\sum_e
-\left\|
-\mathbf{r}
-\left(
-\mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e},
-\mathbf{Q}_{s(e)}
-\right)
-\right\|_2^2.
-\end{aligned}
+\frac{(\widehat{u}_{o,j,q}-u_{o,j,q})^2}{f_v^2}
+\right).
 $$
 
 ### 8.1 식에 나오는 기호
@@ -422,37 +469,33 @@ $\mathcal{E}_{\mathrm{vis}}$의 아래첨자 vis는 vision, 즉 카메라로 본
 
 | 기호 | 뜻 | 값이 어디서 오는가 |
 |---|---|---|
-| $\mathbf{C}_i$ | 고정 카메라 $i$의 자세. 베이스 기준 | 모름. 최적화로 찾아야 함 |
-| $\mathbf{X}$ | 그리퍼와 그리퍼 카메라 사이의 hand-eye 변환 | 모름. 최적화로 찾아야 함 |
-| $\mathbf{Q}_s$ | 세트 $s$의 공통 큐브 자세. 베이스 기준 | FK 방식마다 다름. 9장부터 설명 |
-| $\mathbf{Z}_{i,s}$ | 고정 카메라 $i$가 세트 $s$에서 본 큐브 자세 | 사진에서 PnP를 풀어 얻음 |
-| $\mathbf{Z}_{g,e}$ | 그리퍼 카메라가 이벤트 $e$에서 본 큐브 자세 | 사진에서 PnP를 풀어 얻음 |
-| $\mathbf{G}_e$ | 이벤트 $e$의 그리퍼 자세. 베이스 기준 | 로봇 관절각으로 FK를 계산해 얻음 |
-| $\mathbf{r}(\cdot,\cdot)$ | 두 자세의 차이를 $6$개 숫자로 만드는 잔차 함수 | 7장에서 정의한 함수 |
-| $\|\cdot\|_2^2$ | 그 $6$개 숫자를 제곱해서 더한 값 | 잔차로부터 계산 |
-| $\sum_{i,s}$ | 모든 고정 카메라와 모든 세트에 대해 더한다 | 합 기호 |
-| $\sum_e$ | 모든 그리퍼 카메라 촬영 이벤트에 대해 더한다 | 합 기호 |
-| $s(e)$ | 이벤트 $e$가 속한 세트 번호 | 촬영 기록에 남아 있음 |
+| $\mathbf{C}_i$ | 고정 카메라 $i$의 자세. 베이스 기준 | 모른다. 찾아야 한다 |
+| $\mathbf{X}$ | 그리퍼와 그리퍼 카메라 사이의 hand-eye 변환 | 모른다. 찾아야 한다 |
+| $\mathbf{Q}_s$ | 세트 $s$의 공통 큐브 자세. 베이스 기준 | 방식마다 다르다. 9장부터 설명 |
+| $\mathbf{p}_j$ | target 좌표계의 3차원 코너 | 안다. target geometry |
+| $\mathbf{u}_{o,j}$ | 이미지에서 검출한 native-pixel 코너 | 안다. detector 측정값 |
+| $\mathbf{K}_i,\mathbf{D}_i$ | 내부파라미터와 왜곡계수 | 안다. 모든 단계에서 고정 |
+| $\mathbf{G}_e$ | 이벤트 $e$의 그리퍼 자세. 베이스 기준 | 안다. 로봇 FK 값 |
+| $\pi(\cdot)$ | 3차원 코너를 왜곡된 이미지 픽셀로 투영 | OpenCV camera model |
 
 읽는 순서는 다음과 같다. 안쪽부터 밖으로 나간다.
 
-1. $\mathbf{C}_i\mathbf{Z}_{i,s}$로 고정 카메라들이 예측한 큐브 자세를 만든다. 
-2. 그 예측을 공통 큐브 자세 $\mathbf{Q}_s$와 비교하여 잔차 $6$개 숫자를 얻는다.
-3. 제곱해서 더해 오차 하나의 숫자로 만든다.
-4. 모든 카메라와 모든 세트에 대해 이 값을 전부 합친다.
-5. 그리퍼 카메라 쪽도 $\mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e}$로 같은 과정을 거쳐 합친다.
+1. 현재 카메라와 target pose로 각 3차원 코너의 픽셀 위치를 예측한다.
+2. 예측 픽셀에서 detector가 측정한 픽셀을 뺀다.
+3. $u,v$ 각 성분에 같은 robust loss를 적용한다.
+4. 고정 카메라와 그리퍼 카메라의 모든 선택 관측을 합한다.
 
 ### 8.2 이 식이 뜻하는 것
 
-첫 번째 합은 고정 카메라 예측을 공통 큐브 자세에 맞춘다. 두 번째 합은 그리퍼 카메라 예측을 같은 공통 큐브 자세에 맞춘다.
-
-$\mathcal{E}_{\mathrm{vis}}$를 최소로 만드는 $\mathbf{C}_i$와 $\mathbf{X}$를 찾는 것이 캘리브레이션이다. 측정값 $\mathbf{Z}$와 $\mathbf{G}$는 이미 정해져 있으므로 움직일 수 없고, 오직 미지수만 움직여서 모든 예측이 한 점에 모이게 만든다.
+$\mathcal{E}_{\mathrm{vis}}$를 최소로 만드는 $\mathbf{C}_i$와 $\mathbf{X}$를 찾는 것이 캘리브레이션이다. 측정 픽셀, $\mathbf{K}$, $\mathbf{D}$, target geometry, $\mathbf{G}$는 움직일 수 없고, 행에서 선언한 pose 변수만 움직인다.
 
 우리 캘리브레이션에서 비교하는 세가지 FK 방식은 이 관측식 자체가 다르지 않다. $\mathbf{Q}_s$를 무엇으로 정의하느냐가 다르다.
 
 ---
 
-## 9. 방법 1: No-FK
+<a id="toc-section-10"></a>
+
+## 9. 방법 1: no-FK(vision)
 
 ### 9.1 쉬운 설명
 
@@ -492,7 +535,7 @@ $$
 | $\mathbf{O}_s$ | 그 자리를 채우는 자유변수 |
 | $\widehat{\mathbf{O}}_s$ | 최적화가 끝난 뒤 나온 추정 결과 |
 
-따라서 $\mathbf{Q}_s=\mathbf{O}_s$는 두 값이 같다는 뜻이 아니라, 기준 자리를 고정값이 아니라 자유변수로 채운다는 선언이다. `Fixed-FK`는 같은 자리를 FK 값으로 채운다.
+따라서 $\mathbf{Q}_s=\mathbf{O}_s$는 두 값이 같다는 뜻이 아니라, 기준 자리를 고정값이 아니라 자유변수로 채운다는 선언이다. `FK-fixed`는 같은 자리를 FK 값으로 채운다.
 
 셋 중 어느 것도 큐브의 진짜 자세는 아니다. 진짜 자세는 10.3절에서 $\mathbf{O}^{\mathrm{true}}_s$로 따로 표기한다.
 
@@ -501,28 +544,34 @@ $$
 - raw FK의 계통오차가 캘리브레이션에 직접 들어오지 않는다.
 - 대신 세트마다 $6$자유도인 $\mathbf{O}_s$가 추가되어 미지수가 많아진다.
 - 카메라 연결이나 로봇 움직임이 충분하지 않으면 전체 좌표계의 gauge가 흔들릴 수 있다.
-- `No-FK`도 $\mathbf{G}_e$는 사용한다. 큐브 FK prior $\mathbf{F}_s$만 사용하지 않는다.
+- `no-FK(vision)`도 $\mathbf{G}_e$는 사용한다. 큐브 FK prior $\mathbf{F}_s$만 사용하지 않는다.
 
 ---
 
-## 10. 방법 2: Fixed-FK
+<a id="toc-section-11"></a>
+
+## 10. 방법 2: FK-fixed
 
 ### 10.1 쉬운 설명
 
-로봇 FK가 알려준 큐브 자세를 정답으로 간주하고 움직이지 못하게 고정한다.
+train-only board-free 정렬을 거친 로봇 FK cube 자세를 정답으로 간주하고 움직이지 못하게 고정한다.
 
-raw FK 큐브 prior를 다음과 같이 정의한다.
+raw FK cube-center 자세와 tag-object 좌표계 정렬을 다음과 같이 정의한다.
 
 $$
-\mathbf{F}_s
+\mathbf{F}^{\mathrm{raw}}_s
 \equiv
-{}^{B}\mathbf{T}^{\mathrm{FK}}_{O,s}
+{}^{B}\mathbf{T}^{\mathrm{FK}}_{\mathrm{cube\ center},s},
+\qquad
+\widetilde{\mathbf{F}}_s
+=
+\mathbf{F}^{\mathrm{raw}}_s\boldsymbol{\Delta}.
 $$
 
 큐브 자세는 다음 제약을 만족해야 한다.
 
 $$
-\mathbf{O}_s=\mathbf{F}_s
+\mathbf{O}_s=\widetilde{\mathbf{F}}_s
 $$
 
 ### 10.2 정확한 목적함수
@@ -540,49 +589,31 @@ $$
 \left(
 \{\mathbf{C}_i\},
 \mathbf{X},
-\{\mathbf{F}_s\}
+\{\widetilde{\mathbf{F}}_s\}
 \right)
 $$
 
-이를 완전히 펼치면 다음과 같다.
-
-$$
-\begin{aligned}
-\min_{\{\mathbf{C}_i\},\mathbf{X}}
-{}&
-\sum_{i,s}
-\left\|
-\mathbf{r}(\mathbf{C}_i\mathbf{Z}_{i,s},\mathbf{F}_s)
-\right\|_2^2
-\\
-&+
-\sum_e
-\left\|
-\mathbf{r}
-(\mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e},\mathbf{F}_{s(e)})
-\right\|_2^2.
-\end{aligned}
-$$
+실제 A3는 board pose도 자유변수로 포함하며, $\mathcal{E}_{\mathrm{vis}}$는 8장의 raw-corner pixel 목적함수다. cube pose만 변수 목록에서 제거된다.
 
 ### 10.3 왜 FK 오차가 카메라로 전파되는가?
 
-실제 큐브 자세를 $\mathbf{O}^{\mathrm{true}}_s$라고 하자. raw FK에 계통오차 $\mathbf{D}$가 있으면 다음처럼 쓸 수 있다.
+실제 큐브 자세를 $\mathbf{O}^{\mathrm{true}}_s$라고 하자. 정렬 후에도 남는 FK 계통오차 $\mathbf{D}$가 있으면 다음처럼 쓸 수 있다.
 
 $$
-\mathbf{F}_s
+\widetilde{\mathbf{F}}_s
 =
 \mathbf{O}^{\mathrm{true}}_s\mathbf{D}
 $$
 
-그런데 최적화는 $\mathbf{F}_s$를 움직일 수 없다. 따라서 남은 오차를 줄이기 위해 $\mathbf{C}_i$나 $\mathbf{X}$가 잘못 움직일 수 있다.
+그런데 최적화는 $\widetilde{\mathbf{F}}_s$를 움직일 수 없다. 따라서 남은 오차를 줄이기 위해 $\mathbf{C}_i$나 $\mathbf{X}$가 잘못 움직일 수 있다.
 
-Fixed-FK는 FK가 정확할 때 미지수가 적고 안정적이지만, FK에 공통적인 오정렬이 있으면 그 오차를 캘리브레이션 결과에 흡수시킬 위험이 있다.
+FK-fixed는 FK가 정확할 때 미지수가 적고 안정적이지만, FK에 공통적인 오정렬이 있으면 그 오차를 캘리브레이션 결과에 흡수시킬 위험이 있다.
 
 ### 10.4 카메라에도 계통오차가 있으면
 
 카메라도 내부파라미터나 왜곡 보정이 조금 틀리면 항상 같은 방향으로 치우친 $\mathbf{Z}$를 내놓는다. 예를 들어 큐브를 늘 $3\,\mathrm{mm}$ 멀리 있다고 보고하는 식이다.
 
-이 경우 무슨 일이 벌어지는지 숫자로 따라가 보자. 설명을 위해 $1$차원으로 단순화한다.
+이 경우 FK-fixed에서는 두 계통오차를 구분할 수 없다. $\widetilde{\mathbf{F}}_s$가 고정되어 있으므로 어긋남은 전부 $\mathbf{C}_i$와 $\mathbf{X}$로 밀려 들어가는데, 그 어긋남 안에는 FK가 틀린 몫과 카메라가 틀린 몫이 섞여 있다. 최적화 입장에서 두 몫은 똑같이 생겼고, 어느 쪽 책임인지 판단할 정보가 목적함수 안에 없다. 결국 둘 다 캘리브레이션 결과에 흡수된다.
 
 **참값은 다음과 같다.**
 
@@ -624,341 +655,124 @@ $$
 
 ---
 
-## 11. 방법 3: Corrected-FK
+<a id="toc-section-12"></a>
+
+## 11. 방법 3: corrected-FK
 
 ### 11.1 가장 쉬운 설명
 
-raw FK를 무조건 믿지 않는다. 먼저 vision으로 큐브 자세를 계산하고, raw FK가 vision과 어떤 공통 차이를 갖는지 학습한다. 그 차이로 FK를 보정한 뒤, vision과 충분히 가까운 세트에서만 그 보정된 FK를 사용한다.
+raw FK를 정답처럼 고정하지 않는다. 먼저 **학습 eye-in-hand cube 코너만** 사용해 raw FK와 tag-object 좌표계 사이의 공통 정렬 $\boldsymbol{\Delta}$를 구한다. 최종 캘리브레이션에서는 세트별 cube pose $\mathbf{O}_s$를 계속 자유변수로 두고, 정렬 FK $\widetilde{\mathbf{F}}_s$와의 차이를 6차원 공분산으로 whitening한 robust soft factor를 추가한다.
 
-### 11.2 단계 1: vision-only 초기 해
+따라서 현재 코드의 `corrected-FK`는 hard gate나 pose 교체가 아니다. vision과 FK가 가까우면 FK factor가 자세를 안정시키고, 멀면 Huber loss가 그 영향력을 연속적으로 낮춘다.
 
-먼저 No-FK 문제를 풀어 초기 카메라와 hand-eye를 구한다.
+### 11.2 단계 1: board-free train-only FK 정렬
+
+raw FK의 cube-center 좌표계와 영상에서 사용하는 tag-object 좌표계는 그대로 같다고 가정할 수 없다. 현재 구현은 학습 세트의 eye-in-hand cube 코너와 robot gripper pose를 사용해 $\mathbf{X}$와 공통 우측 정렬 $\boldsymbol{\Delta}$를 함께 추정한다.
 
 $$
-\{\mathbf{C}^{(0)}_i\},\mathbf{X}^{(0)},\{\mathbf{O}^{(0)}_s\}
+\widetilde{\mathbf{F}}_s
 =
-\operatorname{SolveNoFK}(\text{vision observations})
+\mathbf{F}_s\boldsymbol{\Delta}
 $$
 
-### 11.3 단계 2: 세트별 vision 합의 자세
-
-각 세트에서 고정 카메라와 그리퍼 카메라가 예측한 큐브 자세를 모은다.
+정렬 단계가 만족하는 핵심 관계는 다음과 같다.
 
 $$
-\mathcal{P}_s
+\mathbf{G}_e\mathbf{X}\,{}^{C_g}\mathbf{T}_{O,e}
+\approx
+\mathbf{F}_{s(e)}\boldsymbol{\Delta}
+$$
+
+여기서 board, 고정 카메라 관측, held-out event는 사용하지 않는다. 실제 최적화는 PnP pose 차이가 아니라 왜곡을 포함한 native-pixel cube 코너 재투영잔차를 사용한다.
+
+### 11.3 단계 2: 6차원 FK 오차와 공분산 whitening
+
+세트별 자유 cube pose $\mathbf{O}_s$와 정렬 FK 사이의 상대변환을 6차원으로 쓴다.
+
+$$
+\mathbf{e}^{\mathrm{FK}}_s
 =
-\left\{
-\mathbf{C}^{(0)}_i\mathbf{Z}_{i,s}
-\right\}_{i}
-\cup
-\left\{
-\mathbf{G}_e\mathbf{X}^{(0)}\mathbf{Z}_{g,e}
-\right\}_{e:s(e)=s}
+\begin{bmatrix}
+\operatorname{Log}_{\mathrm{SO}(3)}
+(\mathbf{R}(\mathbf{O}_s)^{\mathsf T}
+ \mathbf{R}(\widetilde{\mathbf{F}}_s))
+\\
+\mathbf{t}(\mathbf{O}_s^{-1}\widetilde{\mathbf{F}}_s)
+\end{bmatrix}
+\in\mathbb{R}^{6}.
 $$
 
-기호를 읽는 법은 다음과 같다.
-
-- $\mathcal{P}_s$는 세트 $s$의 큐브 자세 예측을 출처 구분 없이 전부 담은 주머니다. 카메라가 $3$대이고 그 세트에서 그리퍼 촬영이 $4$번 있었다면 자세 $7$개가 들어 있다.
-- $\cup$는 합집합이다. 고정 카메라 예측과 그리퍼 카메라 예측을 한 통에 담아 동등하게 취급하겠다는 뜻이다.
-- 위첨자 $(0)$은 11.2절에서 얻은 초기 추정값이라는 표시다. 최종 결과가 아니라 중간 단계 값이므로 햇 기호와 구분한다.
-
-이 예측들을 강건 평균하여 vision 합의 자세 $\mathbf{V}_s$를 만든다.
+잔차 순서는 $[r_x,r_y,r_z,t_x,t_y,t_z]$이고 단위는 radian과 metre다. 세트별 FK 공분산을 $\boldsymbol{\Sigma}_s$라 하고 Cholesky 분해를 적용하면 다음 whitened 잔차를 얻는다.
 
 $$
-\mathbf{V}_s
-=
-\operatorname{RobustAverage}
-\left(\mathcal{P}_s\right)
+\boldsymbol{\Sigma}_s=\mathbf{L}_s\mathbf{L}_s^{\mathsf T},
+\qquad
+\mathbf{w}_s=\mathbf{L}_s^{-1}\mathbf{e}^{\mathrm{FK}}_s.
 $$
 
-이 단계에서는 예측들을 모두 동등하게 다루고, MAD 기준으로 이상치만 제거한다.
+이렇게 하면 회전과 이동을 임의의 가중치로 더하지 않고, 측정된 불확실성의 표준편차 단위로 비교할 수 있다. 공분산은 대칭 positive-definite $6\times6$이어야 한다.
 
-- **이상치**: 나머지와 동떨어진 값. 코너 오검출이나 큐브 면 착각으로 생긴다. $7$개 중 $6$개가 $2\,\mathrm{mm}$ 안에 모여 있는데 하나가 $100\,\mathrm{mm}$ 튀면 단순 평균은 약 $14\,\mathrm{mm}$ 밀려난다.
-- **MAD**: Median Absolute Deviation, 중앙값 절대편차. 값들이 흩어진 정도를 중앙값으로 재기 때문에 표준편차와 달리 이상치에 오염되지 않는다.
-- **강건 평균**: MAD로 이상치를 거른 뒤 남은 값을 평균한다.
+### 11.4 단계 3: raw-corner vision 항과 robust FK factor의 결합
 
-강건 평균이 이상치를 걸러내는 절차는 다음과 같다.
-
-1. 현재 평균에서 각 예측까지의 거리를 잰다. 이를 $d_1, d_2, \dots, d_n$이라고 하자.
-2. 그 거리들로 잘라낼 선을 정한다.
+최종 A4 목적함수는 다음 구조다.
 
 $$
-\tau
-=
-\operatorname{median}(d)
+\underset{\{\mathbf{C}_i\},\mathbf{X},\mathbf{B},\{\mathbf{O}_s\}}
+{\operatorname{argmin}}
+\left[
+\sum_{o,j,q}
+f_v^2\rho_{\mathrm{softL1}}
+\left(
+\frac{(\widehat{u}_{o,j,q}-u_{o,j,q})^2}{f_v^2}
+\right)
 +
-k\cdot 1.4826\cdot\operatorname{MAD}(d),
-\qquad
-k=2.5
-$$
-
-3. $d_i>\tau$인 예측은 버린다.
-4. 남은 값으로 평균을 다시 내고, 더 걸러낼 것이 없을 때까지 1번부터 최대 세 번 반복한다. 이상치를 한 번 제거하면 평균이 조금 옮겨가고, 그 새 평균을 기준으로 다시 재면 처음에 놓쳤던 이상치가 드러나기 때문이다.
-
-11.6절의 gate도 정확히 같은 형태의 식을 쓴다. 다만 재는 대상이 다르다.
-
-| | 무엇들의 거리를 재는가 |
-|---|---|
-| 강건 평균 (11.3) | 한 세트 **안에서** 카메라 예측들이 평균에서 얼마나 떨어졌는가 |
-| gate (11.6) | 세트별 차이 $\boldsymbol{\Delta}_s$가 **세트 사이의** 공통 보정량에서 얼마나 떨어졌는가 |
-
-
-### 11.4 단계 3: raw FK와 vision 사이의 공통 차이
-
-각 세트의 차이는 다음과 같다.
-
-$$
-\boldsymbol{\Delta}_s
-=
-\mathbf{F}_s^{-1}\mathbf{V}_s
-$$
-
-즉, raw FK에서 vision 결과로 가려면 얼마나 더 움직여야 하는지를 뜻한다.
-
-세트별 차이를 강건 가중 평균하여 공통 보정량을 구한다.
-
-$$
-\overline{\boldsymbol{\Delta}}
-=
-\operatorname{RobustWeightedAverage}_s
+\sum_s\sum_{k=1}^{6}
+f_{\mathrm{FK}}^2\rho_{\mathrm{Huber}}
 \left(
-\boldsymbol{\Delta}_s;,w_s
+\frac{w_{s,k}^2}{f_{\mathrm{FK}}^2}
 \right)
+\right].
 $$
 
-여기서 $w_s$는 세트 $s$를 얼마나 믿을지 나타내는 가중치이며, 그 세트를 뒷받침한 관측의 개수를 쓴다. 고정 카메라 $3$대가 보고 그리퍼 촬영이 $4$번 있었던 세트라면 $w_s=7$이다. 카메라 종류는 구분하지 않고 개수만 센다.
+$o$는 camera-event-target 관측, $j$는 코너, $q\in\{u,v\}$는 픽셀 성분이다. 현재 기본값은 $f_v=2\,\mathrm{px}$, $f_{\mathrm{FK}}=3$이다. 즉 FK 오차가 대략 $3\sigma$ 안에서는 quadratic하게 작용하고, 그 밖에서는 Huber가 영향 증가를 선형으로 제한한다. SciPy에는 전체 loss를 `linear`로 두고 두 종류의 M-estimator를 각각 residual에 명시적으로 인코딩하므로, 픽셀과 FK에 같은 단위의 loss가 잘못 적용되지 않는다.
 
-관측이 $2$개뿐인 세트의 $\boldsymbol{\Delta}_s$는 우연에 크게 흔들리므로, 관측이 많은 세트의 값을 더 크게 반영하여 공통 보정량이 빈약한 세트에 끌려가지 않게 한다.
+### 11.5 hard gate가 아닌 이유
 
-### 11.5 단계 4: FK에 공통 보정량 적용
+$\mathbf{O}_s$는 최적화 변수에서 제거되지 않는다. 또한 어떤 임계값으로 FK pose와 vision pose 중 하나를 선택하지도 않는다. 각 세트는 모든 반복에서 vision 코너와 FK factor의 영향을 동시에 받으며, 영향의 상대 크기는 $\boldsymbol{\Sigma}_s$와 Huber 함수로 결정된다. 따라서 갑작스러운 all-or-nothing 전환이 없고, 공분산이 큰 방향은 약하게, 작은 방향은 강하게 구속된다.
 
-현재 구현은 보정량을 오른쪽에 곱한다.
+### 11.6 실측 covariance와 현재 결과의 경계
 
-$$
-\mathbf{F}^{\mathrm{corr}}_s
-=
-\mathbf{F}_s\overline{\boldsymbol{\Delta}}
-$$
+`--fk_covariance_json`이 없으면 코드는 Simulation과 맞춘 등방성 prior인 이동 $2.0\,\mathrm{mm}$, 회전 $0.30^\circ$를 사용한다. 이 결과는 **preflight**이며 confirmatory 결과가 아니다. 최종 실험에는 blind external GT를 보지 않고 미리 등록한 물리 반복측정 covariance가 필요하다.
 
-### 이 보정은 무엇을 누구에게서 빌리는가
-
-위 식에서 $\mathbf{F}_s$는 그대로 남고, 모든 세트에 같은 $\overline{\boldsymbol{\Delta}}$만 곱해진다. 따라서 vision과 FK가 각각 다른 역할을 맡는다.
-
-| 성분 | 누구를 믿는가 | 이유 |
-|---|---|---|
-| 전체 기준점 (공통 치우침) | vision | 실제로 물체를 보므로 절대 기준을 제공한다 |
-| 세트 간 상대 구조 | FK | 반복성이 좋아 세트 사이의 거리가 정확하다 |
-
-FK는 같은 관절값으로 가면 늘 같은 곳에 가므로 세트들 사이의 상대적 거리가 꽤 정확하다. 대신 영점이 어긋나 있으면 절대 위치가 통째로 밀린다. vision은 반대로 실제 물체를 보므로 절대 기준을 주지만, 매번 노이즈가 끼어 세트별로 들쭉날쭉하다.
-
-그래서 vision에서 기준점을 빌리고, FK에서 세밀한 구조를 빌리는 구성이 된다.
-
-다만 한계도 함께 따라온다. vision을 기준으로 삼는다는 것은 vision의 계통오차까지 물려받는다는 뜻이다. 카메라 내부파라미터가 틀어져 있으면 $\mathbf{V}_s$ 자체가 치우쳐 있고, 그 치우침이 $\overline{\boldsymbol{\Delta}}$를 통해 FK 쪽으로 퍼진다. 10.4절에서 본 문제가 여기서도 남는다.
-
-### 11.6 단계 5: gate로 보정 FK를 믿어도 되는지 검사
-
-앞 단계에서 구한 $\overline{\boldsymbol{\Delta}}$는 모든 세트에 공통으로 적용되는 하나의 보정량이다. 따라서 세트마다 사정이 다르면 잘 맞지 않을 수 있다. 큐브가 그리퍼 안에서 미끄러진 세트, 그 세트에서만 관절 오차가 유난히 컸던 경우가 그렇다. 반대로 그 세트의 관측이 부족해서 vision 쪽이 틀렸을 수도 있다.
-
-어느 쪽이 틀렸는지는 알 수 없지만, 둘이 크게 어긋났다는 사실은 확인할 수 있다. 그래서 세트마다 보정된 FK와 vision 합의를 나란히 놓고 차이를 재고, 그 차이가 기준을 넘으면 해당 세트에서는 FK를 사용하지 않는다. 이 검사를 gate라고 부른다.
-
-이동 차이는 다음과 같다.
-
-$$
-d_t(s)
-=
-1000
-\left\|
-\mathbf{t}(\mathbf{V}_s)
--
-\mathbf{t}(\mathbf{F}^{\mathrm{corr}}_s)
-\right\|_2
-$$
-
-회전 차이는 다음과 같다.
-
-$$
-d_R(s)
-=
-\frac{180}{\pi}
-\cos^{-1}
-\left(
-\frac{
-\operatorname{tr}
-\left(
-\mathbf{R}(\mathbf{V}_s)^{\mathsf T}
-\mathbf{R}(\mathbf{F}^{\mathrm{corr}}_s)
-\right)-1
-}{2}
-\right)
-$$
-
-두 식 앞에 붙은 숫자는 단위 환산이다. 자세의 위치는 미터로 다루므로 $1000$을 곱해 밀리미터로 바꾸고, 회전각은 라디안으로 나오므로 $180/\pi$를 곱해 도로 바꾼다.
-
-세트 $s$는 두 조건을 모두 만족할 때만 통과한다.
-
-$$
-d_t(s)\leq \tau_t,
-\qquad
-d_R(s)\leq \tau_R
-$$
-
-기준선 $\tau_t$와 $\tau_R$은 상수가 아니라, $d_t(s)$와 $d_R(s)$ 값들이 실제로 어떻게 분포하는지를 보고 정한다.
-
-$$
-\tau
-=
-\max\left(
-\operatorname{median}_s(d)
-+
-k \cdot 1.4826 \cdot \operatorname{MAD}_s(d),
-\;
-\tau^{\min}
-\right),
-\qquad
-k=2.5
-$$
-
-상수 $1.4826$은 MAD를 표준편차와 같은 척도로 환산하는 값이다. 정규분포에서 MAD에 이 값을 곱하면 표준편차가 된다. 이 환산 덕분에 $k$를 표준편차의 배수로 읽을 수 있다. $k=2.5$는 중앙값에서 표준편차 $2.5$배까지 정상으로 인정한다는 뜻이며, $\overline{\boldsymbol{\Delta}}$를 구하는 강건 평균이 이미 쓰고 있는 값과 같다.
-
-기준선을 이렇게 잡는 이유는 $d_t(s)$가 무엇을 재는 값인지에 있다.
-
-어떤 세트의 어긋남이 공통 치우침과 정확히 같은 경우를 따라가 보자.
-
-1. $\boldsymbol{\Delta}_s = \overline{\boldsymbol{\Delta}}$. 이 세트의 어긋남이 전체 평균 어긋남과 같다.
-2. 보정은 $\overline{\boldsymbol{\Delta}}$만큼 해주므로 어긋난 만큼 정확히 상쇄된다. 따라서 $\mathbf{F}^{\mathrm{corr}}_s=\mathbf{V}_s$가 된다.
-3. 두 자세가 통째로 겹쳤으므로 위치도 방향도 같아진다. 따라서 $d_t(s)=0$이고 $d_R(s)=0$이다.
-
-시계로 비유하면, 사무실 시계들이 평균 $5$분씩 빠를 때 모든 시계에서 $5$분을 빼는 보정을 하는 상황이다. 정확히 $5$분 빨랐던 시계는 보정 후 남는 오차가 없고, $8$분 빨랐던 시계는 $3$분이 남는다.
-
-여기서 두 값이 $0$이라는 것이 뜻하지 않는 것 두 가지를 분명히 해야 한다. 첫째, FK가 정확했다는 뜻이 아니다. 위 시계도 원래는 $5$분이나 틀렸었다. $d_t(s)$가 $0$이라는 것은 남들만큼만 틀렸다는 뜻이다. 둘째, 두 값이 겹친 그 자리가 참값이라는 뜻도 아니다. $\mathbf{V}_s$ 자체가 치우쳐 있으면 보정된 FK도 같이 치우친 자리로 끌려가고, 그래도 $d_t(s)$는 $0$으로 나온다. 10.4절에서 본 함정과 같은 성격이다.
-
-즉 $d_t(s)$는 FK가 절대적으로 얼마나 틀렸는지가 아니라, 그 세트가 다른 세트들의 공통 경향에서 얼마나 벗어났는지를 재는 값이다. 그렇다면 얼마부터 유별난 값인지는 나머지 세트들이 얼마나 모여 있느냐에 따라 달라진다. 세트들이 모두 $2\,\mathrm{mm}$ 안에 모여 있다면 $10\,\mathrm{mm}$짜리 세트는 명백히 이상하지만, 원래부터 $30\,\mathrm{mm}$씩 흩어져 있었다면 같은 $10\,\mathrm{mm}$도 평범하다. 고정 상수는 이 두 경우를 구분하지 못한다. 
-
-여기에는 보호 장치가 필요하다.
-
-**하한 $\tau^{\min}$이 필요한 이유.** 기준선을 중앙값 근처로만 잡으면 문제가 생긴다. 중앙값이란 절반은 그보다 작고 절반은 그보다 크다는 뜻이다. 따라서 세트들이 모두 잘 맞아서 흩어짐이 거의 없으면, 기준선이 중앙값에 딱 붙어버리고 **멀쩡한 세트의 절반이 탈락한다.** 걸러낼 이상치가 없는데도 절반이 보정된 FK인 $\mathbf{F}^{\mathrm{corr}}_s$를 못 쓰게 되는 것이다.
-
-**하한을 무엇으로 정하는가.** 여기에 다시 상수를 쓰면 처음 문제로 돌아간다. 대신 vision 합의 자신의 흔들림을 쓴다.
-
-각 세트에서 카메라들이 예측한 큐브 자세는 서로 조금씩 어긋나 있다. 그 어긋난 정도가 곧 $\mathbf{V}_s$의 불확실성이다. 11.3절에서 강건 평균을 낼 때 이미 계산되는 값이기도 하다.
-
-$$
-\tau^{\min}_t
-=
-\operatorname{median}_s
-\left(
-\operatorname{scatter}_t(\mathcal{P}_s)
-\right),
-\qquad
-\tau^{\min}_R
-=
-\operatorname{median}_s
-\left(
-\operatorname{scatter}_R(\mathcal{P}_s)
-\right)
-$$
-
-이렇게 두는 이유는 분해능 때문이다. 어떤 세트에서 카메라들끼리 $1.5\,\mathrm{mm}$씩 어긋나 있다면, $\mathbf{V}_s$ 자체가 그만큼 불확실하다. 이때 FK가 $\mathbf{V}_s$에서 $1\,\mathrm{mm}$ 벗어나 있다고 해도 그것이 FK의 잘못인지 vision의 잘못인지 구별할 방법이 없다. 자의 눈금보다 작은 차이를 재려는 것과 같다. 구별할 수 없는 차이로 세트를 탈락시키는 것은 근거가 없으므로, 그 아래는 문제 삼지 않는다.
-
-정리하면 하한의 역할은 무언가를 더 걸러내는 것이 아니라, **구별할 수 없는 차이로 걸러내지 않도록 보장하는 것**이다.
-
-### 11.7 단계 6: gate 결과에 따라 anchor 확정
-
-세트 $s$의 anchor는 gate 통과 여부로 결정된다.
-
-$$
-\mathbf{A}_s
-=
-\begin{cases}
-\mathbf{F}^{\mathrm{corr}}_s,
-&
-d_t(s)\leq\tau_t
-\ \land\ 
-d_R(s)\leq\tau_R,
-\\[4pt]
-\mathbf{V}_s,
-&
-\text{otherwise}.
-\end{cases}
-$$
-
-통과한 세트는 보정된 FK를 **그대로** anchor로 삼는다. 몇 퍼센트만 반영하는 식의 부분 신뢰는 두지 않는다. gate가 이미 그 세트를 믿을지 말지 판정했으므로, 통과한 뒤에 다시 비중을 깎을 근거가 없기 때문이다.
-
-탈락한 세트는 FK를 쓰지 않고 vision 합의 $\mathbf{V}_s$를 anchor로 삼는다.
-
-정리하면 판단은 세트마다 전부 아니면 전무다.
-
-| gate | anchor | FK 사용 |
-|---|---|---|
-| 통과 | $\mathbf{F}^{\mathrm{corr}}_s$ | 그대로 사용 |
-| 탈락 | $\mathbf{V}_s$ | 사용하지 않음 |
-
-탈락한 세트가 `No-FK`와 같아지는 것은 아니다. 값의 출처가 vision이라는 점은 같지만 상태가 다르다.
-
-| | 큐브 자세의 값 | 최적화 중 상태 |
-|---|---|---|
-| `No-FK` | vision으로 찾는다 | 자유변수. 계속 움직인다 |
-| gate 탈락 세트 | vision 합의 $\mathbf{V}_s$ | 고정. 더 움직이지 않는다 |
-
-즉 `Corrected-FK`는 세트마다 anchor의 출처가 갈릴 뿐, 어느 쪽이든 값을 하나로 못 박고 시작한다는 성격은 같다. 그 고정된 anchor로 11.8절의 refinement를 수행한다.
-
-### 11.8 단계 7: anchor를 고정하고 최종 refinement
-
-`Corrected-FK`는 만들어진 $\mathbf{A}_s$를 최종 단계에서 고정 anchor로 사용한다.
-
-$$
-\left\{
-\{\widehat{\mathbf{C}}_i\},
-\widehat{\mathbf{X}}
-\right\}
-=
-\underset{
-\{\mathbf{C}_i\},\mathbf{X}
-}{\operatorname{argmin}}
-\mathcal{E}_{\mathrm{vis}}
-\left(
-\{\mathbf{C}_i\},
-\mathbf{X},
-\{\mathbf{A}_s\}
-\right)
-$$
-
-즉, Corrected-FK는 단순히 목적함수에 약한 벌점 하나를 더하는 것과 다르다. vision 초기 해, FK 공통 정렬, gate 판정, anchor 확정, 고정 anchor refinement의 순서로 동작한다.
-
-### 11.9 아직 검증이 남은 부분
-
-이 장의 절차는 확정된 것이 아니라 검증과 보완이 진행 중이다. 특히 다음 항목들은 실험으로 근거를 마련해야 한다.
-
-- **$k=2.5$의 타당성.** 현재는 강건 평균이 쓰는 값과 통일했을 뿐이다. $k$를 바꿔가며 결과가 얼마나 달라지는지 확인해야 한다.
-- **gate가 실제로 도움이 되는가.** 세트를 탈락시키는 것이 결과를 개선하는지, 아니면 정보를 버리는 손해가 더 큰지는 gate를 끈 조건과 비교해야 알 수 있다.
-- **하한을 vision 산포로 두는 방식의 적절성.** 산포의 중앙값을 쓰는 것이 맞는지, 세트별 산포를 각각 쓰는 편이 나은지는 아직 비교하지 않았다.
-- **실데이터에서의 확인.** 적응형 기준선은 시뮬레이션과 실제 캘리브레이션 코드 양쪽에 반영되어 있으나, 실제 촬영 데이터에서 세트가 어떻게 걸러지는지는 아직 확인하지 않았다.
-
-따라서 이 장의 수치와 정책은 이후 실험 결과에 따라 바뀔 수 있다.
+6차원 표본 공분산의 rank는 반복 수 $N$에 대해 최대 $N-1$이므로, full-rank $6\times6$ 공분산에는 최소 $N=7$개의 독립 반복이 필요하다. 코드도 7회 미만, 비대칭, 비양정치 covariance를 거부한다. 실제로는 안정적인 추정을 위해 7회보다 충분히 많은 반복을 사용하는 편이 바람직하다.
 
 ---
+
+<a id="toc-section-13"></a>
 
 ## 12. 세 FK 방식 비교
 
 | 방법 | 공통 큐브 자세 $\mathbf{Q}_s$ | 큐브 자세의 상태 | 핵심 의미 |
 |---|---:|---|---|
-| `No-FK` | $\mathbf{Q}_s=\mathbf{O}_s$ | 자유변수 | FK를 사용하지 않고 vision 합의로 직접 찾음 |
-| `Fixed-FK` | $\mathbf{Q}_s=\mathbf{F}_s$ | raw FK에 고정 | FK를 정답으로 간주 |
-| `Corrected-FK` | $\mathbf{Q}_s=\mathbf{A}_s$ | 보정된 anchor에 고정 | vision으로 FK를 검증하고 통과한 세트만 사용 |
+| `no-FK(vision)` | 없음 | $\mathbf{O}_s$ 자유변수 | cube FK prior 없이 raw-corner vision으로 추정 |
+| `FK-fixed` | $\mathbf{O}_s=\widetilde{\mathbf{F}}_s$ | cube 변수 제거 | train-only 정렬 FK를 hard constraint로 사용 |
+| `corrected-FK factor` | $\mathbf{w}_s=\mathbf{L}_s^{-1}\mathbf{e}^{\mathrm{FK}}_s$ | $\mathbf{O}_s$ 자유변수 | vision 목적함수에 covariance-whitened robust FK factor 추가 |
 
 한 문장으로 요약하면 다음과 같다.
 
-- `No-FK`: 큐브 자세도 직접 찾는다.
-- `Fixed-FK`: 큐브 자세를 raw FK에 못 박는다.
-- `Corrected-FK`: raw FK를 vision으로 보정하고 gate를 통과한 세트에서만 사용한다.
+- `no-FK(vision)`: 큐브 자세도 직접 찾는다.
+- `FK-fixed`: 큐브 자세를 train-only 정렬 FK에 못 박는다.
+- `corrected-FK factor`: 큐브 자세를 자유롭게 두고 정렬 FK를 불확실성이 있는 soft measurement로 사용한다.
 
 ---
+
+<a id="toc-section-14"></a>
 
 ## 13. Unified 방식
 
 ### 13.1 쉬운 설명
 
-고정 카메라와 그리퍼 카메라가 같은 $\mathbf{Q}_s$를 공유하도록 모든 미지수를 하나의 최적화에서 동시에 푼다.
+고정 카메라와 그리퍼 카메라의 raw-corner residual을 하나의 벡터로 쌓고, 두 경로가 공유하는 target pose와 hand-eye를 포함한 모든 행-선언 자유변수를 동시에 갱신한다.
 
 ### 13.2 수식
 
@@ -968,7 +782,8 @@ $$
 \left(
 \{\mathbf{C}_i\},
 \mathbf{X},
-\{\mathbf{Q}_s\}
+\mathbf{B},
+\{\mathbf{O}_s\}
 \right)
 $$
 
@@ -978,239 +793,73 @@ $$
 \underset{\boldsymbol{\theta}_{\mathrm{uni}}}
 {\operatorname{argmin}}
 \left[
-\mathcal{E}_{\mathrm{fix}}
+\mathcal{E}^{\mathrm{px}}_{\mathrm{fix}}
 +
-\mathcal{E}_{\mathrm{grip}}
+\mathcal{E}^{\mathrm{px}}_{\mathrm{grip}}
 +
-\mathcal{E}_{\mathrm{anchor}}
+\mathbb{1}_{\mathrm{FKfactor}}\mathcal{E}_{\mathrm{FK}}
 \right]
 $$
 
-각 관측항은 다음과 같다.
+여기서 pixel 항은 8장의 동일한 native-pixel corner residual이고, A4/B2에서만 11장의 FK factor가 추가된다. A3에서는 $\mathbf{O}_s=\widetilde{\mathbf{F}}_s$를 고정하므로 cube pose가 자유변수 목록에서 제거된다.
 
-$$
-\mathcal{E}_{\mathrm{fix}}
-=
-\sum_{i,s}
-\left\|
-\mathbf{r}
-(\mathbf{C}_i\mathbf{Z}_{i,s},\mathbf{Q}_s)
-\right\|_2^2
-$$
-
-$$
-\mathcal{E}_{\mathrm{grip}}
-=
-\sum_e
-\left\|
-\mathbf{r}
-(\mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e},\mathbf{Q}_{s(e)})
-\right\|_2^2
-$$
-
-$\mathcal{E}_{\mathrm{anchor}}$는 FK 방식에 따라 없거나, hard constraint로 대체되거나, 별도의 soft anchor로 사용될 수 있다. `Corrected-FK`에서는 $\mathbf{A}_s$를 고정한 refinement로 구현된다.
-
-Unified의 핵심은 한쪽 관측이 $\mathbf{Q}_s$를 움직이면, 같은 $\mathbf{Q}_s$를 공유하는 다른 쪽의 $\mathbf{C}_i$와 $\mathbf{X}$도 영향을 받는다는 것이다. 즉 두 서브시스템이 정보를 교환한다.
+Unified의 핵심은 한쪽 관측이 $\mathbf{O}_s$를 움직이면, 같은 $\mathbf{O}_s$를 공유하는 다른 쪽의 $\mathbf{C}_i$와 $\mathbf{X}$도 같은 반복 안에서 영향을 받는다는 것이다. $e_{cross}$ 같은 평가 지표는 이 목적함수에 들어가지 않는다.
 
 ---
 
-## 14. Independent와 Separated 방식
+<a id="toc-section-15"></a>
 
-### 14.1 먼저 용어를 정확히 구분한다
+## 14. Sequential(`seq`, `-Unified`) 방식
 
-이 프로젝트의 시뮬레이션 설정에서 `Independent`, `Separated`, `따로 풀기`, `-unified`는 같은 축을 가리킨다.
+### 14.1 용어와 실제 코드 계약
 
-즉, `Independent`와 `Separated`라는 서로 다른 두 솔버가 따로 있는 것이 아니다.
+현재 real-data Table 1의 `seq` 또는 `-Unified`는 두 독립 좌표계를 따로 푼 뒤 Kabsch로 맞추는 legacy simulation 방식이 아니다. 하나의 베이스 좌표계 안에서 다음 두 단계를 순서대로 실행하며, stage 1 결과를 stage 2에서 고정한다.
 
-- `Independent`: 결과표와 함수 이름에서 사용하는 이름
-- `Separated`: 고정 카메라 서브시스템과 그리퍼 카메라 서브시스템을 분리해서 푼다는 설명
+### 14.2 Stage 1: eye-in-hand만 최적화
 
-### 14.2 단계 1: 고정 카메라 서브시스템만 푼다
-
-고정 카메라용 공통 큐브 자세를 $\mathbf{Q}^{\mathrm{fix}}_s$라고 두면 다음 문제를 푼다.
+그리퍼 카메라 관측만 사용해 $\mathbf{X}$와 행에 포함된 target pose를 푼다.
 
 $$
-\left\{
-\{\widehat{\mathbf{C}}_i\},
-\{\widehat{\mathbf{Q}}^{\mathrm{fix}}_s\}
-\right\}
+(\widehat{\mathbf{X}},\widehat{\mathbf{B}},
+ \{\widehat{\mathbf{O}}_s\})
 =
-\underset{
-\{\mathbf{C}_i\},
-\{\mathbf{Q}^{\mathrm{fix}}_s\}
-}{\operatorname{argmin}}
-\sum_{i,s}
-\left\|
-\mathbf{r}
-\left(
-\mathbf{C}_i\mathbf{Z}_{i,s},
-\mathbf{Q}^{\mathrm{fix}}_s
-\right)
-\right\|_2^2
+\underset{\mathbf{X},\mathbf{B},\{\mathbf{O}_s\}}
+{\operatorname{argmin}}
+\left[
+\mathcal{E}^{\mathrm{px}}_{\mathrm{grip}}
++
+\mathbb{1}_{\mathrm{B1}}\mathcal{E}_{\mathrm{FK}}
+\right].
 $$
 
-Fixed-FK 또는 보정 anchor가 주어진 독립 방식에서는 카메라별로 다음 후보를 직접 만들 수 있다.
+A0는 board만, A1은 board와 cube, B1은 board와 cube에 corrected-FK factor까지 사용한다. 행에 없는 target 변수와 잔차는 식에서 제거된다.
 
-$$
-\mathbf{C}_{i,s}^{\mathrm{cand}}
-=
-\mathbf{Q}_s
-\mathbf{Z}_{i,s}^{-1}
-$$
+### 14.3 Freeze boundary
 
-그리고 여러 세트의 후보를 강건 평균한다.
+Stage 1에서 얻은 $\widehat{\mathbf{X}}$, $\widehat{\mathbf{B}}$, $\widehat{\mathbf{O}}_s$는 stage 2의 상수다. 이후 fixed-camera 관측이 이 값을 바꾸지 못하고, stage 2 뒤 stage 1로 돌아가는 alternating pass도 없다.
+
+### 14.4 Stage 2: fixed camera별 최적화
+
+각 고정 카메라 $i$는 자신의 raw-corner residual만 사용해 $\mathbf{C}_i$를 푼다.
 
 $$
 \widehat{\mathbf{C}}_i
 =
-\operatorname{RobustAverage}_s
-\left(
-\mathbf{Q}_s\mathbf{Z}_{i,s}^{-1}
-\right)
+\underset{\mathbf{C}_i}{\operatorname{argmin}}
+\mathcal{E}^{\mathrm{px}}_{\mathrm{fix},i}
+(\mathbf{C}_i\mid
+ \widehat{\mathbf{B}},\{\widehat{\mathbf{O}}_s\}).
 $$
 
-여기서 Fixed-FK이면 $\mathbf{Q}_s=\mathbf{F}_s$이고, Corrected-FK이면 $\mathbf{Q}_s=\mathbf{A}_s$다.
+target과 hand-eye가 고정되어 있으므로 camera block들은 수학적으로 분리 가능하다.
 
-### 14.3 단계 2: 그리퍼 카메라 서브시스템만 푼다
+### 14.5 Unified와 Sequential의 핵심 차이
 
-그리퍼 쪽 전용 큐브 자세를 $\mathbf{Q}^{\mathrm{grip}}_s$라고 두면 다음 문제를 푼다.
-
-$$
-\left\{
-\widehat{\mathbf{X}},
-\{\widehat{\mathbf{Q}}^{\mathrm{grip}}_s\}
-\right\}
-=
-\underset{
-\mathbf{X},
-\{\mathbf{Q}^{\mathrm{grip}}_s\}
-}{\operatorname{argmin}}
-\sum_e
-\left\|
-\mathbf{r}
-\left(
-\mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e},
-\mathbf{Q}^{\mathrm{grip}}_{s(e)}
-\right)
-\right\|_2^2
-$$
-
-FK 또는 corrected anchor가 주어진 경우에는 각 관측에서 hand-eye 후보를 직접 만들 수 있다.
-
-$$
-\mathbf{X}_e^{\mathrm{cand}}
-=
-\mathbf{G}_e^{-1}
-\mathbf{Q}_{s(e)}
-\mathbf{Z}_{g,e}^{-1}
-$$
-
-따라서 다음처럼 평균할 수 있다.
-
-$$
-\widehat{\mathbf{X}}
-=
-\operatorname{RobustAverage}_e
-\left(
-\mathbf{G}_e^{-1}
-\mathbf{Q}_{s(e)}
-\mathbf{Z}_{g,e}^{-1}
-\right)
-$$
-
-### 14.4 단계 3: No-FK 독립 방식의 두 결과를 정렬한다
-
-No-FK에서는 두 서브시스템이 서로 다른 큐브 합의를 만들 수 있다. 현재 시뮬레이션은 두 쪽이 예측한 큐브 중심을 이용하여 강체 정렬을 구한다.
-
-고정 카메라 쪽 세트 중심을 다음과 같이 둔다.
-
-$$
-\mathbf{p}^{\mathrm{fix}}_s
-=
-\mathbf{t}
-\left(
-\operatorname{Average}_i
-(\widehat{\mathbf{C}}_i\mathbf{Z}_{i,s})
-\right)
-$$
-
-그리퍼 카메라 쪽 세트 중심은 다음과 같다.
-
-$$
-\mathbf{p}^{\mathrm{grip}}_s
-=
-\mathbf{t}
-\left(
-\operatorname{Average}_{e:s(e)=s}
-(\mathbf{G}_e\widehat{\mathbf{X}}\mathbf{Z}_{g,e})
-\right)
-$$
-
-그리퍼 예측점을 고정 카메라 결과에 맞추는 강체 정렬 $\mathbf{H}=(\mathbf{R}_H,\mathbf{t}_H)$를 구한다.
-
-$$
-\left(
-\widehat{\mathbf{R}}_H,
-\widehat{\mathbf{t}}_H
-\right)
-=
-\underset{
-\mathbf{R}_H\in\mathrm{SO}(3),
-\mathbf{t}_H\in\mathbb{R}^{3}
-}{\operatorname{argmin}}
-\sum_s
-\left\|
-\mathbf{p}^{\mathrm{fix}}_s
--
-\left(
-\mathbf{R}_H\mathbf{p}^{\mathrm{grip}}_s
-+
-\mathbf{t}_H
-\right)
-\right\|_2^2
-$$
-
-정렬 후 그리퍼 예측은 다음처럼 사용한다.
-
-$$
-\widehat{\mathbf{O}}^{\mathrm{grip\rightarrow fix}}_e
-=
-\mathbf{H}
-\left(
-\mathbf{G}_e\widehat{\mathbf{X}}\mathbf{Z}_{g,e}
-\right)
-$$
-
-현재 시뮬레이션 코드의 `_rigid_align`은 공통 세트가 최소 $3$개일 때 큐브 중심점들에 Kabsch 강체 정렬을 적용한다.
-
-### 14.5 Unified와 Independent의 핵심 차이
-
-Unified는 처음부터 하나의 $\mathbf{Q}_s$를 공유한다.
-
-$$
-\mathbf{Q}^{\mathrm{fix}}_s
-=
-\mathbf{Q}^{\mathrm{grip}}_s
-=
-\mathbf{Q}_s
-$$
-
-Independent는 각각 푼 다음 마지막에 정렬한다.
-
-$$
-\left(
-\{\mathbf{C}_i\},\{\mathbf{Q}^{\mathrm{fix}}_s\}
-\right)
-\quad\text{and}\quad
-\left(
-\mathbf{X},\{\mathbf{Q}^{\mathrm{grip}}_s\}
-\right)
-\quad\text{are solved separately}
-$$
-
-따라서 Unified에서는 양쪽 관측이 최적화 중에 정보를 교환하지만, Independent에서는 마지막 정렬 전까지 정보교환이 없다.
+Unified는 eih/e2h residual을 동시에 보고 $\mathbf{C}_i$, $\mathbf{X}$, target pose 사이에 양방향 feedback이 있다. Sequential은 eih가 target과 $\mathbf{X}$를 먼저 정하고, e2h는 그 결과를 받아 $\mathbf{C}_i$만 갱신한다. 두 방식 모두 같은 raw detections, $\mathbf{K},\mathbf{D}$, split, solver 설정을 사용한다.
 
 ---
+
+<a id="toc-section-16"></a>
 
 ## 15. Board-only, Cube-only, Both
 
@@ -1223,18 +872,10 @@ FK 방식과 별개로 어떤 타깃 관측을 사용할지도 선택한다.
 $$
 \mathcal{E}_{\mathrm{cube}}
 =
-\sum_{i,s}
-\left\|
-\mathbf{r}
-(\mathbf{C}_i\mathbf{Z}^{\mathrm{cube}}_{i,s},\mathbf{Q}^{\mathrm{cube}}_s)
-\right\|_2^2
-+
-\sum_e
-\left\|
-\mathbf{r}
-(\mathbf{G}_e\mathbf{X}\mathbf{Z}^{\mathrm{cube}}_{g,e},
-\mathbf{Q}^{\mathrm{cube}}_{s(e)})
-\right\|_2^2
+\sum_{o\in\mathcal{O}_{\mathrm{cube}}}
+\sum_j\sum_{q\in\{u,v\}}
+f_v^2\rho_{\mathrm{softL1}}
+\left((\widehat u_{o,j,q}-u_{o,j,q})^2/f_v^2\right)
 $$
 
 ### 15.2 Board-only
@@ -1244,20 +885,13 @@ $$
 $$
 \mathcal{E}_{\mathrm{board}}
 =
-\sum_{i,s}
-\left\|
-\mathbf{r}
-(\mathbf{C}_i\mathbf{Z}^{\mathrm{board}}_{i,s},\mathbf{Q}^{\mathrm{board}})
-\right\|_2^2
-+
-\sum_e
-\left\|
-\mathbf{r}
-(\mathbf{G}_e\mathbf{X}\mathbf{Z}^{\mathrm{board}}_{g,e},\mathbf{Q}^{\mathrm{board}})
-\right\|_2^2
+\sum_{o\in\mathcal{O}_{\mathrm{board}}}
+\sum_j\sum_{q\in\{u,v\}}
+f_v^2\rho_{\mathrm{softL1}}
+\left((\widehat u_{o,j,q}-u_{o,j,q})^2/f_v^2\right)
 $$
 
-보드는 로봇이 잡고 이동시키는 큐브 FK prior를 갖지 않는다. 따라서 이 프로젝트에서는 `Board-only + Fixed-FK`와 `Board-only + Corrected-FK`를 정의하지 않는다.
+보드는 로봇이 잡고 이동시키는 큐브 FK prior를 갖지 않는다. 따라서 이 프로젝트에서는 `Board-only + FK-fixed`와 `Board-only + corrected-FK`를 정의하지 않는다.
 
 ### 15.3 Both
 
@@ -1275,6 +909,8 @@ $$
 
 ---
 
+<a id="toc-section-17"></a>
+
 ## 16. 왜 전체 조합이 $18$개가 아니라 $14$개인가?
 
 형식적으로는 다음 세 축이 있다.
@@ -1288,7 +924,7 @@ $$
 =18
 $$
 
-하지만 `Board-only`에는 큐브 FK prior가 없으므로 `Fixed-FK`와 `Corrected-FK`를 사용할 수 없다.
+하지만 `Board-only`에는 큐브 FK prior가 없으므로 `FK-fixed`와 `corrected-FK`를 사용할 수 없다.
 
 제외되는 조합 수는 다음과 같다.
 
@@ -1307,29 +943,34 @@ $$
 18-4=14
 $$
 
+이는 물리적으로 정의 가능한 개념 조합의 수다. 현재 real-data Main Table은 이 14개를 전부 실행하는 full factorial이 아니라, A0–A4/B1–B3의 8개 사전 정의 비교행만 실행한다.
+
 ---
 
-## 17. Corrected-FK와 Ridge 출력 후보정은 다르다
+<a id="toc-section-18"></a>
+
+## 17. corrected-FK와 Ridge 출력 후보정은 다르다
 
 이 둘은 자주 혼동되지만 서로 다른 단계다.
 
-### 17.1 Corrected-FK
+### 17.1 corrected-FK
 
-캘리브레이션 입력 쪽에서 raw FK 자세를 vision으로 정렬하고, gate와 blend를 거쳐 anchor $\mathbf{A}_s$를 만든다.
+캘리브레이션 목적함수 안에서 raw FK 자세를 train-only vision으로 정렬하고, 정렬 pose와의 6차원 오차를 공분산으로 whitening한 robust factor를 사용한다.
 
 $$
 \mathbf{F}_s
 \rightarrow
-\mathbf{F}^{\mathrm{corr}}_s
+\widetilde{\mathbf{F}}_s=\mathbf{F}_s\boldsymbol{\Delta}
 \rightarrow
-\mathbf{A}_s
+\mathbf{w}_s=\mathbf{L}_s^{-1}
+\mathbf{e}^{\mathrm{FK}}_s
 \rightarrow
-\text{calibration refinement}
+\mathcal{E}_{\mathrm{vis}}+\mathcal{E}_{\mathrm{FK}}
 $$
 
 ### 17.2 선택적 Ridge 출력 후보정
 
-C1의 선택적 출력 후보정은 캘리브레이션이 끝난 뒤 예측 위치의 잔차를 회귀로 학습한다.
+legacy simulation의 `corr` 출력 후보정은 캘리브레이션이 끝난 뒤 예측 위치의 잔차를 회귀로 학습한다. 이것은 현재 real-data Table 1의 A4 corrected-FK factor가 아니다.
 
 예측 위치를 다음과 같이 둔다.
 
@@ -1386,6 +1027,8 @@ $$
 이 Ridge 결과는 FK proxy와의 일치도를 높이는 출력 보정이다. 실제 외부 측정 장비의 정답과 비교한 절대 물리 정확도라고 말하면 안 된다.
 
 ---
+
+<a id="toc-section-19"></a>
 
 ## 18. 평가 지표를 해석하는 방법
 
@@ -1452,47 +1095,49 @@ $$
 
 ---
 
+<a id="toc-section-20"></a>
+
 ## 19. 코드 흐름으로 다시 보기
 
 아래 코드는 실제 구현을 이해하기 위한 축약 의사코드다.
 
 ```python
-# 1. 이미지 관측에서 pose를 만든다.
-Z_fixed = solve_pnp(fixed_camera_images)
-Z_gripper = solve_pnp(gripper_camera_images)
+# 1. 모든 방법이 공유할 raw corner와 pre-fit 품질 마스크를 만든다.
+corners = detect_native_pixel_corners(images)
+corners = common_pnp_quality_mask(corners, max_rmse_fixed=3, max_rmse_gripper=5)
+train, heldout = event_grouped_set_stratified_split(corners)
 
-# 2. FK 사용 방식에 따라 set target을 정한다.
+# 2. train eye-in-hand cube corner만으로 FK 좌표계를 정렬한다.
+delta = estimate_board_free_fk_alignment(train)
+aligned_fk = {s: raw_fk[s] @ delta for s in sets}
+
+# 3. FK 사용 방식에 따라 cube 변수와 목적함수를 정한다.
 if fk_mode == "none":
-    target_mode = "free"
+    cube_pose = "free"
+    fk_factor = None
 
 elif fk_mode == "fixed":
-    set_anchors = raw_fk
-    target_mode = "fixed"
+    cube_pose = aligned_fk
+    fk_factor = None
 
-elif fk_mode == "corr":
-    visual_model = solve_unified(fk_mode="none")
-    visual_by_set = build_visual_consensus(visual_model)
-    delta = robust_average(inv(raw_fk[s]) @ visual_by_set[s])
-    corrected_fk = {s: raw_fk[s] @ delta for s in sets}
-    set_anchors = gate_select(
-        visual_by_set,          # gate 탈락 시 사용
-        corrected_fk,           # gate 통과 시 그대로 사용
-        gate_k=2.5,             # median + k*1.4826*MAD
-        gate_floor_mm=5.0,
-        gate_floor_deg=1.0,
-    )
-    target_mode = "fixed"
+elif fk_mode == "factor":
+    cube_pose = "free"
+    fk_factor = covariance_whitened_huber_factor(aligned_fk, Sigma)
 
-# 3. 통합 또는 독립 구조로 캘리브레이션한다.
+# 4. 통합 또는 sequential 구조로 raw-corner BA를 푼다.
 if solver_mode == "unified":
-    model = solve_all_observations_together(set_anchors, target_mode)
+    model = solve_joint_raw_corner_BA(train, cube_pose, fk_factor)
 else:
-    fixed_model = solve_fixed_subsystem(set_anchors, target_mode)
-    gripper_model = solve_gripper_subsystem(set_anchors, target_mode)
-    model = align_and_combine(fixed_model, gripper_model)
+    stage1 = solve_eih_raw_corner_BA(train, cube_pose, fk_factor)
+    model = solve_fixed_cameras_with_stage1_frozen(train, stage1)
+
+# 5. heldout에서는 모든 parameter를 고정하고 같은 관측을 평가한다.
+metrics = evaluate_without_refit(model, heldout)
 ```
 
 ---
+
+<a id="toc-section-21"></a>
 
 ## 20. 교수님께 설명할 때의 추천 순서
 
@@ -1500,113 +1145,101 @@ else:
 2. 모든 것을 로봇 베이스 좌표계 $B$로 옮기는 것이 캘리브레이션이라고 설명한다.
 3. 변환행렬 $\mathbf{T}$가 회전 $\mathbf{R}$과 이동 $\mathbf{t}$를 포함한다고 설명한다.
 4. 고정 카메라 경로 $\mathbf{C}_i\mathbf{Z}_{i,s}$와 그리퍼 카메라 경로 $\mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e}$를 설명한다.
-5. 두 경로가 같은 $\mathbf{Q}_s$에 도착하도록 오차를 최소화한다고 설명한다.
-6. $\mathbf{Q}_s$를 어떻게 정하는지가 `No-FK`, `Fixed-FK`, `Corrected-FK`의 차이라고 설명한다.
-7. 두 카메라 계열을 동시에 풀면 Unified이고, 따로 풀고 마지막에 정렬하면 Independent 또는 Separated라고 설명한다.
+5. 실제 solver는 pose 차이가 아니라 raw distorted-pixel corner 재투영오차를 최소화한다고 설명한다.
+6. cube pose를 자유롭게 둘지, 정렬 FK에 고정할지, covariance factor로 연결할지가 세 FK 방식의 차이라고 설명한다.
+7. 두 카메라 계열을 한 residual vector로 함께 풀면 Unified이고, eih를 먼저 푼 뒤 동결하여 fixed camera만 풀면 Sequential이라고 설명한다.
 8. 실데이터의 FK 기반 평가는 절대 정답이 아니라 proxy라는 점을 마지막에 분명히 말한다.
 
 ---
+
+<a id="toc-section-22"></a>
 
 ## 21. 최종 한 장 요약용 수식
 
 ### 공통 vision 목적함수
 
 ```latex
-\begin{aligned}
 \mathcal{E}_{\mathrm{vis}}
-={}&
-\sum_{i,s}
-\left\|
-\mathbf{r}(\mathbf{C}_i\mathbf{Z}_{i,s},\mathbf{Q}_s)
-\right\|_2^2
-\\
-&+
-\sum_e
-\left\|
-\mathbf{r}(\mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e},\mathbf{Q}_{s(e)})
-\right\|_2^2.
-\end{aligned}
+=
+\sum_{o,j}\sum_{q\in\{u,v\}}
+f_v^2\rho_{\mathrm{softL1}}
+\left(
+\frac{(\widehat{u}_{o,j,q}-u_{o,j,q})^2}{f_v^2}
+\right)
 ```
 
 ### 세 FK 방식
 
 ```latex
-\mathbf{Q}_s=
-\begin{cases}
-\mathbf{O}_s, & \text{No-FK},\\
-\mathbf{F}_s, & \text{Fixed-FK},\\
-\mathbf{A}_s, & \text{Corrected-FK}.
-\end{cases}
+\begin{array}{ll}
+\text{no-FK:} & \mathbf{O}_s\text{ is free},\\
+\text{FK-fixed:} & \mathbf{O}_s=\widetilde{\mathbf{F}}_s,\\
+\text{corrected-FK factor:} & \mathbf{O}_s\text{ is free and }\mathcal{E}_{\mathrm{FK}}\text{ is added}.
+\end{array}
 ```
 
-### Corrected-FK 핵심
+### corrected-FK 핵심
 
 ```latex
-\boldsymbol{\Delta}_s=\mathbf{F}_s^{-1}\mathbf{V}_s,
+\widetilde{\mathbf{F}}_s=\mathbf{F}_s\boldsymbol{\Delta},
 \qquad
-\overline{\boldsymbol{\Delta}}
-=
-\operatorname{RobustWeightedAverage}_s(\boldsymbol{\Delta}_s),
-\qquad
-\mathbf{F}^{\mathrm{corr}}_s
-=
-\mathbf{F}_s\overline{\boldsymbol{\Delta}}.
+\mathbf{w}_s=\operatorname{chol}(\boldsymbol{\Sigma}_s)^{-1}
+\mathbf{e}^{\mathrm{FK}}_s
 ```
 
 ```latex
-\mathbf{A}_s
+\mathcal{E}_{\mathrm{FK}}
 =
-\begin{cases}
-\mathbf{F}^{\mathrm{corr}}_s,
-& d_t(s)\leq\tau_t\ \land\ d_R(s)\leq\tau_R,\\
-\mathbf{V}_s, & \text{otherwise}.
-\end{cases}
+\sum_s\sum_{k=1}^{6}
+f_{\mathrm{FK}}^2\rho_{\mathrm{Huber}}
+\left(w_{s,k}^2/f_{\mathrm{FK}}^2\right)
 ```
 
-### Unified와 Independent
+### Unified와 Sequential
 
 ```latex
 \text{Unified:}
 \qquad
-\min_{\{\mathbf{C}_i\},\mathbf{X},\{\mathbf{Q}_s\}}
+\min_{\{\mathbf{C}_i\},\mathbf{X},\mathbf{B},\{\mathbf{O}_s\}}
 \left(
-\mathcal{E}_{\mathrm{fix}}
+\mathcal{E}^{\mathrm{px}}_{\mathrm{fix}}
 +
-\mathcal{E}_{\mathrm{grip}}
+\mathcal{E}^{\mathrm{px}}_{\mathrm{grip}}
++\mathcal{E}_{\mathrm{FK}}
 \right)
 ```
 
 ```latex
-\text{Independent/Separated:}
+\text{Sequential:}
 \qquad
-\min_{\{\mathbf{C}_i\},\{\mathbf{Q}^{\mathrm{fix}}_s\}}
-\mathcal{E}_{\mathrm{fix}}
-\quad\text{and}\quad
-\min_{\mathbf{X},\{\mathbf{Q}^{\mathrm{grip}}_s\}}
-\mathcal{E}_{\mathrm{grip}},
-\quad
-\text{followed by rigid alignment }\mathbf{H}.
+\min_{\mathbf{X},\mathbf{B},\{\mathbf{O}_s\}}
+(\mathcal{E}^{\mathrm{px}}_{\mathrm{grip}}+\mathcal{E}_{\mathrm{FK}}),
+\quad\text{freeze},\quad
+\min_{\{\mathbf{C}_i\}}
+\mathcal{E}^{\mathrm{px}}_{\mathrm{fix}}.
 ```
 
 ---
+
+<a id="toc-section-23"></a>
 
 ## 22. 예상 질문과 짧은 답변
 
 ### 질문: 목적함수 안의 항들은 모두 행렬인가?
 
-$\mathbf{C}_i$, $\mathbf{Z}_{i,s}$, $\mathbf{G}_e$, $\mathbf{X}$, $\mathbf{Z}_{g,e}$, $\mathbf{Q}_s$는 모두 $4 \times 4$ 변환행렬이다. $\mathbf{r}(\cdot,\cdot)$ 또는 $\log(\cdot)$를 적용한 뒤에는 회전 $3$개와 이동 $3$개로 이루어진 $6$차원 벡터가 된다. 마지막의 $\|\cdot\|_2^2$가 그 벡터를 하나의 오차 숫자로 바꾼다.
+pose 변수는 $4\times4$ 변환행렬이지만 visual residual은 각 코너의 $u,v$ 픽셀 차이다. corrected-FK factor만 상대 pose를 회전 3개와 이동 3개의 6차원 벡터로 바꾼 뒤 covariance whitening한다.
 
-### 질문: No-FK는 로봇 FK를 전혀 쓰지 않는가?
+### 질문: no-FK(vision)는 로봇 FK를 전혀 쓰지 않는가?
 
 큐브 FK prior $\mathbf{F}_s$는 쓰지 않는다. 하지만 움직이는 그리퍼 카메라를 베이스에 연결하기 위한 촬영 순간 그리퍼 자세 $\mathbf{G}_e$는 사용한다.
 
-### 질문: Corrected-FK는 soft anchor인가?
+### 질문: corrected-FK는 soft anchor인가?
 
-아니다. gate를 통과한 세트는 corrected FK를 그대로 anchor로 삼고, 탈락한 세트는 vision 합의를 쓴다. 세트마다 전부 아니면 전무로 결정하며, 그렇게 만든 $\mathbf{A}_s$를 최종 refinement에서 고정한다. 목적함수에 벌점 항을 더하는 legacy soft-anchor 방식과는 다르다.
+그렇다. 정확히는 train-only 정렬 FK를 중심으로 한 covariance-whitened robust pose factor다. cube pose는 자유변수로 남으며 hard gate나 pose 교체는 없다.
 
-### 질문: Independent와 Separated는 다른 방법인가?
+### 질문: Sequential과 legacy Independent는 같은 방법인가?
 
-이 프로젝트에서는 같은 의미다. 두 서브시스템을 따로 풀기 때문에 separated라고 설명하고, 코드와 결과표에서는 independent라고 부른다.
+아니다. 현재 real-data `seq`는 eih stage를 먼저 풀고 그 결과를 동결한 뒤 fixed camera만 푼다. 두 좌표계를 독립적으로 푼 뒤 rigid alignment하는 legacy simulation 절차와 구분해야 한다.
 
 ### 질문: 실데이터 FK 오차가 작으면 실제로도 정확한가?
 

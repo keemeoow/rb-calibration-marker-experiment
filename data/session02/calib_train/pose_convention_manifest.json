@@ -1,0 +1,43 @@
+{
+  "schema_version": "pose_convention_manifest_v1",
+  "canonical_robot_frame": "robot_flange",
+  "canonical_cube_center_frame": "physical_cube_center_tool4_143mm",
+  "relative_signature_translation_tol_mm": 2.0,
+  "relative_signature_rotation_tol_deg": 0.2,
+  "set_stationarity_translation_tol_mm": 5.0,
+  "set_stationarity_rotation_tol_deg": 1.0,
+  "segments": [
+    {
+      "description": "Legacy captures: robot pose was tool3 at 150 mm and cube-center tool4 was at 177.5 mm.",
+      "event_ranges": [[0, 89]],
+      "T_reported_robot_to_canonical": [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, -0.1500],
+        [0.0, 0.0, 0.0, 1.0]
+      ],
+      "T_reported_cube_center_to_canonical": [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, -0.0345],
+        [0.0, 0.0, 0.0, 1.0]
+      ]
+    },
+    {
+      "description": "Corrected captures: robot pose is flange and cube-center tool4 is at 143 mm.",
+      "event_ranges": [[90, 95]],
+      "T_reported_robot_to_canonical": [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0]
+      ],
+      "T_reported_cube_center_to_canonical": [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0]
+      ]
+    }
+  ]
+}

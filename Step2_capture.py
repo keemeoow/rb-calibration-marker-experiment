@@ -60,22 +60,22 @@ from typing import Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 
-from camera import RealSenseCamera
-from apriltag_cube import AprilTagCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt
-from charuco_utils import CharucoTarget
-from config import CharucoBoardConfig, get_default_cube_config
-from calibration_runtime_utils import resolve_cube_config_for_run
-from capture_detection_utils import detect_cube_markers_in_frame, marker_roi_quality
-from capture_gate import evaluate_capture_gate, resolve_camera_storage
-from capture_session import allocate_next_capture_session
-from cube_config_utils import (
+from capture_pipeline.camera import RealSenseCamera
+from calibration_pipeline.apriltag_cube import AprilTagCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt
+from calibration_pipeline.charuco import CharucoTarget
+from calibration_pipeline.config import CharucoBoardConfig, get_default_cube_config
+from calibration_pipeline.runtime import resolve_cube_config_for_run
+from capture_pipeline.detection import detect_cube_markers_in_frame, marker_roi_quality
+from capture_pipeline.gate import evaluate_capture_gate, resolve_camera_storage
+from capture_pipeline.session import allocate_next_capture_session
+from calibration_pipeline.cube_config import (
     cube_config_mismatch_keys,
     cube_config_to_dict,
     cube_configs_equivalent,
     load_cube_config_from_meta,
 )
-from robot_comm import euler_deg_to_matrix
-from server.waypoint_safety import validate_safe_joint_config, validate_waypoint_semantics
+from capture_pipeline.robot import euler_deg_to_matrix
+from capture_pipeline.waypoint_safety import validate_safe_joint_config, validate_waypoint_semantics
 
 
 def ensure_dir(p: str) -> str:
@@ -1291,6 +1291,8 @@ def main():
 
     def do_capture(
         capture_gripper_pose_6dof: Optional[List[float]] = None,
+        capture_pose_reference: Optional[str] = None,
+        capture_tool_offset_6dof: Optional[List[float]] = None,
         place_pose_6dof: Optional[List[float]] = None,
         capture_index: Optional[int] = None,
         capture_robot_joints_6dof: Optional[List[float]] = None,
@@ -1417,6 +1419,12 @@ def main():
                 cap_rec["capture_gripper_pose_matrix_4x4"] = T44
             except Exception:
                 pass
+        if capture_pose_reference is not None:
+            cap_rec["capture_pose_reference"] = str(capture_pose_reference)
+        if capture_tool_offset_6dof is not None:
+            cap_rec["capture_tool_offset_6dof"] = [
+                float(x) for x in capture_tool_offset_6dof
+            ]
 
         if capture_robot_joints_6dof is not None:
             cap_rec["capture_robot_joints_6dof"] = [float(x) for x in capture_robot_joints_6dof]
@@ -1467,8 +1475,8 @@ def main():
             is_gripper_cam = (ci == gripper_cam_idx)
 
             # 저장하지 않는 카메라도 기록은 남긴다. 아래 소비자들이 모두
-            # cams[ci]["saved"] 로 거르므로 (CP_common, Step3,
-            # calibration_corner_observations), 조용히 빠지지 않고 왜 없는지가 남는다.
+            # cams[ci]["saved"] 로 거르므로 (calibration_pipeline common/
+            # observations, Step3), 조용히 빠지지 않고 왜 없는지가 남는다.
             if (is_gripper_cam and not storage.store_gripper) or \
                     (not is_gripper_cam and not storage.store_fixed):
                 cap_rec["cams"][str(ci)] = {
@@ -1575,6 +1583,8 @@ def main():
             wp_set_joints = None
             wp_set_tcp = None
             wp_set_cube_center = None
+            wp_tool_pose_reference = None
+            wp_tool_offset_6dof = None
 
             # PC-side teach recording (grip/pose/set). 서버가 recgrip/recpose/recset 시
             # 전체 리스트를 보내면 여기서 세션 번호 붙은 파일로 PC 에만 저장한다.
@@ -1588,6 +1598,7 @@ def main():
 
             def network_loop():
                 nonlocal wp_set_joints, wp_set_tcp, wp_set_cube_center
+                nonlocal wp_tool_pose_reference, wp_tool_offset_6dof
                 try:
                     recv_buf = b""
                     while not network_done.is_set() and not user_quit.is_set():
@@ -1630,6 +1641,8 @@ def main():
                             # 서버 세션(재연결)마다 새 번호 파일 (grip_poses_NNN.json 등).
                             kind = msg.get("kind")
                             entries = msg.get("data")
+                            tool_pose_reference = msg.get("tool_pose_reference")
+                            tool_offset_6dof = msg.get("tool_offset_6dof")
                             name = {"grip": "grip_poses", "pose": "capture_poses",
                                     "set": "capture_sets"}.get(kind)
                             if name is None or not isinstance(entries, list):
@@ -1651,7 +1664,12 @@ def main():
                                 teach_dir, f"{name}_{teach['session']:03d}.json")
                             try:
                                 with open(path, "w") as tf:
-                                    json.dump({name: entries}, tf, indent=2)
+                                    teach_data = {name: entries}
+                                    if tool_pose_reference is not None:
+                                        teach_data["tool_pose_reference"] = tool_pose_reference
+                                    if tool_offset_6dof is not None:
+                                        teach_data["tool_offset_6dof"] = tool_offset_6dof
+                                    json.dump(teach_data, tf, indent=2)
                                 print(f"[Teach] {kind}: {len(entries)} entries -> {path}")
                             except Exception as e:
                                 print(f"[Teach] save error: {e}")
@@ -1752,6 +1770,12 @@ def main():
                             m_grasp = msg.get("grasp_id")
                             m_force = msg.get("force_save")
                             m_motion_safety = msg.get("motion_safety")
+                            m_pose_reference = msg.get("capture_pose_reference")
+                            m_tool_offset = msg.get("capture_tool_offset_6dof")
+                            if m_pose_reference is not None:
+                                wp_tool_pose_reference = m_pose_reference
+                            if m_tool_offset is not None:
+                                wp_tool_offset_6dof = m_tool_offset
 
                             print(f"\n[ManualRobot] Capture signal received (capture_index={pose_idx}, set_index={s_idx})")
                             if capture_tcp:
@@ -1761,6 +1785,8 @@ def main():
 
                             saved, gate = do_capture(
                                 capture_gripper_pose_6dof=capture_tcp,
+                                capture_pose_reference=m_pose_reference,
+                                capture_tool_offset_6dof=m_tool_offset,
                                 capture_index=pose_idx,
                                 capture_robot_joints_6dof=r_joints,
                                 capture_cube_center_6dof=live_cube,
@@ -1798,6 +1824,10 @@ def main():
                                 "cube_center_6dof": msg.get("capture_cube_center_6dof"),
                                 "set_index": s_idx,
                             }
+                            if m_pose_reference is not None:
+                                wp_entry["capture_pose_reference"] = m_pose_reference
+                            if m_tool_offset is not None:
+                                wp_entry["capture_tool_offset_6dof"] = m_tool_offset
                             if m_place_joints is not None:
                                 wp_entry["place_joints"] = m_place_joints
                             wp_list.append(wp_entry)
@@ -1885,6 +1915,10 @@ def main():
                         "set_cube_center": wp_set_cube_center,
                         "waypoints": wp_list,
                     }
+                    if wp_tool_pose_reference is not None:
+                        wp_save["tool_pose_reference"] = wp_tool_pose_reference
+                    if wp_tool_offset_6dof is not None:
+                        wp_save["tool_offset_6dof"] = wp_tool_offset_6dof
                     wp_path = os.path.join(root, "capture_waypoints_recorded.json")
                     with open(wp_path, "w") as f:
                         json.dump(wp_save, f, indent=2)

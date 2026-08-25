@@ -1,2 +1,0 @@
-Transforms are in robot BASE frame.
-Robot cube-center used as a soft constraint IN the solve.

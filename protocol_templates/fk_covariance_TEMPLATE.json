@@ -9,6 +9,7 @@
     "tz_m"
   ],
   "measurement_source": "REPLACE_WITH_REPEAT_GRASP_OR_PLACEMENT_PROTOCOL",
+  "covariance_estimator": "REPLACE_WITH_PREREGISTERED_6D_ESTIMATOR",
   "n_repeats": 0,
   "blind_external_gt_used": false,
   "preregistered_before_blind_test": true,
@@ -20,5 +21,5 @@
     [null, null, null, null, null, null],
     [null, null, null, null, null, null]
   ],
-  "warning": "Template values are invalid placeholders. Replace them with a positive-definite covariance estimated in rad/metre before confirmatory use."
+  "warning": "Template values are invalid placeholders. Use at least 7 independent physical repeats (the minimum for a potentially full-rank 6D sample covariance), then replace the matrix with a positive-definite preregistered estimate in rad/metre before confirmatory use."
 }
