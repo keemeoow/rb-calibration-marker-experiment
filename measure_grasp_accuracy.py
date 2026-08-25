@@ -26,6 +26,12 @@
     아래로 내려야 큐브 중심이 나온다. 두 계산이 얼마나 벌어지는지가 곧 오차다.
 
 실행 예:
+    # 아무 서브커맨드 없이 실행하면(또는 `wizard`) 위 1~4단계를 대화형으로 순서대로
+    # 안내한다 — 처음 쓸 때는 이걸로 시작할 것.
+    python measure_grasp_accuracy.py
+    python measure_grasp_accuracy.py --robot_ip 192.168.0.23
+
+    # 각 단계를 따로 자동화/스크립트로 돌리고 싶을 때는 개별 서브커맨드도 그대로 있다.
     python measure_grasp_accuracy.py record-init --robot_ip 192.168.0.23
     python measure_grasp_accuracy.py record-gt --label center1
     python measure_grasp_accuracy.py run-trial --n_trials 5
@@ -406,24 +412,7 @@ def add_geometry_args(p):
     p.add_argument("--grip_depth_mm", type=float, default=CUBE_GRIP_DEPTH_MM)
 
 
-def main():
-    ap = argparse.ArgumentParser(
-        formatter_class=argparse.RawDescriptionHelpFormatter, description=__doc__)
-    sub = ap.add_subparsers(dest="cmd", required=True)
-
-    p = sub.add_parser("record-init", help="지금 로봇 자세를 인지 대기 자세로 저장")
-    add_common_robot_args(p)
-    p.set_defaults(func=cmd_record_init)
-
-    p = sub.add_parser("record-gt", help="사람이 맞춘 큐브 위치를 GT 로 기록")
-    add_common_robot_args(p)
-    add_geometry_args(p)
-    p.add_argument("--label", default="default")
-    p.set_defaults(func=cmd_record_gt)
-
-    p = sub.add_parser("run-trial", help="인지->이동->오차계산 을 실행 (기본은 그립 안 함)")
-    add_common_robot_args(p)
-    add_geometry_args(p)
+def add_run_trial_args(p):
     p.add_argument("--calib_dir", default=os.path.join(HERE, "data/session02/calib_final_use"))
     p.add_argument("--cam", default="cam1", choices=["cam1", "cam3"])
     p.add_argument("--fuse", action="store_true", help="cam1+cam3를 함께 써서 median 융합")
@@ -445,13 +434,97 @@ def main():
                         "필요도 없다.")
     p.add_argument("--n_trials", type=int, default=1)
     p.add_argument("--between_s", type=float, default=2.0)
+
+
+def add_report_args(p):
+    p.add_argument("--tol_mm", type=float, default=5.0)
+
+
+# ── wizard: 위 4단계를 한 프로세스에서 순서대로 안내한다 ──────────────────
+def _pause(msg: str):
+    input(f"\n>>> {msg}\n    준비되면 Enter... ")
+
+
+def _prompt_default(msg: str, default: str) -> str:
+    v = input(f"{msg} (기본 {default!r}, 그냥 Enter 가능): ").strip()
+    return v if v else default
+
+
+def cmd_wizard(args):
+    print("=" * 70)
+    print(" 그랩 정확도 측정 — 순차 안내 모드")
+    print(" (Ctrl+C 로 언제든 중단 가능. server/zeus_server.py 가 떠 있어야 한다)")
+    print("=" * 70)
+
+    with ZeusClient(args.robot_ip, args.robot_port) as rb:
+        rb.ping()
+    print("[0/4] 로봇 서버 연결 확인 완료.")
+
+    _pause("[1/4] 로봇을 '인지 대기 자세'(카메라로 큐브가 보일 자세)로 조그하세요.")
+    cmd_record_init(args)
+
+    _pause("[2/4] 로봇을 그립 자세로 조그한 뒤, 큐브의 눈금 중점을 그 그립 지점에 "
+           "손으로 맞추세요 (그리퍼가 실제로 물 지점에 눈금 중앙이 오도록).")
+    args.label = _prompt_default("  GT 라벨 이름", args.label or "default")
+    cmd_record_gt(args)
+    args.gt_label = args.label  # 방금 기록한 GT 를 이후 단계에서 그대로 쓴다
+
+    again = True
+    while again:
+        _pause("[3/4] 큐브를 테이블 위 자연스러운 자세로 내려놓고 카메라 시야 안에 두세요.")
+        n = input(f"  몇 번 반복할까요? (기본 {args.n_trials}, 그냥 Enter 가능): ").strip()
+        if n:
+            args.n_trials = int(n)
+        cmd_run_trial(args)
+
+        print("\n[4/4] 결과 리포트")
+        cmd_report(args)
+
+        ans = input("\n다른 자리에서 더 시도할까요? (y/N): ").strip().lower()
+        again = ans in ("y", "yes")
+
+    print("\n완료. 기록은 grasp_accuracy_runs/ 에 쌓여 있다.")
+
+
+def main():
+    ap = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter, description=__doc__)
+    sub = ap.add_subparsers(dest="cmd", required=False)
+
+    p = sub.add_parser("wizard", help="record-init -> record-gt -> run-trial -> report 를 "
+                                      "대화형으로 순서대로 안내 (기본 커맨드)")
+    add_common_robot_args(p)
+    add_geometry_args(p)
+    add_run_trial_args(p)
+    add_report_args(p)
+    p.add_argument("--label", default="default", help="record-gt 에 쓸 기본 GT 라벨")
+    p.set_defaults(func=cmd_wizard)
+
+    p = sub.add_parser("record-init", help="지금 로봇 자세를 인지 대기 자세로 저장")
+    add_common_robot_args(p)
+    p.set_defaults(func=cmd_record_init)
+
+    p = sub.add_parser("record-gt", help="사람이 맞춘 큐브 위치를 GT 로 기록")
+    add_common_robot_args(p)
+    add_geometry_args(p)
+    p.add_argument("--label", default="default")
+    p.set_defaults(func=cmd_record_gt)
+
+    p = sub.add_parser("run-trial", help="인지->이동->오차계산 을 실행 (기본은 그립 안 함)")
+    add_common_robot_args(p)
+    add_geometry_args(p)
+    add_run_trial_args(p)
     p.set_defaults(func=cmd_run_trial)
 
     p = sub.add_parser("report", help="trials.jsonl 통계")
-    p.add_argument("--tol_mm", type=float, default=5.0)
+    add_report_args(p)
     p.set_defaults(func=cmd_report)
 
-    args = ap.parse_args()
+    argv = sys.argv[1:]
+    known = {"wizard", "record-init", "record-gt", "run-trial", "report", "-h", "--help"}
+    if not argv or argv[0] not in known:
+        argv = ["wizard"] + argv
+    args = ap.parse_args(argv)
     args.func(args)
 
 
