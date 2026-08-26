@@ -111,6 +111,7 @@ class AprilTagCubeModel:
         return float(getattr(self.cfg, "marker_size_by_id", {}).get(int(marker_id), self.cfg.marker_size_m))
 
     def local_corners_for(self, marker_id: int) -> np.ndarray:
+        """Canonical detector order, clockwise when viewed from marker +Z."""
         s = self.marker_size(marker_id) / 2.0
         return np.array([[s, -s, 0.0], [-s, -s, 0.0], [-s, s, 0.0], [s, s, 0.0]], dtype=np.float64)
 
@@ -522,7 +523,8 @@ def validate_cube_config(
       2. every marker size matches its face group (+Z top vs. side face)
       3. every marker center lies on its declared face plane
       4. each marker's local +Z axis equals the face outward normal
-      5. no marker ID collides with the Charuco board ID range
+      5. no marker ID collides with the Charuco board ID range when both targets
+         use the same dictionary (overlap across different dictionaries is safe)
       6. all four corners of every marker fall inside the cube face bounds
 
     Units are meters throughout. Returns ``(ok, problems)``.
@@ -550,7 +552,11 @@ def validate_cube_config(
         except Exception:
             charuco_cfg = None
     charuco_ids = charuco_marker_ids(charuco_cfg) if charuco_cfg is not None else set()
-    collide = sorted(set(ids) & charuco_ids)
+    same_dictionary = bool(
+        charuco_cfg is not None
+        and str(getattr(charuco_cfg, "dictionary_name", "")) == str(cfg.dictionary_name)
+    )
+    collide = sorted(set(ids) & charuco_ids) if same_dictionary else []
     if collide:
         problems.append(
             f"[collision] cube IDs {collide} overlap Charuco range "
