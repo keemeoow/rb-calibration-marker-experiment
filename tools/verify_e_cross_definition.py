@@ -51,6 +51,14 @@ def parse_args():
     parser.add_argument("--split_seed", type=int, default=DEFAULT_SPLIT_SEED)
     parser.add_argument("--min_train_eih_cube_events", type=int, default=3)
     parser.add_argument(
+        "--observation-manifest", "--observation_manifest", default=None)
+    parser.add_argument(
+        "--observation-filter-policy", "--observation_filter_policy",
+        choices=("standard", "strict"), default="standard")
+    parser.add_argument(
+        "--align-board-metric-scale", "--align_board_metric_scale",
+        action="store_true")
+    parser.add_argument(
         "--table1_result",
         default="CP_result/session02/late_table1/table1_methods.json")
     parser.add_argument(
@@ -80,6 +88,9 @@ def preparation_args(args):
         x_scale_mode="jac",
         loss="soft_l1",
         f_scale_px=2.0,
+        observation_manifest=args.observation_manifest,
+        observation_filter_policy=args.observation_filter_policy,
+        align_board_metric_scale=args.align_board_metric_scale,
     )
 
 

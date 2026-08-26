@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the canonical CSV, Markdown, and HTML from current result JSON.
 
-Only the v6 camera-scope evaluation and v4 marker-system evaluation are
+Only the v7 set-anchor camera-scope evaluation and v5 marker-system evaluation are
 accepted. This prevents older metric definitions from entering a new report.
 """
 
@@ -259,6 +259,11 @@ def _markdown(rows: list[dict], marker: dict, detailed: bool,
         "- Gripper-to-Fixed (그리퍼카메라–고정카메라 간)는 실제 Board/Cube "
         "Image Corners (보드/큐브 영상 코너)를 사용하지만, 예측 경로에는 "
         "Robot FK와 Hand–Eye (핸드–아이 변환)가 포함된다.",
+        "- 각 set의 최초 고정카메라 관측은 최적화에서 한 번만 사용한다. "
+        "Gripper-to-Fixed 평가는 이 fixed anchor를 같은 set의 모든 held-out "
+        "gripper Event와 연결하고, Event→set→set 동일가중 순서로 집계한다.",
+        "- 공식 결과는 물리 config의 nominal metric scale `1.0`만 사용한다. "
+        "데이터에서 추정한 scale은 별도 diagnostic 결과로만 허용한다.",
         "- Board (보드)와 Cube (큐브)는 모두 촬영 원본에서 평가한다. "
         "캘리브레이션에 사용한 마커 종류와 평가 표적 종류를 동일시하지 않는다.",
         "- Reference-dependent Reprojection (기준 의존 재투영)은 Secondary "
@@ -309,7 +314,9 @@ def _markdown(rows: list[dict], marker: dict, detailed: bool,
         "Pixel Transfer RMSE (픽셀 전달 평균제곱근오차)는 한 카메라의 "
         "측정 PnP 자세를 다른 카메라로 옮겨 실제 검출 코너와 비교한다. "
         "Translation/Rotation Consistency (이동/회전 일관성)는 두 경로로 "
-        "얻은 $T^B_O$의 차이를 mm/deg로 계산한다.",
+        "얻은 $T^B_O$의 차이를 mm/deg로 계산한다. Gripper-to-Fixed의 "
+        "최종값은 pair 성분을 Event RMSE로, Event를 set RMSE로 집계한 뒤 "
+        "set별 동일 가중치로 계산한다.",
         "",
         "## Interpretation Limit (해석 한계)",
         "",
@@ -423,7 +430,7 @@ main{{max-width:1180px;margin:auto;padding:32px 20px 72px}} h1{{font-size:30px;m
 <section class="panel"><h2>Marker-system End-to-End (마커 시스템 전체 경로)</h2><div class="table-wrap"><table>
 <thead><tr><th>System (시스템)</th><th>Own Held-out px</th><th>Fixed-to-Fixed Board/Cube px</th><th>Gripper-to-Fixed Board/Cube px</th><th>Convergence (수렴)</th></tr></thead>
 <tbody>{''.join(marker_rows)}</tbody></table></div></section>
-<section class="panel note"><h2>Interpretation (해석)</h2><p>Fixed-to-Fixed는 Robot FK 없이 고정카메라 부분을 평가합니다. Gripper-to-Fixed는 실제 영상 코너를 사용하지만 <code>T^B_G(e)T^G_C</code> 경로 때문에 Robot FK와 Hand–Eye에 의존합니다. 두 지표 모두 External Absolute Accuracy (외부 절대 정확도)가 아닙니다.</p></section>
+<section class="panel note"><h2>Interpretation (해석)</h2><p>Fixed-to-Fixed는 Robot FK 없이 고정카메라 부분을 평가합니다. Gripper-to-Fixed는 set 최초 fixed anchor를 같은 set의 모든 held-out gripper Event와 연결하고 Event→set→set 동일가중 순서로 집계합니다. 실제 영상 코너를 사용하지만 <code>T^B_G(e)T^G_C</code> 경로 때문에 Robot FK와 Hand–Eye에 의존합니다. 공식 표는 nominal metric scale 1.0만 사용하며, 두 지표 모두 External Absolute Accuracy (외부 절대 정확도)가 아닙니다.</p></section>
 <section class="panel"><h2>Terminology (용어 설명)</h2><ul>
 <li><b>PnP, Perspective-n-Point (3D–2D 자세 추정)</b>: 영상 코너로 카메라–표적 자세를 계산합니다.</li>
 <li><b>FK, Forward Kinematics (순기구학)</b>: 이벤트별 Base-to-Gripper Transform (베이스–그리퍼 변환)을 계산합니다.</li>
@@ -460,10 +467,16 @@ def main() -> None:
     table1_path, cross_path, marker_path = map(
         Path, (args.table1, args.cross, args.marker))
     table1, cross, marker = map(_load, (table1_path, cross_path, marker_path))
-    if cross.get("artifact_schema") != "internal_heldout_evaluation_v6":
-        raise RuntimeError("cross-target result is not the current v6 schema")
-    if marker.get("artifact_schema") != "marker_system_end_to_end_v4":
-        raise RuntimeError("marker-system result is not the current v4 schema")
+    if cross.get("artifact_schema") != "internal_heldout_evaluation_v7":
+        raise RuntimeError("cross-target result is not the current v7 schema")
+    if marker.get("artifact_schema") != "marker_system_end_to_end_v5":
+        raise RuntimeError("marker-system result is not the current v5 schema")
+    metric_scale = table1.get("protocol", {}).get("board_metric_scale", {})
+    if metric_scale.get("enabled") is not False or float(
+            metric_scale.get("scale", 1.0)) != 1.0:
+        raise RuntimeError(
+            "canonical reports require nominal metric geometry; inferred "
+            "scale alignment belongs in a separate diagnostic output")
     if tuple(table1.get("rows", {})) != METHOD_ORDER:
         raise RuntimeError("Table 1 method order or support is incomplete")
     if tuple(row["system"] for row in marker.get("summary", [])) != SYSTEM_ORDER:

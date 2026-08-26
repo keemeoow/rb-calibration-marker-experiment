@@ -205,7 +205,8 @@ def run_system_once(system: str, initial: PoseState, data,
     serialized = serialize_state(state)
     internal_evaluation = evaluate_internal_run(
         serialized, evaluation_cameras, evaluation_observations,
-        data.board_initial, data.fixed_cubes, data.test_obs, data.robot_T,
+        data.board_initial, data.fixed_cubes,
+        list(data.train_obs) + list(data.test_obs), data.robot_T,
         data.K_map, data.D_map, data.gripper, data.path_evaluation_mask,
         fixed_to_fixed_cross_target_mask, gripper_to_fixed_cross_target_mask)
     return {
@@ -307,7 +308,7 @@ def summarize(system: str, runs: list[dict], init_diag: dict) -> dict:
 
 def validate_end_to_end_contract(result: Mapping) -> None:
     """Fail closed if a modality leaks into another system or masks drift."""
-    if result.get("artifact_schema") != "marker_system_end_to_end_v4":
+    if result.get("artifact_schema") != "marker_system_end_to_end_v5":
         raise ValueError("unexpected end-to-end marker-system schema")
     protocol = result.get("protocol", {})
     if protocol.get("same_split_raw_detections_K_D_solver_seeds_and_evaluation") is not True:
@@ -405,6 +406,16 @@ def parse_args(argv=None):
     parser.add_argument("--loss", choices=["huber", "soft_l1", "linear"], default="soft_l1")
     parser.add_argument("--f_scale_px", type=float, default=2.0)
     parser.add_argument("--image_scale", type=float, default=1.0)
+    parser.add_argument(
+        "--observation-manifest", "--observation_manifest",
+        dest="observation_manifest")
+    parser.add_argument(
+        "--observation-filter-policy", "--observation_filter_policy",
+        dest="observation_filter_policy", choices=("standard", "strict"),
+        default="standard")
+    parser.add_argument(
+        "--align-board-metric-scale", "--align_board_metric_scale",
+        dest="align_board_metric_scale", action="store_true")
     return parser.parse_args(argv)
 
 
@@ -426,6 +437,11 @@ def main(argv=None) -> None:
         data.D_map,
         set_filter=data.split["eligible_sets"],
     )
+    path_observations = list(data.train_obs) + list(data.test_obs)
+    event_roles = {
+        **{int(event): "train" for event in data.split["train_events"]},
+        **{int(event): "heldout" for event in data.split["test_events"]},
+    }
     gripper_to_fixed_cross_target_mask = build_gripper_to_fixed_cross_target_mask(
         data.test_obs,
         evaluation_cameras,
@@ -433,6 +449,8 @@ def main(argv=None) -> None:
         data.K_map,
         data.D_map,
         set_filter=data.split["eligible_sets"],
+        fixed_anchor_observations=path_observations,
+        event_roles=event_roles,
     )
 
     runs = {system: [] for system in SYSTEM_ORDER}
@@ -445,12 +463,13 @@ def main(argv=None) -> None:
                 gripper_to_fixed_cross_target_mask, seed, args))
 
     result = {
-        "artifact_schema": "marker_system_end_to_end_v4",
+        "artifact_schema": "marker_system_end_to_end_v5",
         "experiment": "modality_specific_initialization_and_unified_optimization",
         "protocol": {
             "dataset": args.root_folder,
             "intrinsics_dir": args.intrinsics_dir,
             "source_data_provenance": data.source_data_provenance,
+            "board_metric_scale": data.board_metric_scale,
             "pose_convention": data.pose_convention,
             "split": data.split,
             "same_split_raw_detections_K_D_solver_seeds_and_evaluation": True,

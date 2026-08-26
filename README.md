@@ -4,6 +4,8 @@
 
 ## 바로가기
 
+- [Session04 재검출·재캘리브레이션 종합 보고서](session04_recalibration_report.md)
+- [Session04 현재 방법 vs OpenCV hand-eye 7종 비교](CP_result/session04/handeye_method_comparison/README.md)
 - [1. 가장 짧은 실행 순서](#1-가장-짧은-실행-순서)
 - [2. 시스템과 좌표계](#2-시스템과-좌표계)
 - [3. 입력 데이터](#3-입력-데이터)
@@ -24,6 +26,13 @@
 - [18. Terminology (용어 설명)](#18-terminology-용어-설명)
 
 ## 1. 가장 짧은 실행 순서
+
+Session04의 현재 공동최적화와 OpenCV hand-eye/robot-world 7종을 동일한
+nominal scale, split, set-anchor 평가로 비교하려면 다음을 실행한다.
+
+```bash
+/opt/anaconda3/bin/python Run_calibration_comparison.py handeye-benchmark
+```
 
 ```bash
 # 1. RealSense factory intrinsics 저장
@@ -114,6 +123,45 @@ intrinsics/
 └── cam*.npz
 ```
 
+### 3.3 Step2b 촬영 후 관측 필터
+
+촬영이 끝난 뒤 [`Step2b_capture_filter.py`](Step2b_capture_filter.py)를
+실행하면 원본을 수정하지 않고 저장된 RGB를 다시 검출한다. Cube는 기본 검출이
+core 조건을 만족하지 않은 경우에만 subpixel/완화 threshold/2배 확대 후보를
+평가하며, 서로 다른 방향의 non-coplanar face가 2개 이상인 관측만 calibration
+핵심 관측으로 선택한다. Board도 저장 당시 숫자를 재사용하지 않고 모든 saved
+RGB에서 ChArUco corner를 다시 검출한다.
+
+```bash
+python3 Step2b_capture_filter.py \
+  --session-root data/session04/calib_train \
+  --intrinsics-dir intrinsics
+```
+
+기본 출력은 `data/session04/calib_out/capture_filter/`이다. 이 디렉터리의
+`CAPTURE_FILTER.md`에 event별 선택/제외 이유와 재촬영 후보가 정리되고,
+`Step2b_review_overlay.jpg`에서 recovered/quarantine/rejected 관측을 확인할 수
+있다. `Step2b_observation_manifest.json`은 native-pixel 2D corner, 대응 3D corner,
+정책 판정 및 source SHA-256을 고정한다.
+
+Step3/Table1에서 detector를 다시 실행하지 않고 이 관측 집합을 그대로 쓰려면
+다음 옵션을 추가한다.
+
+```bash
+--observation-manifest data/session04/calib_out/capture_filter/Step2b_observation_manifest.json \
+--observation-filter-policy standard
+```
+
+`strict` 정책은 cube RMSE/inlier와 board corner 수 기준을 더 강하게 적용한다.
+Meta, intrinsics 또는 선택된 RGB 파일의 SHA-256이 manifest 생성 이후 바뀌면
+calibration은 stale input으로 판단하고 중단한다.
+
+공식 결과는 항상 물리 config의 nominal metric scale을 그대로 사용한다.
+`--align-board-metric-scale`은 실측값이 아닌 데이터 기반 추정값을 사용하는
+**별도 진단 전용 옵션**이다. 공식 `CP_result/sessionNN` 실행에는 넣지 않으며,
+canonical Markdown/HTML 생성기도 scale 정렬 결과를 거부한다. 실물 치수를 측정하고
+사용자가 명시적으로 승인하기 전에는 config나 공식 결과에 반영하지 않는다.
+
 ## 4. 전체 파이프라인
 
 ```text
@@ -170,6 +218,8 @@ board와 cube 모두 최종 solver에는 PnP pose가 아니라 **3D corner–2D 
 - 각 cube set에 train과 test event가 모두 남도록 나눈다.
 - set별 eye-in-hand cube train event 수가 최소 기준보다 작아지지 않게 한다.
 - test event는 baseline, FK alignment, 초기값 생성에 사용하지 않는다.
+- set 최초 고정카메라 관측은 최적화 잔차에서 한 번만 사용한다. 같은 set의
+  이후 gripper-camera 관측은 공통 `T_base_cube(set)`을 통해 이 anchor와 연결된다.
 
 이 split은 새로운 cube 위치 전체를 숨기는 position holdout이 아니다. 위치 전체 holdout에서 자유 cube pose를 test-time fitting 없이 평가할 수 없기 때문에, primary pixel 평가는 같은 set 안의 held-out event를 사용한다. 새로운 위치에 대한 물리 정확도는 별도 blind external-GT 실험으로 평가한다.
 
@@ -402,7 +452,7 @@ python3 Run_calibration_comparison.py marker-system \
 
 ## 10. 외부 GT 전 Cross-target 평가
 
-Table 1의 A0/B3처럼 목적함수에 cube가 없는 행과 cube-bearing 행은 row-local residual population이 다르다. 하지만 촬영 원본에 보드와 큐브 검출값이 모두 있으면, 캘리브레이션에 쓰지 않은 target도 **평가용 관측**으로 사용할 수 있다. 저장된 각 방법의 transform을 동결한 뒤 같은 held-out event에서 보드와 큐브를 각각 평가한다.
+Table 1의 A0/B3처럼 목적함수에 cube가 없는 행과 cube-bearing 행은 row-local residual population이 다르다. 하지만 촬영 원본에 보드와 큐브 검출값이 모두 있으면, 캘리브레이션에 쓰지 않은 target도 **평가용 관측**으로 사용할 수 있다. 저장된 각 방법의 transform을 동결한다. Fixed-to-Fixed는 같은 held-out event의 고정카메라를 비교하고, Gripper-to-Fixed는 set 최초 fixed anchor를 같은 set의 모든 held-out gripper Event와 비교한다.
 
 ```bash
 python3 Run_calibration_comparison.py cross-target \
@@ -418,7 +468,7 @@ python3 Run_calibration_comparison.py cross-target \
 따라서 외부 GT가 들어오기 전에는 다음처럼 분리한다.
 
 1. Fixed-to-Fixed (고정카메라 간): Shared Target Pose (공유 표적 자세)와 FK 없이 보드·큐브별 Pixel Transfer (픽셀 전달) 및 Pose Consistency (자세 일관성)
-2. Gripper-to-Fixed (그리퍼카메라–고정카메라 간): 공유 표적 자세 없이 보드·큐브별 픽셀 전달 및 자세 일관성. 단, 움직이는 손목카메라 자세 계산에는 Robot FK (로봇 순기구학)가 들어감
+2. Gripper-to-Fixed (그리퍼카메라–고정카메라 간): set 최초 fixed anchor를 같은 set의 모든 held-out gripper Event와 연결해 보드·큐브별 픽셀 전달 및 자세 일관성을 계산. 움직이는 손목카메라 자세 계산에는 Robot FK (로봇 순기구학)가 들어감
 3. 보조 지표: train-only board/cube pose를 reference로 쓰는 reprojection. 모든 방법의 순위를 정하는 근거로 사용하지 않음
 4. Legacy 보조 지표: cube 경로를 평균한 `e_e2e`
 
@@ -480,6 +530,12 @@ T^{B,(g)}_O(e)=T^B_G(e)T^G_{C_g}T^{C_g}_{O,\mathrm{PnP}}
 $$
 
 양방향 pixel transfer는 fixed→gripper와 gripper→fixed를 모두 계산한다. 측정 residual은 실제 보드·큐브 corner이지만, calibration prediction에는 $T^B_G(e)$가 필요하다. 따라서 이 지표는 순수 영상 관측을 사용하면서도 **FK-dependent**이며, Hand–Eye 오차와 FK 오차를 분리할 수 없다.
+
+각 `(target, set, fixed camera)`에서 촬영 순서상 최초 관측을 fixed anchor로
+사전 고정하며, 더 잘 맞는 후속 관측으로 바꾸지 않는다. 고정 관측은 최적화에서
+복제하지 않는다. 평가에서는 같은 set의 각 held-out gripper Event와 pair를 만든다.
+최종 RMSE는 pair 성분→Event RMSE→set RMSE→set 동일가중 RMSE 순서로 집계해,
+하나의 fixed anchor가 반복 참조된 횟수를 독립 fixed 촬영 수처럼 세지 않는다.
 
 ### 11.5 Shared-target reprojection — 보조 진단값
 
@@ -575,7 +631,7 @@ translation mm와 SO(3) rotation deg RMSE를 보고한다. robot FK가 포함되
 
 ## 13. 현재 session02 결과와 비교별 해석
 
-상세 수치, 비교 변화량, Marker-system (마커 시스템) 결과 및 해석은 [session02_result_table1.md](session02_result_table1.md)에 분리한다. 결과 문서는 새 v6의 Fixed-to-Fixed (고정카메라 간) 및 Gripper-to-Fixed (그리퍼카메라–고정카메라 간) Board/Cube (보드/큐브) 평가로만 다시 생성한다.
+상세 수치, 비교 변화량, Marker-system (마커 시스템) 결과 및 해석은 [session02_result_table1.md](session02_result_table1.md)에 분리한다. 결과 문서는 새 v7의 Fixed-to-Fixed (고정카메라 간) 및 set-anchor Gripper-to-Fixed (그리퍼카메라–고정카메라 간) Board/Cube (보드/큐브) 평가로만 다시 생성한다.
 
 핵심 요약은 다음과 같다.
 
@@ -644,9 +700,11 @@ Markdown/HTML은 새 JSON/CSV만 입력으로 사용해 다시 생성한다. 이
 | 코드 | 역할 |
 | --- | --- |
 | `Run_calibration_comparison.py` | 모든 실제 비교실험의 단일 사용자 진입점 |
+| `Step2b_capture_filter.py` | 촬영 후 전체 재검출, standard/strict 필터, frozen-corner manifest와 재촬영 후보 생성 |
 | `Step3_calibration.py` | Table 1과 같은 코드로 baseline만 생성 |
 | `calibration_pipeline/schema.py` | A/B 조건, 자유변수, 공정 비교 계약 |
 | `calibration_pipeline/table1.py` | split, baseline, A/B 실행, raw result 저장 |
+| `calibration_pipeline/handeye_benchmark.py` | 동일 Session04 split에서 OpenCV hand-eye 5종과 robot-world/hand-eye 2종을 현재 A0/A2/A3와 비교 |
 | `calibration_pipeline/observations.py` | board/cube raw pixel observation 구성 |
 | `calibration_pipeline/se3.py` | PnP pose의 robust 평균과 meta/FK 로딩 |
 | `calibration_pipeline/fk_alignment.py` | board-free train-only FK–cube alignment |

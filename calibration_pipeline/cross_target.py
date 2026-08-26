@@ -133,7 +133,7 @@ def summarize(method: str, run_results: list[dict], status: str):
 
 def validate_result_contract(result: Mapping) -> None:
     """Fail closed if a reference-dependent value is promoted as neutral."""
-    if result.get("artifact_schema") != "internal_heldout_evaluation_v6":
+    if result.get("artifact_schema") != "internal_heldout_evaluation_v7":
         raise ValueError("unexpected internal held-out evaluation schema")
     protocol = result.get("protocol", {})
     if protocol.get("external_ground_truth_used") is not False:
@@ -202,6 +202,16 @@ def parse_args(argv=None):
     parser.add_argument("--split_seed", type=int, default=DEFAULT_SPLIT_SEED)
     parser.add_argument("--min_train_eih_cube_events", type=int, default=3)
     parser.add_argument("--image_scale", type=float, default=1.0)
+    parser.add_argument(
+        "--observation-manifest", "--observation_manifest",
+        dest="observation_manifest")
+    parser.add_argument(
+        "--observation-filter-policy", "--observation_filter_policy",
+        dest="observation_filter_policy", choices=("standard", "strict"),
+        default="standard")
+    parser.add_argument(
+        "--align-board-metric-scale", "--align_board_metric_scale",
+        dest="align_board_metric_scale", action="store_true")
     parser.add_argument("--num_inits", type=int, default=3)
     parser.add_argument("--init_translation_mm", type=float, default=5.0)
     parser.add_argument("--init_rotation_deg", type=float, default=1.0)
@@ -251,6 +261,11 @@ def main(argv=None) -> None:
         prepared.D_map,
         set_filter=prepared.split["eligible_sets"],
     )
+    path_observations = list(prepared.train_obs) + list(prepared.test_obs)
+    event_roles = {
+        **{int(event): "train" for event in prepared.split["train_events"]},
+        **{int(event): "heldout" for event in prepared.split["test_events"]},
+    }
     gripper_to_fixed_mask = build_gripper_to_fixed_cross_target_mask(
         prepared.test_obs,
         evaluation_cameras,
@@ -258,6 +273,8 @@ def main(argv=None) -> None:
         prepared.K_map,
         prepared.D_map,
         set_filter=prepared.split["eligible_sets"],
+        fixed_anchor_observations=path_observations,
+        event_roles=event_roles,
     )
 
     per_run = {}
@@ -268,7 +285,7 @@ def main(argv=None) -> None:
             evaluate_internal_run(
                 run["transforms"], evaluation_cameras, observations,
                 prepared.board_initial, prepared.fixed_cubes,
-                prepared.test_obs, prepared.robot_T, prepared.K_map,
+                path_observations, prepared.robot_T, prepared.K_map,
                 prepared.D_map, prepared.gripper,
                 prepared.path_evaluation_mask, fixed_to_fixed_mask,
                 gripper_to_fixed_mask)
@@ -286,12 +303,13 @@ def main(argv=None) -> None:
             "events": sorted({int(observation.event) for observation in group_observations}),
         }
     result = {
-        "artifact_schema": "internal_heldout_evaluation_v6",
+        "artifact_schema": "internal_heldout_evaluation_v7",
         "protocol": {
             "question": (
                 "fixed-camera subsystem and gripper-to-fixed full-chain "
                 "consistency on held-out board and cube before external GT"),
             "source_data_provenance": prepared.source_data_provenance,
+            "board_metric_scale": prepared.board_metric_scale,
             "pose_convention": prepared.pose_convention,
             "test_time_refit": False,
             "split": stored_split,

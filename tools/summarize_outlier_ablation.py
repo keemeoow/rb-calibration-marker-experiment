@@ -107,10 +107,21 @@ def write(rows: list[dict], populations: dict, output_dir: Path) -> None:
             f"{row['linear_fixed_to_fixed_cube_transfer_rmse_px']:.4f} | "
             f"{row['soft_l1_gripper_to_fixed_cube_transfer_rmse_px']:.4f} / "
             f"{row['linear_gripper_to_fixed_cube_transfer_rmse_px']:.4f} |")
+    improved = [
+        f"{row['method']} {abs(row['soft_l1_change_vs_linear_percent']):.2f}%"
+        for row in rows
+        if row["soft_l1_change_vs_linear_percent"] < 0.0
+    ]
+    degraded = [
+        f"{row['method']} {row['soft_l1_change_vs_linear_percent']:.2f}%"
+        for row in rows
+        if row["soft_l1_change_vs_linear_percent"] > 0.0
+    ]
     lines.extend([
         "",
-        "해석: soft-L1은 A0/A3의 held-out 전체 오차를 약 10% 줄였고, "
-        "A4에서는 약 2% 줄였다. 그러나 B2 held-out 전체는 오히려 커졌다. "
+        "해석: held-out 전체 오차 기준으로 soft-L1이 linear보다 낮은 "
+        f"방법은 {', '.join(improved) if improved else '없음'}이고, 높은 "
+        f"방법은 {', '.join(degraded) if degraded else '없음'}이다. "
         "따라서 robust loss가 모든 조건을 일괄 개선한다고 주장할 수 없으며, "
         "방법별·표적별 결과를 함께 보고해야 한다.",
         "",

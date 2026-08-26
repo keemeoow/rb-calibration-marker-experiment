@@ -4,9 +4,9 @@
 
 | Train target | Board transfer px | Board translation mm | Cube transfer px | Cube translation mm | Train candidates/inliers |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| Board only | 1.1720 | 1.7665 | 11.7862 | 15.2734 | 16 / 16 |
-| Cube only | 10.8595 | 15.9983 | 4.6718 | 5.1556 | 20 / 20 |
-| Board + Cube naive average | 5.0371 | 7.3302 | 5.8281 | 7.5014 | 36 / 30 |
+| Board only | 1.4141 | 1.9469 | 12.7009 | 17.0416 | 9 / 8 |
+| Cube only | 11.3082 | 16.6594 | 4.2470 | 4.4798 | 12 / 10 |
+| Board + Cube naive average | 3.4211 | 4.4409 | 11.6733 | 15.2586 | 21 / 10 |
 
 ## Board-vs-Cube Relative-transform Conflict
 
@@ -14,8 +14,8 @@
 
 | Camera | Translation disagreement mm | Rotation disagreement deg |
 | --- | ---: | ---: |
-| 1 | 18.2980 | 0.2396 |
-| 3 | 14.1751 | 0.2036 |
+| 1 | 19.4232 | 0.2723 |
+| 3 | 14.8746 | 0.2170 |
 
 해석: Board-only는 held-out board에서 좋지만 cube에서는 나쁘고, Cube-only는 그 반대다. 즉 현재 큰 수치는 custom optimizer 하나만의 문제라기보다 target geometry/detection/pose convention 사이의 불일치 가능성을 함께 보여준다. Board와 cube 후보를 단순 평균한 결과도 양쪽 모두를 해결하지 못했다.
 

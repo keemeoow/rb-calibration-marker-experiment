@@ -35,9 +35,9 @@ from calibration_pipeline.apriltag_cube import inv_T
 from calibration_pipeline.reprojection import PixelObs, pose_delta, project_points
 
 
-MASK_SCHEMA = "model_independent_path_evaluation_mask_v1"
+MASK_SCHEMA = "model_independent_path_evaluation_mask_v2"
 CROSS_TARGET_MASK_SCHEMA = "fixed_to_fixed_cross_target_mask_v1"
-GRIPPER_TO_FIXED_MASK_SCHEMA = "fk_dependent_gripper_to_fixed_cross_target_mask_v1"
+GRIPPER_TO_FIXED_MASK_SCHEMA = "fk_dependent_gripper_to_fixed_cross_target_mask_v2"
 CROSS_TARGETS = ("board", "cube")
 
 FIXED_TO_FIXED_CROSS_TARGET_CONTRACT = {
@@ -73,6 +73,15 @@ GRIPPER_TO_FIXED_CROSS_TARGET_CONTRACT = {
         "SO3_geodesic_RMSE_deg"),
     "pixel_metric": (
         "per_target_bidirectional_fixed_gripper_pixel_transfer_RMSE_px"),
+    "pair_population": (
+        "each_heldout_gripper_event_paired_with_the_first_saved_fixed_camera_"
+        "anchor_from_the_same_set"),
+    "fixed_anchor_usage": (
+        "one_fixed_residual_in_optimization; measurement_reference_reused_"
+        "across_same_set_gripper_events_only_for_evaluation"),
+    "aggregation": (
+        "pair_components_to_event_RMSE_then_event_to_set_RMSE_then_equal_"
+        "weight_RMSE_across_sets"),
     "uses_shared_base_target_pose": False,
     "uses_robot_fk": True,
     "uses_gripper_camera": True,
@@ -192,6 +201,43 @@ def pairwise_rmse(values: Sequence[tuple[float, float]]) -> tuple[Optional[float
         float(np.sqrt(np.mean(np.square(numeric[:, 0])))),
         float(np.sqrt(np.mean(np.square(numeric[:, 1])))),
     )
+
+
+def _scalar_rmse(values: Sequence[float]) -> Optional[float]:
+    if not values:
+        return None
+    return float(np.sqrt(np.mean(np.square(np.asarray(values, dtype=np.float64)))))
+
+
+def _event_then_set_aggregate(
+        event_rows: Sequence[Mapping], metric_fields: Sequence[str]) -> tuple[dict, list[dict]]:
+    """Give each set equal final weight after event-level aggregation.
+
+    Reusing one fixed-camera anchor for several wrist-camera events creates
+    correlated pairs.  Aggregating pair components within an event, then
+    events within a set, prevents the repeated anchor from masquerading as an
+    independent fixed-camera capture.
+    """
+    by_set: Dict[int, list[Mapping]] = defaultdict(list)
+    for row in event_rows:
+        by_set[int(row["set"])].append(row)
+    set_rows = []
+    for set_index, rows in sorted(by_set.items()):
+        summary = {
+            "set": int(set_index),
+            "n_events": len(rows),
+            "events": sorted(int(row["event"]) for row in rows),
+        }
+        for field in metric_fields:
+            summary[field] = _scalar_rmse([
+                float(row[field]) for row in rows if row.get(field) is not None])
+        set_rows.append(summary)
+    overall = {
+        field: _scalar_rmse([
+            float(row[field]) for row in set_rows if row.get(field) is not None])
+        for field in metric_fields
+    }
+    return overall, set_rows
 
 
 def observation_id(obs: PixelObs) -> str:
@@ -505,12 +551,16 @@ def build_gripper_to_fixed_cross_target_mask(
         observations: Sequence[PixelObs], fixed_camera_ids: Iterable[int],
         gripper_cam_idx: int, K_map, D_map,
         set_filter: Optional[Sequence[int]] = None,
-        required_targets: Sequence[str] = CROSS_TARGETS) -> dict:
-    """Freeze board/cube gripper-to-fixed pairs without a target reference.
+        required_targets: Sequence[str] = CROSS_TARGETS,
+        fixed_anchor_observations: Optional[Sequence[PixelObs]] = None,
+        event_roles: Optional[Mapping[int, str]] = None) -> dict:
+    """Pair each held-out wrist view with its set's first fixed-camera view.
 
-    The pair population depends only on held-out detections and
-    measurement-only PnP validity.  Robot FK and calibrated transforms are
-    deliberately absent from mask construction; they enter only evaluation.
+    ``observations`` supplies the evaluation gripper views.  Fixed anchors are
+    selected from ``fixed_anchor_observations`` before PnP validation by the
+    earliest event for each (target, set, fixed camera), so a later/better
+    frame can never be selected using output quality.  Robot FK and calibrated
+    transforms remain absent from mask construction.
     """
     fixed_cameras = tuple(sorted({int(ci) for ci in fixed_camera_ids}))
     gripper = int(gripper_cam_idx)
@@ -525,22 +575,41 @@ def build_gripper_to_fixed_cross_target_mask(
     if unknown:
         raise ValueError(f"unknown required gripper-to-fixed targets: {unknown}")
 
-    allowed_cameras = set(fixed_cameras) | {gripper}
-    candidates = []
+    roles = {int(event): str(role) for event, role in (event_roles or {}).items()}
+    anchor_source = (
+        observations if fixed_anchor_observations is None
+        else fixed_anchor_observations)
+    gripper_candidates = []
     for obs in observations:
         if str(obs.marker) not in CROSS_TARGETS:
             continue
-        if int(obs.cam) not in allowed_cameras:
+        if int(obs.cam) != gripper:
             continue
         if allowed_sets is not None:
             if obs.set_idx is None or int(obs.set_idx) not in allowed_sets:
                 continue
-        candidates.append(obs)
+        gripper_candidates.append(obs)
+
+    anchor_groups: Dict[tuple[str, int, int], list[PixelObs]] = defaultdict(list)
+    for obs in anchor_source:
+        if str(obs.marker) not in CROSS_TARGETS or int(obs.cam) not in fixed_cameras:
+            continue
+        if obs.set_idx is None:
+            continue
+        if allowed_sets is not None and int(obs.set_idx) not in allowed_sets:
+            continue
+        anchor_groups[(str(obs.marker), int(obs.set_idx), int(obs.cam))].append(obs)
+    selected_anchors = [
+        min(group, key=lambda obs: (int(obs.event), cross_target_observation_id(obs)))
+        for _, group in sorted(anchor_groups.items())
+    ]
 
     by_id: Dict[str, PixelObs] = {}
-    for obs in candidates:
+    for obs in list(selected_anchors) + list(gripper_candidates):
         key = cross_target_observation_id(obs)
         if key in by_id:
+            if by_id[key] is obs:
+                continue
             raise ValueError(f"duplicate gripper-to-fixed observation ID: {key}")
         by_id[key] = obs
 
@@ -551,31 +620,42 @@ def build_gripper_to_fixed_cross_target_mask(
         else:
             valid_ids.append(key)
 
-    grouped: Dict[tuple[str, int, Optional[int]], list[str]] = defaultdict(list)
-    for key in valid_ids:
-        obs = by_id[key]
-        grouped[(str(obs.marker), int(obs.event),
-                 None if obs.set_idx is None else int(obs.set_idx))].append(key)
+    valid = set(valid_ids)
+    fixed_anchor_ids = sorted(
+        cross_target_observation_id(obs) for obs in selected_anchors)
+    gripper_ids = sorted(
+        cross_target_observation_id(obs) for obs in gripper_candidates)
+    anchors_by_target_set: Dict[tuple[str, int], list[str]] = defaultdict(list)
+    for key in fixed_anchor_ids:
+        if key in valid:
+            obs = by_id[key]
+            anchors_by_target_set[(str(obs.marker), int(obs.set_idx))].append(key)
 
     pairs = []
-    for (target, event, set_index), ids in sorted(
-            grouped.items(), key=lambda item: (
-                item[0][0], item[0][1],
-                -1 if item[0][2] is None else item[0][2])):
-        fixed_ids = sorted(
-            (key for key in ids if int(by_id[key].cam) in fixed_cameras),
-            key=lambda key: int(by_id[key].cam))
-        gripper_ids = sorted(
-            key for key in ids if int(by_id[key].cam) == gripper)
-        for gripper_id in gripper_ids:
-            for fixed_id in fixed_ids:
-                pairs.append({
-                    "target": target,
-                    "event": event,
-                    "set": set_index,
-                    "fixed_observation_id": fixed_id,
-                    "gripper_observation_id": gripper_id,
-                })
+    for gripper_id in gripper_ids:
+        if gripper_id not in valid:
+            continue
+        wrist = by_id[gripper_id]
+        target = str(wrist.marker)
+        set_index = int(wrist.set_idx)
+        for fixed_id in sorted(
+                anchors_by_target_set.get((target, set_index), []),
+                key=lambda key: int(by_id[key].cam)):
+            anchor = by_id[fixed_id]
+            pairs.append({
+                "target": target,
+                "event": int(wrist.event),
+                "gripper_event": int(wrist.event),
+                "fixed_anchor_event": int(anchor.event),
+                "set": set_index,
+                "fixed_camera_id": int(anchor.cam),
+                "fixed_anchor_split_role": roles.get(
+                    int(anchor.event), "unspecified"),
+                "gripper_split_role": roles.get(
+                    int(wrist.event), "evaluation"),
+                "fixed_observation_id": fixed_id,
+                "gripper_observation_id": gripper_id,
+            })
 
     support = {}
     for target in CROSS_TARGETS:
@@ -591,6 +671,13 @@ def build_gripper_to_fixed_cross_target_mask(
             "pairs": len(target_pairs),
             "directions": 2 * len(target_pairs),
             "events": sorted({int(pair["event"]) for pair in target_pairs}),
+            "sets": sorted({int(pair["set"]) for pair in target_pairs}),
+            "fixed_anchor_events": sorted({
+                int(pair["fixed_anchor_event"]) for pair in target_pairs}),
+            "fixed_anchor_observations": len({
+                str(pair["fixed_observation_id"]) for pair in target_pairs}),
+            "gripper_observations": len({
+                str(pair["gripper_observation_id"]) for pair in target_pairs}),
         }
     missing = [target for target in required if not support[target]["pairs"]]
     if missing:
@@ -600,7 +687,13 @@ def build_gripper_to_fixed_cross_target_mask(
 
     body = {
         "artifact_schema": GRIPPER_TO_FIXED_MASK_SCHEMA,
-        "split_role": "heldout_event_grouped_set_stratified",
+        "split_role": "heldout_gripper_event_with_same_set_first_fixed_anchor",
+        "fixed_anchor_selection": (
+            "earliest_event_per_target_set_fixed_camera_before_PnP_validation"),
+        "pairing": "same_set_fixed_anchor_times_each_evaluation_gripper_event",
+        "aggregation": (
+            "pair_components_to_event_RMSE_then_event_to_set_RMSE_then_"
+            "equal_weight_RMSE_across_sets"),
         "selection_basis": (
             "frozen_detector_population_and_measurement_only_PnP_validity"),
         "selection_timing_contract": (
@@ -612,9 +705,12 @@ def build_gripper_to_fixed_cross_target_mask(
         "gripper_camera_id": gripper,
         "set_ids": None if allowed_sets is None else sorted(allowed_sets),
         "candidate_observation_ids": sorted(by_id),
+        "fixed_anchor_observation_ids": fixed_anchor_ids,
+        "gripper_observation_ids": gripper_ids,
         "valid_observation_ids": valid_ids,
         "pnp_invalid_observation_ids": invalid_ids,
-        "source_observation_sha256": _cross_target_source_sha256(candidates),
+        "source_observation_sha256": _cross_target_source_sha256(
+            list(by_id.values())),
         "pairs": pairs,
         "support_by_target": support,
         "required_targets": list(required),
@@ -647,12 +743,21 @@ def validate_gripper_to_fixed_cross_target_mask(mask: Mapping) -> None:
             or not required.issubset(targets)):
         raise ValueError("gripper-to-fixed mask lacks required target support")
     valid_ids = set(map(str, mask.get("valid_observation_ids", [])))
+    fixed_anchor_ids = set(map(
+        str, mask.get("fixed_anchor_observation_ids", [])))
+    gripper_ids = set(map(str, mask.get("gripper_observation_ids", [])))
     for pair in pairs:
         fixed_id = str(pair.get("fixed_observation_id", ""))
         gripper_id = str(pair.get("gripper_observation_id", ""))
         if (not fixed_id or not gripper_id or fixed_id == gripper_id
                 or fixed_id not in valid_ids or gripper_id not in valid_ids):
             raise ValueError("invalid gripper-to-fixed pair identity")
+        if fixed_id not in fixed_anchor_ids or gripper_id not in gripper_ids:
+            raise ValueError("gripper-to-fixed pair violates anchor/view roles")
+        if int(pair.get("event", -1)) != int(pair.get("gripper_event", -2)):
+            raise ValueError("gripper-to-fixed event is not the wrist event")
+        if int(pair.get("fixed_camera_id", -1)) not in fixed_cameras:
+            raise ValueError("gripper-to-fixed pair has a non-fixed anchor")
     support = mask.get("support_by_target", {})
     for target in CROSS_TARGETS:
         expected_pairs = sum(str(pair.get("target")) == target for pair in pairs)
@@ -717,7 +822,9 @@ def evaluate_gripper_to_fixed_cross_target(
         target_in_base[key] = camera_pose_by_id[key] @ T_camera_target
 
     accumulators = {
-        target: {"pose": [], "pixel_squared": [], "rows": []}
+        target: {"events": defaultdict(
+            lambda: {"pose": [], "pixel_squared": [], "pairs": 0}),
+                 "rows": []}
         for target in CROSS_TARGETS
     }
     for pair in mask["pairs"]:
@@ -726,7 +833,10 @@ def evaluate_gripper_to_fixed_cross_target(
         gripper_id = pair["gripper_observation_id"]
         dt, dr = fixed_camera_target_pair_disagreement(
             target_in_base[fixed_id], target_in_base[gripper_id])
-        accumulators[target]["pose"].append((dt, dr))
+        event_key = (int(pair["set"]), int(pair["gripper_event"]))
+        event_accumulator = accumulators[target]["events"][event_key]
+        event_accumulator["pose"].append((dt, dr))
+        event_accumulator["pairs"] += 1
         direction_rows = []
         for source_id, destination_id in (
                 (fixed_id, gripper_id), (gripper_id, fixed_id)):
@@ -745,7 +855,7 @@ def evaluate_gripper_to_fixed_cross_target(
                     "invalid gripper-to-fixed pixel transfer: "
                     f"{source_id} -> {destination_id}")
             squared = np.square(prediction - measured).reshape(-1)
-            accumulators[target]["pixel_squared"].extend(squared.tolist())
+            event_accumulator["pixel_squared"].extend(squared.tolist())
             direction_rows.append({
                 "source_observation_id": source_id,
                 "destination_observation_id": destination_id,
@@ -761,19 +871,41 @@ def evaluate_gripper_to_fixed_cross_target(
 
     by_target = {}
     for target in CROSS_TARGETS:
-        pose_values = accumulators[target]["pose"]
-        translation_rmse, rotation_rmse = pairwise_rmse(pose_values)
-        pixel_squared = accumulators[target]["pixel_squared"]
+        event_rows = []
+        for (set_index, event), values in sorted(
+                accumulators[target]["events"].items()):
+            translation_rmse, rotation_rmse = pairwise_rmse(values["pose"])
+            pixel_rmse = (
+                None if not values["pixel_squared"] else
+                float(np.sqrt(np.mean(values["pixel_squared"]))))
+            event_rows.append({
+                "set": int(set_index),
+                "event": int(event),
+                "n_pairs": int(values["pairs"]),
+                "pose_consistency_translation_rmse_mm": translation_rmse,
+                "pose_consistency_rotation_rmse_deg": rotation_rmse,
+                "cross_view_pixel_transfer_rmse_px": pixel_rmse,
+            })
+        fields = (
+            "pose_consistency_translation_rmse_mm",
+            "pose_consistency_rotation_rmse_deg",
+            "cross_view_pixel_transfer_rmse_px",
+        )
+        overall, set_rows = _event_then_set_aggregate(event_rows, fields)
+        pair_rows = accumulators[target]["rows"]
         by_target[target] = {
-            "pose_consistency_translation_rmse_mm": translation_rmse,
-            "pose_consistency_rotation_rmse_deg": rotation_rmse,
-            "cross_view_pixel_transfer_rmse_px": (
-                None if not pixel_squared else
-                float(np.sqrt(np.mean(pixel_squared)))),
-            "n_pairs": len(pose_values),
-            "n_directions": 2 * len(pose_values),
+            **overall,
+            "aggregation": (
+                "pair_components_to_event_RMSE_then_event_to_set_RMSE_then_"
+                "equal_weight_RMSE_across_sets"),
+            "n_pairs": len(pair_rows),
+            "n_directions": 2 * len(pair_rows),
+            "n_events": len(event_rows),
+            "n_sets": len(set_rows),
             "n_output_rejected": 0,
-            "per_pair": accumulators[target]["rows"],
+            "per_pair": pair_rows,
+            "per_event": event_rows,
+            "per_set": set_rows,
         }
     return {
         "applicable": True,
@@ -793,21 +925,40 @@ def build_frozen_path_evaluation_mask(
         observations: Sequence[PixelObs], fixed_camera_ids: Iterable[int],
         gripper_cam_idx: int, K_map, D_map,
         set_filter: Sequence[int], *, require_cross: bool = True,
-        require_e2e: bool = True) -> dict:
-    """Freeze held-out path units without consulting a fitted model output."""
+        require_e2e: bool = True,
+        fixed_anchor_observations: Optional[Sequence[PixelObs]] = None,
+        event_roles: Optional[Mapping[int, str]] = None) -> dict:
+    """Freeze held-out cube paths with one fixed anchor per set/camera."""
     fixed_cameras = tuple(sorted({int(ci) for ci in fixed_camera_ids}))
     gripper = int(gripper_cam_idx)
     allowed_sets = {int(set_index) for set_index in set_filter}
+    roles = {int(event): str(role) for event, role in (event_roles or {}).items()}
     allowed_cameras = set(fixed_cameras) | {gripper}
-    candidates = [
+    evaluation_candidates = [
         obs for obs in observations
         if obs.marker == "cube" and obs.set_idx is not None
         and int(obs.set_idx) in allowed_sets and int(obs.cam) in allowed_cameras
     ]
+    anchor_source = (
+        observations if fixed_anchor_observations is None
+        else fixed_anchor_observations)
+    anchor_groups: Dict[tuple[int, int], list[PixelObs]] = defaultdict(list)
+    for obs in anchor_source:
+        if (obs.marker != "cube" or obs.set_idx is None
+                or int(obs.set_idx) not in allowed_sets
+                or int(obs.cam) not in fixed_cameras):
+            continue
+        anchor_groups[(int(obs.set_idx), int(obs.cam))].append(obs)
+    selected_anchors = [
+        min(group, key=lambda obs: (int(obs.event), observation_id(obs)))
+        for _, group in sorted(anchor_groups.items())
+    ]
     by_id: Dict[str, PixelObs] = {}
-    for obs in candidates:
+    for obs in list(evaluation_candidates) + list(selected_anchors):
         key = observation_id(obs)
         if key in by_id:
+            if by_id[key] is obs:
+                continue
             raise ValueError(f"duplicate path-evaluation observation ID: {key}")
         by_id[key] = obs
 
@@ -818,35 +969,59 @@ def build_frozen_path_evaluation_mask(
         else:
             valid_ids.append(key)
 
+    valid = set(valid_ids)
+    evaluation_ids = {
+        observation_id(obs) for obs in evaluation_candidates}
+    fixed_anchor_ids = sorted(observation_id(obs) for obs in selected_anchors)
     valid_by_event: Dict[tuple[int, int], list[str]] = defaultdict(list)
-    for key in valid_ids:
+    for key in sorted(valid & evaluation_ids):
         obs = by_id[key]
         valid_by_event[(int(obs.event), int(obs.set_idx))].append(key)
 
     cross_pairs = []
-    e2e_units = []
     for (event, set_index), ids in sorted(valid_by_event.items()):
         fixed_ids = sorted(
             (key for key in ids if int(by_id[key].cam) in fixed_cameras),
             key=lambda key: int(by_id[key].cam))
-        eih_ids = sorted(
-            (key for key in ids if int(by_id[key].cam) == gripper))
         for left, right in combinations(fixed_ids, 2):
             cross_pairs.append({
                 "event": event, "set": set_index,
                 "left_observation_id": left, "right_observation_id": right,
             })
-        for eih_id in eih_ids:
-            if fixed_ids:
-                e2e_units.append({
-                    "event": event, "set": set_index,
-                    "fixed_observation_ids": fixed_ids,
-                    "eih_observation_id": eih_id,
-                })
+
+    anchors_by_set: Dict[int, list[str]] = defaultdict(list)
+    for key in fixed_anchor_ids:
+        if key in valid:
+            anchors_by_set[int(by_id[key].set_idx)].append(key)
+    e2e_units = []
+    for key in sorted(valid & evaluation_ids):
+        obs = by_id[key]
+        if int(obs.cam) != gripper:
+            continue
+        fixed_ids = sorted(
+            anchors_by_set.get(int(obs.set_idx), []),
+            key=lambda anchor_id: int(by_id[anchor_id].cam))
+        if fixed_ids:
+            e2e_units.append({
+                "event": int(obs.event),
+                "gripper_event": int(obs.event),
+                "set": int(obs.set_idx),
+                "fixed_anchor_events": sorted({
+                    int(by_id[anchor_id].event) for anchor_id in fixed_ids}),
+                "fixed_anchor_split_roles": sorted({
+                    roles.get(int(by_id[anchor_id].event), "unspecified")
+                    for anchor_id in fixed_ids}),
+                "gripper_split_role": roles.get(
+                    int(obs.event), "evaluation"),
+                "fixed_observation_ids": fixed_ids,
+                "eih_observation_id": key,
+            })
 
     body = {
         "artifact_schema": MASK_SCHEMA,
-        "split_role": "heldout_event_grouped_set_stratified",
+        "split_role": "heldout_gripper_event_with_same_set_first_fixed_anchor",
+        "fixed_anchor_selection": (
+            "earliest_event_per_set_fixed_camera_before_PnP_validation"),
         "selection_basis": (
             "detector_quality_mask_and_measurement_only_PnP_validity_before_model_fit"),
         "model_output_used_for_selection": False,
@@ -855,16 +1030,19 @@ def build_frozen_path_evaluation_mask(
         "fixed_camera_ids": list(fixed_cameras),
         "set_ids": sorted(allowed_sets),
         "candidate_cube_observation_ids": sorted(by_id),
+        "fixed_anchor_observation_ids": fixed_anchor_ids,
+        "evaluation_observation_ids": sorted(evaluation_ids),
         "valid_cube_observation_ids": valid_ids,
         "pnp_invalid_observation_ids": pnp_invalid_ids,
-        "source_observation_sha256": _source_observation_sha256(candidates),
+        "source_observation_sha256": _source_observation_sha256(
+            list(by_id.values())),
         "cross_pairs": cross_pairs,
         "e2e_units": e2e_units,
         "aggregation": {
             "e_cross": "RMSE_over_all_predeclared_fixed_camera_pairs",
             "e_e2e": (
-                "RMSE_over_predeclared_events_after_SE3_average_of_each_exact_"
-                "fixed_camera_bundle"),
+                "fixed_bundle_to_event_then_event_to_set_then_equal_set_"
+                "weighted_RMSE"),
         },
         "e_cross_contract": E_CROSS_CONTRACT,
         "e_cross_pixel_transfer_contract": E_CROSS_PIXEL_TRANSFER_CONTRACT,
@@ -899,6 +1077,24 @@ def validate_frozen_path_evaluation_mask(mask: Mapping) -> None:
         raise ValueError("e_cross is not the canonical fixed-camera cube consistency metric")
     if mask.get("e_cross_pixel_transfer_contract") != E_CROSS_PIXEL_TRANSFER_CONTRACT:
         raise ValueError("cross-view pixel transfer contract mismatch")
+    valid_ids = set(map(str, mask.get("valid_cube_observation_ids", [])))
+    fixed_anchor_ids = set(map(
+        str, mask.get("fixed_anchor_observation_ids", [])))
+    evaluation_ids = set(map(
+        str, mask.get("evaluation_observation_ids", [])))
+    for pair in mask.get("cross_pairs", []):
+        if (str(pair.get("left_observation_id")) not in evaluation_ids
+                or str(pair.get("right_observation_id")) not in evaluation_ids):
+            raise ValueError("e_cross pair is not from the evaluation population")
+    for unit in mask.get("e2e_units", []):
+        fixed_ids = set(map(str, unit.get("fixed_observation_ids", [])))
+        eih_id = str(unit.get("eih_observation_id", ""))
+        if (not fixed_ids or not fixed_ids.issubset(fixed_anchor_ids)
+                or not fixed_ids.issubset(valid_ids)
+                or eih_id not in evaluation_ids or eih_id not in valid_ids):
+            raise ValueError("e_e2e unit violates set-anchor roles")
+        if int(unit.get("event", -1)) != int(unit.get("gripper_event", -2)):
+            raise ValueError("e_e2e unit event is not the gripper event")
     unhashed = dict(mask)
     expected = str(unhashed.pop("evaluation_mask_sha256", ""))
     if not expected or _sha256_json(unhashed) != expected:
@@ -923,6 +1119,8 @@ def not_applicable_path_metrics(mask: Mapping, reason: str) -> dict:
         "n_cross_pairs": 0,
         "n_cross_view_directions": 0,
         "n_e2e_units": 0,
+        "n_e2e_events": 0,
+        "n_e2e_sets": 0,
     }
 
 
@@ -971,7 +1169,7 @@ def evaluate_paths_with_frozen_mask(
         target_in_base[key] = transform
         predicted_by_set[int(obs.set_idx)].append(transform)
 
-    cross_values, e2e_values = [], []
+    cross_values = []
     cross_view_pixel_squared = []
     cross_rows, e2e_rows = [], []
     for pair in mask["cross_pairs"]:
@@ -1019,12 +1217,24 @@ def evaluate_paths_with_frozen_mask(
         fixed = [target_in_base[key] for key in unit["fixed_observation_ids"]]
         fixed_average = cp.robust_se3_average(fixed, None)[0]
         dt, dr = pose_delta(fixed_average, target_in_base[unit["eih_observation_id"]])
-        e2e_values.append((dt, dr))
         e2e_rows.append({**dict(unit), "translation_mm": dt, "rotation_deg": dr})
 
-    def rms(values, index):
-        return (None if not values else
-                float(np.sqrt(np.mean(np.square([value[index] for value in values])))))
+    e2e_by_event: Dict[tuple[int, int], list[Mapping]] = defaultdict(list)
+    for row in e2e_rows:
+        e2e_by_event[(int(row["set"]), int(row["event"]))].append(row)
+    e2e_event_rows = []
+    for (set_index, event), rows in sorted(e2e_by_event.items()):
+        e2e_event_rows.append({
+            "set": int(set_index),
+            "event": int(event),
+            "n_units": len(rows),
+            "translation_mm": _scalar_rmse([
+                float(row["translation_mm"]) for row in rows]),
+            "rotation_deg": _scalar_rmse([
+                float(row["rotation_deg"]) for row in rows]),
+        })
+    e2e_overall, e2e_set_rows = _event_then_set_aggregate(
+        e2e_event_rows, ("translation_mm", "rotation_deg"))
 
     cross_translation_rmse, cross_rotation_rmse = pairwise_rmse(cross_values)
 
@@ -1042,13 +1252,20 @@ def evaluate_paths_with_frozen_mask(
         "cross_view_pixel_transfer_rmse_px": (
             None if not cross_view_pixel_squared else
             float(np.sqrt(np.mean(cross_view_pixel_squared)))),
-        "e_e2e_translation_rmse_mm": rms(e2e_values, 0),
-        "e_e2e_rotation_rmse_deg": rms(e2e_values, 1),
+        "e_e2e_translation_rmse_mm": e2e_overall["translation_mm"],
+        "e_e2e_rotation_rmse_deg": e2e_overall["rotation_deg"],
+        "e_e2e_aggregation": (
+            "fixed_bundle_to_event_then_event_to_set_then_equal_set_"
+            "weighted_RMSE"),
         "n_cross_pairs": len(cross_values),
         "n_cross_view_directions": 2 * len(cross_values),
-        "n_e2e_units": len(e2e_values),
+        "n_e2e_units": len(e2e_rows),
+        "n_e2e_events": len(e2e_event_rows),
+        "n_e2e_sets": len(e2e_set_rows),
         "n_output_rejected": 0,
         "per_cross_pair": cross_rows,
         "per_e2e_unit": e2e_rows,
+        "per_e2e_event": e2e_event_rows,
+        "per_e2e_set": e2e_set_rows,
         "predicted_by_set": dict(predicted_by_set),
     }

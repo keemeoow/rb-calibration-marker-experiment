@@ -184,6 +184,81 @@ class AprilTagCubeTarget:
             self.detector = None
             self._new_api = False
 
+    def _detector_parameters(self, *, relaxed: bool = False):
+        try:
+            params = cv2.aruco.DetectorParameters()
+        except AttributeError:
+            params = cv2.aruco.DetectorParameters_create()
+        params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+        if relaxed:
+            # Recovery only: admit small/oblique quads, then let cube-model PnP
+            # and the all-corner RMSE gate reject geometrically bad detections.
+            params.adaptiveThreshWinSizeMax = 53
+            params.adaptiveThreshWinSizeStep = 4
+            params.minMarkerPerimeterRate = 0.01
+            params.minCornerDistanceRate = 0.02
+            params.minDistanceToBorder = 1
+            params.errorCorrectionRate = 0.8
+        return params
+
+    def _detect_with_parameters(self, image: np.ndarray, params):
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) if image.ndim == 3 else image
+        if self._new_api:
+            detector = cv2.aruco.ArucoDetector(self.dictionary, params)
+            corners, ids, _ = detector.detectMarkers(gray)
+        else:
+            corners, ids, _ = cv2.aruco.detectMarkers(
+                gray, self.dictionary, parameters=params)
+        return ([], None) if ids is None else (
+            corners, ids.flatten().astype(int))
+
+    @staticmethod
+    def _native_scale_corners(corners: List[np.ndarray], scale: float):
+        return [
+            (np.asarray(corner, dtype=np.float64) / float(scale)).astype(
+                np.float32)
+            for corner in corners
+        ]
+
+    def detect_recovery_candidates(
+        self, bgr: np.ndarray,
+    ) -> List[Tuple[str, List[np.ndarray], Optional[np.ndarray]]]:
+        """Return conservative offline re-detection candidates.
+
+        The normal detector remains the primary measurement. These passes are
+        evaluated only after it fails the non-planar multi-face quality gate;
+        callers must still validate every candidate with the cube model and
+        all-corner PnP RMSE before using it.
+        """
+        subpixel = self._detector_parameters(relaxed=False)
+        relaxed = self._detector_parameters(relaxed=True)
+        candidates = []
+
+        corners, ids = self._detect_with_parameters(bgr, subpixel)
+        candidates.append(("native_subpixel", corners, ids))
+
+        corners, ids = self._detect_with_parameters(bgr, relaxed)
+        candidates.append(("native_relaxed_subpixel", corners, ids))
+
+        upscaled = cv2.resize(
+            bgr, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
+        corners, ids = self._detect_with_parameters(upscaled, subpixel)
+        candidates.append((
+            "up2_subpixel", self._native_scale_corners(corners, 2.0), ids))
+
+        gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if bgr.ndim == 3 else bgr
+        blurred = cv2.GaussianBlur(gray, (0, 0), 1.2)
+        sharpened = cv2.addWeighted(gray, 1.8, blurred, -0.8, 0.0)
+        sharpened = cv2.resize(
+            sharpened, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
+        corners, ids = self._detect_with_parameters(sharpened, relaxed)
+        candidates.append((
+            "up2_unsharp_relaxed",
+            self._native_scale_corners(corners, 2.0),
+            ids,
+        ))
+        return candidates
+
     def detect(self, bgr: np.ndarray) -> Tuple[List[np.ndarray], Optional[np.ndarray]]:
         gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY) if bgr.ndim == 3 else bgr
         if self._new_api:

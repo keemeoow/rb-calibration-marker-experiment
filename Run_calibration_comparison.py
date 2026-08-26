@@ -19,6 +19,7 @@ def _load_commands() -> dict[str, tuple[str, Callable[[list[str]], None]]]:
     from calibration_pipeline.blind_prediction import main as blind_prediction
     from calibration_pipeline.cross_target import main as cross_target
     from calibration_pipeline.external_gt import main as external_gt
+    from calibration_pipeline.handeye_benchmark import main as handeye_benchmark
     from calibration_pipeline.marker_system import main as marker_system
     from calibration_pipeline.opencv_relative_baseline import (
         main as opencv_relative)
@@ -35,6 +36,9 @@ def _load_commands() -> dict[str, tuple[str, Callable[[list[str]], None]]]:
         "opencv-relative": (
             "OpenCV PnP 기반 FK-free 고정카메라 reference baseline",
             opencv_relative),
+        "handeye-benchmark": (
+            "Session04 현재 방법과 OpenCV hand-eye/robot-world 7종 비교",
+            handeye_benchmark),
         "blind-predict": ("외부 GT를 읽지 않는 blind 예측 생성", blind_prediction),
         "external-gt": ("잠금 해제된 외부 GT로 blind 예측 채점", external_gt),
     }

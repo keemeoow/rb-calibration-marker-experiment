@@ -184,6 +184,16 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--min_train_eih_cube_events", type=int, default=3)
     parser.add_argument("--image_scale", type=float, default=1.0)
     parser.add_argument(
+        "--observation-manifest", "--observation_manifest",
+        dest="observation_manifest")
+    parser.add_argument(
+        "--observation-filter-policy", "--observation_filter_policy",
+        dest="observation_filter_policy", choices=("standard", "strict"),
+        default="standard")
+    parser.add_argument(
+        "--align-board-metric-scale", "--align_board_metric_scale",
+        dest="align_board_metric_scale", action="store_true")
+    parser.add_argument(
         "--out_dir", default="CP_result/session02/opencv_relative_baseline")
     return parser.parse_args(argv)
 
@@ -215,12 +225,29 @@ def prepare_visual_only_data(args) -> SimpleNamespace:
                  if int(observation.event) in train_events]
     test_obs = [observation for observation in pool
                 if int(observation.event) in test_events]
+    if bool(getattr(args, "align_board_metric_scale", False)):
+        board_metric_scale = table1.estimate_train_board_metric_scale(
+            train_obs, gripper, K_map, D_map)
+        observations = table1.apply_board_metric_scale(
+            observations, board_metric_scale["scale"])
+        pool = [observation for observation in observations
+                if observation.set_idx in eligible]
+        train_obs = [observation for observation in pool
+                     if int(observation.event) in train_events]
+        test_obs = [observation for observation in pool
+                    if int(observation.event) in test_events]
+    else:
+        board_metric_scale = {
+            "mode": "nominal_config", "enabled": False, "scale": 1.0,
+            "heldout_observations_used": False,
+        }
     provenance = table1._source_data_provenance(  # noqa: SLF001
         args, camera_ids, pool, train_obs, test_obs)
     return SimpleNamespace(
         gripper=gripper, K_map=K_map, D_map=D_map, split=split,
         train_obs=train_obs, test_obs=test_obs,
-        source_data_provenance=provenance)
+        source_data_provenance=provenance,
+        board_metric_scale=board_metric_scale)
 
 
 def main(argv=None) -> None:
@@ -302,6 +329,7 @@ def main(argv=None) -> None:
             "gauge_anchor_camera": anchor,
             "split": prepared.split,
             "source_data_provenance": prepared.source_data_provenance,
+            "board_metric_scale": prepared.board_metric_scale,
             "evaluation_mask_sha256": evaluation_mask[
                 "evaluation_mask_sha256"],
         },
