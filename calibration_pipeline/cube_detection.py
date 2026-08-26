@@ -99,7 +99,7 @@ def _pnp_quality(
     Planar support uses IPPE and explicitly chooses the positive-depth solution
     with the lowest all-corner error.  Non-planar support uses RANSAC only to
     initialize the pose; acceptance is still based on the RMSE of *all* input
-    corners, so an outlier cannot disappear from the common quality mask.
+    corners, so an outlier cannot disappear from the shared quality mask.
     """
     obj = np.asarray(object_points, dtype=np.float64).reshape(-1, 3)
     img = np.asarray(image_points, dtype=np.float64).reshape(-1, 2)

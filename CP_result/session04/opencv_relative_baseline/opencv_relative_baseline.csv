@@ -1,0 +1,4 @@
+baseline,board_cross_view_pixel_transfer_rmse_px,board_pose_consistency_translation_rmse_mm,board_pose_consistency_rotation_rmse_deg,n_board_pairs,cube_cross_view_pixel_transfer_rmse_px,cube_pose_consistency_translation_rmse_mm,cube_pose_consistency_rotation_rmse_deg,n_cube_pairs,n_train_relative_candidates,n_train_relative_inliers
+opencv_board,1.1720480040083008,1.7664971257211026,0.1753773658527941,5,11.78621141291392,15.27339445062883,1.3565539952686092,9,16,16
+opencv_cube,10.859472498037778,15.998321928772437,0.3252004825614968,5,4.671775066924454,5.155552690828458,1.41273876962769,9,20,20
+opencv_board_cube,5.037083939529816,7.330208203225597,0.1943705614548849,5,5.8280603869092396,7.5013662335144025,1.3603046386508977,9,36,30

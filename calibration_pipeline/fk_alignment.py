@@ -345,8 +345,8 @@ def _solve(problem: BoardFreeFKCubeProblem, options: SolverOptions,
         xtol=options.xtol, ftol=options.ftol, gtol=options.gtol)
     gtc, delta = problem.unpack(solution.x)
     final = problem.residual(solution.x)
-    common = SE3Scaling(rotation_scale_rad=1.0, translation_scale_m=0.5)
-    factors = coordinate_change_factors(2, options.scaling, common)
+    reference_scaling = SE3Scaling(rotation_scale_rad=1.0, translation_scale_m=0.5)
+    factors = coordinate_change_factors(2, options.scaling, reference_scaling)
     gradient = np.asarray(solution.grad, dtype=np.float64).reshape(-1)
     return gtc, delta, {
         "seed": int(seed),

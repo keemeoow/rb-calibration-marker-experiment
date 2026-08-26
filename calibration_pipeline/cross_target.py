@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Evaluate every Table 1 row on shared held-out board and cube targets.
+"""Evaluate every Table 1 row on held-out board and cube observations.
 
 The calibration transforms are loaded from stored runs and never refitted.
-For a fair cross-target comparison, every row is scored on the same fixed-camera
-held-out corners using target poses frozen from training data:
+Before external GT exists, two scopes are reported.  Fixed-to-fixed transfer
+isolates fixed-camera calibration without FK.  Gripper-to-fixed transfer uses the
+same measured board/cube corners but evaluates the full hand-eye+FK chain.
 
-* cube: canonical train-only board-free FK artifact;
-* board: canonical train-only eih-board initialization.
-
-These target poses are shared internal references, not external physical GT.
+Reprojection against shared train-only board/cube poses is retained as a
+secondary diagnostic.  Sharing a reference and observation population does
+not make that reference neutral across calibration methods.
 """
 
 from __future__ import annotations
@@ -17,6 +17,7 @@ import argparse
 import csv
 import json
 import os
+from typing import Mapping
 
 import numpy as np
 
@@ -25,11 +26,16 @@ from calibration_pipeline.schema import DEFAULT_SPLIT_SEED
 from calibration_pipeline.path_evaluation import (
     E_CROSS_CONTRACT,
     E_CROSS_PIXEL_TRANSFER_CONTRACT,
+    GRIPPER_TO_FIXED_CROSS_TARGET_CONTRACT,
+    FIXED_TO_FIXED_CROSS_TARGET_CONTRACT,
+    build_gripper_to_fixed_cross_target_mask,
+    build_fixed_to_fixed_cross_target_mask,
 )
 from calibration_pipeline.evaluation import (
+    REFERENCE_DEPENDENT_REPROJECTION_CONTRACT,
     canonical_json_sha256,
-    common_target_observation_groups,
-    evaluate_common_target_run,
+    evaluate_internal_run,
+    fixed_camera_board_cube_groups,
     jsonable,
 )
 
@@ -66,11 +72,45 @@ def summarize(method: str, run_results: list[dict], status: str):
     row = {"method": method, "status": status, "n_runs": len(run_results)}
     for group in ("overall", "board", "cube"):
         mean, std = _mean_std([
-            result[group]["rmse_px"] for result in run_results])
-        row[f"shared_target_{group}_rmse_px_mean"] = mean
-        row[f"shared_target_{group}_rmse_px_std"] = std
-    row["n_observations"] = run_results[0]["overall"]["n_observations"]
-    row["n_corners"] = run_results[0]["overall"]["n_corners"]
+            result["reference_dependent_reprojection"][group]["rmse_px"]
+            for result in run_results])
+        row[f"reference_dependent_{group}_reprojection_rmse_px_mean"] = mean
+        row[f"reference_dependent_{group}_reprojection_rmse_px_std"] = std
+    diagnostic = run_results[0]["reference_dependent_reprojection"]["overall"]
+    row["n_reference_dependent_observations"] = diagnostic["n_observations"]
+    row["n_reference_dependent_corners"] = diagnostic["n_corners"]
+
+    cross_view_fields = (
+        "cross_view_pixel_transfer_rmse_px",
+        "pose_consistency_translation_rmse_mm",
+        "pose_consistency_rotation_rmse_deg",
+    )
+    for target in ("board", "cube"):
+        for field in cross_view_fields:
+            mean, std = _mean_std([
+                result["fixed_to_fixed"]["by_target"][target][field]
+                for result in run_results])
+            row[f"fixed_to_fixed_{target}_{field}_mean"] = mean
+            row[f"fixed_to_fixed_{target}_{field}_std"] = std
+        target_result = run_results[0][
+            "fixed_to_fixed"]["by_target"][target]
+        row[f"n_fixed_to_fixed_{target}_pairs"] = int(target_result["n_pairs"])
+        row[f"n_fixed_to_fixed_{target}_directions"] = int(
+            target_result["n_directions"])
+
+    for target in ("board", "cube"):
+        for field in cross_view_fields:
+            mean, std = _mean_std([
+                result["gripper_to_fixed"]["by_target"][target][field]
+                for result in run_results])
+            row[f"gripper_to_fixed_{target}_{field}_mean"] = mean
+            row[f"gripper_to_fixed_{target}_{field}_std"] = std
+        target_result = run_results[0][
+            "gripper_to_fixed"]["by_target"][target]
+        row[f"n_gripper_to_fixed_{target}_pairs"] = int(target_result["n_pairs"])
+        row[f"n_gripper_to_fixed_{target}_directions"] = int(
+            target_result["n_directions"])
+
     for field in (
         "e_cross_translation_rmse_mm",
         "e_cross_rotation_rmse_deg",
@@ -79,22 +119,63 @@ def summarize(method: str, run_results: list[dict], status: str):
         "cross_view_pixel_transfer_rmse_px",
     ):
         mean, std = _mean_std([
-            result["common_path"].get(field) for result in run_results])
-        row[f"common_path_{field}_mean"] = mean
-        row[f"common_path_{field}_std"] = std
-    row["fixed_camera_cube_position_consistency_rmse_mm_mean"] = row[
-        "common_path_e_cross_translation_rmse_mm_mean"]
-    row["fixed_camera_cube_position_consistency_rmse_mm_std"] = row[
-        "common_path_e_cross_translation_rmse_mm_std"]
-    row["fixed_camera_cube_rotation_consistency_rmse_deg_mean"] = row[
-        "common_path_e_cross_rotation_rmse_deg_mean"]
-    row["fixed_camera_cube_rotation_consistency_rmse_deg_std"] = row[
-        "common_path_e_cross_rotation_rmse_deg_std"]
-    row["n_cross_pairs"] = int(run_results[0]["common_path"]["n_cross_pairs"])
-    row["n_cross_view_directions"] = int(
-        run_results[0]["common_path"]["n_cross_view_directions"])
-    row["n_e2e_units"] = int(run_results[0]["common_path"]["n_e2e_units"])
+            result["legacy_fk_dependent_cube_path"].get(field)
+            for result in run_results])
+        row[f"legacy_cube_path_{field}_mean"] = mean
+        row[f"legacy_cube_path_{field}_std"] = std
+    legacy = run_results[0]["legacy_fk_dependent_cube_path"]
+    row["n_legacy_cube_cross_pairs"] = int(legacy["n_cross_pairs"])
+    row["n_legacy_cube_cross_view_directions"] = int(
+        legacy["n_cross_view_directions"])
+    row["n_fk_dependent_e2e_units"] = int(legacy["n_e2e_units"])
     return row
+
+
+def validate_result_contract(result: Mapping) -> None:
+    """Fail closed if a reference-dependent value is promoted as neutral."""
+    if result.get("artifact_schema") != "internal_heldout_evaluation_v6":
+        raise ValueError("unexpected internal held-out evaluation schema")
+    protocol = result.get("protocol", {})
+    if protocol.get("external_ground_truth_used") is not False:
+        raise ValueError("pre-GT evaluation cannot claim external ground truth")
+    primary = protocol.get("fixed_to_fixed_evaluation", {})
+    mask_sha256 = primary.get("evaluation_mask_sha256")
+    if (not mask_sha256
+            or primary.get("definition") != FIXED_TO_FIXED_CROSS_TARGET_CONTRACT):
+        raise ValueError("fixed-to-fixed board/cube evaluation contract is missing")
+    gripper_to_fixed_protocol = protocol.get("gripper_to_fixed_evaluation", {})
+    gripper_mask_sha256 = gripper_to_fixed_protocol.get(
+        "evaluation_mask_sha256")
+    if (not gripper_mask_sha256
+            or gripper_to_fixed_protocol.get("definition")
+            != GRIPPER_TO_FIXED_CROSS_TARGET_CONTRACT):
+        raise ValueError(
+            "gripper-to-fixed board/cube evaluation contract is missing")
+    dependent = protocol.get("metric_applicability", {}).get(
+        "reference_dependent_reprojection_px", {})
+    if dependent.get("may_rank_methods_before_external_gt") is not False:
+        raise ValueError("reference-dependent reprojection was promoted for ranking")
+    if protocol.get("reference_dependent_reprojection", {}).get(
+            "definition") != REFERENCE_DEPENDENT_REPROJECTION_CONTRACT:
+        raise ValueError("reference-dependent reprojection contract drift")
+    for method, runs in result.get("per_run", {}).items():
+        for run in runs:
+            fixed_to_fixed = run.get("fixed_to_fixed", {})
+            if fixed_to_fixed.get("evaluation_mask_sha256") != mask_sha256:
+                raise ValueError(f"{method}: fixed-to-fixed evaluation mask drift")
+            if set(fixed_to_fixed.get("by_target", {})) != {"board", "cube"}:
+                raise ValueError(f"{method}: board/cube support drift")
+            gripper_to_fixed = run.get("gripper_to_fixed", {})
+            if (gripper_to_fixed.get("evaluation_mask_sha256")
+                    != gripper_mask_sha256):
+                raise ValueError(
+                    f"{method}: gripper-to-fixed evaluation mask drift")
+            if set(gripper_to_fixed.get("by_target", {})) != {"board", "cube"}:
+                raise ValueError(
+                    f"{method}: gripper-to-fixed target support drift")
+            shared = run.get("reference_dependent_reprojection", {})
+            if shared.get("metric_contract") != REFERENCE_DEPENDENT_REPROJECTION_CONTRACT:
+                raise ValueError(f"{method}: shared-reference contract drift")
 
 
 def write_outputs(result: dict, output_dir: str) -> None:
@@ -110,7 +191,9 @@ def write_outputs(result: dict, output_dir: str) -> None:
 
 
 def parse_args(argv=None):
-    parser = argparse.ArgumentParser(description="Session02 cross-target held-out evaluation")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Pre-GT fixed-to-fixed and gripper-to-fixed board/cube evaluation"))
     parser.add_argument("--root_folder", default="data/session02/calib_train")
     parser.add_argument("--intrinsics_dir", default="intrinsics")
     parser.add_argument("--calib_dir", default="data/session02/calib_train/calib_out")
@@ -147,30 +230,48 @@ def main(argv=None) -> None:
     if prepared.alignment_artifact["artifact_sha256"] != stored_artifact_hash:
         raise RuntimeError("reconstructed shared cube artifact does not match stored results")
 
-    common_cameras = None
+    evaluation_cameras = None
     for runs in stored_runs.values():
         for run in runs:
             cameras = {int(camera) for camera in run["transforms"]["T_base_Ci"]}
-            common_cameras = cameras if common_cameras is None else common_cameras & cameras
-    common_cameras = set() if common_cameras is None else common_cameras
-    common_cameras.discard(prepared.gripper)
-    if not common_cameras:
+            evaluation_cameras = (
+                cameras if evaluation_cameras is None
+                else evaluation_cameras & cameras)
+    evaluation_cameras = set() if evaluation_cameras is None else evaluation_cameras
+    evaluation_cameras.discard(prepared.gripper)
+    if not evaluation_cameras:
         raise RuntimeError("no fixed camera is registered by every method/run")
 
-    observations = common_target_observation_groups(
-        prepared.test_obs, common_cameras)
+    observations = fixed_camera_board_cube_groups(
+        prepared.test_obs, evaluation_cameras)
+    fixed_to_fixed_mask = build_fixed_to_fixed_cross_target_mask(
+        prepared.test_obs,
+        evaluation_cameras,
+        prepared.K_map,
+        prepared.D_map,
+        set_filter=prepared.split["eligible_sets"],
+    )
+    gripper_to_fixed_mask = build_gripper_to_fixed_cross_target_mask(
+        prepared.test_obs,
+        evaluation_cameras,
+        prepared.gripper,
+        prepared.K_map,
+        prepared.D_map,
+        set_filter=prepared.split["eligible_sets"],
+    )
 
     per_run = {}
     summary = []
     for method in METHOD_ORDER:
         print(f"[CROSS-TARGET] {method}")
         per_run[method] = [
-            evaluate_common_target_run(
-                run["transforms"], common_cameras, observations,
+            evaluate_internal_run(
+                run["transforms"], evaluation_cameras, observations,
                 prepared.board_initial, prepared.fixed_cubes,
                 prepared.test_obs, prepared.robot_T, prepared.K_map,
                 prepared.D_map, prepared.gripper,
-                prepared.path_evaluation_mask)
+                prepared.path_evaluation_mask, fixed_to_fixed_mask,
+                gripper_to_fixed_mask)
             for run in stored_runs[method]
         ]
         summary.append(summarize(
@@ -185,43 +286,60 @@ def main(argv=None) -> None:
             "events": sorted({int(observation.event) for observation in group_observations}),
         }
     result = {
-        "artifact_schema": "session02_common_heldout_evaluation_v3",
+        "artifact_schema": "internal_heldout_evaluation_v6",
         "protocol": {
-            "question": "frozen calibration transfer to shared held-out board and cube targets",
+            "question": (
+                "fixed-camera subsystem and gripper-to-fixed full-chain "
+                "consistency on held-out board and cube before external GT"),
             "source_data_provenance": prepared.source_data_provenance,
             "pose_convention": prepared.pose_convention,
             "test_time_refit": False,
             "split": stored_split,
-            "common_fixed_cameras": sorted(common_cameras),
-            "eih_path_excluded": True,
-            "eih_exclusion_reason": "shared target pose construction can be circular with the gripper-camera path",
-            "cube_pose_source": "canonical train-only board-free FK artifact",
-            "cube_pose_artifact_sha256": stored_artifact_hash,
-            "board_pose_source": "canonical train-only eih-board hand-eye initialization",
-            "board_pose_sha256": _json_sha256(prepared.board_initial),
+            "evaluation_fixed_camera_intersection": sorted(evaluation_cameras),
+            "camera_intersection_reason": (
+                "every method must be evaluated on identical fixed-camera pairs"),
+            "eye_in_hand_evaluated": True,
+            "eye_in_hand_evaluation_depends_on_robot_fk": True,
+            "why_two_camera_scopes_are_reported": (
+                "fixed-to-fixed isolates fixed-camera calibration; "
+                "gripper-to-fixed evaluates the combined hand-eye, FK, and "
+                "fixed-camera chain"),
             "external_ground_truth_used": False,
             "may_be_described_as_absolute_accuracy": False,
             "metric_applicability": {
-                "common_target_reprojection_px": {
+                "fixed_to_fixed_board_cube": {
                     "all_methods": True,
-                    "role": "secondary_internal_transfer_metric",
+                    "role": "fixed_camera_subsystem_internal_metric",
                     "limitation": (
-                        "shared train-only target poses are internal references, "
-                        "not external ground truth"),
+                        "cannot measure absolute physical accuracy or detect a "
+                        "systematic calibration error shared by every fixed "
+                        "camera"),
                 },
-                "cross_view_pixel_transfer_px": {
+                "gripper_to_fixed_board_cube": {
                     "all_methods": True,
-                    "role": "primary_common_inter_camera_pixel_metric",
+                    "role": "full_system_internal_chain_metric",
+                    "uses_visual_observations": True,
+                    "uses_robot_fk_in_prediction": True,
                     "limitation": (
-                        "internal relative consistency; source pose comes from "
-                        "measurement-only PnP"),
+                        "cannot separate hand-eye calibration error from robot "
+                        "FK error and is not independent absolute accuracy"),
                 },
-                "e_cross_pose_consistency": {
+                "reference_dependent_reprojection_px": {
                     "all_methods": True,
-                    "role": "secondary_fixed_camera_3D_consistency_metric",
-                    "limitation": "cannot detect common-mode calibration error",
+                    "role": "secondary_reference_dependent_diagnostic",
+                    "may_rank_methods_before_external_gt": False,
+                    "limitation": (
+                        "shared train-only target poses are not neutral external "
+                        "references and can favor aligned assumptions"),
                 },
-                "e_e2e_path_closure": {
+                "legacy_cube_e_cross_pose_consistency": {
+                    "all_methods": True,
+                    "role": "backward_compatible_cube_only_diagnostic",
+                    "limitation": (
+                        "cannot detect a systematic calibration error shared "
+                        "by every fixed camera"),
+                },
+                "fk_dependent_e2e_path_closure": {
                     "all_methods": True,
                     "role": "secondary_robot_path_closure_metric",
                     "limitation": (
@@ -229,7 +347,35 @@ def main(argv=None) -> None:
                 },
             },
             "support": support,
-            "common_path_evaluation": {
+            "fixed_to_fixed_evaluation": {
+                "evaluation_mask_sha256": fixed_to_fixed_mask[
+                    "evaluation_mask_sha256"],
+                "selection_uses_model_output": False,
+                "applied_to_every_method": True,
+                "test_time_refit": False,
+                "definition": FIXED_TO_FIXED_CROSS_TARGET_CONTRACT,
+                "support_by_target": fixed_to_fixed_mask["support_by_target"],
+            },
+            "reference_dependent_reprojection": {
+                "definition": REFERENCE_DEPENDENT_REPROJECTION_CONTRACT,
+                "cube_pose_source": "canonical train-only board-free FK artifact",
+                "cube_pose_artifact_sha256": stored_artifact_hash,
+                "board_pose_source": (
+                    "canonical train-only eih-board hand-eye initialization"),
+                "board_pose_sha256": _json_sha256(prepared.board_initial),
+            },
+            "gripper_to_fixed_evaluation": {
+                "evaluation_mask_sha256": gripper_to_fixed_mask[
+                    "evaluation_mask_sha256"],
+                "selection_uses_model_output": False,
+                "selection_uses_robot_fk": False,
+                "evaluation_uses_robot_fk": True,
+                "applied_to_every_method": True,
+                "test_time_refit": False,
+                "definition": GRIPPER_TO_FIXED_CROSS_TARGET_CONTRACT,
+                "support_by_target": gripper_to_fixed_mask["support_by_target"],
+            },
+            "legacy_cube_and_fk_path_evaluation": {
                 "evaluation_mask_sha256": prepared.path_evaluation_mask[
                     "evaluation_mask_sha256"],
                 "n_cross_pairs": len(prepared.path_evaluation_mask["cross_pairs"]),
@@ -244,6 +390,7 @@ def main(argv=None) -> None:
         "summary": summary,
         "per_run": per_run,
     }
+    validate_result_contract(result)
     write_outputs(result, args.out_dir)
     print(f"[DONE] {args.out_dir}/cross_target_evaluation.{{json,csv}}")
 

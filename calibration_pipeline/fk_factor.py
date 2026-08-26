@@ -36,7 +36,9 @@ from calibration_pipeline.reprojection import (
     coordinate_change_factors,
     freeze_manifest,
     jacobian_diagnostics,
+    observation_population,
     perturbed_x,
+    robust_least_squares_cost,
     solve_corner_reprojection,
 )
 
@@ -57,7 +59,7 @@ FK_MODES = frozenset({FK_MODE_NONE, FK_MODE_FIXED, FK_MODE_FACTOR, FK_MODE_CORR}
 
 
 def _rho(z: np.ndarray, loss: str) -> np.ndarray:
-    """SciPy-compatible rho(z), excluding the common 1/2 cost factor."""
+    """SciPy-compatible rho(z), excluding the shared 1/2 cost factor."""
     z = np.asarray(z, dtype=np.float64)
     if loss == "linear":
         return z
@@ -340,7 +342,24 @@ def solve_factorized_fk(
     elapsed = float(time.perf_counter() - started)
     state = problem.unpack(solution.x)
     final_visual = problem.visual_raw(solution.x)
+    initial_factor_blocks = problem.factor_raw_blocks(x0)
     factor_blocks = problem.factor_raw_blocks(solution.x)
+    initial_factor_raw = (
+        np.concatenate([block for _, block in initial_factor_blocks])
+        if initial_factor_blocks else np.zeros(0, dtype=np.float64))
+    final_factor_raw = (
+        np.concatenate([block for _, block in factor_blocks])
+        if factor_blocks else np.zeros(0, dtype=np.float64))
+    visual_initial_robust_cost = robust_least_squares_cost(
+        initial_visual, options.loss, options.f_scale_px)
+    visual_final_robust_cost = robust_least_squares_cost(
+        final_visual, options.loss, options.f_scale_px)
+    factor_initial_robust_cost = robust_least_squares_cost(
+        initial_factor_raw, fk_spec.loss, fk_spec.robust_scale)
+    factor_final_robust_cost = robust_least_squares_cost(
+        final_factor_raw, fk_spec.loss, fk_spec.robust_scale)
+    final_total_robust_cost = (
+        visual_final_robust_cost + factor_final_robust_cost)
     common_scaling = SE3Scaling(rotation_scale_rad=1.0, translation_scale_m=0.5)
     common_factors = coordinate_change_factors(
         len(problem.variable_keys), options.scaling, common_scaling)
@@ -367,10 +386,54 @@ def solve_factorized_fk(
         "n_parameters": int(problem.n_params),
         "n_visual_residuals": int(problem.visual.n_residuals),
         "n_fk_residuals": int(sum(len(block) for _, block in factor_blocks)),
+        "visual_residual_population": observation_population(
+            observations, gripper_cam_idx),
         "freeze_manifest": freeze_manifest(reference_state, variable_keys_),
         "variable_keys": [f"{kind}:{idx}" for kind, idx in problem.variable_keys],
         "initial_reprojection_rmse_px": float(np.sqrt(np.mean(np.square(initial_visual)))),
         "train_reprojection_rmse_px": float(np.sqrt(np.mean(np.square(final_visual)))),
+        "objective_block_costs": {
+            "cost_definition": "0.5 * sum(rho((residual / scale)^2) * scale^2)",
+            "visual": {
+                "n_residual_components": int(len(final_visual)),
+                "loss": str(options.loss),
+                "scale_px": float(options.f_scale_px),
+                "initial_raw_l2_cost": float(
+                    0.5 * np.sum(np.square(initial_visual))),
+                "final_raw_l2_cost": float(
+                    0.5 * np.sum(np.square(final_visual))),
+                "initial_robust_cost": visual_initial_robust_cost,
+                "final_robust_cost": visual_final_robust_cost,
+                "final_robust_cost_per_component": float(
+                    visual_final_robust_cost / max(1, len(final_visual))),
+                "fraction_of_total_robust_cost": float(
+                    visual_final_robust_cost
+                    / max(np.finfo(float).eps, final_total_robust_cost)),
+            },
+            "fk": {
+                "active": bool(factor_blocks),
+                "n_factor_blocks": int(len(factor_blocks)),
+                "n_residual_components": int(len(final_factor_raw)),
+                "loss": str(fk_spec.loss),
+                "scale_sigma": float(fk_spec.robust_scale),
+                "initial_raw_l2_cost": float(
+                    0.5 * np.sum(np.square(initial_factor_raw))),
+                "final_raw_l2_cost": float(
+                    0.5 * np.sum(np.square(final_factor_raw))),
+                "initial_robust_cost": factor_initial_robust_cost,
+                "final_robust_cost": factor_final_robust_cost,
+                "final_robust_cost_per_component": float(
+                    factor_final_robust_cost
+                    / max(1, len(final_factor_raw))),
+                "fraction_of_total_robust_cost": float(
+                    factor_final_robust_cost
+                    / max(np.finfo(float).eps, final_total_robust_cost)),
+            },
+            "final_total_robust_cost": final_total_robust_cost,
+            "matches_scipy_linear_cost": bool(np.isclose(
+                final_total_robust_cost, float(solution.cost),
+                rtol=1e-10, atol=1e-10)),
+        },
         "fk_factor": {
             "active": bool(factor_blocks),
             "sets": [int(set_index) for set_index, _ in factor_blocks],

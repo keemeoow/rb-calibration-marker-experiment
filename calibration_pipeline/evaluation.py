@@ -15,7 +15,11 @@ from typing import Any, Dict, Mapping, Sequence
 import numpy as np
 
 from calibration_pipeline.apriltag_cube import inv_T
-from calibration_pipeline.path_evaluation import evaluate_paths_with_common_mask
+from calibration_pipeline.path_evaluation import (
+    evaluate_gripper_to_fixed_cross_target,
+    evaluate_paths_with_frozen_mask,
+    evaluate_fixed_to_fixed_cross_target,
+)
 from calibration_pipeline.reprojection import PixelObs, PoseState, project_points
 
 
@@ -27,6 +31,19 @@ REPROJECTION_METRIC_CONTRACT = {
     "parameters_frozen_during_evaluation": True,
     "model_dependent_observation_rejection": False,
     "millimetre_reprojection_conversion_reported": False,
+}
+
+REFERENCE_DEPENDENT_REPROJECTION_CONTRACT = {
+    "name": "shared_train_target_pose_reprojection_diagnostic",
+    "uses_same_heldout_fixed_camera_corners": True,
+    "uses_shared_train_target_pose": True,
+    "reference_is_external_ground_truth": False,
+    "reference_is_neutral_across_calibration_methods": False,
+    "role_before_external_gt": "secondary_reference_dependent_diagnostic",
+    "may_rank_methods_before_external_gt": False,
+    "limitation": (
+        "the board and cube base-frame poses are train-derived internal "
+        "references and may be closer to methods that share their assumptions"),
 }
 
 
@@ -209,11 +226,11 @@ def pixel_reprojection_metrics(
     return result
 
 
-def common_target_observation_groups(
-    test_observations: Sequence[PixelObs], common_fixed_cameras: Sequence[int]
+def fixed_camera_board_cube_groups(
+    test_observations: Sequence[PixelObs], fixed_camera_ids: Sequence[int]
 ) -> dict[str, list[PixelObs]]:
-    """Return one fixed-camera board/cube held-out population for all methods."""
-    cameras = {int(camera) for camera in common_fixed_cameras}
+    """Return held-out board/cube corners on an explicit camera intersection."""
+    cameras = {int(camera) for camera in fixed_camera_ids}
 
     def selected(marker: str | None = None) -> list[PixelObs]:
         return [
@@ -230,42 +247,50 @@ def common_target_observation_groups(
         "cube": selected("cube"),
     }
     if not all(groups.values()):
-        raise RuntimeError("common-target held-out evaluation group is empty")
+        raise RuntimeError("fixed-camera board/cube evaluation group is empty")
     return groups
 
 
-def evaluate_common_target_run(
+def evaluate_internal_run(
     raw_transforms: Mapping,
-    common_fixed_cameras: Sequence[int],
+    evaluation_fixed_cameras: Sequence[int],
     observation_groups: Mapping[str, Sequence[PixelObs]],
-    common_board_pose: np.ndarray,
-    common_cube_poses: Mapping[int, np.ndarray],
+    shared_train_board_pose: np.ndarray,
+    shared_train_cube_poses: Mapping[int, np.ndarray],
     all_test_observations: Sequence[PixelObs],
     robot_T: Mapping[int, np.ndarray],
     K_map: Mapping[int, np.ndarray],
     D_map: Mapping[int, np.ndarray],
     gripper_cam_idx: int,
     path_evaluation_mask: Mapping,
+    fixed_to_fixed_cross_target_mask: Mapping,
+    gripper_to_fixed_cross_target_mask: Mapping,
 ) -> dict:
-    """Evaluate frozen calibration on shared pixel and path-consistency data."""
+    """Evaluate one frozen calibration before independent external GT exists.
+
+    Fixed-to-fixed isolates relative fixed-camera calibration without FK.
+    Gripper-to-fixed uses the same visual cross-view idea but necessarily passes
+    through robot FK and hand-eye.  Shared-target reprojection and the legacy
+    cube path remain explicitly labelled diagnostics.
+    """
     stored = deserialize_state(raw_transforms)
-    cameras = {int(camera) for camera in common_fixed_cameras}
+    cameras = {int(camera) for camera in evaluation_fixed_cameras}
     evaluation_state = PoseState(
         cams={camera: stored.cams[camera] for camera in sorted(cameras)},
         gtc=stored.gtc,
-        board=np.asarray(common_board_pose, dtype=np.float64),
+        board=np.asarray(shared_train_board_pose, dtype=np.float64),
         cubes={
             int(set_index): np.asarray(transform, dtype=np.float64)
-            for set_index, transform in common_cube_poses.items()
+            for set_index, transform in shared_train_cube_poses.items()
         },
     )
-    output = {}
+    reference_dependent = {}
     for label in ("overall", "board", "cube"):
         metrics = pixel_reprojection_metrics(
             observation_groups[label], evaluation_state, robot_T, K_map,
             D_map, gripper_cam_idx)
         overall = metrics["overall"]
-        output[label] = {
+        reference_dependent[label] = {
             "rmse_px": float(overall["rmse_px"]),
             "n_observations": int(overall["n_observations"]),
             "n_corners": int(overall["n_corners"]),
@@ -276,7 +301,26 @@ def evaluate_common_target_run(
                 for camera in sorted(cameras)
             },
         }
-    path = evaluate_paths_with_common_mask(
+    reference_dependent["metric_contract"] = dict(
+        REFERENCE_DEPENDENT_REPROJECTION_CONTRACT)
+
+    fixed_to_fixed = evaluate_fixed_to_fixed_cross_target(
+        all_test_observations,
+        evaluation_state.cams,
+        K_map,
+        D_map,
+        fixed_to_fixed_cross_target_mask,
+    )
+    gripper_to_fixed = evaluate_gripper_to_fixed_cross_target(
+        all_test_observations,
+        evaluation_state.cams,
+        evaluation_state.gtc,
+        robot_T,
+        K_map,
+        D_map,
+        gripper_to_fixed_cross_target_mask,
+    )
+    legacy_path = evaluate_paths_with_frozen_mask(
         all_test_observations,
         evaluation_state.cams,
         evaluation_state.gtc,
@@ -286,6 +330,12 @@ def evaluate_common_target_run(
         D_map,
         path_evaluation_mask,
     )
-    path.pop("predicted_by_set", None)
-    output["common_path"] = path
-    return output
+    legacy_path.pop("predicted_by_set", None)
+    return {
+        "fixed_to_fixed": fixed_to_fixed,
+        "gripper_to_fixed": gripper_to_fixed,
+        "reference_dependent_reprojection": reference_dependent,
+        "legacy_fk_dependent_cube_path": legacy_path,
+        "external_ground_truth_used": False,
+        "absolute_accuracy_evaluated": False,
+    }

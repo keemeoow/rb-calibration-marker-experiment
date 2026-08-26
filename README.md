@@ -1,6 +1,6 @@
 # 다중 고정카메라·로봇 Hand–Eye 캘리브레이션 비교실험
 
-이 문서는 실제 데이터 캡처부터 A0~A5/B1~B3 비교실험, 공통 평가지표, 결과 파일 생성까지의 메인 설명서다. 구현의 기준은 `Run_calibration_comparison.py`와 `calibration_pipeline/`이며, 현재 최종 추정기는 모든 실행 조건에서 동일한 **raw-corner pixel reprojection 최적화**를 사용한다.
+이 문서는 실제 데이터 캡처부터 A0~A5/B1~B3 비교실험, 평가 계약, 결과 파일 생성까지의 메인 설명서다. 구현의 기준은 `Run_calibration_comparison.py`와 `calibration_pipeline/`이며, 현재 최종 추정기는 모든 실행 조건에서 동일한 **raw-corner pixel reprojection 최적화**를 사용한다.
 
 ## 바로가기
 
@@ -13,7 +13,7 @@
 - [7. 순차와 통합 최적화의 차이](#7-순차와-통합-최적화의-차이)
 - [8. A0~A5/B1~B3 비교실험](#8-a0a5b1b3-비교실험)
 - [9. 마커 시스템 End-to-End 비교](#9-마커-시스템-end-to-end-비교)
-- [10. 공통 Cross-target 평가](#10-공통-cross-target-평가)
+- [10. 외부 GT 전 Cross-target 평가](#10-외부-gt-전-cross-target-평가)
 - [11. 평가지표 정의와 적용 범위](#11-평가지표-정의와-적용-범위)
 - [12. 어떤 조건끼리 비교해야 하는가](#12-어떤-조건끼리-비교해야-하는가)
 - [13. 현재 session02 결과와 비교별 해석](#13-현재-session02-결과와-비교별-해석)
@@ -21,6 +21,7 @@
 - [15. 코드 구조](#15-코드-구조)
 - [16. 전체 실행 명령](#16-전체-실행-명령)
 - [17. 현재 해석 한계](#17-현재-해석-한계)
+- [18. Terminology (용어 설명)](#18-terminology-용어-설명)
 
 ## 1. 가장 짧은 실행 순서
 
@@ -51,7 +52,7 @@ python3 Run_calibration_comparison.py table1 \
   --out_dir CP_result/sessionNN/late_table1
 ```
 
-`Step3_calibration.py`는 별도 최종 solver가 아니다. `table1`과 같은 코드를 이용해 공통 train-only baseline만 먼저 생성·검증하고 싶을 때 사용한다. 따라서 Step3를 생략하고 `table1`을 바로 실행해도 계산 경로는 동일하다.
+`Step3_calibration.py`는 별도 최종 Solver (최적화기)가 아니다. `table1`과 같은 코드로 Shared Train-only Baseline (동일 학습 전용 초기값)만 먼저 생성·검증할 때 사용한다. 따라서 Step3를 생략하고 `table1`을 바로 실행해도 계산 경로는 동일하다.
 
 ## 2. 시스템과 좌표계
 
@@ -136,7 +137,10 @@ cube/board raw corner 검출
        A5는 실측 correction label 전까지 baseline만 예약
                     │
                     ├── row-local train/test reprojection px
-                    ├── frozen common-mask e_cross / pixel transfer / e_e2e
+                    ├── FK-free Fixed-to-Fixed (고정카메라 간) Board/Cube Cross-view
+                    ├── FK-dependent Gripper-to-Fixed (그리퍼카메라–고정카메라 간) Board/Cube Cross-view
+                    ├── reference-dependent reprojection diagnostic
+                    ├── legacy cube e_cross / FK-dependent e_e2e
                     └── transforms + solver diagnostics
                     │
                     ▼
@@ -204,7 +208,7 @@ $$
 T^B_{C_i}=T^B_O\left(T^{C_i}_O\right)^{-1}
 $$
 
-board와 cube에서 얻은 후보를 카메라별로 robust SE(3) 평균한다. 이 값들은 모든 Table 1 조건의 공통 출발점일 뿐 최종 결과가 아니다.
+Board (보드)와 Cube (큐브)에서 얻은 후보를 카메라별로 Robust SE(3) Mean (강건 평균)한다. 이 값들은 모든 Table 1 조건이 공유하는 출발점일 뿐 최종 결과가 아니다.
 
 ### 5.4 Board-free FK–cube alignment
 
@@ -263,7 +267,7 @@ $$
 - SE(3) left-local perturbation과 retraction
 - 기본 `max_nfev=300`, `xtol=ftol=gtol=1e-8`
 
-최종 단계에는 PnP 평균, pose-consistency 후처리 또는 Ridge 보정이 없다. RANSAC으로 결과가 나쁜 관측을 사후 제거하지도 않는다. 검출 품질과 PnP-validity 기반 공통 mask는 모델 fitting 전에 고정하고, 최적화 중 이상치 영향은 공통 `soft_l1` loss로 제한한다.
+최종 단계에는 PnP Mean (PnP 평균), Pose-consistency Post-processing (자세 일관성 후처리) 또는 Ridge Correction (릿지 보정)이 없다. RANSAC으로 결과가 나쁜 관측을 사후 제거하지도 않는다. Detection Quality and PnP-validity Mask (검출 품질·PnP 유효성 마스크)는 Model Fitting (모델 적합) 전에 고정하고, 최적화 중 이상치 영향은 모든 조건에서 동일한 `soft_l1` Robust Loss (강건 손실)로 제한한다.
 
 ## 7. 순차와 통합 최적화의 차이
 
@@ -370,7 +374,7 @@ A5는 이름만 있는 임의 solver가 아니다. 독립 실측으로 얻은 6-
 
 - B1↔A4: marker와 FK factor는 같고 순차/통합만 다르다.
 - B2↔A4: cube와 FK factor는 같고 board residual 유무만 다르다.
-- B3↔A2: board 기반 통합이라는 공통 조건에서 cube residual 유무를 본다.
+- B3↔A2: Board-based Unified Optimization (보드 기반 통합 최적화)이라는 동일 조건에서 Cube Residual (큐브 잔차) 유무를 본다.
 
 B2/B3는 all-marker shared initializer에서 시작한 뒤 residual과 변수를 제거한다. 따라서 “처음부터 cube-only/board-only 시스템을 구축했을 때의 성능”이 아니라 **동일 초기조건에서 최적화 항의 기여도**를 측정한다.
 
@@ -394,11 +398,11 @@ python3 Run_calibration_comparison.py marker-system \
 
 세 시스템은 split, raw detection, $(K,D)$, solver, seed와 held-out 평가 population을 공유하지만 초기값은 modality별로 별도 생성한다. cube-only는 board-free train-only FK artifact로 Hand–Eye를 초기화하지만, 최종 목적함수에는 FK factor가 없다.
 
-출력은 각 시스템의 own-marker held-out px와 모든 시스템에 공통인 board+cube target px, `e_cross`, pixel transfer, `e_e2e`다. 외부 GT가 아니므로 절대 정확도 주장은 할 수 없다.
+보드와 큐브의 촬영 원본이 모두 있으므로, 어떤 Marker (마커)로 캘리브레이션했는지와 무관하게 두 Target (표적)을 모두 평가할 수 있다. 평가는 Fixed-to-Fixed (고정카메라 간)와 Gripper-to-Fixed (그리퍼카메라–고정카메라 간)를 함께 보고한다. 전자는 FK 없이 고정카메라 보정만 분리하고, 후자는 같은 Image Corner (영상 코너)를 사용하되 `FK × Hand–Eye`를 거쳐 전체 체인을 평가한다. Shared Target Pose Reprojection (공유 표적 자세 재투영)은 보조 진단값이며, External GT (외부 정답)가 아니므로 절대 정확도 주장은 할 수 없다.
 
-## 10. 공통 Cross-target 평가
+## 10. 외부 GT 전 Cross-target 평가
 
-Table 1의 A0/B3처럼 목적함수에 cube가 없는 행과 cube-bearing 행은 row-local overall residual population이 다르다. 이를 보완하기 위해 모든 저장된 transform을 같은 held-out fixed-camera board+cube corner에서 다시 평가한다.
+Table 1의 A0/B3처럼 목적함수에 cube가 없는 행과 cube-bearing 행은 row-local residual population이 다르다. 하지만 촬영 원본에 보드와 큐브 검출값이 모두 있으면, 캘리브레이션에 쓰지 않은 target도 **평가용 관측**으로 사용할 수 있다. 저장된 각 방법의 transform을 동결한 뒤 같은 held-out event에서 보드와 큐브를 각각 평가한다.
 
 ```bash
 python3 Run_calibration_comparison.py cross-target \
@@ -409,7 +413,16 @@ python3 Run_calibration_comparison.py cross-target \
   --out_dir CP_result/sessionNN/cross_target_evaluation
 ```
 
-평가 중 calibration transform은 다시 최적화하지 않는다. board pose는 train-only eih-board 초기값, cube pose는 train-only board-free FK artifact를 모든 방법에 공통 내부 reference로 사용한다. 따라서 조건 간 비교 population은 같지만 외부 물리 GT는 아니다.
+모든 방법에는 Identical Evaluation Population (동일 평가 모집단), 즉 같은 Camera Pair (카메라 쌍)·Event (이벤트)·Corner (코너)를 적용한다. 그러나 모집단이 같다는 사실만으로 Reference (기준값)가 공정하거나 중립적이라는 뜻은 아니다.
+
+따라서 외부 GT가 들어오기 전에는 다음처럼 분리한다.
+
+1. Fixed-to-Fixed (고정카메라 간): Shared Target Pose (공유 표적 자세)와 FK 없이 보드·큐브별 Pixel Transfer (픽셀 전달) 및 Pose Consistency (자세 일관성)
+2. Gripper-to-Fixed (그리퍼카메라–고정카메라 간): 공유 표적 자세 없이 보드·큐브별 픽셀 전달 및 자세 일관성. 단, 움직이는 손목카메라 자세 계산에는 Robot FK (로봇 순기구학)가 들어감
+3. 보조 지표: train-only board/cube pose를 reference로 쓰는 reprojection. 모든 방법의 순위를 정하는 근거로 사용하지 않음
+4. Legacy 보조 지표: cube 경로를 평균한 `e_e2e`
+
+Fixed-to-Fixed (고정카메라 간) 값이 전체 평가를 대표하지는 않는다. 이는 Camera Extrinsic (카메라 외부 파라미터)의 상대 일관성을 Robot FK와 Hand–Eye 오차에서 분리하는 **부분 지표**다. 전체 Eye-in-Hand + Eye-to-Hand (그리퍼카메라 + 고정카메라) 성능은 Gripper-to-Fixed를 함께 보고하되, 그 오차에는 FK·Hand–Eye·Fixed-camera 오차가 섞인다고 명시한다.
 
 ## 11. 평가지표 정의와 적용 범위
 
@@ -425,15 +438,54 @@ $$
 - 최적화가 제대로 수렴했는지 보는 diagnostic
 - 일반화 성능이나 절대 정확도의 주 지표가 아님
 
-### 11.2 Held-out reprojection RMSE px — Primary metric
+### 11.2 Own-marker held-out reprojection RMSE px
 
 같은 식을 held-out event corner에 적용한다. 모든 transform은 train 결과로 동결하며 test-time refit이나 결과 의존적 관측 제거가 없다.
 
-- 같은 marker population을 가진 조건끼리는 직접 비교 가능
+- 같은 marker population을 가진 조건끼리의 주 pixel 지표로 직접 비교 가능
 - target 구성이 다른 조건의 pooled `overall`은 직접 비교하면 안 됨
 - 재투영 오차는 px만 보고하며 예측 깊이를 곱한 임의의 mm 환산값은 사용하지 않음
 
-### 11.3 `e_cross` — 고정카메라 간 cube pose consistency
+### 11.3 FK-free Fixed-to-Fixed (FK 없는 고정카메라 간) Board/Cube Cross-view
+
+Target $O\in\{board,cube\}$에 대해 각 고정카메라가 자기 측정 corner만으로 PnP pose를 계산한다.
+
+$$
+T^{B,(i)}_O=T^B_{C_i}T^{C_i}_{O,\mathrm{PnP}}
+$$
+
+동일 event의 카메라 pair $(i,j)$에서 pose 차이와 양방향 pixel transfer를 계산한다.
+
+$$
+T^{C_j}_O=\left(T^B_{C_j}\right)^{-1}T^B_{C_i}T^{C_i}_{O,\mathrm{PnP}}
+$$
+
+- 보드와 큐브는 각각 별도로 보고한다. 서로 다른 geometry/corner 수를 하나의 pooled 순위값으로 합치지 않는다.
+- shared base-frame target pose, robot FK, gripper camera, 외부 GT를 사용하지 않는다.
+- 모든 방법에 동일한 사전 고정 pair와 corner를 사용하며, 결과가 큰 pair를 사후 제거하지 않는다.
+- Camera-relative Consistency (카메라 간 상대 일관성)는 평가하지만, 모든 고정카메라에 함께 존재하는 Systematic Error (계통 오차)와 Absolute Physical Accuracy (절대 물리 정확도)는 검출할 수 없다.
+
+### 11.4 FK-dependent Gripper-to-Fixed (FK 의존 그리퍼카메라–고정카메라 간) Board/Cube Cross-view
+
+Eye-in-hand 카메라 $C_g$의 event별 base pose는 다음과 같다.
+
+$$
+T^B_{C_g}(e)=T^B_G(e)T^G_{C_g}
+$$
+
+Gripper 카메라가 영상에서 PnP한 target pose를 base로 옮겨 fixed camera 결과와 비교한다.
+
+$$
+T^{B,(g)}_O(e)=T^B_G(e)T^G_{C_g}T^{C_g}_{O,\mathrm{PnP}}
+$$
+
+양방향 pixel transfer는 fixed→gripper와 gripper→fixed를 모두 계산한다. 측정 residual은 실제 보드·큐브 corner이지만, calibration prediction에는 $T^B_G(e)$가 필요하다. 따라서 이 지표는 순수 영상 관측을 사용하면서도 **FK-dependent**이며, Hand–Eye 오차와 FK 오차를 분리할 수 없다.
+
+### 11.5 Shared-target reprojection — 보조 진단값
+
+Board는 train-only Hand–Eye 초기 pose, cube는 train-only board-free FK artifact pose를 공유 reference로 넣어 fixed-camera reprojection을 계산한다. 관측 population은 동일하지만 reference 자체가 외부 GT가 아니며 특정 방법의 가정과 더 가까울 수 있다. 따라서 이 값은 과거 결과와의 연결 및 진단 목적으로만 남기고, 외부 GT 전 방법 순위나 공정성 주장의 근거로 사용하지 않는다.
+
+### 11.6 Legacy `e_cross` — 고정카메라 간 cube pose consistency
 
 각 고정카메라가 자기 영상 corner만으로 cube PnP를 독립 계산한다.
 
@@ -453,7 +505,7 @@ $$
 
 이 mm는 재투영 오차를 mm로 변환한 값이 아니라 두 카메라가 예측한 cube 중심 사이의 실제 좌표 거리다. robot FK, gripper camera, nominal cube 정답, 외부 GT는 사용하지 않는다. 따라서 일반적인 고정카메라 간 위치/회전 일관성 지표이지만 절대 정확도는 아니다.
 
-### 11.4 Cross-view pixel transfer RMSE px
+### 11.7 Legacy cube cross-view pixel transfer RMSE px
 
 카메라 A의 측정 corner로 얻은 cube PnP pose를 추정된 카메라 상대관계로 B에 옮긴 뒤 B의 실제 측정 corner와 비교한다.
 
@@ -464,7 +516,9 @@ $$
 
 A→B와 B→A를 모두 계산한다. FK나 공유 cube 정답 없이 카메라 간 상대 보정을 px 도메인에서 평가하는 지표다.
 
-### 11.5 `e_e2e` — Eye-in-hand와 Eye-to-hand 경로 일치
+현재 Fixed-to-Fixed (고정카메라 간) 지표는 같은 계산을 보드와 큐브 모두에 수행한다. 이 절은 기존 Cube-only (큐브 전용) 출력 필드의 정의를 보존하기 위한 설명이다.
+
+### 11.8 `e_e2e` — Eye-in-hand와 Eye-to-hand 경로 일치
 
 같은 held-out cube에 대해 다음 두 경로를 비교한다.
 
@@ -473,14 +527,14 @@ A→B와 B→A를 모두 계산한다. FK나 공유 cube 정답 없이 카메라
 
 translation mm와 SO(3) rotation deg RMSE를 보고한다. robot FK가 포함되므로 전체 변환 체인의 내부 일관성 지표이며 외부 GT 정확도는 아니다.
 
-### 11.6 수렴·등록·안정성 지표
+### 11.9 수렴·등록·안정성 지표
 
 - `converged_runs / total_runs`: 여러 초기 seed 중 solver 성공 수
-- `n_registered_fixed_cameras`: 공통 조건을 만족하며 등록된 고정카메라 수
+- `n_registered_fixed_cameras`: 모든 비교 조건을 만족하며 등록된 Fixed Camera (고정카메라) 수
 - transform dispersion: seed 간 translation/rotation 표준편차와 최댓값
 - Jacobian rank/condition number: 관측가능성과 수치 안정성 diagnostic
 
-### 11.7 External-GT 절대 정확도
+### 11.10 External-GT 절대 정확도
 
 물리 정확도는 calibration과 분리된 blind 데이터에서만 평가한다.
 
@@ -490,43 +544,45 @@ translation mm와 SO(3) rotation deg RMSE를 보고한다. robot FK가 포함되
 
 내부 `e_cross`/`e_e2e`가 좋아도 external-GT 오차가 반드시 작다는 뜻은 아니다.
 
-### 11.8 조건별 지표 적용표
+### 11.11 조건별 지표 적용표
 
 | 지표 | A0/B3 board-only row-local | Cube-bearing A1~A4/B1/B2 | Cross-target 전체 행 | Marker-system | 해석 |
 | --- | --- | --- | --- | --- | --- |
-| Train reprojection px | board만 | 선언된 marker | 공통 평가 아님 | 각 시스템 marker | fitting diagnostic |
-| Held-out reprojection px | board만 | 선언된 marker | 공통 board+cube | own/common 모두 | primary internal pixel metric |
-| `e_cross` mm/deg | N/A | 가능 | 전체 행 가능 | 가능 | 고정카메라 간 cube pose 일관성 |
-| Pixel transfer px | N/A | 가능 | 전체 행 가능 | 가능 | 카메라 상대관계의 px 검증 |
-| `e_e2e` mm/deg | N/A | 가능 | 전체 행 가능 | 가능 | FK 포함 전체 경로 일관성 |
+| Train Reprojection (학습 재투영) px | board만 | 선언된 marker | 전체 행 동일 평가는 아님 | 각 시스템 marker | Fitting Diagnostic (적합 진단) |
+| Own-marker held-out reprojection px | board만 | 선언된 marker | 해당 없음 | 각 시스템 marker | 같은 marker 조건 내 주 pixel 지표 |
+| Fixed-to-Fixed Board Transfer/Pose (고정카메라 간 보드 전달/자세) | row-local과 무관 | row-local과 무관 | 전체 행 가능 | 전체 시스템 가능 | FK-free Board Relative Evaluation (FK 없는 보드 상대평가) |
+| Fixed-to-Fixed Cube Transfer/Pose (고정카메라 간 큐브 전달/자세) | row-local과 무관 | row-local과 무관 | 전체 행 가능 | 전체 시스템 가능 | FK-free Cube Relative Evaluation (FK 없는 큐브 상대평가) |
+| Gripper-to-Fixed Board/Cube Transfer/Pose (그리퍼카메라–고정카메라 간 보드/큐브 전달·자세) | row-local과 무관 | row-local과 무관 | 전체 행 가능 | 전체 시스템 가능 | Visual Full-chain Evaluation (영상 기반 전체 체인 평가); FK-dependent |
+| Shared-target reprojection px | 해당 없음 | 해당 없음 | 전체 행 가능 | 전체 시스템 가능 | reference-dependent 보조 진단; 순위 금지 |
+| FK-dependent `e_e2e` mm/deg | N/A | 가능 | 전체 행 가능 | 가능 | FK 포함 전체 경로 보조 지표 |
 | External TRE/rotation | blind GT 필요 | blind GT 필요 | 해당 없음 | 해당 없음 | 절대 물리 정확도 |
 
 ## 12. 어떤 조건끼리 비교해야 하는가
 
-| 연구 질문 | 비교 | 공통으로 볼 지표 | 피해야 할 해석 |
+| Research Question (연구 질문) | Comparison (비교) | Shared Evaluation Metric (동일하게 볼 지표) | Invalid Interpretation (피해야 할 해석) |
 | --- | --- | --- | --- |
 | 순차법에 cube residual이 도움이 되는가 | A0 → A1 | held-out board px, 등록 수 | 서로 다른 pooled overall 직접 비교 |
 | vision 조건에서 통합 feedback이 도움이 되는가 | A1 → A2 | held-out overall/board/cube px | 초기값 차이로 설명 |
-| soft FK 조건에서도 통합 효과가 있는가 | B1 → A4 | held-out overall/board/cube, 공통 path | 서로 다른 FK weight 사용 |
-| hard FK 고정의 효과는 무엇인가 | A2 → A3 | 동일 held-out marker px, cross-target/path | FK가 GT라고 단정 |
-| soft FK factor의 효과는 무엇인가 | A2 → A4 | 동일 held-out marker px, cross-target/path | 실측 covariance 없을 때 최종 결론 |
-| hard fixed와 soft factor 중 무엇이 나은가 | A3 ↔ A4 | px, common path, 이후 external GT | 내부 지표만으로 물리 정확도 단정 |
-| board residual의 최적화 기여는 무엇인가 | B2 → A4 | held-out cube px, `e_cross`, pixel transfer, `e_e2e` | marker 시스템 end-to-end 성능 주장 |
-| cube residual의 최적화 기여는 무엇인가 | B3 → A2 | held-out board px와 cross-target/path | B3 row-local N/A를 0으로 간주 |
-| 실제 marker 시스템으로 무엇이 좋은가 | marker-system의 3개 조건 | common target px와 common path | Table 1 B2/B3로 대체 |
+| soft FK 조건에서도 통합 효과가 있는가 | B1 → A4 | Held-out Same-marker (홀드아웃 동일 마커) px, Fixed-to-Fixed와 Gripper-to-Fixed | 서로 다른 FK Weight (FK 가중치) 사용 |
+| hard FK 고정의 효과는 무엇인가 | A2 → A3 | 동일 Held-out Marker (홀드아웃 마커) px, Fixed-to-Fixed와 Gripper-to-Fixed | FK가 GT라고 단정 |
+| soft FK factor의 효과는 무엇인가 | A2 → A4 | 동일 Held-out Marker px, Fixed-to-Fixed와 Gripper-to-Fixed | 실측 Covariance (공분산) 없을 때 최종 결론 |
+| hard fixed와 soft factor 중 무엇이 나은가 | A3 ↔ A4 | 두 camera scope, 이후 external GT | 한 scope만으로 순위 결정 |
+| Board Residual (보드 잔차)의 최적화 기여는 무엇인가 | B2 → A4 | Held-out Cube (홀드아웃 큐브) px, Fixed-to-Fixed와 Gripper-to-Fixed | Marker System End-to-End (마커 시스템 전체 성능) 주장 |
+| Cube Residual (큐브 잔차)의 최적화 기여는 무엇인가 | B3 → A2 | Held-out Board (홀드아웃 보드) px, Fixed-to-Fixed와 Gripper-to-Fixed | B3 Row-local N/A (행 내부 미적용)를 0으로 간주 |
+| 실제 Marker System (마커 시스템)으로 무엇이 좋은가 | marker-system의 3개 조건 | Board/Cube Fixed-to-Fixed와 Gripper-to-Fixed | Shared Target Pose Reprojection (공유 표적 자세 재투영)으로 순위 결정 |
 
-핵심 원칙은 **같은 관측 population을 가진 지표만 직접 비교하는 것**이다. 조건마다 marker가 다르면 해당 marker의 공통 component 또는 `cross-target` 결과를 사용한다.
+핵심 원칙은 **같은 Observation Population (관측 모집단)을 쓰는 것만으로 충분하지 않고, Evaluation Scope (평가 범위)와 Dependency (의존성)를 분리해야 한다**는 것이다. Fixed-to-Fixed는 FK-free Fixed-camera Subsystem Metric (FK 없는 고정카메라 부분 지표), Gripper-to-Fixed는 FK-dependent Full-chain Metric (FK 의존 전체 체인 지표)로 함께 보고한다. Shared-target Reprojection (공유 표적 재투영)은 보조값으로만 본다.
 
 ## 13. 현재 session02 결과와 비교별 해석
 
-상세 수치, 공정 비교 변화량, marker-system 결과 및 해석은 [session02_result_table1.md](session02_result_table1.md)에 분리했다. 이 문서의 표는 세 canonical CSV와 자동 대조되며 Interactive HTML과 동일한 데이터만 사용한다.
+상세 수치, 비교 변화량, Marker-system (마커 시스템) 결과 및 해석은 [session02_result_table1.md](session02_result_table1.md)에 분리한다. 결과 문서는 새 v6의 Fixed-to-Fixed (고정카메라 간) 및 Gripper-to-Fixed (그리퍼카메라–고정카메라 간) Board/Cube (보드/큐브) 평가로만 다시 생성한다.
 
 핵심 요약은 다음과 같다.
 
-- 통합 최적화는 translation 계열을 일관되게 개선하지만 회전은 소폭 악화하고 held-out primary px 개선폭은 매우 작다.
-- A3는 full board+cube 조건의 자체 held-out pixel 및 inter-camera 지표에서 가장 좋지만 common px와 `e_e2e` 회전은 혼합되므로 물리 정확도의 최종 우승자로 확정할 수 없다.
-- Soft-FK 조건은 아직 Simulation prior 기반 preflight이며 실측 covariance 재실행이 필요하다.
-- Board와 cube는 서로 다른 지표를 개선하므로 marker-system의 절대 우승 조건도 아직 없다.
+- A2는 Board Pixel Transfer (보드 픽셀 전달)에서 두 Camera Scope (카메라 범위) 모두 가장 낮고, A3는 Cube Pixel Transfer (큐브 픽셀 전달)에서 두 범위 모두 가장 낮다. 단일 방법이 두 표적에서 모두 최소는 아니다.
+- A3는 Cube (큐브) 지표를 낮추지만 Board (보드) 지표를 높인다. 따라서 “전체 최우수”가 아니라 Target-dependent Trade-off (표적별 상충 관계)로 해석한다.
+- A4는 A2와 비교할 때 Board는 소폭 높고 Cube는 소폭 낮다. 또한 Simulation Prior (시뮬레이션 사전값) 기반 Preflight (예비실험)이므로 실측 Covariance (공분산) 재실행이 필요하다.
+- Marker-system End-to-End (마커 시스템 전체 경로)에서도 Board-only, Cube-only, Board+Cube가 평가 범위와 표적에 따라 엇갈린다. External GT (외부 정답) 전에는 절대 우승 조건을 정하지 않는다.
 
 ## 14. 출력 파일과 시각화 데이터 흐름
 
@@ -541,13 +597,13 @@ CP_result/sessionNN/late_table1/
 └── TABLE1_RESULTS.md
 ```
 
-- `shared_train_only_baseline.json`: split, solver, 관측 loader, 공통/행별 initial state, meta/intrinsics/구현 파일 및 train/heldout 관측 population SHA-256
+- `shared_train_only_baseline.json`: Split (분할), Solver (최적화기), Observation Loader (관측 로더), Shared/Row-specific Initial State (동일/행별 초기 상태), Meta/Intrinsics/Implementation (메타/내부 파라미터/구현 파일) 및 Train/Held-out Observation Population SHA-256
 - `shared_board_free_fk_cube.json`: board/held-out 미사용 FK–cube alignment provenance
 - `table1_methods.json`: 각 행·seed의 transforms, train/test px, path metrics, solver/Jacobian diagnostics
 - `table1_results.csv`: 논문/HTML용 요약 숫자의 canonical table
 - `TABLE1_RESULTS.md`: 교수님 피드백, 결과표, 지표 해석 문서
 
-기본 실행은 3개 초기값을 사용한다. seed 0은 공통 baseline 그대로이고, 나머지 seed는 각 자유 transform에 결정론적인 5 mm/1° perturbation을 준다. `table1_methods.json`에는 각 run의 원값을 보존하고, CSV/표에는 수렴 수와 metric 평균을 요약한다. 따라서 한 번의 우연한 초기값에서 얻은 숫자만 보고하지 않는다.
+기본 실행은 3개 Initial States (초기값)를 사용한다. Seed 0 (시드 0)은 Shared Baseline (동일 초기값) 그대로이고, 나머지 seed는 각 자유 transform에 결정론적인 5 mm/1° Perturbation (교란)을 준다. `table1_methods.json`에는 각 run의 원값을 보존하고, CSV/표에는 Converged Runs (수렴 실행 수)와 Metric Mean (지표 평균)을 요약한다. 따라서 한 번의 우연한 초기값에서 얻은 숫자만 보고하지 않는다.
 
 ### 14.2 보조 평가 출력
 
@@ -556,9 +612,16 @@ CP_result/sessionNN/
 ├── cross_target_evaluation/
 │   ├── cross_target_evaluation.json
 │   └── cross_target_evaluation.csv
-└── marker_system_end_to_end/
-    ├── marker_system_end_to_end.json
-    └── marker_system_end_to_end.csv
+├── marker_system_end_to_end/
+│   ├── marker_system_end_to_end.json
+│   └── marker_system_end_to_end.csv
+├── opencv_relative_baseline/
+│   ├── opencv_relative_baseline.json
+│   ├── opencv_relative_baseline.csv
+│   └── OPENCV_RELATIVE_BASELINE.md
+└── outlier_ablation/
+    ├── OUTLIER_LOSS_ABLATION.md
+    └── outlier_loss_ablation.csv
 ```
 
 ### 14.3 시각화 동기화
@@ -574,7 +637,7 @@ table1_results.csv + 2 evaluation CSV + HTML + MD
         └─> tools/verify_table1_visual_sync.py
 ```
 
-Markdown 결과표는 읽기 좋은 설명과 함께 유지하지만, 표시 숫자는 verifier가 세 canonical CSV 및 HTML의 숫자와 대조한다. `e_cross`는 `tools/verify_e_cross_definition.py`가 FK/GT 없는 별도 코드 경로로 다시 계산한다.
+Markdown/HTML은 새 JSON/CSV만 입력으로 사용해 다시 생성한다. 이전 계산식에서 만든 Derived Results (파생 결과)는 유지하지 않는다. Fixed-to-Fixed (고정카메라 간)와 Gripper-to-Fixed (그리퍼카메라–고정카메라 간) 계산은 `tools/verify_camera_scope_evaluation.py`의 Synthetic Contract Test (합성 계약 검증)로 확인한다.
 
 ## 15. 코드 구조
 
@@ -587,22 +650,25 @@ Markdown 결과표는 읽기 좋은 설명과 함께 유지하지만, 표시 숫
 | `calibration_pipeline/observations.py` | board/cube raw pixel observation 구성 |
 | `calibration_pipeline/se3.py` | PnP pose의 robust 평균과 meta/FK 로딩 |
 | `calibration_pipeline/fk_alignment.py` | board-free train-only FK–cube alignment |
-| `calibration_pipeline/reprojection.py` | 공통 raw-corner pixel solver |
+| `calibration_pipeline/reprojection.py` | 모든 조건에서 동일하게 쓰는 Raw-corner Pixel Solver (원시 코너 픽셀 최적화기) |
 | `calibration_pipeline/fk_factor.py` | covariance-whitened corrected-FK factor |
-| `calibration_pipeline/evaluation.py` | frozen pixel reprojection과 공통 target 평가 |
-| `calibration_pipeline/path_evaluation.py` | `e_cross`, pixel transfer, `e_e2e` |
-| `calibration_pipeline/cross_target.py` | 모든 Table 1 transform의 동일 population 재평가 |
+| `calibration_pipeline/evaluation.py` | Camera-scope/Reference-dependent Internal Evaluation (카메라 범위/기준 의존 내부 평가)의 명시적 분리 |
+| `calibration_pipeline/path_evaluation.py` | Fixed-to-Fixed, Gripper-to-Fixed Board/Cube Cross-view (보드/큐브 교차 시점)와 Legacy Path (기존 경로) |
+| `calibration_pipeline/cross_target.py` | 모든 Table 1 transform의 두 camera scope 재평가 |
 | `calibration_pipeline/marker_system.py` | modality별 초기화부터 수행하는 end-to-end 비교 |
+| `calibration_pipeline/opencv_relative_baseline.py` | OpenCV PnP 기반 FK-free fixed-camera reference baseline |
 | `calibration_pipeline/blind_prediction.py` | GT-blind pose prediction |
 | `calibration_pipeline/external_gt.py` | 독립 GT 통계 평가 |
 | `tools/sync_table1_canonical_data.py` | JSON/CSV에서 결과 CSV와 HTML 동기화 |
 | `tools/verify_table1_visual_sync.py` | CSV·MD·HTML 숫자 및 계약 검증 |
 | `tools/verify_e_cross_definition.py` | 표준 fixed-camera consistency 독립 재계산 |
+| `tools/verify_camera_scope_evaluation.py` | 두 Camera Scope (카메라 범위) 계약, Hand–Eye 민감도와 Planar PnP (평면 PnP) 검증 |
+| `tools/summarize_outlier_ablation.py` | 동일 관측에서 soft-L1과 linear loss 결과 비교 |
 
 ## 16. 전체 실행 명령
 
 ```bash
-# 선택: 공통 baseline만 먼저 생성
+# 선택: Shared Baseline (동일 초기값)만 먼저 생성
 python3 Step3_calibration.py \
   --root_folder data/sessionNN/calib_train \
   --intrinsics_dir intrinsics \
@@ -619,7 +685,7 @@ python3 Run_calibration_comparison.py table1 \
   --num_inits 3 \
   --out_dir CP_result/sessionNN/late_table1
 
-# 저장된 모든 Table 1 방법의 공통 target 평가
+# 저장된 모든 Table 1 방법의 외부-GT 전 board/cube 내부 평가
 python3 Run_calibration_comparison.py cross-target \
   --root_folder data/sessionNN/calib_train \
   --intrinsics_dir intrinsics \
@@ -636,13 +702,39 @@ python3 Run_calibration_comparison.py marker-system \
   --split_seed 20260731 \
   --out_dir CP_result/sessionNN/marker_system_end_to_end
 
-# canonical CSV와 interactive HTML 갱신
-# 현재 sync script의 source 경로는 canonical session02로 고정되어 있음
-python3 tools/sync_table1_canonical_data.py
+# 공개 OpenCV PnP 경로를 이용한 FK-free 고정카메라 reference baseline
+python3 Run_calibration_comparison.py opencv-relative \
+  --root_folder data/sessionNN/calib_train \
+  --intrinsics_dir intrinsics \
+  --include_sets 5-12 \
+  --split_seed 20260731 \
+  --out_dir CP_result/sessionNN/opencv_relative_baseline
 
-# 결과 무결성 검증
+# Outlier soft-weighting 대조: 같은 관측을 linear loss로 재실행
+python3 Run_calibration_comparison.py table1 \
+  --root_folder data/sessionNN/calib_train \
+  --intrinsics_dir intrinsics \
+  --include_sets 5-12 \
+  --split_seed 20260731 \
+  --num_inits 3 \
+  --loss linear \
+  --out_dir CP_result/sessionNN/outlier_ablation/linear_table1
+python3 Run_calibration_comparison.py cross-target \
+  --root_folder data/sessionNN/calib_train \
+  --intrinsics_dir intrinsics \
+  --include_sets 5-12 \
+  --split_seed 20260731 \
+  --loss linear \
+  --table1_result CP_result/sessionNN/outlier_ablation/linear_table1/table1_methods.json \
+  --out_dir CP_result/sessionNN/outlier_ablation/linear_cross_target
+python3 tools/summarize_outlier_ablation.py
+
+# 새 JSON/CSV로 Markdown/HTML 재생성 및 동기화 검증
+python3 tools/sync_table1_canonical_data.py
 python3 tools/verify_table1_visual_sync.py
+# 계산 계약 검증
 python3 tools/verify_e_cross_definition.py
+python3 tools/verify_camera_scope_evaluation.py
 ```
 
 현재 session02 결과는 다음에서 확인한다.
@@ -650,6 +742,8 @@ python3 tools/verify_e_cross_definition.py
 - [Session02 Table 1 결과와 비교별 해석](session02_result_table1.md)
 - [Table 1 결과 및 교수님 피드백 반영](CP_result/session02/late_table1/TABLE1_RESULTS.md)
 - [Interactive 결과](./_TABLE1_INTERACTIVE.html)
+- [OpenCV FK-free reference baseline](CP_result/session02/opencv_relative_baseline/OPENCV_RELATIVE_BASELINE.md)
+- [Soft-L1 vs linear outlier loss 대조](CP_result/session02/outlier_ablation/OUTLIER_LOSS_ABLATION.md)
 - [순차/통합 및 FK factor 수식 상세](CALIBRATION_EXPLANATION_LATEX.md)
 - [캘리브레이션 방법과 SOTA 설명](CALIBRATION_EXPLANATION_LATEX.md)
 - [Simulation 추후 수정 목록](Simulation/Simulation_TO_EDIT.md)
@@ -658,7 +752,26 @@ python3 tools/verify_e_cross_definition.py
 
 1. A3의 FK-fixed가 좋은 것은 aligned FK cube pose를 hard constraint로 사용한 영향일 수 있다. 눈금 cube jig의 반복 파지 실측 없이 FK를 정답으로 주장할 수 없다.
 2. A4/B1/B2는 실측 covariance 파일이 없으면 Simulation prior를 사용한 preflight다. 최종 corrected-FK 주장에는 preregistered physical covariance가 필요하다.
-3. `e_cross`, pixel transfer, `e_e2e`는 중요한 내부 일관성 지표지만 external absolute accuracy가 아니다.
+3. Fixed-to-Fixed (고정카메라 간)와 Gripper-to-Fixed (그리퍼카메라–고정카메라 간) Board/Cube Cross-view (보드/큐브 교차 시점)는 외부 GT 전 내부 지표일 뿐 External Absolute Accuracy (외부 절대 정확도)가 아니다.
 4. event holdout pixel 평가는 관측 일반화 검증이며 새로운 작업 위치 전체에 대한 물리 정확도를 직접 보장하지 않는다.
 5. B2/B3 shared-baseline ablation과 marker-system end-to-end 비교는 연구 질문이 다르므로 같은 주장으로 섞지 않는다.
 6. A5는 correction label과 적용 규칙이 확정되기 전까지 실행하지 않는다.
+7. Shared train-only target pose reprojection은 reference-dependent 보조 진단값이며, 외부 GT 전 공정한 방법 순위에 사용하지 않는다.
+8. Session02에서 board 기반 상대 자세와 cube 기반 상대 자세가 camera 1에서 21.9 mm, camera 3에서 19.5 mm 다르다. FK 실험보다 먼저 cube geometry, corner ordering, target별 PnP 편향을 확인해야 한다.
+
+직접 수행해야 하는 다음 실험은 다음과 같다.
+
+1. 모든 고정카메라와 그리퍼카메라가 같은 새 위치의 board/cube를 동시에 저장하는 blind capture를 추가한다.
+2. 눈금 jig에서 동일 자세 왕복 반복으로 robot repeatability를 먼저 측정한 뒤, 독립 측정한 target pose로 FK absolute error를 계산한다.
+3. 별도 세션에서 peg-in-hole 또는 grasp success/접촉 위치 오차를 측정한다. 이때 인식 알고리즘과 target은 모든 방법에 고정한다.
+4. MATLAB/기존 multiview toolbox는 동일 원본과 동일 held-out split으로 별도 실행해 OpenCV reference보다 강한 외부 baseline을 추가한다.
+
+## 18. Terminology (용어 설명)
+
+- **Fixed-to-Fixed (고정카메라 간)**: 두 고정카메라가 같은 표적을 관측했을 때의 상대 일관성 평가. Robot FK (로봇 순기구학)를 사용하지 않는다.
+- **Gripper-to-Fixed (그리퍼카메라–고정카메라 간)**: 움직이는 그리퍼카메라와 고정카메라의 동일 표적 관측을 비교하는 전체 체인 평가. 영상 코너를 사용하지만 Robot FK와 Hand–Eye가 예측 경로에 포함된다.
+- **Reference-dependent Reprojection (기준 의존 재투영)**: 학습 데이터로 만든 표적 자세를 기준으로 사용하는 보조 진단. External GT (외부 정답)가 아니므로 방법 순위의 근거로 쓰지 않는다.
+- **PnP (3D–2D 자세 추정)**: 알려진 3D 표적점과 검출된 2D 영상점을 이용해 카메라–표적 자세를 계산하는 방법.
+- **FK, Forward Kinematics (순기구학)**: 로봇 관절 상태로부터 Base-to-Gripper Transform (베이스–그리퍼 변환)을 계산하는 과정.
+- **Hand–Eye Transform (핸드–아이 변환)**: Gripper-to-Camera Transform (그리퍼–카메라 변환) $T^G_C$.
+- **RMSE, Root Mean Squared Error (평균제곱근오차)**: 잔차 제곱 평균의 제곱근. px, mm, deg는 서로 다른 물리량이므로 합쳐 순위를 만들지 않는다.

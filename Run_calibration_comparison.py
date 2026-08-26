@@ -20,12 +20,21 @@ def _load_commands() -> dict[str, tuple[str, Callable[[list[str]], None]]]:
     from calibration_pipeline.cross_target import main as cross_target
     from calibration_pipeline.external_gt import main as external_gt
     from calibration_pipeline.marker_system import main as marker_system
+    from calibration_pipeline.opencv_relative_baseline import (
+        main as opencv_relative)
     from calibration_pipeline.table1 import main as table1
 
     return {
-        "table1": ("A0~A5/B1~B3 공통-baseline 비교", table1),
+        "table1": (
+            "A0~A5/B1~B3 Shared Baseline (동일 초기값) 비교", table1),
         "marker-system": ("board/cube/both modality별 end-to-end 비교", marker_system),
-        "cross-target": ("공통 held-out 관측의 카메라 간 평가", cross_target),
+        "cross-target": (
+            "Pre-GT Fixed-to-Fixed (고정카메라 간) 및 Gripper-to-Fixed "
+            "(그리퍼카메라–고정카메라 간) Board/Cube 평가",
+            cross_target),
+        "opencv-relative": (
+            "OpenCV PnP 기반 FK-free 고정카메라 reference baseline",
+            opencv_relative),
         "blind-predict": ("외부 GT를 읽지 않는 blind 예측 생성", blind_prediction),
         "external-gt": ("잠금 해제된 외부 GT로 blind 예측 채점", external_gt),
     }

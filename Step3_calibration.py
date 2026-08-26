@@ -9,11 +9,11 @@ baseline-only mode, so Step3 and A0-A5/B1-B3 cannot drift.
 Outputs in ``--out_dir``:
 
 * ``shared_train_only_baseline.json`` — split, K/D contract, solver options,
-  common reference state, and every row-specialized initial state;
+  shared reference state, and every row-specialized initial state;
 * ``shared_board_free_fk_cube.json`` — train-only aligned FK cube artifact.
 
 No final calibration transform is fitted here. The comparison runner consumes
-the authenticated baseline and performs every executable row through the common
+the authenticated baseline and performs every executable row through the shared
 raw-corner pixel-reprojection backend.
 """
 

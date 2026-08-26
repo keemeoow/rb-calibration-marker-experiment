@@ -3,7 +3,7 @@
 
 This runner answers a different question from the shared-initialization Table 1:
 
-* Table 1 marker rows remove residuals/variables after one common initializer
+* Table 1 marker rows remove residuals/variables after one shared initializer
   and therefore measure optimization-level marker contribution.
 * This runner initializes and optimizes each system using only its declared
   marker modality: board-only, cube-only, or board+cube.
@@ -12,7 +12,10 @@ All systems still share the event split, raw detections, K/D, solver options,
 random seeds, held-out observations, and evaluation masks.  The cube-only
 initializer is board-free but uses the preregistered train-only robot-FK cube
 artifact to initialize hand-eye; its final visual objective has no FK factor.
-The reported common-target metrics are internal comparisons, not external GT.
+Pre-GT reporting has two complementary scopes: fixed-to-fixed cross-view isolates
+fixed-camera calibration without FK, while gripper-to-fixed cross-view evaluates
+the full hand-eye+FK+fixed-camera chain.  Both use board/cube image corners and
+no shared target pose.  Shared-pose reprojection remains diagnostic only.
 """
 
 from __future__ import annotations
@@ -27,10 +30,17 @@ import numpy as np
 
 from calibration_pipeline import table1
 from calibration_pipeline.schema import DEFAULT_SPLIT_SEED, MARKER_COMPARISON_CONTRACT
+from calibration_pipeline.path_evaluation import (
+    GRIPPER_TO_FIXED_CROSS_TARGET_CONTRACT,
+    FIXED_TO_FIXED_CROSS_TARGET_CONTRACT,
+    build_gripper_to_fixed_cross_target_mask,
+    build_fixed_to_fixed_cross_target_mask,
+)
 from calibration_pipeline.reprojection import PoseState
 from calibration_pipeline.evaluation import (
-    common_target_observation_groups,
-    evaluate_common_target_run,
+    REFERENCE_DEPENDENT_REPROJECTION_CONTRACT,
+    evaluate_internal_run,
+    fixed_camera_board_cube_groups,
     jsonable,
     pixel_reprojection_metrics,
     serialize_state,
@@ -170,8 +180,12 @@ def build_modality_reference_states(data) -> tuple[dict[str, PoseState], dict]:
     return states, diagnostics
 
 
-def run_system_once(system: str, initial: PoseState, data, common_cameras: set[int],
-                    common_observations: Mapping, seed: int, args) -> dict:
+def run_system_once(system: str, initial: PoseState, data,
+                    evaluation_cameras: set[int],
+                    evaluation_observations: Mapping,
+                    fixed_to_fixed_cross_target_mask: Mapping,
+                    gripper_to_fixed_cross_target_mask: Mapping,
+                    seed: int, args) -> dict:
     markers = SYSTEM_MARKERS[system]
     train = _marker_observations(
         data.train_obs, markers, data.gripper, initial.cams)
@@ -189,10 +203,11 @@ def run_system_once(system: str, initial: PoseState, data, common_cameras: set[i
         args,
     )
     serialized = serialize_state(state)
-    common = evaluate_common_target_run(
-        serialized, common_cameras, common_observations,
+    internal_evaluation = evaluate_internal_run(
+        serialized, evaluation_cameras, evaluation_observations,
         data.board_initial, data.fixed_cubes, data.test_obs, data.robot_T,
-        data.K_map, data.D_map, data.gripper, data.path_evaluation_mask)
+        data.K_map, data.D_map, data.gripper, data.path_evaluation_mask,
+        fixed_to_fixed_cross_target_mask, gripper_to_fixed_cross_target_mask)
     return {
         "system": system,
         "seed": int(seed),
@@ -203,7 +218,7 @@ def run_system_once(system: str, initial: PoseState, data, common_cameras: set[i
             train, state, data.robot_T, data.K_map, data.D_map, data.gripper),
         "heldout_own_reprojection": pixel_reprojection_metrics(
             test, state, data.robot_T, data.K_map, data.D_map, data.gripper),
-        "heldout_common_target": common,
+        "heldout_internal_evaluation": internal_evaluation,
         "transforms": serialized,
     }
 
@@ -238,45 +253,85 @@ def summarize(system: str, runs: list[dict], init_diag: dict) -> dict:
     metric_paths = {
         "own_heldout_overall_rmse_px": (
             "heldout_own_reprojection", "overall", "rmse_px"),
-        "common_target_overall_rmse_px": (
-            "heldout_common_target", "overall", "rmse_px"),
-        "common_target_board_rmse_px": (
-            "heldout_common_target", "board", "rmse_px"),
-        "common_target_cube_rmse_px": (
-            "heldout_common_target", "cube", "rmse_px"),
-        "e_cross_translation_rmse_mm": (
-            "heldout_common_target", "common_path", "e_cross_translation_rmse_mm"),
-        "e_cross_rotation_rmse_deg": (
-            "heldout_common_target", "common_path", "e_cross_rotation_rmse_deg"),
-        "e_e2e_translation_rmse_mm": (
-            "heldout_common_target", "common_path", "e_e2e_translation_rmse_mm"),
-        "e_e2e_rotation_rmse_deg": (
-            "heldout_common_target", "common_path", "e_e2e_rotation_rmse_deg"),
-        "cross_view_pixel_transfer_rmse_px": (
-            "heldout_common_target", "common_path",
-            "cross_view_pixel_transfer_rmse_px"),
+        "reference_dependent_overall_reprojection_rmse_px": (
+            "heldout_internal_evaluation", "reference_dependent_reprojection",
+            "overall", "rmse_px"),
+        "reference_dependent_board_reprojection_rmse_px": (
+            "heldout_internal_evaluation", "reference_dependent_reprojection",
+            "board", "rmse_px"),
+        "reference_dependent_cube_reprojection_rmse_px": (
+            "heldout_internal_evaluation", "reference_dependent_reprojection",
+            "cube", "rmse_px"),
+        "fk_dependent_e2e_translation_rmse_mm": (
+            "heldout_internal_evaluation", "legacy_fk_dependent_cube_path",
+            "e_e2e_translation_rmse_mm"),
+        "fk_dependent_e2e_rotation_rmse_deg": (
+            "heldout_internal_evaluation", "legacy_fk_dependent_cube_path",
+            "e_e2e_rotation_rmse_deg"),
     }
+    for target in ("board", "cube"):
+        for field in (
+                "cross_view_pixel_transfer_rmse_px",
+                "pose_consistency_translation_rmse_mm",
+                "pose_consistency_rotation_rmse_deg"):
+            metric_paths[f"fixed_to_fixed_{target}_{field}"] = (
+                "heldout_internal_evaluation", "fixed_to_fixed",
+                "by_target", target, field)
+            metric_paths[f"gripper_to_fixed_{target}_{field}"] = (
+                "heldout_internal_evaluation", "gripper_to_fixed",
+                "by_target", target, field)
     for label, path in metric_paths.items():
         mean, std = _mean_std([_nested(run, *path) for run in runs])
         row[f"{label}_mean"] = mean
         row[f"{label}_std"] = std
-    common = runs[0]["heldout_common_target"]
-    row["n_common_observations"] = int(common["overall"]["n_observations"])
-    row["n_common_corners"] = int(common["overall"]["n_corners"])
-    row["n_cross_pairs"] = int(common["common_path"]["n_cross_pairs"])
-    row["n_cross_view_directions"] = int(
-        common["common_path"]["n_cross_view_directions"])
-    row["n_e2e_units"] = int(common["common_path"]["n_e2e_units"])
+    evaluation = runs[0]["heldout_internal_evaluation"]
+    reference_dependent = evaluation["reference_dependent_reprojection"]["overall"]
+    row["n_reference_dependent_observations"] = int(
+        reference_dependent["n_observations"])
+    row["n_reference_dependent_corners"] = int(reference_dependent["n_corners"])
+    for target in ("board", "cube"):
+        target_result = evaluation["fixed_to_fixed"][
+            "by_target"][target]
+        row[f"n_fixed_to_fixed_{target}_pairs"] = int(target_result["n_pairs"])
+        row[f"n_fixed_to_fixed_{target}_directions"] = int(
+            target_result["n_directions"])
+        gripper_target = evaluation["gripper_to_fixed"][
+            "by_target"][target]
+        row[f"n_gripper_to_fixed_{target}_pairs"] = int(gripper_target["n_pairs"])
+        row[f"n_gripper_to_fixed_{target}_directions"] = int(
+            gripper_target["n_directions"])
+    row["n_fk_dependent_e2e_units"] = int(
+        evaluation["legacy_fk_dependent_cube_path"]["n_e2e_units"])
     return row
 
 
 def validate_end_to_end_contract(result: Mapping) -> None:
     """Fail closed if a modality leaks into another system or masks drift."""
-    if result.get("artifact_schema") != "marker_system_end_to_end_v1":
+    if result.get("artifact_schema") != "marker_system_end_to_end_v4":
         raise ValueError("unexpected end-to-end marker-system schema")
     protocol = result.get("protocol", {})
     if protocol.get("same_split_raw_detections_K_D_solver_seeds_and_evaluation") is not True:
         raise ValueError("end-to-end marker systems do not share an evaluation contract")
+    fixed_evaluation = protocol.get("fixed_camera_subsystem_evaluation", {})
+    if fixed_evaluation.get("definition") != FIXED_TO_FIXED_CROSS_TARGET_CONTRACT:
+        raise ValueError(
+            "marker systems lack the fixed-to-fixed board/cube contract")
+    evaluation_mask_sha256 = fixed_evaluation.get("evaluation_mask_sha256")
+    if not evaluation_mask_sha256:
+        raise ValueError("fixed-to-fixed board/cube mask hash is missing")
+    gripper_evaluation = protocol.get(
+        "gripper_to_fixed_full_chain_evaluation", {})
+    gripper_mask_sha256 = gripper_evaluation.get("evaluation_mask_sha256")
+    if (not gripper_mask_sha256
+            or gripper_evaluation.get("definition")
+            != GRIPPER_TO_FIXED_CROSS_TARGET_CONTRACT):
+        raise ValueError("marker systems lack the gripper-to-fixed contract")
+    reference_dependent = protocol.get(
+        "secondary_reference_dependent_reprojection", {})
+    if (reference_dependent.get("definition")
+            != REFERENCE_DEPENDENT_REPROJECTION_CONTRACT
+            or reference_dependent.get("may_rank_marker_systems") is not False):
+        raise ValueError("shared target-pose reprojection was not kept diagnostic")
     initialization = result.get("initialization", {})
     expected_information = {
         "board_only": (True, False),
@@ -294,6 +349,23 @@ def validate_end_to_end_contract(result: Mapping) -> None:
         for run in result.get("runs", {}).get(system, []):
             if set(run.get("objective_markers", ())) != set(SYSTEM_MARKERS[system]):
                 raise ValueError(f"{system}: objective marker contract drift")
+            internal = run.get("heldout_internal_evaluation", {})
+            fixed_to_fixed = internal.get("fixed_to_fixed", {})
+            if (fixed_to_fixed.get("evaluation_mask_sha256")
+                    != evaluation_mask_sha256):
+                raise ValueError(f"{system}: fixed-to-fixed mask drift")
+            if set(fixed_to_fixed.get("by_target", {})) != {"board", "cube"}:
+                raise ValueError(f"{system}: board/cube evaluation support drift")
+            gripper_to_fixed = internal.get("gripper_to_fixed", {})
+            if (gripper_to_fixed.get("evaluation_mask_sha256")
+                    != gripper_mask_sha256):
+                raise ValueError(f"{system}: gripper-to-fixed mask drift")
+            if set(gripper_to_fixed.get("by_target", {})) != {"board", "cube"}:
+                raise ValueError(
+                    f"{system}: gripper-to-fixed target support drift")
+            shared = internal.get("reference_dependent_reprojection", {})
+            if shared.get("metric_contract") != REFERENCE_DEPENDENT_REPROJECTION_CONTRACT:
+                raise ValueError(f"{system}: shared-reference diagnostic contract drift")
     if None in state_hashes or len(state_hashes) != len(SYSTEM_ORDER):
         raise ValueError("marker systems did not receive distinct modality initializers")
 
@@ -340,24 +412,40 @@ def main(argv=None) -> None:
     args = parse_args(argv)
     data = table1.prepare_ablation_data(args)
     states, init_diagnostics = build_modality_reference_states(data)
-    common_cameras = set.intersection(
+    evaluation_cameras = set.intersection(
         *({int(camera) for camera in state.cams} for state in states.values()))
-    common_cameras.discard(data.gripper)
-    if not common_cameras:
+    evaluation_cameras.discard(data.gripper)
+    if not evaluation_cameras:
         raise RuntimeError("no fixed camera is initialized by all marker systems")
-    common_observations = common_target_observation_groups(
-        data.test_obs, common_cameras)
+    evaluation_observations = fixed_camera_board_cube_groups(
+        data.test_obs, evaluation_cameras)
+    fixed_to_fixed_cross_target_mask = build_fixed_to_fixed_cross_target_mask(
+        data.test_obs,
+        evaluation_cameras,
+        data.K_map,
+        data.D_map,
+        set_filter=data.split["eligible_sets"],
+    )
+    gripper_to_fixed_cross_target_mask = build_gripper_to_fixed_cross_target_mask(
+        data.test_obs,
+        evaluation_cameras,
+        data.gripper,
+        data.K_map,
+        data.D_map,
+        set_filter=data.split["eligible_sets"],
+    )
 
     runs = {system: [] for system in SYSTEM_ORDER}
     for seed in range(int(args.num_inits)):
         for system in SYSTEM_ORDER:
             print(f"[MARKER-E2E] {system} seed={seed}")
             runs[system].append(run_system_once(
-                system, states[system], data, common_cameras,
-                common_observations, seed, args))
+                system, states[system], data, evaluation_cameras,
+                evaluation_observations, fixed_to_fixed_cross_target_mask,
+                gripper_to_fixed_cross_target_mask, seed, args))
 
     result = {
-        "artifact_schema": "marker_system_end_to_end_v1",
+        "artifact_schema": "marker_system_end_to_end_v4",
         "experiment": "modality_specific_initialization_and_unified_optimization",
         "protocol": {
             "dataset": args.root_folder,
@@ -369,16 +457,43 @@ def main(argv=None) -> None:
             "initialization_policy": "marker_modality_specific_train_only",
             "optimization_policy": "same_marker_modality_unified_visual_objective",
             "solver_options": table1.canonical_solver_options(args).to_dict(),
-            "common_fixed_cameras": sorted(common_cameras),
-            "common_target_support": {
+            "evaluation_fixed_camera_intersection": sorted(evaluation_cameras),
+            "camera_intersection_reason": (
+                "all marker systems must use identical fixed-camera pairs"),
+            "heldout_board_cube_support": {
                 group: {
                     "n_observations": len(observations),
                     "n_corners": sum(len(obs.image_points) for obs in observations),
                 }
-                for group, observations in common_observations.items()
+                for group, observations in evaluation_observations.items()
             },
-            "path_evaluation_mask_sha256": data.path_evaluation_mask[
-                "evaluation_mask_sha256"],
+            "fixed_camera_subsystem_evaluation": {
+                "role": "FK_free_fixed_camera_relative_comparison",
+                "definition": FIXED_TO_FIXED_CROSS_TARGET_CONTRACT,
+                "evaluation_mask_sha256": fixed_to_fixed_cross_target_mask[
+                    "evaluation_mask_sha256"],
+                "support_by_target": fixed_to_fixed_cross_target_mask[
+                    "support_by_target"],
+            },
+            "gripper_to_fixed_full_chain_evaluation": {
+                "role": "visual_observation_FK_dependent_full_chain_comparison",
+                "definition": GRIPPER_TO_FIXED_CROSS_TARGET_CONTRACT,
+                "evaluation_mask_sha256": gripper_to_fixed_cross_target_mask[
+                    "evaluation_mask_sha256"],
+                "support_by_target": gripper_to_fixed_cross_target_mask[
+                    "support_by_target"],
+                "uses_robot_fk_in_evaluation": True,
+                "uses_shared_target_pose": False,
+            },
+            "secondary_reference_dependent_reprojection": {
+                "definition": REFERENCE_DEPENDENT_REPROJECTION_CONTRACT,
+                "may_rank_marker_systems": False,
+            },
+            "secondary_fk_dependent_path": {
+                "evaluation_mask_sha256": data.path_evaluation_mask[
+                    "evaluation_mask_sha256"],
+                "may_be_described_as_external_GT": False,
+            },
             "external_ground_truth_used": False,
             "may_be_described_as_absolute_accuracy": False,
             "schema_contract": MARKER_COMPARISON_CONTRACT["end_to_end_system"],

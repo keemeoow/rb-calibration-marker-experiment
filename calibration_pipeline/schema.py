@@ -1,6 +1,6 @@
 """Canonical method schema and comparison contract for Table 1.
 
-Robot FK ``T_base_gripper`` is a common kinematic backbone in every condition.
+Robot FK ``T_base_gripper`` is the shared kinematic backbone in every condition.
 The pose-source fields below describe only whether a target pose is fixed from
 that FK backbone or estimated from images; they never mean "use FK at all".
 """
@@ -224,13 +224,21 @@ PRIMARY_SPLIT = "event_grouped_and_set_stratified"
 TRAIN_REPROJECTION_ROLE = "optimization_diagnostic_only"
 POSITION_HOLDOUT_ROLE = "external_GT_or_explicit_FK_proxy_only"
 TASK_POSE_PROXY_LABEL = "e_task_pose^{FK-proxy}"
+# ``PRIMARY_METRIC`` ranks only rows with the same marker population.  Across
+# board-only/cube-only/combined systems, use the target-specific camera-scope
+# metrics until independent external GT is available.
+PRE_GT_CROSS_METHOD_PRIMARY = (
+    "two_scope_target_specific_cross_view:FK_free_fixed_to_fixed_plus_"
+    "FK_dependent_gripper_to_fixed")
+SHARED_TARGET_REPROJECTION_ROLE = (
+    "secondary_reference_dependent_diagnostic_not_for_cross_method_ranking")
 
 # Table 1 is a component ablation: every row starts from the same train-only
 # reference state.  In particular, its marker-removal rows answer what happens
-# when a marker residual/variable is removed *after common initialization*.
+# when a marker residual/variable is removed *after shared initialization*.
 # They are not end-to-end board-only/cube-only system comparisons.  The latter
 # are implemented by ``Run_calibration_comparison.py marker-system`` with modality-specific
-# initializers and one common evaluation contract.
+# initializers and one identical evaluation contract.
 MARKER_COMPARISON_CONTRACT = {
     "optimization_level": {
         "runner": "Run_calibration_comparison.py table1",
@@ -245,16 +253,21 @@ MARKER_COMPARISON_CONTRACT = {
         "fixed_across_systems": (
             "train_test_split", "raw_detections", "camera_intrinsics_K",
             "distortion_D", "solver_options", "initialization_seeds",
-            "heldout_common_target_evaluation_mask",
+            "heldout_fixed_to_fixed_board_cube_mask",
+            "heldout_gripper_to_fixed_board_cube_mask",
         ),
-        "interpretation": "marker_system_performance_under_internal_evaluation",
+        "interpretation": (
+            "marker_system_relative_performance_under_target_specific_fixed_"
+            "subsystem_and_gripper_to_fixed_full_chain_evaluation"),
+        "shared_target_pose_reprojection_role": (
+            "secondary_reference_dependent_diagnostic_not_for_ranking"),
         "may_claim_external_absolute_accuracy": False,
     },
 }
 
 # Different target sets cannot be ranked on a pooled residual because they do
 # not contain the same measurements.  Each declared contrast therefore names
-# the only common component that may support that interpretation.
+# the only shared component that may support that interpretation.
 EVALUATION_COMPARISON_CONTRACT = {
     "A0_to_A1": {
         "rows": ("A0", "A1"),
@@ -374,7 +387,7 @@ def validate_main_runner_contract() -> None:
             raise ValueError(f"{name}: comparison references an unknown row")
     if EVALUATION_COMPARISON_CONTRACT["B2_to_A4"]["components"][0] != \
             "heldout_reprojection.cube":
-        raise ValueError("B2/A4 must be compared on the common cube component")
+        raise ValueError("B2/A4 must be compared on the shared cube component")
     if EVALUATION_COMPARISON_CONTRACT["B3_to_A3"]["causal_interpretation"] is not None:
         raise ValueError("B3/A3 is a whole-system reference, not a marker-only causal contrast")
     if MARKER_COMPARISON_CONTRACT["optimization_level"][

@@ -76,11 +76,11 @@ from calibration_pipeline.fk_factor import (
     validate_covariance,
 )
 from calibration_pipeline.path_evaluation import (
-    build_common_path_evaluation_mask,
-    evaluate_paths_with_common_mask,
+    build_frozen_path_evaluation_mask,
+    evaluate_paths_with_frozen_mask,
     not_applicable_path_metrics,
     solve_observed_pose,
-    validate_common_path_evaluation_mask,
+    validate_frozen_path_evaluation_mask,
 )
 from calibration_pipeline.reprojection import (
     PixelObs,
@@ -410,7 +410,7 @@ def build_shared_reference_state(
 
     The shared prefit may use both marker families, but it is never scored and
     never sees held-out events.  Every row receives byte-identical values for
-    transforms it has in common with another row.  A row then changes only its
+    transforms it shares with another row.  A row then changes only its
     declared target presence, FK pose source, and optimization freeze mask.
     """
     all_marker_condition = next(
@@ -451,7 +451,7 @@ def build_shared_reference_state(
 def make_initial_state(
         condition: AblationCondition, shared_reference_state: PoseState,
         fixed_cubes: Mapping[int, np.ndarray]) -> Tuple[PoseState, dict]:
-    """Specialize one common reference state only by the declared treatment."""
+    """Specialize one shared reference state only by the declared treatment."""
     state = shared_reference_state.clone()
     if "board" not in condition.target_set:
         state.board = None
@@ -562,7 +562,7 @@ def run_condition_once(condition: AblationCondition, initial_state: PoseState,
         # Use the full held-out cube pool and the same pre-fit mask for every
         # cube-bearing row.  The row-specific target filter must not alter the
         # path-consistency evaluation population.
-        path = evaluate_paths_with_common_mask(
+        path = evaluate_paths_with_frozen_mask(
             test_obs, final_state.cams, final_state.gtc, robot_T,
             gripper, K_map, D_map, path_evaluation_mask)
     else:
@@ -737,7 +737,7 @@ def run_factor_condition_once(condition: AblationCondition, initial_state: PoseS
     test_metrics = pixel_reprojection_metrics(
         relevant_test, final_state, data.robot_T, data.K_map, data.D_map,
         data.gripper)
-    path = evaluate_paths_with_common_mask(
+    path = evaluate_paths_with_frozen_mask(
         data.test_obs, final_state.cams, final_state.gtc, data.robot_T,
         data.gripper, data.K_map, data.D_map, data.path_evaluation_mask)
     path.pop("predicted_by_set", None)
@@ -1016,7 +1016,7 @@ def prepare_ablation_data(args) -> PreparedAblationData:
         int(obs.cam) for obs in test_obs
         if obs.marker == "cube" and int(obs.cam) != gripper
     })
-    path_evaluation_mask = build_common_path_evaluation_mask(
+    path_evaluation_mask = build_frozen_path_evaluation_mask(
         observations=test_obs,
         fixed_camera_ids=common_fixed_cameras,
         gripper_cam_idx=gripper,
@@ -1024,7 +1024,7 @@ def prepare_ablation_data(args) -> PreparedAblationData:
         D_map=D_map,
         set_filter=sorted(eligible),
     )
-    validate_common_path_evaluation_mask(path_evaluation_mask)
+    validate_frozen_path_evaluation_mask(path_evaluation_mask)
 
     # Build the canonical FK artifact before any board-derived quantity exists.
     # The estimator itself additionally rejects all non-eih-cube observations.
@@ -1220,8 +1220,8 @@ def validate_result_evaluation_contract(result: Mapping) -> None:
     protocol = result.get("protocol", {})
     mask = protocol.get("model_independent_path_evaluation_mask")
     if mask is None:
-        raise ValueError("result is missing the common path-evaluation mask")
-    validate_common_path_evaluation_mask(mask)
+        raise ValueError("result is missing the frozen path-evaluation mask")
+    validate_frozen_path_evaluation_mask(mask)
     mask_sha = mask["evaluation_mask_sha256"]
     expected_cross = len(mask["cross_pairs"])
     expected_e2e = len(mask["e2e_units"])
@@ -1243,9 +1243,11 @@ def validate_result_evaluation_contract(result: Mapping) -> None:
                 if metrics.get("applicable") is not True:
                     raise ValueError(f"{row}: cube-bearing row lacks path metrics")
                 if int(metrics.get("n_cross_pairs", -1)) != expected_cross:
-                    raise ValueError(f"{row}: e_cross population differs from common mask")
+                    raise ValueError(
+                        f"{row}: e_cross population differs from the frozen mask")
                 if int(metrics.get("n_e2e_units", -1)) != expected_e2e:
-                    raise ValueError(f"{row}: e_e2e population differs from common mask")
+                    raise ValueError(
+                        f"{row}: e_e2e population differs from the frozen mask")
                 if int(metrics.get("n_output_rejected", -1)) != 0:
                     raise ValueError(f"{row}: fitted output rejected evaluation units")
             elif metrics.get("applicable") is not False:
@@ -1298,7 +1300,8 @@ def parse_args(argv=None):
     parser.add_argument("--x_scale_mode", choices=["unit", "jac"], default="jac",
                         help="SciPy trust-region x_scale mode.")
     parser.add_argument("--loss", choices=["huber", "soft_l1", "linear"], default="soft_l1",
-                        help="Common pixel loss; canonical default is smooth robust soft_l1.")
+                        help=("Identical pixel loss for every row; canonical "
+                              "default is smooth robust soft_l1."))
     parser.add_argument("--f_scale_px", type=float, default=2.0,
                         help="Robust-loss transition in pixels; ignored by linear loss.")
     parser.add_argument(
@@ -1411,6 +1414,11 @@ def main(argv=None, force_baseline_only: bool = False) -> None:
             "split": split,
             "backend": "canonical_corner_reprojection_v1",
             "optimization_structure": OPTIMIZATION_STRUCTURE_CONTRACT,
+            "optimization_terminology": {
+                "seq": "sequential_frozen_stage",
+                "U": "unified_joint_optimization",
+                "forbidden_synonym_for_seq": "independent",
+            },
             "one_runner_for_all_executable_rows": True,
             "visual_objective": "raw_distorted_pixel_corner_reprojection",
             "solver_options": canonical_solver_options(args).to_dict(),
@@ -1517,6 +1525,10 @@ def main(argv=None, force_baseline_only: bool = False) -> None:
             "condition": {
                 "target_set": condition.target_set,
                 "unified": condition.unified,
+                "optimization_label": (
+                    "sequential_frozen_stage"
+                    if condition.unified == "seq"
+                    else "unified_joint_optimization"),
                 "fk_to_cube": condition.fk_to_cube,
                 "fk_to_board": condition.fk_to_board,
                 "label": condition.label,

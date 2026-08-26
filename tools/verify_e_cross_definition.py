@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Independently verify e_cross as fixed-camera cube-pose consistency.
 
-The recomputation intentionally does not call ``evaluate_paths_with_common_mask``
+The recomputation intentionally does not call ``evaluate_paths_with_frozen_mask``
 and never reads robot FK or hand-eye.  For each frozen held-out camera pair it
 computes
 
@@ -9,7 +9,7 @@ computes
 
 then aggregates pairwise cube-center distance and SO(3) geodesic distance by
 RMSE.  The values must match the canonical result JSON exactly within floating
-point tolerance and remain invariant to a common base-frame change.
+point tolerance and remain invariant to the same base-frame change.
 """
 
 from __future__ import annotations
@@ -48,6 +48,8 @@ def parse_args():
     parser.add_argument(
         "--calib_dir", default="data/session02/calib_train/calib_out")
     parser.add_argument("--include_sets", default="5-12")
+    parser.add_argument("--split_seed", type=int, default=DEFAULT_SPLIT_SEED)
+    parser.add_argument("--min_train_eih_cube_events", type=int, default=3)
     parser.add_argument(
         "--table1_result",
         default="CP_result/session02/late_table1/table1_methods.json")
@@ -65,8 +67,8 @@ def preparation_args(args):
         calib_dir=args.calib_dir,
         include_sets=args.include_sets,
         test_fraction=0.2,
-        split_seed=DEFAULT_SPLIT_SEED,
-        min_train_eih_cube_events=3,
+        split_seed=args.split_seed,
+        min_train_eih_cube_events=args.min_train_eih_cube_events,
         image_scale=1.0,
         num_inits=3,
         init_translation_mm=5.0,
@@ -119,7 +121,7 @@ def main() -> None:
     }
     mask = prepared.path_evaluation_mask
 
-    # A common coordinate-frame change must not alter a relative consistency
+    # An identical coordinate-frame change must not alter a relative consistency
     # metric.  This fixed transform is used only for that invariance check.
     common_frame = np.eye(4, dtype=np.float64)
     common_frame[:3, :3] = Rotation.from_rotvec([0.2, -0.1, 0.15]).as_matrix()
@@ -177,7 +179,10 @@ def main() -> None:
                 checked_pairs += 1
             translation_rmse, rotation_rmse = aggregate(values)
             pixel_rmse = float(np.sqrt(np.mean(pixel_squared)))
-            stored = expected["per_run"][method][run_index]["common_path"]
+            run_evaluation = expected["per_run"][method][run_index]
+            stored = run_evaluation.get("legacy_fk_dependent_cube_path")
+            if stored is None:
+                raise AssertionError("cross-target artifact lacks the cube path")
             if not np.isclose(
                     translation_rmse,
                     stored["e_cross_translation_rmse_mm"],

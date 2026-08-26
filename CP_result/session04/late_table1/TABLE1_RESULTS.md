@@ -1,4 +1,4 @@
-# Session02 Calibration Evaluation (캘리브레이션 평가)
+# Session04 Table 1 Results (표 1 결과)
 
 > Status: Pre-GT Internal Evaluation (외부 GT 전 내부 평가). 이 문서는 External GT (외부 정답)를 사용한 절대 정확도 순위를 제시하지 않는다.
 
@@ -13,24 +13,24 @@
 
 | Method (방법) | Marker Set (마커 구성) | Optimization (최적화) | Cube Pose (큐브 자세 처리) | Train Overall (학습 전체 px) | Own Held-out Overall (자체 홀드아웃 전체 px) | Board/Cube Held-out (보드/큐브 홀드아웃 px) | Convergence (수렴) | Status (상태) |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |
-| A0 (baseline) | board | sequential_frozen_stage | — | 3.8654 | 2.4675 | 2.4675 / N/A | 3/3 | Complete (완료) |
-| A1 (+cube) | cube+board | sequential_frozen_stage | estimated | 3.7146 | 2.9942 | 2.5090 / 4.2264 | 3/3 | Complete (완료) |
-| A2 (+unified) | cube+board | unified_joint_optimization | estimated | 3.7118 | 2.9715 | 2.4863 / 4.2015 | 3/3 | Complete (완료) |
-| A3 (Ours (full)) | cube+board | unified_joint_optimization | FK-fixed | 3.9662 | 2.5315 | 2.5019 / 2.6276 | 3/3 | Complete (완료) |
-| A4 (Ours (corrected-FK factor)) | cube+board | unified_joint_optimization | corrected-FK-factor | 3.7115 | 2.9525 | 2.4861 / 4.1435 | 3/3 | Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값) |
-| B1 (−Unified) | cube+board | sequential_frozen_stage | corrected-FK-factor | 3.7136 | 2.9729 | 2.5082 / 4.1624 | 3/3 | Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값) |
-| B2 (−board) | cube | unified_joint_optimization | corrected-FK-factor | 3.0497 | 4.2202 | N/A / 4.2202 | 3/3 | Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값) |
-| B3 (−cube) | board | unified_joint_optimization | — | 3.8654 | 2.4675 | 2.4675 / N/A | 3/3 | Complete (완료) |
+| A0 (baseline) | board | sequential_frozen_stage | — | 6.1832 | 5.8773 | 5.8773 / N/A | 3/3 | Complete (완료) |
+| A1 (+cube) | cube+board | sequential_frozen_stage | estimated | 5.9224 | 6.3602 | 5.9153 / 7.7657 | 3/3 | Complete (완료) |
+| A2 (+unified) | cube+board | unified_joint_optimization | estimated | 5.7846 | 6.2143 | 5.9229 / 7.1745 | 3/3 | Complete (완료) |
+| A3 (Ours (full)) | cube+board | unified_joint_optimization | FK-fixed | 5.9805 | 5.4968 | 5.7250 / 4.5724 | 3/3 | Complete (완료) |
+| A4 (Ours (corrected-FK factor)) | cube+board | unified_joint_optimization | corrected-FK-factor | 5.7846 | 6.1904 | 5.9128 / 7.1088 | 3/3 | Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값) |
+| B1 (−Unified) | cube+board | sequential_frozen_stage | corrected-FK-factor | 5.9154 | 6.3309 | 5.9092 / 7.6710 | 3/3 | Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값) |
+| B2 (−board) | cube | unified_joint_optimization | corrected-FK-factor | 3.7132 | 6.6975 | N/A / 6.6975 | 3/3 | Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값) |
+| B3 (−cube) | board | unified_joint_optimization | — | 6.1832 | 5.8772 | 5.8772 / N/A | 3/3 | Complete (완료) |
 
 ## Objective Block Diagnostics (목적함수 블록 진단)
 
 | Method (방법) | FK 처리 | Visual residual components (시각 잔차 수) | FK blocks / components (FK 블록/잔차 수) | Visual robust cost (시각 비용) | FK robust cost (FK 비용) | FK cost fraction (FK 비용 비율) |
 | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| A2 | estimated | 7754 | 0 / 0 | 23447.26 | 0.00 | 0.000% |
-| A3 | FK-fixed (hard constant; residual 없음) | 7754 | 0 / 0 | 25555.84 | 0.00 | 0.000% |
-| A4 | corrected-FK-factor | 7754 | 8 / 48 | 23453.98 | 31.30 | 0.133% |
-| B1 | corrected-FK-factor | 6474 | 8 / 48 | 22768.13 | 35.24 | 0.155% |
-| B2 | corrected-FK-factor | 1688 | 8 / 48 | 3857.04 | 30.78 | 0.792% |
+| A2 | estimated | 10702 | 0 / 0 | 61765.45 | 0.00 | 0.000% |
+| A3 | FK-fixed (hard constant; residual 없음) | 10702 | 0 / 0 | 65338.16 | 0.00 | 0.000% |
+| A4 | corrected-FK-factor | 10702 | 13 / 78 | 61807.01 | 113.09 | 0.183% |
+| B1 | corrected-FK-factor | 8406 | 13 / 78 | 59283.13 | 130.83 | 0.220% |
+| B2 | corrected-FK-factor | 1992 | 13 / 78 | 5931.97 | 94.07 | 1.561% |
 
 > 이 비율은 최종 목적함수 값의 분해다. 각 항의 Jacobian과 변수 연결 구조가 다르므로, FK cost 비율을 파라미터 영향력 비율로 해석하면 안 된다.
 
@@ -40,35 +40,35 @@
 
 | Method (방법) | Board Pixel (보드 px) | Board Translation (보드 이동 mm) | Board Rotation (보드 회전 deg) | Cube Pixel (큐브 px) | Cube Translation (큐브 이동 mm) | Cube Rotation (큐브 회전 deg) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| A0 | 2.9152 | 3.4548 | 0.4114 | 11.7971 | 14.2795 | 0.8603 |
-| A1 | 2.7157 | 3.0380 | 0.4424 | 12.7283 | 15.8616 | 0.8086 |
-| A2 | 2.7072 | 3.3930 | 0.4565 | 12.0223 | 14.8496 | 0.8437 |
-| A3 | 4.2937 | 5.8991 | 0.4728 | 9.6528 | 11.5639 | 0.8442 |
-| A4 | 2.7596 | 3.4694 | 0.4432 | 11.9717 | 14.7545 | 0.8466 |
-| B1 | 2.7364 | 3.0878 | 0.4239 | 12.6368 | 15.7124 | 0.8119 |
-| B2 | 3.6756 | 5.2159 | 0.5417 | 11.1316 | 14.0157 | 1.0872 |
-| B3 | 2.9169 | 3.4568 | 0.4116 | 11.7979 | 14.2793 | 0.8607 |
+| A0 | 0.8795 | 1.2764 | 0.1601 | 11.4709 | 14.8581 | 1.3588 |
+| A1 | 1.9699 | 2.0179 | 0.4818 | 10.7893 | 13.8134 | 1.4674 |
+| A2 | 1.6976 | 1.7903 | 0.5346 | 9.6100 | 12.3958 | 1.4572 |
+| A3 | 3.4871 | 4.7325 | 0.3518 | 7.1163 | 9.4860 | 1.4009 |
+| A4 | 1.6960 | 1.7696 | 0.5502 | 9.5791 | 12.3691 | 1.4708 |
+| B1 | 2.0291 | 2.0975 | 0.4914 | 10.7375 | 13.7652 | 1.4663 |
+| B2 | 3.7844 | 4.9628 | 0.6438 | 6.9340 | 8.6410 | 1.5589 |
+| B3 | 0.8802 | 1.2771 | 0.1601 | 11.4711 | 14.8589 | 1.3589 |
 
 ### Gripper-to-Fixed (그리퍼카메라–고정카메라 간)
 
 | Method (방법) | Board Pixel (보드 px) | Board Translation (보드 이동 mm) | Board Rotation (보드 회전 deg) | Cube Pixel (큐브 px) | Cube Translation (큐브 이동 mm) | Cube Rotation (큐브 회전 deg) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| A0 | 3.4670 | 3.6364 | 0.4078 | 7.2054 | 8.7543 | 1.1145 |
-| A1 | 3.3601 | 3.7720 | 0.5957 | 8.0735 | 9.9106 | 0.9239 |
-| A2 | 3.3336 | 3.6671 | 0.6126 | 7.4688 | 9.2350 | 0.9518 |
-| A3 | 4.6270 | 4.7592 | 0.5014 | 5.8096 | 7.3903 | 1.0382 |
-| A4 | 3.3564 | 3.6661 | 0.5975 | 7.4038 | 9.1691 | 0.9498 |
-| B1 | 3.3594 | 3.7490 | 0.5814 | 7.9733 | 9.8097 | 0.9224 |
-| B2 | 3.7794 | 3.9643 | 0.7630 | 7.4269 | 9.0752 | 1.0366 |
-| B3 | 3.4679 | 3.6366 | 0.4076 | 7.2055 | 8.7542 | 1.1148 |
+| A0 | 6.8528 | 7.1155 | 0.5435 | 9.4778 | 9.9321 | 1.1293 |
+| A1 | 7.1604 | 9.0046 | 1.1072 | 9.7098 | 10.2791 | 1.4699 |
+| A2 | 7.1781 | 9.3471 | 1.2727 | 9.2498 | 9.6951 | 1.5611 |
+| A3 | 7.3443 | 8.2255 | 0.6178 | 8.6882 | 8.5329 | 1.1331 |
+| A4 | 7.1826 | 9.3124 | 1.2648 | 9.2592 | 9.7057 | 1.5522 |
+| B1 | 7.1964 | 9.0548 | 1.1018 | 9.7038 | 10.2655 | 1.4628 |
+| B2 | 7.3569 | 10.8418 | 1.6608 | 8.0188 | 8.5501 | 1.9163 |
+| B3 | 6.8532 | 7.1168 | 0.5434 | 9.4786 | 9.9332 | 1.1289 |
 
 ### Marker-system End-to-End (마커 시스템 전체 경로)
 
 | System (시스템) | Own Held-out (자체 홀드아웃 px) | Fixed-to-Fixed Board/Cube (고정카메라 간 보드/큐브 px) | Gripper-to-Fixed Board/Cube (그리퍼카메라–고정카메라 간 보드/큐브 px) | Convergence (수렴) |
 | --- | ---: | ---: | ---: | ---: |
-| Board-only end-to-end | 2.4676 | 2.9151 / 11.7990 | 3.4669 / 7.2070 | 3/3 |
-| Cube-only end-to-end | 4.2798 | 3.6096 / 11.3110 | 3.7603 / 7.5768 | 3/3 |
-| Board+Cube end-to-end | 2.9715 | 2.7072 / 12.0223 | 3.3336 / 7.4688 | 3/3 |
+| Board-only end-to-end | 5.8773 | 0.8789 / 11.4695 | 6.8526 / 9.4762 | 3/3 |
+| Cube-only end-to-end | 6.6602 | 3.4723 / 7.2645 | 7.3813 / 8.2717 | 3/3 |
+| Board+Cube end-to-end | 6.2143 | 1.6976 / 9.6100 | 7.1781 / 9.2498 | 3/3 |
 
 ## Calculation (계산 방식)
 
@@ -94,7 +94,3 @@ Fixed-to-Fixed는 모든 고정카메라에 함께 존재하는 Systematic Error
 - **PnP, Perspective-n-Point (3D–2D 자세 추정)**: 3D 표적점과 2D 영상점으로 카메라–표적 자세를 계산한다.
 - **RMSE, Root Mean Squared Error (평균제곱근오차)**: 잔차 제곱 평균의 제곱근. px, mm, deg는 서로 합치지 않는다.
 - **Reference-dependent Reprojection (기준 의존 재투영)**: 학습 표적 자세에 의존하는 보조 진단으로 External GT가 아니다.
-
-## Required Next Experiment (다음 필수 실험)
-
-Independent External GT (독립 외부 정답)가 확정되면 Blind Position Holdout (비공개 위치 홀드아웃)으로 Translation Error (이동 오차), Rotation Error (회전 오차), P95, Failure Rate (실패율)를 다시 계산한다. 그 전에는 내부 지표만 유지한다.

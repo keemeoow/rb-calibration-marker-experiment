@@ -1,0 +1,2070 @@
+{
+  "artifact_schema": "opencv_relative_reference_baseline_v1",
+  "protocol": {
+    "role": "public_library_reference_for_data_vs_custom_code_diagnosis",
+    "not_a_sota_claim": true,
+    "calibration": "OpenCV measurement-only PnP direct anchor-camera relative transforms plus preregistered MAD-trimmed SE3 average",
+    "uses_joint_optimizer": false,
+    "uses_robot_fk": false,
+    "uses_handeye": false,
+    "uses_shared_target_pose": false,
+    "test_time_refit": false,
+    "fixed_camera_ids": [
+      0,
+      1,
+      3
+    ],
+    "gauge_anchor_camera": 0,
+    "split": {
+      "strategy": "event_grouped_and_set_stratified",
+      "seed": 20260731,
+      "test_fraction_requested": 0.2,
+      "min_train_eih_cube_events": 2,
+      "eligible_sets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "train_events": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        18,
+        19,
+        20,
+        22,
+        23,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        33,
+        34,
+        35,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        47,
+        48,
+        49,
+        50,
+        51,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        60,
+        61,
+        62,
+        63,
+        64,
+        66,
+        67,
+        68,
+        69,
+        70,
+        72,
+        74,
+        75,
+        76,
+        77
+      ],
+      "test_events": [
+        0,
+        9,
+        17,
+        21,
+        24,
+        32,
+        36,
+        46,
+        52,
+        59,
+        65,
+        71,
+        73
+      ],
+      "per_set": {
+        "0": {
+          "train_events": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ],
+          "test_events": [
+            0
+          ],
+          "train_eih_cube_events": [
+            1,
+            2,
+            4,
+            5
+          ]
+        },
+        "1": {
+          "train_events": [
+            6,
+            7,
+            8,
+            10,
+            11
+          ],
+          "test_events": [
+            9
+          ],
+          "train_eih_cube_events": [
+            6,
+            7,
+            8,
+            10
+          ]
+        },
+        "2": {
+          "train_events": [
+            12,
+            13,
+            14,
+            15,
+            16
+          ],
+          "test_events": [
+            17
+          ],
+          "train_eih_cube_events": [
+            12,
+            13,
+            16
+          ]
+        },
+        "3": {
+          "train_events": [
+            18,
+            19,
+            20,
+            22,
+            23
+          ],
+          "test_events": [
+            21
+          ],
+          "train_eih_cube_events": [
+            18,
+            22
+          ]
+        },
+        "4": {
+          "train_events": [
+            25,
+            26,
+            27,
+            28,
+            29
+          ],
+          "test_events": [
+            24
+          ],
+          "train_eih_cube_events": [
+            25,
+            26,
+            27,
+            29
+          ]
+        },
+        "5": {
+          "train_events": [
+            30,
+            31,
+            33,
+            34,
+            35
+          ],
+          "test_events": [
+            32
+          ],
+          "train_eih_cube_events": [
+            30,
+            31,
+            33,
+            35
+          ]
+        },
+        "6": {
+          "train_events": [
+            37,
+            38,
+            39,
+            40,
+            41
+          ],
+          "test_events": [
+            36
+          ],
+          "train_eih_cube_events": [
+            37,
+            38,
+            39,
+            41
+          ]
+        },
+        "7": {
+          "train_events": [
+            42,
+            43,
+            44,
+            45,
+            47
+          ],
+          "test_events": [
+            46
+          ],
+          "train_eih_cube_events": [
+            42,
+            43,
+            44,
+            45,
+            47
+          ]
+        },
+        "8": {
+          "train_events": [
+            48,
+            49,
+            50,
+            51,
+            53
+          ],
+          "test_events": [
+            52
+          ],
+          "train_eih_cube_events": [
+            48,
+            49,
+            50,
+            51,
+            53
+          ]
+        },
+        "9": {
+          "train_events": [
+            54,
+            55,
+            56,
+            57,
+            58
+          ],
+          "test_events": [
+            59
+          ],
+          "train_eih_cube_events": [
+            54,
+            55,
+            56,
+            57,
+            58
+          ]
+        },
+        "10": {
+          "train_events": [
+            60,
+            61,
+            62,
+            63,
+            64
+          ],
+          "test_events": [
+            65
+          ],
+          "train_eih_cube_events": [
+            60,
+            61,
+            62,
+            63,
+            64
+          ]
+        },
+        "11": {
+          "train_events": [
+            66,
+            67,
+            68,
+            69,
+            70
+          ],
+          "test_events": [
+            71
+          ],
+          "train_eih_cube_events": [
+            66,
+            67,
+            68,
+            69,
+            70
+          ]
+        },
+        "12": {
+          "train_events": [
+            72,
+            74,
+            75,
+            76,
+            77
+          ],
+          "test_events": [
+            73
+          ],
+          "train_eih_cube_events": [
+            72,
+            74,
+            75,
+            76,
+            77
+          ]
+        }
+      },
+      "dropped_sets": {}
+    },
+    "source_data_provenance": {
+      "meta_json": {
+        "path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session04/calib_train/meta.json",
+        "sha256": "fa86c823bada4ae5222ffda45865b63f9a6cc05418a717156f44e37b246eea3a"
+      },
+      "intrinsics": {
+        "0": {
+          "path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/intrinsics/cam0.npz",
+          "sha256": "e34d7176f271509e70566c02a3dd51b755588c88e172f75d6b0b3d9c464907d6"
+        },
+        "1": {
+          "path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/intrinsics/cam1.npz",
+          "sha256": "8c1fbe08d7fb862d503d06d91d63c153bfb4f04cc6751aedcc9d880714e60ca3"
+        },
+        "2": {
+          "path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/intrinsics/cam2.npz",
+          "sha256": "3fbeeba8f3d4a37780d0bc7d085749015b6c7f595fb2bfda8bb76cc42b777138"
+        },
+        "3": {
+          "path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/intrinsics/cam3.npz",
+          "sha256": "dc2cca9f67a992e5334711de0aea83e874d134cdc26a5842d7e9f6c88b96457e"
+        }
+      },
+      "implementation_sha256": {
+        "calibration_pipeline/apriltag_cube.py": "17692532bdfc51d4193b776fc3084124ebf3c717054be22a69a90e767d39b18c",
+        "calibration_pipeline/charuco.py": "f5bc57cbfda59e4e4768789d1ad16e60de3c8fb3aa9b66a9d4d4679d13c6e1d4",
+        "calibration_pipeline/config.py": "e727f257973bc10cf59dd4354eb43016bfbba357d63d881f935dc5300e910ea5",
+        "calibration_pipeline/cross_target.py": "ee5b52282a058d7b30e20eee6804260e1195916abb0994d22d7bc383460f40fd",
+        "calibration_pipeline/cube_detection.py": "74a02b5e6abb8011388532e2114535d2e897fa49bd38ad797f2abea007165689",
+        "calibration_pipeline/evaluation.py": "16b991587ab6fd0dac0f16cd115646b14e44c558c28216ca2b1d04119409ff62",
+        "calibration_pipeline/fk_alignment.py": "4cedcc964be08f157a6a6e17607797296407855bf38ec3a58e32501f4908c65a",
+        "calibration_pipeline/fk_factor.py": "6c2caccacc48708f227324392b53c4f9bb8adf7686dd987a9ec0be6aeecbff62",
+        "calibration_pipeline/marker_system.py": "ccaba63cd41172a1133296905e6dc94fd91d3d4eafff4d60a584b4bbb67b79c4",
+        "calibration_pipeline/observations.py": "af773897943f69184be839b03627068fef7583571b96a59c97c573eee8c10403",
+        "calibration_pipeline/path_evaluation.py": "007eb4e7f4129853d35acb9fe8ad5ed473f6f4c93761dee101e5f689fec35014",
+        "calibration_pipeline/pose_convention.py": "410c5e06ac52e9d06aaf8414051b5a508d196e19bd41047c0ee24b96d7cc08be",
+        "calibration_pipeline/reprojection.py": "d053cf4b1f04e26aa9206c845c8ec3d576edd18eaecfe69f26e7d89c0fd6960b",
+        "calibration_pipeline/runtime.py": "97f2d9e4b227f2d314ba3bf5261c8f08cbf9ce8db0b2cf9f12010f682a7a8956",
+        "calibration_pipeline/schema.py": "4f77c397195024af65f9850ca6a9a47d2b54ca3ae352fdfac0fdbe45e6e1f42f",
+        "calibration_pipeline/se3.py": "a760b3f8d66dcf193c7d5b7a56d12f7061088dacc3c549c38d3c7baaffdd93e9",
+        "calibration_pipeline/table1.py": "2a3b9039a54791635a77526cdf8fd842a2923b4ab9d148010e83c0c2485fd468"
+      },
+      "observation_populations": {
+        "eligible": {
+          "sha256": "e6cb7bd2733b40ddc24f3115d4ca45d7683dfa9ef7eca2b7e9841723e9511e48",
+          "observations": 216,
+          "corners": 6482,
+          "events": [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            47,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            59,
+            60,
+            61,
+            62,
+            63,
+            64,
+            65,
+            66,
+            67,
+            68,
+            69,
+            70,
+            71,
+            72,
+            73,
+            74,
+            75,
+            76,
+            77
+          ]
+        },
+        "train": {
+          "sha256": "e7cda60126f7c3be5330a4d8633a722bbf56dd942063dc3b671e190d98a1e6f1",
+          "observations": 176,
+          "corners": 5351,
+          "events": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            18,
+            19,
+            20,
+            22,
+            23,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            33,
+            34,
+            35,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            47,
+            48,
+            49,
+            50,
+            51,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            60,
+            61,
+            62,
+            63,
+            64,
+            66,
+            67,
+            68,
+            69,
+            70,
+            72,
+            74,
+            75,
+            76,
+            77
+          ]
+        },
+        "heldout": {
+          "sha256": "a5c58b78ff6f083d28875116f89e585d43d02ac7d845494febfa91cac091f37c",
+          "observations": 40,
+          "corners": 1131,
+          "events": [
+            0,
+            9,
+            17,
+            21,
+            24,
+            32,
+            36,
+            46,
+            52,
+            59,
+            65,
+            71,
+            73
+          ]
+        }
+      }
+    },
+    "evaluation_mask_sha256": "9353ca8565c2929198d79ef5c329806c2599cdfd91cf919dd5739d646629faee"
+  },
+  "results": {
+    "opencv_board": {
+      "train_targets": [
+        "board"
+      ],
+      "T_anchor_camera": {
+        "0": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "1": [
+          [
+            -0.49668660983932,
+            -0.32591992229375194,
+            0.8044119689924801,
+            -0.4737335768233816
+          ],
+          [
+            0.3882580400167058,
+            0.7454781249114208,
+            0.5417730702433806,
+            -0.32013428149056733
+          ],
+          [
+            -0.7762461632553876,
+            0.5814108440084236,
+            -0.24372797233945726,
+            0.7885556898486331
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "3": [
+          [
+            -0.6416035863388662,
+            0.28700539609759856,
+            -0.7113176088133664,
+            0.5912917319797488
+          ],
+          [
+            -0.3888438600710674,
+            0.6776611886983452,
+            0.6241600482384131,
+            -0.3352524366047198
+          ],
+          [
+            0.6611696382034923,
+            0.6770548101467166,
+            -0.3231895629117013,
+            0.741273722894587
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "fit_diagnostics": {
+        "0": {
+          "role": "gauge_anchor",
+          "num_total": 0,
+          "num_inliers": 0
+        },
+        "1": {
+          "num_total": 10,
+          "num_inliers": 10,
+          "inlier_ratio": 1.0,
+          "translation_std_mm": 0.6916217206292661,
+          "rotation_std_deg": 0.0585510424726297
+        },
+        "3": {
+          "num_total": 6,
+          "num_inliers": 6,
+          "inlier_ratio": 1.0,
+          "translation_std_mm": 0.3925731154088824,
+          "rotation_std_deg": 0.0301894565210392
+        }
+      },
+      "heldout_fixed_to_fixed": {
+        "applicable": true,
+        "evaluation_mask_sha256": "9353ca8565c2929198d79ef5c329806c2599cdfd91cf919dd5739d646629faee",
+        "metric_contract": {
+          "name": "fixed_to_fixed_board_cube_cross_target",
+          "targets": [
+            "board",
+            "cube"
+          ],
+          "per_camera_pose": "T_base_target_from_camera = T_base_camera @ T_camera_target_measurement_only_PnP",
+          "pose_metrics": "per_target_pairwise_translation_RMSE_mm_and_SO3_geodesic_RMSE_deg",
+          "pixel_metric": "per_target_bidirectional_component_wise_pixel_transfer_RMSE_px",
+          "uses_shared_base_target_pose": false,
+          "uses_robot_fk": false,
+          "uses_gripper_camera": false,
+          "uses_external_ground_truth": false,
+          "absolute_accuracy_metric": false,
+          "ranking_role_before_external_gt": "fixed_camera_subsystem_relative_metric"
+        },
+        "model_dependent_gating": false,
+        "output_dependent_pose_gate": null,
+        "by_target": {
+          "board": {
+            "pose_consistency_translation_rmse_mm": 1.7664971257211026,
+            "pose_consistency_rotation_rmse_deg": 0.1753773658527941,
+            "cross_view_pixel_transfer_rmse_px": 1.1720480040083008,
+            "n_pairs": 5,
+            "n_directions": 10,
+            "n_output_rejected": 0,
+            "per_pair": [
+              {
+                "target": "board",
+                "event": 0,
+                "set": 0,
+                "left_observation_id": "board:event=0:set=0:cam=0",
+                "right_observation_id": "board:event=0:set=0:cam=1",
+                "translation_mm": 1.5346289535431206,
+                "rotation_deg": 0.2249536247324881,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "board:event=0:set=0:cam=0",
+                    "destination_observation_id": "board:event=0:set=0:cam=1",
+                    "rmse_px": 0.5866103196260868,
+                    "n_corners": 28
+                  },
+                  {
+                    "source_observation_id": "board:event=0:set=0:cam=1",
+                    "destination_observation_id": "board:event=0:set=0:cam=0",
+                    "rmse_px": 1.2767089565018404,
+                    "n_corners": 47
+                  }
+                ]
+              },
+              {
+                "target": "board",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "board:event=24:set=4:cam=0",
+                "right_observation_id": "board:event=24:set=4:cam=1",
+                "translation_mm": 2.473818861036208,
+                "rotation_deg": 0.21577868353699156,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=0",
+                    "destination_observation_id": "board:event=24:set=4:cam=1",
+                    "rmse_px": 0.4283070950621611,
+                    "n_corners": 23
+                  },
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=1",
+                    "destination_observation_id": "board:event=24:set=4:cam=0",
+                    "rmse_px": 2.19271695085358,
+                    "n_corners": 42
+                  }
+                ]
+              },
+              {
+                "target": "board",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "board:event=24:set=4:cam=0",
+                "right_observation_id": "board:event=24:set=4:cam=3",
+                "translation_mm": 0.26894253315038086,
+                "rotation_deg": 0.09912400316977434,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=0",
+                    "destination_observation_id": "board:event=24:set=4:cam=3",
+                    "rmse_px": 0.4253174049127153,
+                    "n_corners": 16
+                  },
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=3",
+                    "destination_observation_id": "board:event=24:set=4:cam=0",
+                    "rmse_px": 0.34695850406238277,
+                    "n_corners": 42
+                  }
+                ]
+              },
+              {
+                "target": "board",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "board:event=24:set=4:cam=1",
+                "right_observation_id": "board:event=24:set=4:cam=3",
+                "translation_mm": 2.616317558362486,
+                "rotation_deg": 0.20207200493765454,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=1",
+                    "destination_observation_id": "board:event=24:set=4:cam=3",
+                    "rmse_px": 2.4077137992546933,
+                    "n_corners": 16
+                  },
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=3",
+                    "destination_observation_id": "board:event=24:set=4:cam=1",
+                    "rmse_px": 0.5673207693728634,
+                    "n_corners": 23
+                  }
+                ]
+              },
+              {
+                "target": "board",
+                "event": 36,
+                "set": 6,
+                "left_observation_id": "board:event=36:set=6:cam=0",
+                "right_observation_id": "board:event=36:set=6:cam=1",
+                "translation_mm": 0.4585270344266134,
+                "rotation_deg": 0.07721959294218528,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "board:event=36:set=6:cam=0",
+                    "destination_observation_id": "board:event=36:set=6:cam=1",
+                    "rmse_px": 0.49706172837164486,
+                    "n_corners": 24
+                  },
+                  {
+                    "source_observation_id": "board:event=36:set=6:cam=1",
+                    "destination_observation_id": "board:event=36:set=6:cam=0",
+                    "rmse_px": 0.28119162744596055,
+                    "n_corners": 37
+                  }
+                ]
+              }
+            ]
+          },
+          "cube": {
+            "pose_consistency_translation_rmse_mm": 15.27339445062883,
+            "pose_consistency_rotation_rmse_deg": 1.3565539952686092,
+            "cross_view_pixel_transfer_rmse_px": 11.78621141291392,
+            "n_pairs": 9,
+            "n_directions": 18,
+            "n_output_rejected": 0,
+            "per_pair": [
+              {
+                "target": "cube",
+                "event": 0,
+                "set": 0,
+                "left_observation_id": "cube:event=0:set=0:cam=0",
+                "right_observation_id": "cube:event=0:set=0:cam=1",
+                "translation_mm": 13.451630985712072,
+                "rotation_deg": 1.3269002491152742,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=0",
+                    "destination_observation_id": "cube:event=0:set=0:cam=1",
+                    "rmse_px": 4.292674841211846,
+                    "n_corners": 12
+                  },
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=1",
+                    "destination_observation_id": "cube:event=0:set=0:cam=0",
+                    "rmse_px": 12.875555929550389,
+                    "n_corners": 16
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 0,
+                "set": 0,
+                "left_observation_id": "cube:event=0:set=0:cam=0",
+                "right_observation_id": "cube:event=0:set=0:cam=3",
+                "translation_mm": 14.853753740664141,
+                "rotation_deg": 1.6525286160153627,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=0",
+                    "destination_observation_id": "cube:event=0:set=0:cam=3",
+                    "rmse_px": 2.8287252166357923,
+                    "n_corners": 8
+                  },
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=3",
+                    "destination_observation_id": "cube:event=0:set=0:cam=0",
+                    "rmse_px": 20.55739434786096,
+                    "n_corners": 16
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 0,
+                "set": 0,
+                "left_observation_id": "cube:event=0:set=0:cam=1",
+                "right_observation_id": "cube:event=0:set=0:cam=3",
+                "translation_mm": 18.78889936125111,
+                "rotation_deg": 0.8120341108833791,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=1",
+                    "destination_observation_id": "cube:event=0:set=0:cam=3",
+                    "rmse_px": 9.359769991799139,
+                    "n_corners": 8
+                  },
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=3",
+                    "destination_observation_id": "cube:event=0:set=0:cam=1",
+                    "rmse_px": 18.556884205080085,
+                    "n_corners": 12
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "cube:event=24:set=4:cam=0",
+                "right_observation_id": "cube:event=24:set=4:cam=1",
+                "translation_mm": 14.980923112811734,
+                "rotation_deg": 0.9730191129113972,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=0",
+                    "destination_observation_id": "cube:event=24:set=4:cam=1",
+                    "rmse_px": 7.836513027659026,
+                    "n_corners": 8
+                  },
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=1",
+                    "destination_observation_id": "cube:event=24:set=4:cam=0",
+                    "rmse_px": 14.359964274157088,
+                    "n_corners": 16
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "cube:event=24:set=4:cam=0",
+                "right_observation_id": "cube:event=24:set=4:cam=3",
+                "translation_mm": 13.832474074637906,
+                "rotation_deg": 2.2900904543227805,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=0",
+                    "destination_observation_id": "cube:event=24:set=4:cam=3",
+                    "rmse_px": 10.18981600893078,
+                    "n_corners": 12
+                  },
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=3",
+                    "destination_observation_id": "cube:event=24:set=4:cam=0",
+                    "rmse_px": 7.393027635618267,
+                    "n_corners": 16
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "cube:event=24:set=4:cam=1",
+                "right_observation_id": "cube:event=24:set=4:cam=3",
+                "translation_mm": 16.132537780787032,
+                "rotation_deg": 1.8546384646535428,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=1",
+                    "destination_observation_id": "cube:event=24:set=4:cam=3",
+                    "rmse_px": 14.85218410881111,
+                    "n_corners": 12
+                  },
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=3",
+                    "destination_observation_id": "cube:event=24:set=4:cam=1",
+                    "rmse_px": 7.101631383207082,
+                    "n_corners": 8
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 36,
+                "set": 6,
+                "left_observation_id": "cube:event=36:set=6:cam=0",
+                "right_observation_id": "cube:event=36:set=6:cam=1",
+                "translation_mm": 13.111520652734637,
+                "rotation_deg": 0.9891910879567809,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=0",
+                    "destination_observation_id": "cube:event=36:set=6:cam=1",
+                    "rmse_px": 4.162022474993959,
+                    "n_corners": 12
+                  },
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=1",
+                    "destination_observation_id": "cube:event=36:set=6:cam=0",
+                    "rmse_px": 11.877917362837113,
+                    "n_corners": 8
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 36,
+                "set": 6,
+                "left_observation_id": "cube:event=36:set=6:cam=0",
+                "right_observation_id": "cube:event=36:set=6:cam=3",
+                "translation_mm": 11.05212730637649,
+                "rotation_deg": 0.5820453336997461,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=0",
+                    "destination_observation_id": "cube:event=36:set=6:cam=3",
+                    "rmse_px": 6.981086461732527,
+                    "n_corners": 16
+                  },
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=3",
+                    "destination_observation_id": "cube:event=36:set=6:cam=0",
+                    "rmse_px": 8.223211967132087,
+                    "n_corners": 8
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 36,
+                "set": 6,
+                "left_observation_id": "cube:event=36:set=6:cam=1",
+                "right_observation_id": "cube:event=36:set=6:cam=3",
+                "translation_mm": 19.359763000092308,
+                "rotation_deg": 0.680436688461626,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=1",
+                    "destination_observation_id": "cube:event=36:set=6:cam=3",
+                    "rmse_px": 13.638738269251338,
+                    "n_corners": 16
+                  },
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=3",
+                    "destination_observation_id": "cube:event=36:set=6:cam=1",
+                    "rmse_px": 8.553592291764586,
+                    "n_corners": 12
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "overall_pixel_transfer_rmse_px": 7.69240288334987,
+        "overall_note": "pooled board+cube pixel transfer is descriptive only; use each target component for comparison",
+        "n_output_rejected": 0
+      }
+    },
+    "opencv_cube": {
+      "train_targets": [
+        "cube"
+      ],
+      "T_anchor_camera": {
+        "0": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "1": [
+          [
+            -0.4991907309942326,
+            -0.3280988589507978,
+            0.8019724140172327,
+            -0.48287262984489043
+          ],
+          [
+            0.38686532709431903,
+            0.7437776840941465,
+            0.5450962991396595,
+            -0.3292089503851111
+          ],
+          [
+            -0.7753346585711547,
+            0.5823623402991753,
+            -0.2443568534328811,
+            0.8015535282842241
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "3": [
+          [
+            -0.643315517389213,
+            0.2857607956673135,
+            -0.7102717175460623,
+            0.5973934198005907
+          ],
+          [
+            -0.3902894201268044,
+            0.6757227151591626,
+            0.6253582819112676,
+            -0.34029153996020495
+          ],
+          [
+            0.658649613697095,
+            0.6795142234548985,
+            -0.3231734928782903,
+            0.7530342360218898
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "fit_diagnostics": {
+        "0": {
+          "role": "gauge_anchor",
+          "num_total": 0,
+          "num_inliers": 0
+        },
+        "1": {
+          "num_total": 10,
+          "num_inliers": 10,
+          "inlier_ratio": 1.0,
+          "translation_std_mm": 4.247731088072126,
+          "rotation_std_deg": 0.2759863646418729
+        },
+        "3": {
+          "num_total": 10,
+          "num_inliers": 10,
+          "inlier_ratio": 1.0,
+          "translation_std_mm": 10.184627906913144,
+          "rotation_std_deg": 0.5151567606351277
+        }
+      },
+      "heldout_fixed_to_fixed": {
+        "applicable": true,
+        "evaluation_mask_sha256": "9353ca8565c2929198d79ef5c329806c2599cdfd91cf919dd5739d646629faee",
+        "metric_contract": {
+          "name": "fixed_to_fixed_board_cube_cross_target",
+          "targets": [
+            "board",
+            "cube"
+          ],
+          "per_camera_pose": "T_base_target_from_camera = T_base_camera @ T_camera_target_measurement_only_PnP",
+          "pose_metrics": "per_target_pairwise_translation_RMSE_mm_and_SO3_geodesic_RMSE_deg",
+          "pixel_metric": "per_target_bidirectional_component_wise_pixel_transfer_RMSE_px",
+          "uses_shared_base_target_pose": false,
+          "uses_robot_fk": false,
+          "uses_gripper_camera": false,
+          "uses_external_ground_truth": false,
+          "absolute_accuracy_metric": false,
+          "ranking_role_before_external_gt": "fixed_camera_subsystem_relative_metric"
+        },
+        "model_dependent_gating": false,
+        "output_dependent_pose_gate": null,
+        "by_target": {
+          "board": {
+            "pose_consistency_translation_rmse_mm": 15.998321928772437,
+            "pose_consistency_rotation_rmse_deg": 0.3252004825614968,
+            "cross_view_pixel_transfer_rmse_px": 10.859472498037778,
+            "n_pairs": 5,
+            "n_directions": 10,
+            "n_output_rejected": 0,
+            "per_pair": [
+              {
+                "target": "board",
+                "event": 0,
+                "set": 0,
+                "left_observation_id": "board:event=0:set=0:cam=0",
+                "right_observation_id": "board:event=0:set=0:cam=1",
+                "translation_mm": 16.811781217897245,
+                "rotation_deg": 0.2980055767261787,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "board:event=0:set=0:cam=0",
+                    "destination_observation_id": "board:event=0:set=0:cam=1",
+                    "rmse_px": 9.977414739928488,
+                    "n_corners": 28
+                  },
+                  {
+                    "source_observation_id": "board:event=0:set=0:cam=1",
+                    "destination_observation_id": "board:event=0:set=0:cam=0",
+                    "rmse_px": 11.663244869157877,
+                    "n_corners": 47
+                  }
+                ]
+              },
+              {
+                "target": "board",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "board:event=24:set=4:cam=0",
+                "right_observation_id": "board:event=24:set=4:cam=1",
+                "translation_mm": 16.361590679823003,
+                "rotation_deg": 0.3174057724762158,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=0",
+                    "destination_observation_id": "board:event=24:set=4:cam=1",
+                    "rmse_px": 11.14920201669195,
+                    "n_corners": 23
+                  },
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=1",
+                    "destination_observation_id": "board:event=24:set=4:cam=0",
+                    "rmse_px": 11.336644415803066,
+                    "n_corners": 42
+                  }
+                ]
+              },
+              {
+                "target": "board",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "board:event=24:set=4:cam=0",
+                "right_observation_id": "board:event=24:set=4:cam=3",
+                "translation_mm": 13.249348156806255,
+                "rotation_deg": 0.2095441453808532,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=0",
+                    "destination_observation_id": "board:event=24:set=4:cam=3",
+                    "rmse_px": 11.595780566713191,
+                    "n_corners": 16
+                  },
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=3",
+                    "destination_observation_id": "board:event=24:set=4:cam=0",
+                    "rmse_px": 7.143627595933472,
+                    "n_corners": 42
+                  }
+                ]
+              },
+              {
+                "target": "board",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "board:event=24:set=4:cam=1",
+                "right_observation_id": "board:event=24:set=4:cam=3",
+                "translation_mm": 14.671713979965967,
+                "rotation_deg": 0.4639578569902621,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=1",
+                    "destination_observation_id": "board:event=24:set=4:cam=3",
+                    "rmse_px": 10.420604095573383,
+                    "n_corners": 16
+                  },
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=3",
+                    "destination_observation_id": "board:event=24:set=4:cam=1",
+                    "rmse_px": 9.427825137607819,
+                    "n_corners": 23
+                  }
+                ]
+              },
+              {
+                "target": "board",
+                "event": 36,
+                "set": 6,
+                "left_observation_id": "board:event=36:set=6:cam=0",
+                "right_observation_id": "board:event=36:set=6:cam=1",
+                "translation_mm": 18.400800735307623,
+                "rotation_deg": 0.2829441273531538,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "board:event=36:set=6:cam=0",
+                    "destination_observation_id": "board:event=36:set=6:cam=1",
+                    "rmse_px": 11.080876467246249,
+                    "n_corners": 24
+                  },
+                  {
+                    "source_observation_id": "board:event=36:set=6:cam=1",
+                    "destination_observation_id": "board:event=36:set=6:cam=0",
+                    "rmse_px": 13.438142455130487,
+                    "n_corners": 37
+                  }
+                ]
+              }
+            ]
+          },
+          "cube": {
+            "pose_consistency_translation_rmse_mm": 5.155552690828458,
+            "pose_consistency_rotation_rmse_deg": 1.41273876962769,
+            "cross_view_pixel_transfer_rmse_px": 4.671775066924454,
+            "n_pairs": 9,
+            "n_directions": 18,
+            "n_output_rejected": 0,
+            "per_pair": [
+              {
+                "target": "cube",
+                "event": 0,
+                "set": 0,
+                "left_observation_id": "cube:event=0:set=0:cam=0",
+                "right_observation_id": "cube:event=0:set=0:cam=1",
+                "translation_mm": 5.5212423158528745,
+                "rotation_deg": 1.4937530483421984,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=0",
+                    "destination_observation_id": "cube:event=0:set=0:cam=1",
+                    "rmse_px": 3.712001756646244,
+                    "n_corners": 12
+                  },
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=1",
+                    "destination_observation_id": "cube:event=0:set=0:cam=0",
+                    "rmse_px": 4.791312894660971,
+                    "n_corners": 16
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 0,
+                "set": 0,
+                "left_observation_id": "cube:event=0:set=0:cam=0",
+                "right_observation_id": "cube:event=0:set=0:cam=3",
+                "translation_mm": 6.209452164614621,
+                "rotation_deg": 1.5508456250595892,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=0",
+                    "destination_observation_id": "cube:event=0:set=0:cam=3",
+                    "rmse_px": 3.967185655715421,
+                    "n_corners": 8
+                  },
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=3",
+                    "destination_observation_id": "cube:event=0:set=0:cam=0",
+                    "rmse_px": 4.818916463398891,
+                    "n_corners": 16
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 0,
+                "set": 0,
+                "left_observation_id": "cube:event=0:set=0:cam=1",
+                "right_observation_id": "cube:event=0:set=0:cam=3",
+                "translation_mm": 2.527394901428196,
+                "rotation_deg": 0.9463613715924499,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=1",
+                    "destination_observation_id": "cube:event=0:set=0:cam=3",
+                    "rmse_px": 1.5505778797446883,
+                    "n_corners": 8
+                  },
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=3",
+                    "destination_observation_id": "cube:event=0:set=0:cam=1",
+                    "rmse_px": 2.790454707417261,
+                    "n_corners": 12
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "cube:event=24:set=4:cam=0",
+                "right_observation_id": "cube:event=24:set=4:cam=1",
+                "translation_mm": 3.3312058498181782,
+                "rotation_deg": 0.7747060280513279,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=0",
+                    "destination_observation_id": "cube:event=24:set=4:cam=1",
+                    "rmse_px": 0.7232445954365162,
+                    "n_corners": 8
+                  },
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=1",
+                    "destination_observation_id": "cube:event=24:set=4:cam=0",
+                    "rmse_px": 3.8365689528869003,
+                    "n_corners": 16
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "cube:event=24:set=4:cam=0",
+                "right_observation_id": "cube:event=24:set=4:cam=3",
+                "translation_mm": 1.9319006026013645,
+                "rotation_deg": 2.438215419389006,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=0",
+                    "destination_observation_id": "cube:event=24:set=4:cam=3",
+                    "rmse_px": 3.340683817452988,
+                    "n_corners": 12
+                  },
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=3",
+                    "destination_observation_id": "cube:event=24:set=4:cam=0",
+                    "rmse_px": 2.032934210629998,
+                    "n_corners": 16
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "cube:event=24:set=4:cam=1",
+                "right_observation_id": "cube:event=24:set=4:cam=3",
+                "translation_mm": 2.695401192663334,
+                "rotation_deg": 2.1433371761294198,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=1",
+                    "destination_observation_id": "cube:event=24:set=4:cam=3",
+                    "rmse_px": 3.404955252367788,
+                    "n_corners": 12
+                  },
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=3",
+                    "destination_observation_id": "cube:event=24:set=4:cam=1",
+                    "rmse_px": 1.68644134006748,
+                    "n_corners": 8
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 36,
+                "set": 6,
+                "left_observation_id": "cube:event=36:set=6:cam=0",
+                "right_observation_id": "cube:event=36:set=6:cam=1",
+                "translation_mm": 8.09951482427472,
+                "rotation_deg": 0.778184384018721,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=0",
+                    "destination_observation_id": "cube:event=36:set=6:cam=1",
+                    "rmse_px": 7.8321905154551095,
+                    "n_corners": 12
+                  },
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=1",
+                    "destination_observation_id": "cube:event=36:set=6:cam=0",
+                    "rmse_px": 1.4677694424972902,
+                    "n_corners": 8
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 36,
+                "set": 6,
+                "left_observation_id": "cube:event=36:set=6:cam=0",
+                "right_observation_id": "cube:event=36:set=6:cam=3",
+                "translation_mm": 7.668426630271029,
+                "rotation_deg": 0.6921258107183403,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=0",
+                    "destination_observation_id": "cube:event=36:set=6:cam=3",
+                    "rmse_px": 10.795652260209142,
+                    "n_corners": 16
+                  },
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=3",
+                    "destination_observation_id": "cube:event=36:set=6:cam=0",
+                    "rmse_px": 3.6153323417916345,
+                    "n_corners": 8
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 36,
+                "set": 6,
+                "left_observation_id": "cube:event=36:set=6:cam=1",
+                "right_observation_id": "cube:event=36:set=6:cam=3",
+                "translation_mm": 4.157776657579018,
+                "rotation_deg": 0.45485176467184385,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=1",
+                    "destination_observation_id": "cube:event=36:set=6:cam=3",
+                    "rmse_px": 1.9957223338312955,
+                    "n_corners": 16
+                  },
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=3",
+                    "destination_observation_id": "cube:event=36:set=6:cam=1",
+                    "rmse_px": 3.91062839393526,
+                    "n_corners": 12
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "overall_pixel_transfer_rmse_px": 8.805826993515886,
+        "overall_note": "pooled board+cube pixel transfer is descriptive only; use each target component for comparison",
+        "n_output_rejected": 0
+      }
+    },
+    "opencv_board_cube": {
+      "train_targets": [
+        "board",
+        "cube"
+      ],
+      "T_anchor_camera": {
+        "0": [
+          [
+            1.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            1.0,
+            0.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            1.0,
+            0.0
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "1": [
+          [
+            -0.4972883494022246,
+            -0.32715850447631434,
+            0.8035369378551507,
+            -0.47820540559409835
+          ],
+          [
+            0.38817614934001676,
+            0.7443992888420783,
+            0.5433129630838616,
+            -0.32438504780166666
+          ],
+          [
+            -0.7759017815628266,
+            0.5820970810098859,
+            -0.24318596515301216,
+            0.7940958977300344
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ],
+        "3": [
+          [
+            -0.6421315521183553,
+            0.2868448310345668,
+            -0.7109058395334942,
+            0.5952615863983947
+          ],
+          [
+            -0.3902434371408219,
+            0.6758895712651883,
+            0.6252066436175137,
+            -0.3383798982585333
+          ],
+          [
+            0.6598311371423669,
+            0.6788912507638541,
+            -0.32207070666811743,
+            0.745530102749405
+          ],
+          [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        ]
+      },
+      "fit_diagnostics": {
+        "0": {
+          "role": "gauge_anchor",
+          "num_total": 0,
+          "num_inliers": 0
+        },
+        "1": {
+          "num_total": 20,
+          "num_inliers": 19,
+          "inlier_ratio": 0.95,
+          "translation_std_mm": 2.862720849348302,
+          "rotation_std_deg": 0.4190633791130286
+        },
+        "3": {
+          "num_total": 16,
+          "num_inliers": 11,
+          "inlier_ratio": 0.6875,
+          "translation_std_mm": 2.7129808299608444,
+          "rotation_std_deg": 0.4320686265275742
+        }
+      },
+      "heldout_fixed_to_fixed": {
+        "applicable": true,
+        "evaluation_mask_sha256": "9353ca8565c2929198d79ef5c329806c2599cdfd91cf919dd5739d646629faee",
+        "metric_contract": {
+          "name": "fixed_to_fixed_board_cube_cross_target",
+          "targets": [
+            "board",
+            "cube"
+          ],
+          "per_camera_pose": "T_base_target_from_camera = T_base_camera @ T_camera_target_measurement_only_PnP",
+          "pose_metrics": "per_target_pairwise_translation_RMSE_mm_and_SO3_geodesic_RMSE_deg",
+          "pixel_metric": "per_target_bidirectional_component_wise_pixel_transfer_RMSE_px",
+          "uses_shared_base_target_pose": false,
+          "uses_robot_fk": false,
+          "uses_gripper_camera": false,
+          "uses_external_ground_truth": false,
+          "absolute_accuracy_metric": false,
+          "ranking_role_before_external_gt": "fixed_camera_subsystem_relative_metric"
+        },
+        "model_dependent_gating": false,
+        "output_dependent_pose_gate": null,
+        "by_target": {
+          "board": {
+            "pose_consistency_translation_rmse_mm": 7.330208203225597,
+            "pose_consistency_rotation_rmse_deg": 0.1943705614548849,
+            "cross_view_pixel_transfer_rmse_px": 5.037083939529816,
+            "n_pairs": 5,
+            "n_directions": 10,
+            "n_output_rejected": 0,
+            "per_pair": [
+              {
+                "target": "board",
+                "event": 0,
+                "set": 0,
+                "left_observation_id": "board:event=0:set=0:cam=0",
+                "right_observation_id": "board:event=0:set=0:cam=1",
+                "translation_mm": 7.19261095818043,
+                "rotation_deg": 0.18936996296241224,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "board:event=0:set=0:cam=0",
+                    "destination_observation_id": "board:event=0:set=0:cam=1",
+                    "rmse_px": 4.510326449784724,
+                    "n_corners": 28
+                  },
+                  {
+                    "source_observation_id": "board:event=0:set=0:cam=1",
+                    "destination_observation_id": "board:event=0:set=0:cam=0",
+                    "rmse_px": 4.918819262751436,
+                    "n_corners": 47
+                  }
+                ]
+              },
+              {
+                "target": "board",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "board:event=24:set=4:cam=0",
+                "right_observation_id": "board:event=24:set=4:cam=1",
+                "translation_mm": 6.815928629220021,
+                "rotation_deg": 0.19225385059095682,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=0",
+                    "destination_observation_id": "board:event=24:set=4:cam=1",
+                    "rmse_px": 5.287451953449062,
+                    "n_corners": 23
+                  },
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=1",
+                    "destination_observation_id": "board:event=24:set=4:cam=0",
+                    "rmse_px": 4.280306585503086,
+                    "n_corners": 42
+                  }
+                ]
+              },
+              {
+                "target": "board",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "board:event=24:set=4:cam=0",
+                "right_observation_id": "board:event=24:set=4:cam=3",
+                "translation_mm": 6.5613722552461065,
+                "rotation_deg": 0.12598106815362742,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=0",
+                    "destination_observation_id": "board:event=24:set=4:cam=3",
+                    "rmse_px": 4.735192110144801,
+                    "n_corners": 16
+                  },
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=3",
+                    "destination_observation_id": "board:event=24:set=4:cam=0",
+                    "rmse_px": 4.471199560244937,
+                    "n_corners": 42
+                  }
+                ]
+              },
+              {
+                "target": "board",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "board:event=24:set=4:cam=1",
+                "right_observation_id": "board:event=24:set=4:cam=3",
+                "translation_mm": 7.10654579163606,
+                "rotation_deg": 0.28712331352318987,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=1",
+                    "destination_observation_id": "board:event=24:set=4:cam=3",
+                    "rmse_px": 4.131230348480097,
+                    "n_corners": 16
+                  },
+                  {
+                    "source_observation_id": "board:event=24:set=4:cam=3",
+                    "destination_observation_id": "board:event=24:set=4:cam=1",
+                    "rmse_px": 5.631343278825359,
+                    "n_corners": 23
+                  }
+                ]
+              },
+              {
+                "target": "board",
+                "event": 36,
+                "set": 6,
+                "left_observation_id": "board:event=36:set=6:cam=0",
+                "right_observation_id": "board:event=36:set=6:cam=1",
+                "translation_mm": 8.770098464571948,
+                "rotation_deg": 0.13328924622915272,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "board:event=36:set=6:cam=0",
+                    "destination_observation_id": "board:event=36:set=6:cam=1",
+                    "rmse_px": 5.383106605385665,
+                    "n_corners": 24
+                  },
+                  {
+                    "source_observation_id": "board:event=36:set=6:cam=1",
+                    "destination_observation_id": "board:event=36:set=6:cam=0",
+                    "rmse_px": 6.462665665438033,
+                    "n_corners": 37
+                  }
+                ]
+              }
+            ]
+          },
+          "cube": {
+            "pose_consistency_translation_rmse_mm": 7.5013662335144025,
+            "pose_consistency_rotation_rmse_deg": 1.3603046386508977,
+            "cross_view_pixel_transfer_rmse_px": 5.8280603869092396,
+            "n_pairs": 9,
+            "n_directions": 18,
+            "n_output_rejected": 0,
+            "per_pair": [
+              {
+                "target": "cube",
+                "event": 0,
+                "set": 0,
+                "left_observation_id": "cube:event=0:set=0:cam=0",
+                "right_observation_id": "cube:event=0:set=0:cam=1",
+                "translation_mm": 5.048290963368199,
+                "rotation_deg": 1.3614419277161092,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=0",
+                    "destination_observation_id": "cube:event=0:set=0:cam=1",
+                    "rmse_px": 1.4313646093846777,
+                    "n_corners": 12
+                  },
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=1",
+                    "destination_observation_id": "cube:event=0:set=0:cam=0",
+                    "rmse_px": 5.519600400417267,
+                    "n_corners": 16
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 0,
+                "set": 0,
+                "left_observation_id": "cube:event=0:set=0:cam=0",
+                "right_observation_id": "cube:event=0:set=0:cam=3",
+                "translation_mm": 8.421813860360215,
+                "rotation_deg": 1.5426983237320062,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=0",
+                    "destination_observation_id": "cube:event=0:set=0:cam=3",
+                    "rmse_px": 0.7609136732107269,
+                    "n_corners": 8
+                  },
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=3",
+                    "destination_observation_id": "cube:event=0:set=0:cam=0",
+                    "rmse_px": 11.665067623197112,
+                    "n_corners": 16
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 0,
+                "set": 0,
+                "left_observation_id": "cube:event=0:set=0:cam=1",
+                "right_observation_id": "cube:event=0:set=0:cam=3",
+                "translation_mm": 9.284772374867822,
+                "rotation_deg": 0.7877877936263672,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=1",
+                    "destination_observation_id": "cube:event=0:set=0:cam=3",
+                    "rmse_px": 4.319389700053767,
+                    "n_corners": 8
+                  },
+                  {
+                    "source_observation_id": "cube:event=0:set=0:cam=3",
+                    "destination_observation_id": "cube:event=0:set=0:cam=1",
+                    "rmse_px": 9.573753107248287,
+                    "n_corners": 12
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "cube:event=24:set=4:cam=0",
+                "right_observation_id": "cube:event=24:set=4:cam=1",
+                "translation_mm": 6.81745309542835,
+                "rotation_deg": 0.8943393388944041,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=0",
+                    "destination_observation_id": "cube:event=24:set=4:cam=1",
+                    "rmse_px": 4.150340703632829,
+                    "n_corners": 8
+                  },
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=1",
+                    "destination_observation_id": "cube:event=24:set=4:cam=0",
+                    "rmse_px": 5.852270179334944,
+                    "n_corners": 16
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "cube:event=24:set=4:cam=0",
+                "right_observation_id": "cube:event=24:set=4:cam=3",
+                "translation_mm": 6.872939129965713,
+                "rotation_deg": 2.357634724753943,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=0",
+                    "destination_observation_id": "cube:event=24:set=4:cam=3",
+                    "rmse_px": 5.682151855881056,
+                    "n_corners": 12
+                  },
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=3",
+                    "destination_observation_id": "cube:event=24:set=4:cam=0",
+                    "rmse_px": 3.4137271617959444,
+                    "n_corners": 16
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 24,
+                "set": 4,
+                "left_observation_id": "cube:event=24:set=4:cam=1",
+                "right_observation_id": "cube:event=24:set=4:cam=3",
+                "translation_mm": 6.8912519540029535,
+                "rotation_deg": 1.931098749511667,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=1",
+                    "destination_observation_id": "cube:event=24:set=4:cam=3",
+                    "rmse_px": 6.297325969608727,
+                    "n_corners": 12
+                  },
+                  {
+                    "source_observation_id": "cube:event=24:set=4:cam=3",
+                    "destination_observation_id": "cube:event=24:set=4:cam=1",
+                    "rmse_px": 3.7001306824914804,
+                    "n_corners": 8
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 36,
+                "set": 6,
+                "left_observation_id": "cube:event=36:set=6:cam=0",
+                "right_observation_id": "cube:event=36:set=6:cam=1",
+                "translation_mm": 6.763978031825439,
+                "rotation_deg": 0.9263109734898817,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=0",
+                    "destination_observation_id": "cube:event=36:set=6:cam=1",
+                    "rmse_px": 1.8295765757666351,
+                    "n_corners": 12
+                  },
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=1",
+                    "destination_observation_id": "cube:event=36:set=6:cam=0",
+                    "rmse_px": 5.88331312607314,
+                    "n_corners": 8
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 36,
+                "set": 6,
+                "left_observation_id": "cube:event=36:set=6:cam=0",
+                "right_observation_id": "cube:event=36:set=6:cam=3",
+                "translation_mm": 5.193993055217852,
+                "rotation_deg": 0.6761572569818303,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=0",
+                    "destination_observation_id": "cube:event=36:set=6:cam=3",
+                    "rmse_px": 1.3226905812804768,
+                    "n_corners": 16
+                  },
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=3",
+                    "destination_observation_id": "cube:event=36:set=6:cam=0",
+                    "rmse_px": 4.743926722507056,
+                    "n_corners": 8
+                  }
+                ]
+              },
+              {
+                "target": "cube",
+                "event": 36,
+                "set": 6,
+                "left_observation_id": "cube:event=36:set=6:cam=1",
+                "right_observation_id": "cube:event=36:set=6:cam=3",
+                "translation_mm": 10.482461293155536,
+                "rotation_deg": 0.6301897781133683,
+                "pixel_transfer_directions": [
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=1",
+                    "destination_observation_id": "cube:event=36:set=6:cam=3",
+                    "rmse_px": 6.45180197227644,
+                    "n_corners": 16
+                  },
+                  {
+                    "source_observation_id": "cube:event=36:set=6:cam=3",
+                    "destination_observation_id": "cube:event=36:set=6:cam=1",
+                    "rmse_px": 5.458311430436188,
+                    "n_corners": 12
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "overall_pixel_transfer_rmse_px": 5.383654129058068,
+        "overall_note": "pooled board+cube pixel transfer is descriptive only; use each target component for comparison",
+        "n_output_rejected": 0
+      }
+    }
+  },
+  "board_vs_cube_relative_transform_conflict": {
+    "definition": "pose_delta(T_anchor_camera_from_board_train, T_anchor_camera_from_cube_train)",
+    "uses_robot_fk": false,
+    "per_camera": {
+      "1": {
+        "translation_mm": 18.297970097070216,
+        "rotation_deg": 0.23960511042705493
+      },
+      "3": {
+        "translation_mm": 14.17507763321696,
+        "rotation_deg": 0.20360664648157756
+      }
+    },
+    "translation_rmse_mm": 16.366864934693567,
+    "rotation_rmse_deg": 0.22233564203050676
+  },
+  "summary": [
+    {
+      "baseline": "opencv_board",
+      "board_cross_view_pixel_transfer_rmse_px": 1.1720480040083008,
+      "board_pose_consistency_translation_rmse_mm": 1.7664971257211026,
+      "board_pose_consistency_rotation_rmse_deg": 0.1753773658527941,
+      "n_board_pairs": 5,
+      "cube_cross_view_pixel_transfer_rmse_px": 11.78621141291392,
+      "cube_pose_consistency_translation_rmse_mm": 15.27339445062883,
+      "cube_pose_consistency_rotation_rmse_deg": 1.3565539952686092,
+      "n_cube_pairs": 9,
+      "n_train_relative_candidates": 16,
+      "n_train_relative_inliers": 16
+    },
+    {
+      "baseline": "opencv_cube",
+      "board_cross_view_pixel_transfer_rmse_px": 10.859472498037778,
+      "board_pose_consistency_translation_rmse_mm": 15.998321928772437,
+      "board_pose_consistency_rotation_rmse_deg": 0.3252004825614968,
+      "n_board_pairs": 5,
+      "cube_cross_view_pixel_transfer_rmse_px": 4.671775066924454,
+      "cube_pose_consistency_translation_rmse_mm": 5.155552690828458,
+      "cube_pose_consistency_rotation_rmse_deg": 1.41273876962769,
+      "n_cube_pairs": 9,
+      "n_train_relative_candidates": 20,
+      "n_train_relative_inliers": 20
+    },
+    {
+      "baseline": "opencv_board_cube",
+      "board_cross_view_pixel_transfer_rmse_px": 5.037083939529816,
+      "board_pose_consistency_translation_rmse_mm": 7.330208203225597,
+      "board_pose_consistency_rotation_rmse_deg": 0.1943705614548849,
+      "n_board_pairs": 5,
+      "cube_cross_view_pixel_transfer_rmse_px": 5.8280603869092396,
+      "cube_pose_consistency_translation_rmse_mm": 7.5013662335144025,
+      "cube_pose_consistency_rotation_rmse_deg": 1.3603046386508977,
+      "n_cube_pairs": 9,
+      "n_train_relative_candidates": 36,
+      "n_train_relative_inliers": 30
+    }
+  ]
+}
