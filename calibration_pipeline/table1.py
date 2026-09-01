@@ -61,7 +61,10 @@ from calibration_pipeline.runtime import (
     resolve_cube_config_for_run,
 )
 from calibration_pipeline.config import get_default_cube_config
-from calibration_pipeline.observations import load_cube_board_pixel_observations
+from calibration_pipeline.observations import (
+    load_cube_board_pixel_observations,
+    load_pixel_observations_from_manifest,
+)
 from calibration_pipeline.pose_convention import apply_pose_convention_manifest
 from calibration_pipeline.fk_alignment import estimate_board_free_fk_cube_artifact
 from calibration_pipeline.fk_factor import (
@@ -76,11 +79,11 @@ from calibration_pipeline.fk_factor import (
     validate_covariance,
 )
 from calibration_pipeline.path_evaluation import (
-    build_common_path_evaluation_mask,
-    evaluate_paths_with_common_mask,
+    build_frozen_path_evaluation_mask,
+    evaluate_paths_with_frozen_mask,
     not_applicable_path_metrics,
     solve_observed_pose,
-    validate_common_path_evaluation_mask,
+    validate_frozen_path_evaluation_mask,
 )
 from calibration_pipeline.reprojection import (
     PixelObs,
@@ -169,6 +172,15 @@ def _source_data_provenance(
             "heldout": _observation_population_manifest(heldout_observations),
         },
     }
+    observation_manifest = getattr(args, "observation_manifest", None)
+    if observation_manifest:
+        manifest_path = os.path.abspath(observation_manifest)
+        provenance["observation_manifest"] = {
+            "path": manifest_path,
+            "sha256": _file_sha256(manifest_path),
+            "policy": str(getattr(
+                args, "observation_filter_policy", "standard")),
+        }
     pose_manifest_path = os.path.abspath(os.path.join(
         args.root_folder, "pose_convention_manifest.json"))
     if os.path.isfile(pose_manifest_path):
@@ -185,6 +197,8 @@ def validate_source_data_provenance(provenance: Mapping) -> None:
     entries.extend(provenance.get("intrinsics", {}).values())
     if provenance.get("pose_convention_manifest"):
         entries.append(provenance["pose_convention_manifest"])
+    if provenance.get("observation_manifest"):
+        entries.append(provenance["observation_manifest"])
     for entry in entries:
         path = str(entry.get("path", ""))
         expected = str(entry.get("sha256", ""))
@@ -410,7 +424,7 @@ def build_shared_reference_state(
 
     The shared prefit may use both marker families, but it is never scored and
     never sees held-out events.  Every row receives byte-identical values for
-    transforms it has in common with another row.  A row then changes only its
+    transforms it shares with another row.  A row then changes only its
     declared target presence, FK pose source, and optimization freeze mask.
     """
     all_marker_condition = next(
@@ -451,7 +465,7 @@ def build_shared_reference_state(
 def make_initial_state(
         condition: AblationCondition, shared_reference_state: PoseState,
         fixed_cubes: Mapping[int, np.ndarray]) -> Tuple[PoseState, dict]:
-    """Specialize one common reference state only by the declared treatment."""
+    """Specialize one shared reference state only by the declared treatment."""
     state = shared_reference_state.clone()
     if "board" not in condition.target_set:
         state.board = None
@@ -562,8 +576,9 @@ def run_condition_once(condition: AblationCondition, initial_state: PoseState,
         # Use the full held-out cube pool and the same pre-fit mask for every
         # cube-bearing row.  The row-specific target filter must not alter the
         # path-consistency evaluation population.
-        path = evaluate_paths_with_common_mask(
-            test_obs, final_state.cams, final_state.gtc, robot_T,
+        path = evaluate_paths_with_frozen_mask(
+            list(train_obs) + list(test_obs),
+            final_state.cams, final_state.gtc, robot_T,
             gripper, K_map, D_map, path_evaluation_mask)
     else:
         path = not_applicable_path_metrics(
@@ -737,8 +752,9 @@ def run_factor_condition_once(condition: AblationCondition, initial_state: PoseS
     test_metrics = pixel_reprojection_metrics(
         relevant_test, final_state, data.robot_T, data.K_map, data.D_map,
         data.gripper)
-    path = evaluate_paths_with_common_mask(
-        data.test_obs, final_state.cams, final_state.gtc, data.robot_T,
+    path = evaluate_paths_with_frozen_mask(
+        list(data.train_obs) + list(data.test_obs),
+        final_state.cams, final_state.gtc, data.robot_T,
         data.gripper, data.K_map, data.D_map, data.path_evaluation_mask)
     path.pop("predicted_by_set", None)
     return {
@@ -943,15 +959,173 @@ def run_noise_free_sanity(args) -> dict:
 
 
 def detect_observations(args, meta, K_map, D_map, all_cam_ids, gripper):
+    observation_manifest = getattr(args, "observation_manifest", None)
+    if observation_manifest:
+        allowed_events = [
+            int(capture["event_id"])
+            for capture in meta.get("captures", [])
+            if int(capture.get("event_id", -1)) >= 0
+        ]
+        observations, manifest_diag = load_pixel_observations_from_manifest(
+            observation_manifest,
+            policy=str(getattr(
+                args, "observation_filter_policy", "standard")),
+            root=args.root_folder,
+            intrinsics_dir=args.intrinsics_dir,
+            allowed_event_ids=allowed_events,
+            validate_sources=True,
+        )
+        return (
+            observations,
+            manifest_diag.get("cube_config_source", "manifest"),
+            manifest_diag,
+        )
     cfg, cfg_source = resolve_cube_config_for_run(
         args.root_folder, calib_dir=args.calib_dir, default_cfg=get_default_cube_config())
     cube = AprilTagCubeTarget(cfg)
     observations, observation_diag = load_cube_board_pixel_observations(
         args.root_folder, meta, cube, K_map, D_map, all_cam_ids, gripper,
         exclude_gripped_cube=True, fixed_cube_min_corners=8,
-        image_scale=float(getattr(args, "image_scale", 1.0)))
+        image_scale=float(getattr(args, "image_scale", 1.0)),
+        cube_observation_policy=str(getattr(
+            args, "cube_observation_policy", "core_multiface")))
     cube_reason = observation_diag["cube"]
     return observations, cfg_source, cube_reason
+
+
+def apply_board_metric_scale(
+        observations: Sequence[PixelObs], scale: float) -> List[PixelObs]:
+    """Scale ChArUco object coordinates without changing frozen image pixels."""
+    scale = float(scale)
+    if not np.isfinite(scale) or scale <= 0.0:
+        raise ValueError("board metric scale must be finite and positive")
+    return [PixelObs(
+        marker=str(observation.marker),
+        cam=int(observation.cam),
+        event=int(observation.event),
+        set_idx=(None if observation.set_idx is None
+                 else int(observation.set_idx)),
+        object_points=(
+            np.asarray(observation.object_points, dtype=np.float64) * scale
+            if observation.marker == "board"
+            else np.asarray(observation.object_points, dtype=np.float64).copy()
+        ),
+        image_points=np.asarray(
+            observation.image_points, dtype=np.float64).copy(),
+        grasp_idx=(None if observation.grasp_idx is None
+                   else int(observation.grasp_idx)),
+    ) for observation in observations]
+
+
+def estimate_train_board_metric_scale(
+        train_observations: Sequence[PixelObs], gripper_cam_idx: int,
+        K_map, D_map) -> dict:
+    """Align board metric scale to cube using train-only fixed-camera overlap.
+
+    A uniform target-size error leaves relative-camera rotation and translation
+    direction nearly unchanged but scales recovered baseline length. This
+    estimator robustly averages board- and cube-derived anchor-camera transforms
+    and solves one least-squares scale from their translation vectors. It never
+    reads held-out observations, robot FK, Hand-Eye, or external GT.
+    """
+    gripper = int(gripper_cam_idx)
+    fixed_cameras = sorted({
+        int(observation.cam) for observation in train_observations
+        if int(observation.cam) != gripper
+    })
+    if len(fixed_cameras) < 2:
+        raise RuntimeError("board metric alignment needs at least two fixed cameras")
+    anchor = int(fixed_cameras[0])
+    grouped = defaultdict(dict)
+    for observation in train_observations:
+        camera = int(observation.cam)
+        if camera in fixed_cameras and observation.marker in {"board", "cube"}:
+            grouped[(str(observation.marker), int(observation.event))][camera] = observation
+
+    fitted = {"board": {}, "cube": {}}
+    fit_diagnostics = {"board": {}, "cube": {}}
+    for marker in ("board", "cube"):
+        for camera in fixed_cameras:
+            if camera == anchor:
+                continue
+            candidates = []
+            source_events = []
+            for (target, event), by_camera in sorted(grouped.items()):
+                if target != marker or anchor not in by_camera or camera not in by_camera:
+                    continue
+                T_anchor_target = solve_observed_pose(
+                    by_camera[anchor], K_map, D_map)
+                T_camera_target = solve_observed_pose(
+                    by_camera[camera], K_map, D_map)
+                if T_anchor_target is None or T_camera_target is None:
+                    continue
+                candidates.append(T_anchor_target @ inv_T(T_camera_target))
+                source_events.append(int(event))
+            if not candidates:
+                raise RuntimeError(
+                    f"no train {marker} overlap for cam{anchor}-cam{camera}")
+            transform, diagnostics = cp.robust_se3_average(candidates)
+            fitted[marker][camera] = transform
+            fit_diagnostics[marker][str(camera)] = {
+                **diagnostics,
+                "source_event_ids": source_events,
+            }
+
+    board_vectors = np.concatenate([
+        fitted["board"][camera][:3, 3]
+        for camera in fixed_cameras if camera != anchor
+    ])
+    cube_vectors = np.concatenate([
+        fitted["cube"][camera][:3, 3]
+        for camera in fixed_cameras if camera != anchor
+    ])
+    denominator = float(board_vectors @ board_vectors)
+    if denominator <= 1e-12:
+        raise RuntimeError("degenerate board-derived fixed-camera baseline")
+    scale = float((board_vectors @ cube_vectors) / denominator)
+    if not 0.95 <= scale <= 1.05:
+        raise RuntimeError(
+            f"train-only board metric scale {scale:.6f} is outside [0.95, 1.05]")
+
+    per_camera = {}
+    for camera in fixed_cameras:
+        if camera == anchor:
+            continue
+        board_transform = fitted["board"][camera]
+        cube_transform = fitted["cube"][camera]
+        before_mm, rotation_deg = pose_delta(board_transform, cube_transform)
+        scaled_board = np.asarray(board_transform, dtype=np.float64).copy()
+        scaled_board[:3, 3] *= scale
+        after_mm, after_rotation_deg = pose_delta(scaled_board, cube_transform)
+        board_vector = board_transform[:3, 3]
+        camera_scale = float(
+            (board_vector @ cube_transform[:3, 3])
+            / max(float(board_vector @ board_vector), 1e-12))
+        per_camera[str(camera)] = {
+            "translation_disagreement_before_mm": float(before_mm),
+            "translation_disagreement_after_mm": float(after_mm),
+            "rotation_disagreement_deg": float(rotation_deg),
+            "rotation_disagreement_after_deg": float(after_rotation_deg),
+            "camera_specific_scale": camera_scale,
+            "board_baseline_norm_mm": float(
+                np.linalg.norm(board_transform[:3, 3]) * 1000.0),
+            "cube_baseline_norm_mm": float(
+                np.linalg.norm(cube_transform[:3, 3]) * 1000.0),
+        }
+    return {
+        "mode": "train_only_fixed_camera_board_to_cube_metric_alignment",
+        "enabled": True,
+        "scale": scale,
+        "nominal_square_length_mm": 25.0,
+        "effective_square_length_mm": 25.0 * scale,
+        "anchor_camera_id": anchor,
+        "fixed_camera_ids": fixed_cameras,
+        "heldout_observations_used": False,
+        "robot_fk_used": False,
+        "external_ground_truth_used": False,
+        "per_camera": per_camera,
+        "fit_diagnostics": fit_diagnostics,
+    }
 
 
 @dataclass
@@ -967,6 +1141,7 @@ class PreparedAblationData:
     train_obs: List[PixelObs]
     test_obs: List[PixelObs]
     source_data_provenance: dict
+    board_metric_scale: dict
     pose_convention: dict
     path_evaluation_mask: dict
     board_gtc: np.ndarray
@@ -1010,21 +1185,44 @@ def prepare_ablation_data(args) -> PreparedAblationData:
     pool = [obs for obs in observations if obs.set_idx in eligible]
     train_obs = [obs for obs in pool if int(obs.event) in train_events]
     test_obs = [obs for obs in pool if int(obs.event) in test_events]
+    if bool(getattr(args, "align_board_metric_scale", False)):
+        board_metric_scale = estimate_train_board_metric_scale(
+            train_obs, gripper, K_map, D_map)
+        observations = apply_board_metric_scale(
+            observations, board_metric_scale["scale"])
+        pool = [obs for obs in observations if obs.set_idx in eligible]
+        train_obs = [obs for obs in pool if int(obs.event) in train_events]
+        test_obs = [obs for obs in pool if int(obs.event) in test_events]
+    else:
+        board_metric_scale = {
+            "mode": "nominal_config",
+            "enabled": False,
+            "scale": 1.0,
+            "nominal_square_length_mm": 25.0,
+            "effective_square_length_mm": 25.0,
+            "heldout_observations_used": False,
+        }
     source_data_provenance = _source_data_provenance(
         args, all_cam_ids, pool, train_obs, test_obs)
     common_fixed_cameras = sorted({
         int(obs.cam) for obs in test_obs
         if obs.marker == "cube" and int(obs.cam) != gripper
     })
-    path_evaluation_mask = build_common_path_evaluation_mask(
+    event_roles = {
+        **{int(event): "train" for event in train_events},
+        **{int(event): "heldout" for event in test_events},
+    }
+    path_evaluation_mask = build_frozen_path_evaluation_mask(
         observations=test_obs,
         fixed_camera_ids=common_fixed_cameras,
         gripper_cam_idx=gripper,
         K_map=K_map,
         D_map=D_map,
         set_filter=sorted(eligible),
+        fixed_anchor_observations=pool,
+        event_roles=event_roles,
     )
-    validate_common_path_evaluation_mask(path_evaluation_mask)
+    validate_frozen_path_evaluation_mask(path_evaluation_mask)
 
     # Build the canonical FK artifact before any board-derived quantity exists.
     # The estimator itself additionally rejects all non-eih-cube observations.
@@ -1099,6 +1297,7 @@ def prepare_ablation_data(args) -> PreparedAblationData:
         train_obs=train_obs,
         test_obs=test_obs,
         source_data_provenance=source_data_provenance,
+        board_metric_scale=board_metric_scale,
         pose_convention=pose_convention,
         path_evaluation_mask=path_evaluation_mask,
         board_gtc=board_gtc,
@@ -1149,9 +1348,12 @@ def build_shared_baseline_artifact(
         "observation_loader": {
             "exclude_gripped_cube": True,
             "fixed_cube_min_corners": 8,
+            "cube_observation_policy": data.cube_detection[
+                "observation_policy"],
             "image_scale": float(getattr(args, "image_scale", 1.0)),
             "cube_pnp_quality_contract": data.cube_detection[
                 "quality_contract"],
+            "board_metric_scale": data.board_metric_scale,
         },
         "cube_config_source": data.cube_config_source,
         "source_data_provenance": data.source_data_provenance,
@@ -1220,8 +1422,8 @@ def validate_result_evaluation_contract(result: Mapping) -> None:
     protocol = result.get("protocol", {})
     mask = protocol.get("model_independent_path_evaluation_mask")
     if mask is None:
-        raise ValueError("result is missing the common path-evaluation mask")
-    validate_common_path_evaluation_mask(mask)
+        raise ValueError("result is missing the frozen path-evaluation mask")
+    validate_frozen_path_evaluation_mask(mask)
     mask_sha = mask["evaluation_mask_sha256"]
     expected_cross = len(mask["cross_pairs"])
     expected_e2e = len(mask["e2e_units"])
@@ -1243,9 +1445,11 @@ def validate_result_evaluation_contract(result: Mapping) -> None:
                 if metrics.get("applicable") is not True:
                     raise ValueError(f"{row}: cube-bearing row lacks path metrics")
                 if int(metrics.get("n_cross_pairs", -1)) != expected_cross:
-                    raise ValueError(f"{row}: e_cross population differs from common mask")
+                    raise ValueError(
+                        f"{row}: e_cross population differs from the frozen mask")
                 if int(metrics.get("n_e2e_units", -1)) != expected_e2e:
-                    raise ValueError(f"{row}: e_e2e population differs from common mask")
+                    raise ValueError(
+                        f"{row}: e_e2e population differs from the frozen mask")
                 if int(metrics.get("n_output_rejected", -1)) != 0:
                     raise ValueError(f"{row}: fitted output rejected evaluation units")
             elif metrics.get("applicable") is not False:
@@ -1298,13 +1502,41 @@ def parse_args(argv=None):
     parser.add_argument("--x_scale_mode", choices=["unit", "jac"], default="jac",
                         help="SciPy trust-region x_scale mode.")
     parser.add_argument("--loss", choices=["huber", "soft_l1", "linear"], default="soft_l1",
-                        help="Common pixel loss; canonical default is smooth robust soft_l1.")
+                        help=("Identical pixel loss for every row; canonical "
+                              "default is smooth robust soft_l1."))
     parser.add_argument("--f_scale_px", type=float, default=2.0,
                         help="Robust-loss transition in pixels; ignored by linear loss.")
     parser.add_argument(
         "--image_scale", type=float, default=1.0,
         help=("Detection raster scale. Detected points are mapped back to native "
               "pixel coordinates; 1.0 preserves the production path."))
+    parser.add_argument(
+        "--cube-observation-policy",
+        choices=("core_multiface", "legacy"),
+        default="core_multiface",
+        help=("core_multiface keeps only >=2-face non-planar cube images; "
+              "legacy reproduces the prior corner-count policy for comparison."),
+    )
+    parser.add_argument(
+        "--observation-manifest", "--observation_manifest",
+        dest="observation_manifest",
+        help=("Step2b frozen-corner manifest. When set, detectors are not run "
+              "and this exact observation population is used."),
+    )
+    parser.add_argument(
+        "--observation-filter-policy", "--observation_filter_policy",
+        dest="observation_filter_policy",
+        choices=("standard", "strict"),
+        default="standard",
+        help="Selection policy stored in --observation-manifest.",
+    )
+    parser.add_argument(
+        "--align-board-metric-scale", "--align_board_metric_scale",
+        dest="align_board_metric_scale", action="store_true",
+        help=("Estimate one board object-coordinate scale from train-only "
+              "fixed-camera board/cube relative transforms, then freeze it "
+              "for train and held-out observations."),
+    )
     parser.add_argument(
         "--fk_covariance_json",
         help=("Preregistered measured FK covariance. Without it, A4/B1/B2 "
@@ -1405,12 +1637,18 @@ def main(argv=None, force_baseline_only: bool = False) -> None:
             "resolved_set_indices": split["eligible_sets"],
             "cube_config_source": cube_cfg_source,
             "source_data_provenance": prepared.source_data_provenance,
+            "board_metric_scale": prepared.board_metric_scale,
             "pose_convention": prepared.pose_convention,
             "primary_metric": PRIMARY_METRIC,
             "reprojection_metric_contract": REPROJECTION_METRIC_CONTRACT,
             "split": split,
             "backend": "canonical_corner_reprojection_v1",
             "optimization_structure": OPTIMIZATION_STRUCTURE_CONTRACT,
+            "optimization_terminology": {
+                "seq": "sequential_frozen_stage",
+                "U": "unified_joint_optimization",
+                "forbidden_synonym_for_seq": "independent",
+            },
             "one_runner_for_all_executable_rows": True,
             "visual_objective": "raw_distorted_pixel_corner_reprojection",
             "solver_options": canonical_solver_options(args).to_dict(),
@@ -1517,6 +1755,10 @@ def main(argv=None, force_baseline_only: bool = False) -> None:
             "condition": {
                 "target_set": condition.target_set,
                 "unified": condition.unified,
+                "optimization_label": (
+                    "sequential_frozen_stage"
+                    if condition.unified == "seq"
+                    else "unified_joint_optimization"),
                 "fk_to_cube": condition.fk_to_cube,
                 "fk_to_board": condition.fk_to_board,
                 "label": condition.label,

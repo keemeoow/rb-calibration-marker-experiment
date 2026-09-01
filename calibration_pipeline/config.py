@@ -13,6 +13,8 @@ from typing import Dict, Tuple
 # USER-EDITABLE MARKER IDS / SIZES - AprilTag 59mm calibration cube
 # -----------------------------------------------------------------------------
 # Edit only this block when reprinting tags with different IDs.
+# Sizes are the outer black-border side lengths used by solvePnP. Measure that
+# border on the printed tags (not the white paper/pocket) before changing them.
 # Top face has two 25mm tags on +Z, centered at y=-14mm and y=+14mm.
 # Four side faces have one 51mm tag each.
 # =============================================================================
@@ -79,8 +81,11 @@ class CubeConfig:
         SIDE_MARKER_NEG_Y_ID: (0.0, -0.0295, -0.001),
     })
 
-    # Detector corner order correction. Keep identity unless a printed tag is
-    # physically rotated/mirrored and you have verified the required order.
+    # OpenCV returns decoded marker corners visually clockwise in the image.
+    # local_corners_for() uses the matching order
+    # (+u,-v), (-u,-v), (-u,+v), (+u,+v), which is clockwise when viewed from
+    # outside the cube. Keep identity unless detector/model order is explicitly
+    # verified to differ; printed in-plane rotation belongs in face_roll_deg.
     corner_reorder: Dict[int, Tuple[int, int, int, int]] = field(default_factory=lambda: {
         TOP_MARKER_NEG_Y_ID: (0, 1, 2, 3),
         TOP_MARKER_POS_Y_ID: (0, 1, 2, 3),
@@ -92,10 +97,10 @@ class CubeConfig:
 
     # In-plane rotation around each face normal, degrees. Validate physically.
     # Per-face in-plane roll (deg, about the face normal) of the printed marker vs
-    # the nominal face axes. Calibrated from data/session multi-face co-observations
+    # the nominal face axes. Calibrated from data/session04 multi-face co-observations
     # (self-calibration over roll in {0,90,180,270}): the physical cube's side tags
     # are mounted rotated by 90-degree steps. Applying these brought the inter-face
-    # cube-pose rotation disagreement from median ~91deg down to ~1.9deg.
+    # cube-pose rotation disagreement from median 90.72deg down to 2.20deg.
     # If the cube is reprinted/re-stickered, re-run the face-roll self-calibration.
     face_roll_deg: Dict[int, float] = field(default_factory=lambda: {
         TOP_MARKER_NEG_Y_ID: 0.0,

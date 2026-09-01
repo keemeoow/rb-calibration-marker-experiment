@@ -40,6 +40,28 @@ GRIPPED_TARGET_EVENT = "event_free"   # T_base_cube[e] free, FK unused
 GRIPPED_TARGET_MODELS = frozenset({GRIPPED_TARGET_GRASP, GRIPPED_TARGET_EVENT})
 
 
+def robust_least_squares_cost(
+        residuals: np.ndarray, loss: str, scale: float) -> float:
+    """Return SciPy's robust least-squares cost for one residual block.
+
+    Keeping this calculation explicit makes the large visual block comparable
+    with the much smaller FK block.  The value includes the same ``1/2`` factor
+    used by :func:`scipy.optimize.least_squares`.
+    """
+    values = np.asarray(residuals, dtype=np.float64).reshape(-1)
+    scale = float(scale)
+    if loss not in {"linear", "huber", "soft_l1"} or scale <= 0.0:
+        raise ValueError("invalid robust loss or scale")
+    z = np.square(values / scale)
+    if loss == "linear":
+        rho = z
+    elif loss == "soft_l1":
+        rho = 2.0 * (np.sqrt(1.0 + z) - 1.0)
+    else:
+        rho = np.where(z <= 1.0, z, 2.0 * np.sqrt(z) - 1.0)
+    return float(0.5 * scale * scale * np.sum(rho))
+
+
 @dataclass(frozen=True)
 class PixelObs:
     marker: str
@@ -53,6 +75,39 @@ class PixelObs:
     # the gripper, so one constant per grasp replaces one pose per placement.
     # ``None`` keeps the placement model and the legacy behaviour untouched.
     grasp_idx: Optional[int] = None
+
+
+def observation_population(
+        observations: Sequence[PixelObs], gripper_cam_idx: int) -> dict:
+    """Describe the exact residual population before any model is fitted."""
+    gripper = int(gripper_cam_idx)
+
+    def empty() -> dict:
+        return {"observations": 0, "corners": 0, "residual_components": 0}
+
+    total = empty()
+    by_marker: Dict[str, dict] = {}
+    by_role = {"eih": empty(), "e2h": empty()}
+    by_camera: Dict[str, dict] = {}
+    for observation in observations:
+        corners = int(len(np.asarray(observation.image_points).reshape(-1, 2)))
+        role = "eih" if int(observation.cam) == gripper else "e2h"
+        camera = str(int(observation.cam))
+        marker = str(observation.marker)
+        for bucket in (
+                total,
+                by_marker.setdefault(marker, empty()),
+                by_role[role],
+                by_camera.setdefault(camera, empty())):
+            bucket["observations"] += 1
+            bucket["corners"] += corners
+            bucket["residual_components"] += 2 * corners
+    return {
+        **total,
+        "by_marker": dict(sorted(by_marker.items())),
+        "by_camera_role": by_role,
+        "by_camera": dict(sorted(by_camera.items(), key=lambda item: int(item[0]))),
+    }
 
 
 @dataclass
@@ -462,7 +517,7 @@ def jacobian_diagnostics(
 
 def coordinate_change_factors(n_transforms: int, source: SE3Scaling,
                               target: SE3Scaling) -> np.ndarray:
-    """Return ``dx_source / dx_target`` for a common physical perturbation."""
+    """Return ``dx_source / dx_target`` for the same physical perturbation."""
     source.validate()
     target.validate()
     block = np.array(
@@ -536,10 +591,39 @@ def solve_corner_reprojection(
         "elapsed_s": elapsed,
         "n_parameters": int(problem.n_params),
         "n_residuals": int(problem.n_residuals),
+        "visual_residual_population": observation_population(
+            observations, gripper_cam_idx),
         "freeze_manifest": freeze_manifest(reference_state, variable_keys_),
         "variable_keys": [f"{kind}:{idx}" for kind, idx in problem.variable_keys],
         "initial_reprojection_rmse_px": float(np.sqrt(np.mean(np.square(initial_residual)))),
         "train_reprojection_rmse_px": float(np.sqrt(np.mean(np.square(final_residual)))),
+        "objective_block_costs": {
+            "cost_definition": "0.5 * sum(rho((residual / scale)^2) * scale^2)",
+            "visual": {
+                "n_residual_components": int(len(final_residual)),
+                "loss": str(options.loss),
+                "scale_px": float(options.f_scale_px),
+                "initial_raw_l2_cost": float(
+                    0.5 * np.sum(np.square(initial_residual))),
+                "final_raw_l2_cost": float(
+                    0.5 * np.sum(np.square(final_residual))),
+                "initial_robust_cost": robust_least_squares_cost(
+                    initial_residual, options.loss, options.f_scale_px),
+                "final_robust_cost": robust_least_squares_cost(
+                    final_residual, options.loss, options.f_scale_px),
+                "final_robust_cost_per_component": float(
+                    robust_least_squares_cost(
+                        final_residual, options.loss, options.f_scale_px)
+                    / max(1, len(final_residual))),
+            },
+            "fk": {
+                "active": False,
+                "n_factor_blocks": 0,
+                "n_residual_components": 0,
+                "final_robust_cost": 0.0,
+                "fraction_of_total_robust_cost": 0.0,
+            },
+        },
         "cost": float(solution.cost),
         "jacobian": jacobian_diagnostics(solution.jac, problem.n_params),
         "common_scaled_jacobian": {
