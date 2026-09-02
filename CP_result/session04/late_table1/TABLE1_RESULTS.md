@@ -20,6 +20,38 @@
 - Reference-dependent Reprojection (기준 의존 재투영)은 Secondary Diagnostic (보조 진단)이며 방법 순위에 사용하지 않는다.
 - 현재 결론의 대표 행은 A2다. A4는 measured FK covariance 전 preflight이고, A5는 이전 A3의 성능 원인을 설명하는 post-hoc diagnostic이다. 실제 물리 순위는 External GT 이후 결정한다.
 
+## Matched Contrast Decision Table (비교실험 구성 확정표)
+
+모든 행을 하나의 전체 순위로 세우지 않고, 한 번에 한 요소만 달라지는 contrast만 해석한다.
+
+| Tier (구분) | Direct Contrast (직접 비교) | Question (검증 질문) | Primary Metric (주 지표) | Session04 Result | Decision (판정) |
+| --- | --- | --- | --- | --- | --- |
+| Confirmatory internal | A0 <-> B3 | Board-only에서 sequential freeze와 unified feedback 차이가 있는가 | held-out board px | Board 4.0530 -> 4.0531 (+0.0001) | 동률. Board-only에서는 통합 자체가 추가 이득을 만들지 않는다. |
+| Confirmatory internal | A0 -> A1 | 순차법에 cube residual을 추가하면 board 성능이 좋아지는가 | held-out board px, N_reg | Board 4.0530 -> 4.0645 (+0.0116); N_reg 3 -> 3 | Board는 미세 악화. 순차 구조에서는 cube 추가 이득이 보이지 않는다. |
+| Confirmatory internal | A1 -> A2 | Vision-only 조건에서 unified feedback이 도움이 되는가 | held-out board/cube px | Board 4.0645 -> 3.9840 (-0.0805); Cube 4.1402 -> 3.5958 (-0.5443) | 두 target 모두 개선. 현재 내부 확증에서 가장 강한 긍정 contrast다. |
+| Confirmatory internal | B3 -> A2 | Unified 조건에서 cube residual이 board calibration에도 도움이 되는가 | held-out board px | Board 4.0531 -> 3.9840 (-0.0690) | Board shared component가 개선. 단 marker-system 전체 성능 주장은 아니다. |
+| Confirmatory internal | A2 -> A3 | Vision-estimated cube pose를 raw-FK hard fixed로 바꾸면 어떤가 | held-out board/cube px | Board 3.9840 -> 4.1025 (+0.1185); Cube 3.5958 -> 6.3959 (+2.8000) | 특히 cube가 크게 악화. raw FK를 GT로 해석하면 안 된다. |
+| Preflight | B1 -> A4 | 같은 soft FK factor에서 sequential과 unified 중 무엇이 나은가 | held-out board/cube px | Board 4.0648 -> 3.9884 (-0.0764); Cube 4.1182 -> 3.5805 (-0.5378) | 통합 개선 경향. measured covariance 전까지는 preflight다. |
+| Preflight | A2 -> A4 | Unified vision-only에 soft FK factor를 추가하면 이득이 있는가 | held-out board/cube px | Board 3.9840 -> 3.9884 (+0.0044); Cube 3.5958 -> 3.5805 (-0.0153) | 사실상 동률. A4는 방법 확장 후보지만 현재 우월성 주장은 금지. |
+| Preflight | B2 -> A4 | Soft FK 조건에서 board residual이 cube 보정에 도움 되는가 | held-out cube px | Cube 4.4827 -> 3.5805 (-0.9023) | Cube가 개선. board residual은 soft-FK cube 추정에 도움이 된다. |
+| Post-hoc | A3 <-> A5, A4 <-> A5 | Raw/aligned FK, soft/hard 원인을 분리할 수 있는가 | internal metrics only | A3->A5 Board 4.1025 -> 3.8804 (-0.2222); Cube 6.3959 -> 3.2274 (-3.1685); A4->A5 Board 3.9884 -> 3.8804 (-0.1080); Cube 3.5805 -> 3.2274 (-0.3531) | A5는 원인 진단 전용. 독립 correction 또는 물리 순위가 아니다. |
+
+> 현재 메인 결론은 A2다. A4는 measured FK covariance가 들어오기 전까지 방법 확장 후보이고, A5는 post-hoc 원인 진단이다.
+
+## Metric Decision Matrix (평가지표 판정표)
+
+| Metric (지표) | Tier (등급) | Use (사용법) | Limit (제한) | Current Support (현재 근거) |
+| --- | --- | --- | --- | --- |
+| Train reprojection RMSE | Solver diagnostic | 수렴/적합 상태 확인 | 학습 관측에 대한 fit이므로 방법 우월성 지표가 아니다. | row별 train residual |
+| Own-marker held-out RMSE | Primary internal pixel metric | matched contrast의 board/cube별 주 지표 | 같은 set의 다른 event라 새 위치 일반화나 물리 GT가 아니다. | Board 703 corners, Cube 236 corners |
+| Pooled overall RMSE | Secondary summary | 같은 marker population 내부에서만 참고 | Board corner 지지도가 커서 전체값이 board에 치우친다. | 전체 순위 금지 |
+| Set-equal-weight RMSE | Exploratory support-bias check | corner-pooled 값 옆에 병기 | n=9 sets라 CI/유의성 주장은 아직 약하다. | corner -> event -> set -> set 동일가중 |
+| Fixed-to-Fixed Board/Cube | Supplementary FK-free subsystem metric | 고정카메라 상대 일관성 진단 | 모든 고정카메라에 함께 존재하는 systematic error와 절대 물리 오차를 검출하지 못한다. | fixed cameras 0, 1, 3; 17 obs |
+| Gripper-to-Fixed Board/Cube | Supplementary FK-dependent closure metric | 전체 chain 내부 진단 | FK와 Hand-Eye가 섞이며 fixed anchor 일부는 train 관측이다. | mixed train-anchor/held-out internal closure |
+| Reference-dependent reprojection | Secondary diagnostic | 공유 target pose 기준의 보조 확인 | reference가 fitted target이므로 ranking 지표가 아니다. | cross-target v8 artifact |
+| Seed mean +/- std | Stability diagnostic | 3개 초기화 perturbation 안정성 확인 | 독립 실험 표본이 아니라 통계적 반복으로 해석하지 않는다. | 27/27 converged |
+| External TRE/rotation/P95/failure | Future final primary metric | blind external GT 확보 후 최종 물리 정확도 | 현재 Session04에는 GT가 없어 계산 불가. | future capture required |
+
 ## Code-consistency Audit (코드 일치성 검증)
 
 ### 카메라 간 Relative Pose
@@ -73,8 +105,8 @@ A5는 board와 held-out을 제외한 train eye-in-hand cube 영상으로 추정�
 | A0 (baseline) | board | sequential_frozen_stage | — | 3.8202 | 4.0530 | 4.0530 / N/A | 3/3 | Complete (완료) |
 | A1 (+cube) | cube+board | sequential_frozen_stage | estimated | 3.7923 | 4.0837 | 4.0645 / 4.1402 | 3/3 | Complete (완료) |
 | A2 (+unified) | cube+board | unified_joint_optimization | estimated | 3.7421 | 3.8901 | **3.9840** / **3.5958** | 3/3 | Complete (완료) |
-| A3 (raw-FK hard fixed) | cube+board | unified_joint_optimization | raw-FK-fixed | 5.1587 | 4.7835 | 4.1026 / 6.3959 | 3/3 | Complete (완료) |
-| B3 (−cube) | board | unified_joint_optimization | — | 3.8202 | 4.0530 | 4.0530 / N/A | 3/3 | Complete (완료) |
+| A3 (raw-FK hard fixed) | cube+board | unified_joint_optimization | raw-FK-fixed | 5.1587 | 4.7835 | 4.1025 / 6.3959 | 3/3 | Complete (완료) |
+| B3 (−cube) | board | unified_joint_optimization | — | 3.8202 | 4.0531 | 4.0531 / N/A | 3/3 | Complete (완료) |
 
 ### Preflight (예비실험)
 
@@ -93,6 +125,24 @@ Simulation prior FK covariance를 쓰므로 물리 우월성 주장에는 쓰지
 | Method (방법) | 기여도2 - Marker Set (마커 구성) | 기여도1 - Optimization (최적화) | 기여도3 - Cube Pose (큐브 자세 처리) | Train Overall (학습 전체 px) | Own Held-out Overall (자체 홀드아웃 전체 px) | Board/Cube Held-out (보드/큐브 홀드아웃 px) | Convergence (수렴) | Status (상태) |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |
 | A5 (Post-hoc diagnostic (vision-aligned FK fixed)) | cube+board | unified_joint_optimization | vision-aligned-FK-fixed | 3.9648 | 3.7270 | 3.8804 / 3.2274 | 3/3 | Post-hoc Diagnostic (사후 원인 진단) |
+
+### Set-equal-weight Held-out RMSE (set 동일가중 홀드아웃)
+
+Held-out corner 지지도는 Board `703` / Cube `236`이므로 corner-pooled Overall은 Board가 약 `74.9%`를 차지한다. 아래 표는 같은 관측을 corner-pooled와 `corner → event → set → set 동일가중` 두 방식으로 집계한 값이다. 두 값의 차이는 정확도 변화가 아니라 set별 corner 지지도 불균형의 크기이며, 방법 간 방향이 달라지는 행은 corner 지지도에 의존하는 결론이므로 단독으로 해석하지 않는다.
+
+| Method (방법) | Board pooled / set-equal (보드 px) | Cube pooled / set-equal (큐브 px) | Overall pooled / set-equal (전체 px) | Status (상태) |
+| --- | ---: | ---: | ---: | --- |
+| A0 (baseline) | 4.0530 / 4.1922 | N/A / N/A | 4.0530 / 4.1922 | Complete (완료) |
+| A1 (+cube) | 4.0645 / 4.1895 | 4.1402 / 4.8990 | 4.0837 / 4.4282 | Complete (완료) |
+| A2 (+unified) | 3.9840 / 4.1298 | 3.5958 / 4.1029 | 3.8901 / 4.1369 | Complete (완료) |
+| A3 (raw-FK hard fixed) | 4.1025 / 4.2940 | 6.3959 / 6.9985 | 4.7835 / 5.3355 | Complete (완료) |
+| A4 (corrected-FK soft factor) | 3.9884 / 4.1332 | 3.5805 / 4.0734 | 3.8899 / 4.1339 | Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값) |
+| A5 (Post-hoc diagnostic (vision-aligned FK fixed)) | 3.8804 / 4.0761 | 3.2274 / 3.7157 | 3.7270 / 4.0251 | Post-hoc Diagnostic (사후 원인 진단) |
+| B1 (−Unified) | 4.0648 / 4.1895 | 4.1182 / 4.8545 | 4.0783 / 4.4164 | Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값) |
+| B2 (−board) | N/A / N/A | 4.4827 / 4.7570 | 4.4827 / 4.7570 | Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값) |
+| B3 (−cube) | 4.0531 / 4.1923 | N/A / N/A | 4.0531 / 4.1923 | Complete (완료) |
+
+> Set 동일가중 값은 corner-pooled 값을 대체하지 않는 보조 지표이며, `n=9 sets`이므로 이 차이만으로 유의성을 주장하지 않는다.
 
 > `Convergence 3/3`은 서로 다른 초기화 seed 3회 모두에서 SciPy solver가 `success=True`로 종료됐다는 뜻이다. Sequential 행은 두 stage가 모두 성공해야 하며, B1은 stage 1과 모든 fixed-camera stage 2가 성공해야 1회 수렴으로 센다. 이는 solver 종료 조건 충족을 뜻할 뿐, 절대 정확도나 전역 최적해를 보장하지 않는다.
 
@@ -117,37 +167,37 @@ Simulation prior FK covariance를 쓰므로 물리 우월성 주장에는 쓰지
 
 | Method (방법) | Board Pixel (보드 px) | Board Translation (보드 이동 mm) | Board Rotation (보드 회전 deg) | Cube Pixel (큐브 px) | Cube Translation (큐브 이동 mm) | Cube Rotation (큐브 회전 deg) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| A0 | 1.1851 | 1.7186 | **0.1926** | 6.6803 | 10.1150 | 0.6312 |
-| A1 | 2.8468 | 3.8417 | 0.3316 | 6.3167 | 9.2291 | 0.8210 |
-| A2 | 3.0243 | 4.3201 | 0.4218 | 3.9992 | 5.9598 | 0.6322 |
-| A3 | 2.4999 | 2.6499 | 1.7229 | 5.8562 | 9.0238 | 2.1769 |
+| A0 | 1.1851 | 1.7187 | **0.1926** | 6.6803 | 10.1151 | 0.6312 |
+| A1 | 2.8473 | 3.8423 | 0.3315 | 6.3173 | 9.2300 | 0.8210 |
+| A2 | 3.0241 | 4.3197 | 0.4218 | 3.9997 | 5.9604 | 0.6321 |
+| A3 | 2.4999 | 2.6496 | 1.7229 | 5.8563 | 9.0239 | 2.1769 |
 | A4 | 3.1156 | 4.4295 | 0.4118 | 4.0375 | 5.9500 | 0.6294 |
 | A5 | 4.8563 | 7.3005 | 0.4917 | **3.4706** | **4.4892** | 0.8073 |
 | B1 | 2.9129 | 3.9581 | 0.3474 | 6.2871 | 9.1546 | 0.8406 |
 | B2 | 4.1681 | 5.7157 | 0.3533 | 3.5610 | 4.8703 | **0.4866** |
-| B3 | **1.1829** | **1.7159** | 0.1931 | 6.6767 | 10.1095 | 0.6309 |
+| B3 | **1.1817** | **1.7139** | 0.1933 | 6.6759 | 10.1082 | 0.6306 |
 
 ### Gripper-to-Fixed (그리퍼카메라–고정카메라 간)
 
 | Method (방법) | Board Pixel (보드 px) | Board Translation (보드 이동 mm) | Board Rotation (보드 회전 deg) | Cube Pixel (큐브 px) | Cube Translation (큐브 이동 mm) | Cube Rotation (큐브 회전 deg) |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| A0 | **4.5445** | 5.4811 | 0.7966 | 7.4402 | 8.1421 | 0.9779 |
-| A1 | 4.8356 | 6.1045 | 0.9829 | 7.6100 | 8.6914 | 1.1164 |
-| A2 | 5.2890 | 7.2539 | 1.0833 | 6.8987 | 7.6781 | 1.1296 |
-| A3 | 4.8364 | **4.5646** | 1.9454 | 7.1666 | 8.0966 | 2.0590 |
+| A0 | **4.5444** | 5.4810 | 0.7966 | 7.4402 | 8.1421 | 0.9779 |
+| A1 | 4.8357 | 6.1045 | 0.9829 | 7.6103 | 8.6918 | 1.1164 |
+| A2 | 5.2889 | 7.2536 | 1.0833 | 6.8987 | 7.6782 | 1.1296 |
+| A3 | 4.8363 | **4.5645** | 1.9455 | 7.1667 | 8.0968 | 2.0591 |
 | A4 | 5.3034 | 7.2305 | 1.0633 | 6.9064 | 7.7073 | 1.1144 |
-| A5 | 5.6332 | 6.8618 | **0.7790** | **6.2895** | **7.2581** | **0.9110** |
+| A5 | 5.6332 | 6.8618 | **0.7789** | **6.2895** | **7.2581** | **0.9110** |
 | B1 | 4.8536 | 6.0976 | 0.9803 | 7.5907 | 8.6865 | 1.1161 |
-| B2 | 5.4611 | 7.9540 | 1.1039 | 7.2526 | 8.1046 | 1.1786 |
-| B3 | 4.5447 | 5.4821 | 0.7966 | 7.4385 | 8.1401 | 0.9777 |
+| B2 | 5.4611 | 7.9540 | 1.1039 | 7.2526 | 8.1045 | 1.1786 |
+| B3 | 4.5449 | 5.4827 | 0.7966 | 7.4381 | 8.1394 | 0.9777 |
 
 ### Marker-system End-to-End (마커 시스템 전체 경로)
 
 | System (시스템) | Own Held-out (자체 홀드아웃 px) | Fixed-to-Fixed Board/Cube (고정카메라 간 보드/큐브 px) | Gripper-to-Fixed Board/Cube (그리퍼카메라–고정카메라 간 보드/큐브 px) | Convergence (수렴) |
 | --- | ---: | ---: | ---: | ---: |
-| Board-only end-to-end | 4.0530 | **1.1832** / 6.6778 | **4.5447** / 7.4389 | 3/3 |
-| Cube-only end-to-end | 4.6038 | 3.8587 / **3.5977** | 5.3888 / 7.4576 | 3/3 |
-| Board+Cube end-to-end | 3.8901 | 3.0243 / 3.9992 | 5.2890 / **6.8987** | 3/3 |
+| Board-only end-to-end | 4.0531 | **1.1831** / 6.6780 | **4.5447** / 7.4389 | 3/3 |
+| Cube-only end-to-end | 4.6037 | 3.8585 / **3.5981** | 5.3888 / 7.4576 | 3/3 |
+| Board+Cube end-to-end | 3.8901 | 3.0241 / 3.9997 | 5.2889 / **6.8987** | 3/3 |
 
 ## Calculation (계산 방식)
 
@@ -160,6 +210,8 @@ $$T^B_{C_g}(e)=T^B_G(e)T^G_{C_g}$$
 $$T^{B,(g)}_O(e)=T^B_G(e)T^G_{C_g}T^{C_g}_{O,\mathrm{PnP}}$$
 
 Pixel Transfer RMSE (픽셀 전달 평균제곱근오차)는 한 카메라의 측정 PnP 자세를 다른 카메라로 옮겨 실제 검출 코너와 비교한다. Translation/Rotation Consistency (이동/회전 일관성)는 두 경로로 얻은 $T^B_O$의 차이를 mm/deg로 계산한다. Gripper-to-Fixed의 최종값은 pair 성분을 Event RMSE로, Event를 set RMSE로 집계한 뒤 set별 동일 가중치로 계산한다.
+
+Held-out reprojection의 기본값은 corner-pooled RMSE $\sqrt{\frac{1}{2N}\sum(du^2+dv^2)}$이다. 같은 관측을 `corner → Event RMSE → set RMSE → set별 동일 가중치` 순서로 다시 집계한 값을 Set-equal-weight로 병기한다. 두 값은 corner 지지도가 set마다 같을 때만 일치하므로, 차이는 정확도가 아니라 지지도 불균형의 크기를 뜻한다.
 
 ## Interpretation Limit (해석 한계)
 

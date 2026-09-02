@@ -119,6 +119,7 @@ from calibration_pipeline.reprojection import (
 )
 from calibration_pipeline.evaluation import (
     REPROJECTION_METRIC_CONTRACT,
+    SET_EQUAL_WEIGHT_REPROJECTION_CONTRACT,
     canonical_json_sha256 as _canonical_json_sha256,
     jsonable as _jsonable,
     pixel_reprojection_metrics,
@@ -1203,6 +1204,8 @@ def detect_observations(args, meta, K_map, D_map, all_cam_ids, gripper):
             intrinsics_dir=args.intrinsics_dir,
             allowed_event_ids=allowed_events,
             validate_sources=True,
+            allow_relocated_root=bool(getattr(
+                args, "allow_relocated_session_root", False)),
         )
         return (
             observations,
@@ -1840,6 +1843,13 @@ def parse_args(argv=None):
               "and this exact observation population is used."),
     )
     parser.add_argument(
+        "--allow-relocated-session-root", "--allow_relocated_session_root",
+        dest="allow_relocated_session_root", action="store_true",
+        help=("Replay a --observation-manifest captured in another checkout. "
+              "Only the recorded absolute path prefix is remapped; every "
+              "recorded SHA-256 is still verified against the local files."),
+    )
+    parser.add_argument(
         "--observation-filter-policy", "--observation_filter_policy",
         dest="observation_filter_policy",
         choices=("standard", "strict"),
@@ -1955,6 +1965,8 @@ def main(argv=None, force_baseline_only: bool = False) -> None:
             "pose_convention": prepared.pose_convention,
             "primary_metric": PRIMARY_METRIC,
             "reprojection_metric_contract": REPROJECTION_METRIC_CONTRACT,
+            "set_equal_weight_metric_contract": (
+                SET_EQUAL_WEIGHT_REPROJECTION_CONTRACT),
             "split": split,
             "backend": "canonical_corner_reprojection_v1",
             "optimization_structure": OPTIMIZATION_STRUCTURE_CONTRACT,

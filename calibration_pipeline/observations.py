@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from collections import Counter, defaultdict
+from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import cv2
@@ -101,8 +102,46 @@ def _validate_frozen_geometry(record: dict, object_points: np.ndarray,
                 "cube object-point blocks disagree with frozen marker order")
 
 
-def _validate_manifest_file(entry: dict, label: str) -> None:
-    path = os.path.abspath(str(entry.get("path", "")))
+def _relocation(recorded_root: str, local_root: str):
+    """Map paths recorded on another machine onto this checkout.
+
+    The manifest stores absolute paths, so a session captured elsewhere cannot
+    be replayed here even when every byte is identical.  Only the prefix above
+    the shared trailing path differs, so strip the common suffix and swap the
+    two prefixes; the SHA-256 checks stay in force and remain the actual
+    integrity contract.
+    """
+    recorded_parts = Path(recorded_root).parts
+    local_parts = Path(local_root).parts
+    shared = 0
+    while (shared < min(len(recorded_parts), len(local_parts))
+           and recorded_parts[-1 - shared] == local_parts[-1 - shared]):
+        shared += 1
+    if shared == 0:
+        raise ValueError(
+            "cannot relocate the post-capture manifest: the recorded session "
+            f"root {recorded_root!r} shares no trailing path with "
+            f"{local_root!r}")
+    recorded_prefix = str(Path(*recorded_parts[:len(recorded_parts) - shared]))
+    local_prefix = str(Path(*local_parts[:len(local_parts) - shared]))
+
+    def relocate(path: str) -> str:
+        path = str(path)
+        if recorded_prefix and path.startswith(recorded_prefix):
+            return os.path.join(
+                local_prefix, os.path.relpath(path, recorded_prefix))
+        return path
+
+    return relocate, recorded_prefix, local_prefix
+
+
+def _identity_relocation(path: str) -> str:
+    return str(path)
+
+
+def _validate_manifest_file(entry: dict, label: str,
+                            relocate=_identity_relocation) -> None:
+    path = os.path.abspath(relocate(str(entry.get("path", ""))))
     expected = str(entry.get("sha256", ""))
     if not path or not expected or not os.path.isfile(path):
         raise ValueError(f"post-capture manifest {label} is unavailable: {path!r}")
@@ -141,7 +180,8 @@ def load_pixel_observations_from_manifest(
         root: Optional[str] = None,
         intrinsics_dir: Optional[str] = None,
         allowed_event_ids: Optional[Sequence[int]] = None,
-        validate_sources: bool = True) -> Tuple[List[PixelObs], dict]:
+        validate_sources: bool = True,
+        allow_relocated_root: bool = False) -> Tuple[List[PixelObs], dict]:
     """Load the immutable native-pixel corners selected by step 04.
 
     Unlike the normal observation loader, this path never runs a detector.  It
@@ -174,13 +214,22 @@ def load_pixel_observations_from_manifest(
         raise ValueError(
             "manifest cube corner-refinement contract is missing or invalid")
     recorded_root = os.path.realpath(str(source.get("session_root", "")))
+    relocate = _identity_relocation
+    relocated = False
     if root is not None and recorded_root != os.path.realpath(root):
-        raise ValueError(
-            "post-capture manifest session root differs from --root_folder: "
-            f"{recorded_root!r} != {os.path.realpath(root)!r}")
+        if not allow_relocated_root:
+            raise ValueError(
+                "post-capture manifest session root differs from --root_folder: "
+                f"{recorded_root!r} != {os.path.realpath(root)!r}; pass "
+                "--allow-relocated-session-root to replay a manifest captured "
+                "in another checkout (every SHA-256 is still enforced)")
+        relocate, _, _ = _relocation(recorded_root, os.path.realpath(root))
+        relocated = True
     if validate_sources:
-        _validate_manifest_file(source.get("meta_json", {}), "meta.json")
-        with open(source["meta_json"]["path"], "r", encoding="utf-8") as stream:
+        _validate_manifest_file(
+            source.get("meta_json", {}), "meta.json", relocate)
+        with open(relocate(source["meta_json"]["path"]), "r",
+                  encoding="utf-8") as stream:
             current_meta = json.load(stream)
         if not _configs_match(current_meta.get("charuco_board_config"),
                               charuco_config_to_dict(board_cfg)):
@@ -194,11 +243,14 @@ def load_pixel_observations_from_manifest(
             for camera, entry in source.get("intrinsics", {}).items():
                 current = os.path.abspath(os.path.join(
                     intrinsics_dir, f"cam{int(camera)}.npz"))
-                if current != os.path.abspath(str(entry.get("path", ""))):
+                recorded = os.path.abspath(
+                    relocate(str(entry.get("path", ""))))
+                if current != recorded:
                     raise ValueError(
                         f"manifest cam{camera} intrinsic path differs from "
                         f"--intrinsics_dir: {current}")
-                _validate_manifest_file(entry, f"cam{camera} intrinsics")
+                _validate_manifest_file(
+                    entry, f"cam{camera} intrinsics", relocate)
 
     allowed = (
         None if allowed_event_ids is None
@@ -219,7 +271,8 @@ def load_pixel_observations_from_manifest(
             if not isinstance(image_entry, dict):
                 raise ValueError(
                     f"manifest lacks image provenance for {relative_path!r}")
-            _validate_manifest_file(image_entry, f"image {relative_path}")
+            _validate_manifest_file(
+                image_entry, f"image {relative_path}", relocate)
             validated_images.add(relative_path)
 
     observations: List[PixelObs] = []
@@ -288,6 +341,10 @@ def load_pixel_observations_from_manifest(
         "n_cube_observations": int(counts.get("cube", 0)),
         "n_board_observations": int(counts.get("board", 0)),
         "source_hashes_validated": bool(validate_sources),
+        "session_root_relocated": bool(relocated),
+        "manifest_recorded_session_root": recorded_root,
+        "local_session_root": (
+            None if root is None else os.path.realpath(root)),
     }
     return observations, diagnostics
 

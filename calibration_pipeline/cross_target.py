@@ -246,6 +246,12 @@ def parse_args(argv=None):
     parser.add_argument(
         "--out_dir", default=None,
         help="Default: CP_result/<session>/cross_target_evaluation.")
+    parser.add_argument(
+        "--allow-relocated-session-root", "--allow_relocated_session_root",
+        dest="allow_relocated_session_root", action="store_true",
+        help=("Replay a --observation-manifest captured in another checkout. "
+              "Only the recorded absolute path prefix is remapped; every "
+              "recorded SHA-256 is still verified against the local files."))
     args = parser.parse_args(argv)
     return apply_session_defaults(args, {'calib_dir': 'calib_dir', 'table1_result': 'table1_result',
          'out_dir': 'cross_target_dir',

@@ -120,6 +120,19 @@ python3 tools/compare_markers.py --root_folder data/session04/calib_train
 python3 tools/opencv_baseline.py --root_folder data/session04/calib_train
 ```
 
+## 다른 checkout에서 재실행할 때
+
+`Step2b_observation_manifest.json`은 촬영한 머신의 절대 경로를 기록한다. 다른
+checkout에서 그대로 재실행하면 session root 불일치로 05가 중단된다. 이때
+`--allow-relocated-session-root`를 05·`evaluate_cross_target`·`compare_markers`에
+함께 준다. 이 플래그는 기록된 경로 접두사만 현재 checkout으로 옮기며, meta.json,
+intrinsics, 모든 영상의 SHA-256 검증은 그대로 수행한다. 즉 무결성 계약은
+경로 문자열이 아니라 해시가 계속 담당한다.
+
+보조 평가 두 개는 `--include_sets`와 `--split_seed`를 05와 동일하게 주어야 한다.
+기본값(`5-12`)으로 실행하면 split이 달라져 `reconstructed split does not match
+stored results`로 중단된다.
+
 이 세 평가는 05의 calibration 행렬을 만드는 필수 단계가 아니다. 과거의 통합
 Table 1 Markdown/HTML을 갱신할 때만 `tools/sync_table1_canonical_data.py`를 사용한다.
 

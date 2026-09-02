@@ -39,6 +39,10 @@ def test_session04_standard_frozen_population_and_source_hashes():
         root=str(SESSION_ROOT),
         intrinsics_dir=str(INTRINSICS_ROOT),
         validate_sources=True,
+        # The manifest records the absolute paths of the machine that captured
+        # it, so the suite only runs in that checkout without this.  Every
+        # recorded SHA-256 is still verified below.
+        allow_relocated_root=True,
     )
 
     assert diagnostics["manifest_schema"] == POST_CAPTURE_MANIFEST_SCHEMA
