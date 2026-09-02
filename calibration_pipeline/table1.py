@@ -7,11 +7,12 @@ The runner implements the contract in ``calibration_pipeline.schema``:
 * ``seq`` is eih-only fitting followed by an e2h-only camera fit, with an
   explicit freeze boundary and no alternating pass;
 * ``U`` fits both paths in one objective;
-* A3 consumes the train-only aligned FK cube artifact reused by A4/B1/B2;
+* A3 freezes raw FK after a preregistered mechanical frame conversion;
+* A4/A5/B1/B2 reuse one train-only image-aligned FK cube artifact;
 * every row starts from one train-only shared reference state for overlapping
   transforms, before its declared marker/FK treatment is applied;
-* A0/A1/A2/A3/A4/B1/B2/B3 are emitted by this runner only;
-* A3 uses the same canonical corner solver directly, with cube poses frozen;
+* A0/A1/A2/A3/A4/A5/B1/B2/B3 are emitted by this runner only;
+* A3/A5 use the same canonical corner solver directly, with cube poses frozen;
 * A4/B1/B2 use one shared covariance-whitened robust FK-factor implementation;
 * the primary metric is event-grouped, set-stratified held-out corner
   reprojection with every fitted transform frozen;
@@ -29,7 +30,7 @@ import json
 import os
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Callable, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 import cv2
 import numpy as np
@@ -38,23 +39,36 @@ from scipy.spatial.transform import Rotation
 from calibration_pipeline import se3 as cp
 from calibration_pipeline.schema import (
     CORRECTED_FK_FACTOR_CONTRACT,
+    ALIGNED_FK_FIXED_ROWS,
     DEFAULT_SPLIT_SEED,
     EVALUATION_COMPARISON_CONTRACT,
     FK_ALIGNMENT_SHARED_ROWS,
+    FK_FIXED_CONTRACT,
+    FK_FIXED_ROWS,
+    INTER_CAMERA_COUPLING_CONTRACT,
     MAIN_ABLATION_CONDITIONS,
     NOISE_FREE_SANITY_TOLERANCES,
+    OBJECTIVE_TERM_CONTRACT,
     OPTIMIZATION_STRUCTURE_CONTRACT,
     PRIMARY_METRIC,
     PRIMARY_SPLIT,
+    POSE_SOURCE_FK_FIXED,
+    POSE_SOURCE_ALIGNED_FK_FIXED,
+    RAW_FK_FIXED_ROWS,
+    RELATIVE_POSE_REPORTING_CONTRACT,
+    RAW_FK_CUBE_CENTER_TO_OBJECT,
     SEQUENTIAL_STAGE_SPECS,
     TASK_POSE_PROXY_LABEL,
     UNIFIED_FREE_VARIABLES,
+    VISION_ALIGNED_FK_FIXED_CONTRACT,
     AblationCondition,
     validate_fk_alignment_artifact,
     validate_main_runner_contract,
 )
 from calibration_pipeline.apriltag_cube import AprilTagCubeTarget, inv_T
 from calibration_pipeline.runtime import (
+    DEFAULT_SESSION_ROOT,
+    apply_session_defaults,
     filter_meta_by_set_indices,
     get_capture_set_index,
     load_intrinsics_with_depth_scale,
@@ -75,6 +89,7 @@ from calibration_pipeline.fk_factor import (
     SIGMA_FK_DEG,
     SIGMA_FK_MM,
     diagonal_covariance,
+    factorized_objective_cost,
     solve_factorized_fk,
     validate_covariance,
 )
@@ -86,16 +101,21 @@ from calibration_pipeline.path_evaluation import (
     validate_frozen_path_evaluation_mask,
 )
 from calibration_pipeline.reprojection import (
+    FramePruneRefitOptions,
     PixelObs,
     PoseState,
+    RESIDUAL_WEIGHTING_MODES,
     SE3Scaling,
     SolverOptions,
+    observation_population,
     pose_delta,
     project_points,
+    select_frame_prune_subset,
     set_state_transform,
     solve_corner_reprojection,
     state_transform,
     variable_keys,
+    visual_objective_cost,
 )
 from calibration_pipeline.evaluation import (
     REPROJECTION_METRIC_CONTRACT,
@@ -108,10 +128,10 @@ from calibration_pipeline.evaluation import (
 )
 
 SHARED_BASELINE_SCHEMA = "table1_shared_train_only_baseline_v2"
-RUNNABLE_ROWS = ("A0", "A1", "A2", "A3", "A4", "B1", "B2", "B3")
-BASELINE_ROWS = RUNNABLE_ROWS + ("A5",)
+RUNNABLE_ROWS = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
+BASELINE_ROWS = ("A0", "A1", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3")
 PENDING_ROWS = {
-    "A5": {
+    "A6": {
         "status": "not_run",
         "reason": "independent train-only 6-DoF FK correction labels are unavailable",
         "baseline": "same shared train-only reference state as A4",
@@ -464,7 +484,9 @@ def build_shared_reference_state(
 
 def make_initial_state(
         condition: AblationCondition, shared_reference_state: PoseState,
-        fixed_cubes: Mapping[int, np.ndarray]) -> Tuple[PoseState, dict]:
+        fixed_cubes: Mapping[int, np.ndarray],
+        aligned_fixed_cubes: Optional[Mapping[int, np.ndarray]] = None,
+        ) -> Tuple[PoseState, dict]:
     """Specialize one shared reference state only by the declared treatment."""
     state = shared_reference_state.clone()
     if "board" not in condition.target_set:
@@ -472,12 +494,21 @@ def make_initial_state(
     if "cube" not in condition.target_set:
         state.cubes = {}
         cube_source = "absent"
-    elif condition.fk_to_cube == "FK-fixed":
+    elif condition.fk_to_cube == POSE_SOURCE_FK_FIXED:
         state.cubes = {
             int(s): np.asarray(T, dtype=np.float64).copy()
             for s, T in fixed_cubes.items()
         }
-        cube_source = "shared_board_free_FK_artifact"
+        cube_source = "raw_FK_pose_with_preregistered_mechanical_frame_map"
+    elif condition.fk_to_cube == POSE_SOURCE_ALIGNED_FK_FIXED:
+        if aligned_fixed_cubes is None:
+            raise ValueError(
+                f"{condition.row}: vision-aligned FK fixed poses are required")
+        state.cubes = {
+            int(s): np.asarray(T, dtype=np.float64).copy()
+            for s, T in aligned_fixed_cubes.items()
+        }
+        cube_source = "train_only_board_free_vision_aligned_FK_pose"
     else:
         cube_source = "shared_train_only_visual_initialization"
     return state, {
@@ -507,25 +538,177 @@ def canonical_solver_options(args, max_nfev: Optional[int] = None,
             translation_scale_m=float(getattr(args, "translation_scale_m", 1.0)),
         ),
         x_scale_mode=str(getattr(args, "x_scale_mode", "jac")),
+        residual_weighting=str(getattr(
+            args, "residual_weighting", "per_corner")),
     )
+
+
+def canonical_frame_prune_options(args) -> FramePruneRefitOptions:
+    options = FramePruneRefitOptions(
+        enabled=bool(getattr(args, "frame_prune_refit", True)),
+        mad_multiplier=float(getattr(args, "frame_prune_mad_multiplier", 3.0)),
+        minimum_rmse_px=float(getattr(args, "frame_prune_min_rmse_px", 4.0)),
+        maximum_fraction=float(getattr(args, "frame_prune_max_fraction", 0.30)),
+        minimum_observations_per_variable=int(getattr(
+            args, "frame_prune_min_observations_per_variable", 2)),
+        minimum_relative_improvement=float(getattr(
+            args, "frame_prune_min_relative_improvement", 1e-6)),
+    )
+    options.validate()
+    return options
+
+
+def _solve_summary(diagnostics: Optional[Mapping]) -> Optional[dict]:
+    if diagnostics is None:
+        return None
+    return {
+        "success": bool(diagnostics.get("success", False)),
+        "status": diagnostics.get("status"),
+        "message": diagnostics.get("message"),
+        "nfev": int(diagnostics.get("nfev", 0)),
+        "elapsed_s": float(diagnostics.get("elapsed_s", 0.0)),
+        "train_reprojection_rmse_px": diagnostics.get(
+            "train_reprojection_rmse_px"),
+    }
+
+
+def run_frame_prune_refit(
+        observations: Sequence[PixelObs],
+        variable_keys_: Sequence[Tuple[str, int]],
+        first_state: PoseState,
+        first_diagnostics: Mapping,
+        robot_T,
+        K_map,
+        D_map,
+        gripper_cam_idx: int,
+        solver_options: SolverOptions,
+        prune_options: FramePruneRefitOptions,
+        refit_solver: Callable[[Sequence[PixelObs]], Tuple[PoseState, dict]],
+        full_objective_cost: Callable[[PoseState], float],
+        ) -> Tuple[PoseState, dict]:
+    """Apply one training-only frame prune/refit pass with safe rollback."""
+    kept, selection = select_frame_prune_subset(
+        observations=observations,
+        variable_keys_=variable_keys_,
+        fitted_state=first_state,
+        robot_T=robot_T,
+        K_map=K_map,
+        D_map=D_map,
+        gripper_cam_idx=gripper_cam_idx,
+        solver_options=solver_options,
+        prune_options=prune_options,
+    )
+    first_cost = float(full_objective_cost(first_state))
+    candidate_state = None
+    candidate_diagnostics = None
+    candidate_cost = None
+    refit_error = None
+    if selection["attempted"]:
+        try:
+            candidate_state, candidate_diagnostics = refit_solver(kept)
+            candidate_cost = float(full_objective_cost(candidate_state))
+        except Exception as exc:  # rollback is the contract for a failed refit
+            refit_error = f"{type(exc).__name__}: {exc}"
+
+    relative_improvement = None
+    accepted = False
+    rollback_reason = None
+    if not selection["attempted"]:
+        rollback_reason = "refit_not_attempted"
+    elif refit_error is not None:
+        rollback_reason = "refit_exception"
+    elif not bool(candidate_diagnostics.get("success", False)):
+        rollback_reason = "refit_unsuccessful"
+    elif not np.isfinite(candidate_cost):
+        rollback_reason = "non_finite_candidate_full_objective"
+    else:
+        relative_improvement = float(
+            (first_cost - candidate_cost) / max(abs(first_cost), 1e-15))
+        accepted = bool(
+            relative_improvement > prune_options.minimum_relative_improvement)
+        if not accepted:
+            rollback_reason = "insufficient_full_objective_improvement"
+
+    chosen_state = candidate_state if accepted else first_state
+    chosen_diagnostics = dict(
+        candidate_diagnostics if accepted else first_diagnostics)
+    selected_cost = candidate_cost if accepted else first_cost
+    chosen_diagnostics["input_visual_residual_population"] = (
+        observation_population(observations, gripper_cam_idx))
+    chosen_diagnostics["effective_visual_residual_population"] = (
+        observation_population(kept if accepted else observations,
+                               gripper_cam_idx))
+    chosen_diagnostics["frame_prune_refit"] = {
+        "selection": selection,
+        "first_fit": _solve_summary(first_diagnostics),
+        "refit": _solve_summary(candidate_diagnostics),
+        "refit_error": refit_error,
+        "first_full_training_robust_cost": first_cost,
+        "candidate_full_training_robust_cost": candidate_cost,
+        "selected_full_training_robust_cost": selected_cost,
+        "relative_full_objective_improvement": relative_improvement,
+        "required_relative_improvement": float(
+            prune_options.minimum_relative_improvement),
+        "accepted": accepted,
+        "rolled_back": bool(selection["attempted"] and not accepted),
+        "rollback_reason": rollback_reason,
+        "total_nfev": int(first_diagnostics.get("nfev", 0)) + int(
+            0 if candidate_diagnostics is None
+            else candidate_diagnostics.get("nfev", 0)),
+        "heldout_observations_used": False,
+        "heldout_observations_pruned": False,
+    }
+    return chosen_state, chosen_diagnostics
 
 
 def solve_stage(observations: Sequence[PixelObs], free_families: Sequence[str],
                 reference_state: PoseState, robot_T, K_map, D_map, gripper: int,
                 seed: int, args, max_nfev: Optional[int] = None,
                 tol: Optional[float] = None) -> Tuple[PoseState, dict]:
-    return solve_corner_reprojection(
+    keys = variable_keys(free_families, reference_state)
+    solver_options = canonical_solver_options(
+        args, max_nfev=max_nfev, tol=tol)
+    prune_options = canonical_frame_prune_options(args)
+    first_state, first_diagnostics = solve_corner_reprojection(
         observations=observations,
-        variable_keys_=variable_keys(free_families, reference_state),
+        variable_keys_=keys,
         reference_state=reference_state,
         robot_T=robot_T,
         K_map=K_map,
         D_map=D_map,
         gripper_cam_idx=gripper,
-        options=canonical_solver_options(args, max_nfev=max_nfev, tol=tol),
+        options=solver_options,
         seed=seed,
         init_translation_mm=float(args.init_translation_mm),
         init_rotation_deg=float(args.init_rotation_deg),
+    )
+    return run_frame_prune_refit(
+        observations=observations,
+        variable_keys_=keys,
+        first_state=first_state,
+        first_diagnostics=first_diagnostics,
+        robot_T=robot_T,
+        K_map=K_map,
+        D_map=D_map,
+        gripper_cam_idx=gripper,
+        solver_options=solver_options,
+        prune_options=prune_options,
+        refit_solver=lambda kept: solve_corner_reprojection(
+            observations=kept,
+            variable_keys_=keys,
+            reference_state=first_state,
+            robot_T=robot_T,
+            K_map=K_map,
+            D_map=D_map,
+            gripper_cam_idx=gripper,
+            options=solver_options,
+            seed=0,
+            init_translation_mm=0.0,
+            init_rotation_deg=0.0,
+        ),
+        full_objective_cost=lambda state: visual_objective_cost(
+            observations, keys, state, robot_T, K_map, D_map, gripper,
+            solver_options),
     )
 
 
@@ -551,14 +734,14 @@ def run_condition_once(condition: AblationCondition, initial_state: PoseState,
             robot_T, K_map, D_map, gripper, seed, args)
         stages = {"stage1_eih": d1, "stage2_e2h": d2}
         converged = bool(d1["success"] and d2["success"])
-    elif condition.row == "A3":
+    elif condition.row in FK_FIXED_ROWS:
         # Hard-FK is represented solely by the freeze mask: cube transforms are
         # present in the state but absent from A3's declared free variables.
         final_state, diag = solve_stage(
-            relevant_train, UNIFIED_FREE_VARIABLES["A3"], initial_state,
+            relevant_train, UNIFIED_FREE_VARIABLES[condition.row], initial_state,
             robot_T, K_map, D_map, gripper, seed, args)
         diag["entry_point"] = "calibration_pipeline.reprojection.solve_corner_reprojection"
-        diag["fk_mode"] = "fixed"
+        diag["fk_mode"] = condition.fk_to_cube
         diag["shared_reference_state_sha256"] = state_sha256(initial_state)
         stages = {"joint_eih_e2h": diag}
         converged = bool(diag.get("success", False))
@@ -676,27 +859,72 @@ def _solve_with_fk_factor(observations: Sequence[PixelObs], free_families,
                           reference_state: PoseState, data, covariances,
                           seed: int, args, use_factor: bool = True,
                           explicit_variable_keys=None):
-    return solve_factorized_fk(
+    keys = (
+        variable_keys(free_families, reference_state)
+        if explicit_variable_keys is None else list(explicit_variable_keys))
+    solver_options = canonical_solver_options(args)
+    prune_options = canonical_frame_prune_options(args)
+    fk_spec = FKFactorSpec(
+        mode=FK_MODE_FACTOR if use_factor else FK_MODE_NONE,
+        loss="huber",
+        robust_scale=HUBER_F_SCALE,
+    )
+    first_state, first_diagnostics = solve_factorized_fk(
         observations=observations,
-        variable_keys_=(
-            variable_keys(free_families, reference_state)
-            if explicit_variable_keys is None else explicit_variable_keys),
+        variable_keys_=keys,
         reference_state=reference_state,
         robot_T=data.robot_T,
         K_map=data.K_map,
         D_map=data.D_map,
         gripper_cam_idx=data.gripper,
-        options=canonical_solver_options(args),
-        fk_targets=data.fixed_cubes,
+        options=solver_options,
+        fk_targets=data.aligned_fk_cubes,
         fk_covariances=covariances,
-        fk_spec=FKFactorSpec(
-            mode=FK_MODE_FACTOR if use_factor else FK_MODE_NONE,
-            loss="huber",
-            robust_scale=HUBER_F_SCALE,
-        ),
+        fk_spec=fk_spec,
         seed=seed,
         init_translation_mm=float(args.init_translation_mm),
         init_rotation_deg=float(args.init_rotation_deg),
+    )
+    return run_frame_prune_refit(
+        observations=observations,
+        variable_keys_=keys,
+        first_state=first_state,
+        first_diagnostics=first_diagnostics,
+        robot_T=data.robot_T,
+        K_map=data.K_map,
+        D_map=data.D_map,
+        gripper_cam_idx=data.gripper,
+        solver_options=solver_options,
+        prune_options=prune_options,
+        refit_solver=lambda kept: solve_factorized_fk(
+            observations=kept,
+            variable_keys_=keys,
+            reference_state=first_state,
+            robot_T=data.robot_T,
+            K_map=data.K_map,
+            D_map=data.D_map,
+            gripper_cam_idx=data.gripper,
+            options=solver_options,
+            fk_targets=data.aligned_fk_cubes,
+            fk_covariances=covariances,
+            fk_spec=fk_spec,
+            seed=0,
+            init_translation_mm=0.0,
+            init_rotation_deg=0.0,
+        ),
+        full_objective_cost=lambda state: factorized_objective_cost(
+            observations=observations,
+            variable_keys_=keys,
+            state=state,
+            robot_T=data.robot_T,
+            K_map=data.K_map,
+            D_map=data.D_map,
+            gripper_cam_idx=data.gripper,
+            options=solver_options,
+            fk_targets=data.aligned_fk_cubes,
+            fk_covariances=covariances,
+            fk_spec=fk_spec,
+        ),
     )
 
 
@@ -861,7 +1089,8 @@ def solve_synthetic(condition: AblationCondition, observations, truth: PoseState
                     fixed_cube_poses: Optional[Mapping[int, np.ndarray]] = None,
                     solver_seed: int = 0) -> Tuple[PoseState, float, dict]:
     init = perturbed_state(truth)
-    if condition.fk_to_cube == "FK-fixed":
+    if condition.fk_to_cube in {
+            POSE_SOURCE_FK_FIXED, POSE_SOURCE_ALIGNED_FK_FIXED}:
         # FK-fixed transforms are constants, not perturbed initialization
         # variables.  Perturbing them would simulate FK noise, not solver init.
         source = truth.cubes if fixed_cube_poses is None else fixed_cube_poses
@@ -1017,6 +1246,31 @@ def apply_board_metric_scale(
     ) for observation in observations]
 
 
+def infer_board_square_length_mm(
+        observations: Sequence[PixelObs]) -> float:
+    """Read the frozen board metric from object points instead of a default."""
+    coordinates = []
+    for observation in observations:
+        if observation.marker != "board":
+            continue
+        points = np.asarray(
+            observation.object_points, dtype=np.float64).reshape(-1, 3)
+        coordinates.extend(points[:, axis] for axis in (0, 1))
+    if not coordinates:
+        raise RuntimeError("cannot infer board square length without board corners")
+    values = np.unique(np.round(np.concatenate(coordinates), 9))
+    differences = np.diff(values)
+    positive = differences[differences > 1e-7]
+    if not len(positive):
+        raise RuntimeError("frozen board object points have no metric spacing")
+    spacing_m = float(np.min(positive))
+    ratios = np.concatenate(coordinates) / spacing_m
+    if not np.allclose(ratios, np.round(ratios), rtol=0.0, atol=1e-5):
+        raise RuntimeError(
+            "frozen board object points do not lie on one square grid")
+    return spacing_m * 1000.0
+
+
 def estimate_train_board_metric_scale(
         train_observations: Sequence[PixelObs], gripper_cam_idx: int,
         K_map, D_map) -> dict:
@@ -1112,12 +1366,14 @@ def estimate_train_board_metric_scale(
             "cube_baseline_norm_mm": float(
                 np.linalg.norm(cube_transform[:3, 3]) * 1000.0),
         }
+    nominal_square_length_mm = infer_board_square_length_mm(
+        train_observations)
     return {
         "mode": "train_only_fixed_camera_board_to_cube_metric_alignment",
         "enabled": True,
         "scale": scale,
-        "nominal_square_length_mm": 25.0,
-        "effective_square_length_mm": 25.0 * scale,
+        "nominal_square_length_mm": nominal_square_length_mm,
+        "effective_square_length_mm": nominal_square_length_mm * scale,
         "anchor_camera_id": anchor,
         "fixed_camera_ids": fixed_cameras,
         "heldout_observations_used": False,
@@ -1151,6 +1407,7 @@ class PreparedAblationData:
     shared_reference_state: PoseState
     shared_reference_diagnostics: dict
     fixed_cubes: Dict[int, np.ndarray]
+    aligned_fk_cubes: Dict[int, np.ndarray]
     fixed_gtc_initial: np.ndarray
     alignment_artifact: dict
 
@@ -1194,12 +1451,13 @@ def prepare_ablation_data(args) -> PreparedAblationData:
         train_obs = [obs for obs in pool if int(obs.event) in train_events]
         test_obs = [obs for obs in pool if int(obs.event) in test_events]
     else:
+        nominal_square_length_mm = infer_board_square_length_mm(train_obs)
         board_metric_scale = {
             "mode": "nominal_config",
             "enabled": False,
             "scale": 1.0,
-            "nominal_square_length_mm": 25.0,
-            "effective_square_length_mm": 25.0,
+            "nominal_square_length_mm": nominal_square_length_mm,
+            "effective_square_length_mm": nominal_square_length_mm,
             "heldout_observations_used": False,
         }
     source_data_provenance = _source_data_provenance(
@@ -1264,10 +1522,23 @@ def prepare_ablation_data(args) -> PreparedAblationData:
         raise RuntimeError(
             f"board-free FK artifact raw FK came from held-out events "
             f"{sorted(leaked_raw_events)}")
-    missing_fk = sorted(eligible - set(aligned_fk_all))
-    if missing_fk:
-        raise RuntimeError(f"board-free aligned FK cube pose missing for sets {missing_fk}")
-    fixed_cubes = {s: aligned_fk_all[s] for s in sorted(eligible)}
+    missing_aligned_fk = sorted(eligible - set(aligned_fk_all))
+    if missing_aligned_fk:
+        raise RuntimeError(
+            "board-free aligned FK cube pose missing for sets "
+            f"{missing_aligned_fk}")
+    missing_raw_fk = sorted(eligible - set(raw_fk_all))
+    if missing_raw_fk:
+        raise RuntimeError(f"raw FK cube pose missing for sets {missing_raw_fk}")
+    mechanical_frame_map = np.asarray(
+        RAW_FK_CUBE_CENTER_TO_OBJECT, dtype=np.float64)
+    fixed_cubes = {
+        s: np.asarray(raw_fk_all[s], dtype=np.float64) @ mechanical_frame_map
+        for s in sorted(eligible)
+    }
+    aligned_fk_cubes = {
+        s: aligned_fk_all[s] for s in sorted(eligible)
+    }
 
     # Board-derived quantities begin only after the canonical artifact is
     # frozen.  They initialize board-bearing rows and create a supplementary
@@ -1307,6 +1578,7 @@ def prepare_ablation_data(args) -> PreparedAblationData:
         shared_reference_state=shared_reference_state,
         shared_reference_diagnostics=shared_reference_diag,
         fixed_cubes=fixed_cubes,
+        aligned_fk_cubes=aligned_fk_cubes,
         fixed_gtc_initial=fixed_gtc_initial,
         alignment_artifact=artifact,
     )
@@ -1339,6 +1611,7 @@ def build_shared_baseline_artifact(
             for row, state in sorted(row_reference_states.items())
         },
         "solver_options": canonical_solver_options(args).to_dict(),
+        "frame_prune_refit": canonical_frame_prune_options(args).to_dict(),
         "initialization": {
             "num_inits": int(args.num_inits),
             "translation_mm": float(args.init_translation_mm),
@@ -1380,14 +1653,15 @@ def validate_shared_baseline_artifact(payload: Mapping) -> None:
         raise ValueError("shared baseline must exclude held-out information")
     validate_source_data_provenance(payload.get("source_data_provenance", {}))
     if set(payload.get("row_reference_states", {})) != set(BASELINE_ROWS):
-        raise ValueError("shared baseline must contain A0-A5/B1-B3 row states")
-    if payload["row_reference_states"]["A5"] != payload["row_reference_states"]["A4"]:
-        raise ValueError("pending A5 must start from the byte-identical A4 baseline")
+        raise ValueError("shared baseline must contain A0-A6/B1-B3 row states")
+    if payload["row_reference_states"]["A6"] != payload["row_reference_states"]["A4"]:
+        raise ValueError("pending A6 must start from the byte-identical A4 baseline")
 
 
 def validate_row_initialization_contract(
         row_states: Mapping[str, PoseState], shared: PoseState,
-        fixed_cubes: Mapping[int, np.ndarray]) -> None:
+        fixed_cubes: Mapping[int, np.ndarray],
+        aligned_fixed_cubes: Mapping[int, np.ndarray]) -> None:
     """Reject accidental row-specific initialization beyond the treatment."""
     for row, state in row_states.items():
         condition = next(
@@ -1408,8 +1682,12 @@ def validate_row_initialization_contract(
             if state.cubes:
                 raise ValueError(f"{row}: removed cube remains in the row state")
             continue
-        expected = (fixed_cubes if condition.fk_to_cube == "FK-fixed"
-                    else shared.cubes)
+        if condition.fk_to_cube == POSE_SOURCE_FK_FIXED:
+            expected = fixed_cubes
+        elif condition.fk_to_cube == POSE_SOURCE_ALIGNED_FK_FIXED:
+            expected = aligned_fixed_cubes
+        else:
+            expected = shared.cubes
         if sorted(state.cubes) != sorted(expected):
             raise ValueError(f"{row}: cube-set baseline drift")
         for set_index, transform in expected.items():
@@ -1429,6 +1707,15 @@ def validate_result_evaluation_contract(result: Mapping) -> None:
     expected_e2e = len(mask["e2e_units"])
     if protocol.get("model_dependent_test_gating") is not False:
         raise ValueError("result protocol permits model-dependent test gating")
+    if protocol.get("relative_pose_reporting") != \
+            RELATIVE_POSE_REPORTING_CONTRACT:
+        raise ValueError("result is missing the relative-pose reporting policy")
+    e_cross_policy = protocol.get("metric_selection_contract", {}).get(
+        "e_cross", {})
+    if (e_cross_policy.get("reporting_tier") != "supplementary"
+            or e_cross_policy.get(
+                "may_rank_methods_before_external_gt") is not False):
+        raise ValueError("e_cross was promoted above a supplementary metric")
     for row, entry in result.get("rows", {}).items():
         if entry.get("path_evaluation_mask_sha256") != mask_sha:
             raise ValueError(f"{row}: row-level evaluation-mask SHA mismatch")
@@ -1469,13 +1756,33 @@ def write_outputs(result: dict, out_dir: str) -> None:
         json.dump(_jsonable(result), handle, indent=2)
 
 
+def add_frame_prune_arguments(parser: argparse.ArgumentParser) -> None:
+    group = parser.add_argument_group("training frame prune/refit")
+    group.add_argument(
+        "--frame-prune-refit",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=("After the first fit, prune high-RMSE (event,camera) training "
+              "frames, refit once, and rollback unless the full training "
+              "robust objective improves."),
+    )
+    group.add_argument("--frame-prune-mad-multiplier", type=float, default=3.0)
+    group.add_argument("--frame-prune-min-rmse-px", type=float, default=4.0)
+    group.add_argument("--frame-prune-max-fraction", type=float, default=0.30)
+    group.add_argument(
+        "--frame-prune-min-observations-per-variable", type=int, default=2)
+    group.add_argument(
+        "--frame-prune-min-relative-improvement", type=float, default=1e-6)
+
+
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(
-        description=("Unified A0-A4/B1-B3 raw-corner reprojection ablation; "
-                     "A5 shares the baseline but awaits independent labels"))
-    parser.add_argument("--root_folder", default="data/session")
+        description=("Unified A0-A5/B1-B3 raw-corner reprojection ablation; "
+                     "A6 shares the baseline but awaits independent labels"))
+    parser.add_argument("--root_folder", default=DEFAULT_SESSION_ROOT)
     parser.add_argument("--intrinsics_dir", default="intrinsics")
-    parser.add_argument("--calib_dir", default="data/session/calib_out")
+    parser.add_argument("--calib_dir", default=None,
+                        help="Default: <session>/calib_out from --root_folder.")
     parser.add_argument(
         "--out_dir",
         help=("Output directory. Default: CP_result/<sessionNN>/late_table1 "
@@ -1483,7 +1790,7 @@ def parse_args(argv=None):
     )
     parser.add_argument(
         "--rows", default=",".join(RUNNABLE_ROWS),
-        help="Comma-separated subset of A0,A1,A2,A3,A4,B1,B2,B3.")
+        help="Comma-separated subset of A0,A1,A2,A3,A4,A5,B1,B2,B3.")
     parser.add_argument(
         "--include_sets", default="",
         help="Use only these set_index values (comma list/ranges, e.g. 5-12).")
@@ -1507,6 +1814,15 @@ def parse_args(argv=None):
     parser.add_argument("--f_scale_px", type=float, default=2.0,
                         help="Robust-loss transition in pixels; ignored by linear loss.")
     parser.add_argument(
+        "--residual-weighting",
+        choices=sorted(RESIDUAL_WEIGHTING_MODES),
+        default="per_corner",
+        help=("Visual residual aggregation. 'per_corner' is canonical; "
+              "'equal_observation_total' scales each observation block by "
+              "1/sqrt(number of detected corners)."),
+    )
+    add_frame_prune_arguments(parser)
+    parser.add_argument(
         "--image_scale", type=float, default=1.0,
         help=("Detection raster scale. Detected points are mapped back to native "
               "pixel coordinates; 1.0 preserves the production path."))
@@ -1520,7 +1836,7 @@ def parse_args(argv=None):
     parser.add_argument(
         "--observation-manifest", "--observation_manifest",
         dest="observation_manifest",
-        help=("Step2b frozen-corner manifest. When set, detectors are not run "
+        help=("Step 04 frozen-corner manifest. When set, detectors are not run "
               "and this exact observation population is used."),
     )
     parser.add_argument(
@@ -1545,18 +1861,14 @@ def parse_args(argv=None):
         "--baseline_only", action="store_true",
         help="Prepare the authenticated shared baseline/artifacts without fitting rows.")
     parser.add_argument("--sanity_only", action="store_true")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    return apply_session_defaults(
+        args, {'calib_dir': 'calib_dir', 'out_dir': 'table1_dir',
+               'observation_manifest': 'observation_manifest'})
 
 
 def main(argv=None, force_baseline_only: bool = False) -> None:
     args = parse_args(argv)
-    if args.out_dir is None:
-        session_name = next(
-            (part for part in reversed(os.path.normpath(args.root_folder).split(os.sep))
-             if part.startswith("session")),
-            "session",
-        )
-        args.out_dir = os.path.join("CP_result", session_name, "late_table1")
     args.baseline_only = bool(args.baseline_only or force_baseline_only)
     validate_main_runner_contract()
     print("[SANITY] noise-free A1=A2")
@@ -1595,13 +1907,15 @@ def main(argv=None, force_baseline_only: bool = False) -> None:
     row_initialization_diagnostics = {}
     for row in RUNNABLE_ROWS:
         state, diagnostics = make_initial_state(
-            by_row[row], prepared.shared_reference_state, fixed_cubes)
+            by_row[row], prepared.shared_reference_state, fixed_cubes,
+            prepared.aligned_fk_cubes)
         row_initials[row] = state
         row_initialization_diagnostics[row] = diagnostics
     validate_row_initialization_contract(
-        row_initials, prepared.shared_reference_state, fixed_cubes)
+        row_initials, prepared.shared_reference_state, fixed_cubes,
+        prepared.aligned_fk_cubes)
     baseline_states = dict(row_initials)
-    baseline_states["A5"] = row_initials["A4"].clone()
+    baseline_states["A6"] = row_initials["A4"].clone()
     baseline_artifact = build_shared_baseline_artifact(
         args, prepared, baseline_states)
     validate_shared_baseline_artifact(baseline_artifact)
@@ -1618,10 +1932,10 @@ def main(argv=None, force_baseline_only: bool = False) -> None:
     factor_rows_requested = bool(set(requested) & {"A4", "B1", "B2"})
     if factor_rows_requested and args.fk_covariance_json:
         covariances, covariance_provenance = load_fk_covariances(
-            args.fk_covariance_json, sorted(fixed_cubes))
+            args.fk_covariance_json, sorted(prepared.aligned_fk_cubes))
     elif factor_rows_requested:
         covariances, covariance_provenance = preflight_fk_covariances(
-            sorted(fixed_cubes))
+            sorted(prepared.aligned_fk_cubes))
     else:
         covariances, covariance_provenance = {}, {
             "path": None,
@@ -1644,6 +1958,17 @@ def main(argv=None, force_baseline_only: bool = False) -> None:
             "split": split,
             "backend": "canonical_corner_reprojection_v1",
             "optimization_structure": OPTIMIZATION_STRUCTURE_CONTRACT,
+            "objective_terms": OBJECTIVE_TERM_CONTRACT,
+            "inter_camera_coupling": INTER_CAMERA_COUPLING_CONTRACT,
+            "relative_pose_reporting": RELATIVE_POSE_REPORTING_CONTRACT,
+            "fk_fixed": {
+                "mathematical_contract": FK_FIXED_CONTRACT,
+                "rows": sorted(RAW_FK_FIXED_ROWS),
+            },
+            "vision_aligned_fk_fixed": {
+                "mathematical_contract": VISION_ALIGNED_FK_FIXED_CONTRACT,
+                "rows": sorted(ALIGNED_FK_FIXED_ROWS),
+            },
             "optimization_terminology": {
                 "seq": "sequential_frozen_stage",
                 "U": "unified_joint_optimization",
@@ -1652,6 +1977,7 @@ def main(argv=None, force_baseline_only: bool = False) -> None:
             "one_runner_for_all_executable_rows": True,
             "visual_objective": "raw_distorted_pixel_corner_reprojection",
             "solver_options": canonical_solver_options(args).to_dict(),
+            "frame_prune_refit": canonical_frame_prune_options(args).to_dict(),
             "max_nfev": int(args.max_nfev), "tol": float(args.tol),
             "num_inits": int(args.num_inits),
             "post_correction": False,
@@ -1674,6 +2000,9 @@ def main(argv=None, force_baseline_only: bool = False) -> None:
                     "model_dependent_gating": False,
                     "evaluation_mask_sha256": path_evaluation_mask[
                         "evaluation_mask_sha256"],
+                    "role": "method_specific_heldout_consistency",
+                    "reporting_tier": "supplementary",
+                    "may_rank_methods_before_external_gt": False,
                 },
                 "e_task_pose": {
                     "available_external_ground_truth": False,

@@ -1,0 +1,52 @@
+{
+  "artifact_schema": "robot_task_trial_manifest_v1",
+  "task_type": "peg_in_hole",
+  "methods": ["A2", "A4"],
+  "ours_method": "A2",
+  "preregistered_before_trials": true,
+  "calibration_frozen_before_trials": true,
+  "method_order_randomized": true,
+  "same_robot_hardware_across_methods": true,
+  "same_perception_and_target_across_methods": true,
+  "outcomes_not_used_to_change_calibration": true,
+  "success_definition": "REPLACE_BEFORE_PREREGISTRATION",
+  "contact_error_measurement": "REPLACE_WITH_INDEPENDENT_XYZ_MEASUREMENT_PROCEDURE",
+  "preregistered_margins": {
+    "minimum_success_rate": null,
+    "maximum_p95_contact_error_mm": null
+  },
+  "sessions": [
+    {
+      "session_id": "session_01",
+      "pairs": [
+        {
+          "pair_id": "pair_0001",
+          "target_id": "target_pose_0001",
+          "strata": ["workspace_center", "approach_vertical"],
+          "execution_order": ["A4", "A2"],
+          "trials": {
+            "A2": {
+              "success": null,
+              "failure_reason": null,
+              "contact_error_mm": {
+                "x": null,
+                "y": null,
+                "z": null
+              }
+            },
+            "A4": {
+              "success": null,
+              "failure_reason": null,
+              "contact_error_mm": {
+                "x": null,
+                "y": null,
+                "z": null
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "warning": "Replace every placeholder/null and add at least two independent sessions before confirmatory use. Every pair must contain one explicit attempt per method; record missing or aborted attempts as success=false with failure_reason."
+}

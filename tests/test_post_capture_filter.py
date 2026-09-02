@@ -1,5 +1,7 @@
 """Frozen post-capture observation manifest contract tests."""
 
+import copy
+import json
 from pathlib import Path
 
 import numpy as np
@@ -7,6 +9,10 @@ import numpy as np
 from calibration_pipeline.observations import (
     POST_CAPTURE_MANIFEST_SCHEMA,
     load_pixel_observations_from_manifest,
+)
+from calibration_pipeline.board_config import (
+    charuco_config_from_dict,
+    charuco_topology,
 )
 from calibration_pipeline import table1
 from calibration_pipeline.path_evaluation import (
@@ -38,9 +44,62 @@ def test_session04_standard_frozen_population_and_source_hashes():
     assert diagnostics["manifest_schema"] == POST_CAPTURE_MANIFEST_SCHEMA
     assert diagnostics["source"] == "post_capture_frozen_manifest"
     assert diagnostics["source_hashes_validated"] is True
+    board_cfg = charuco_config_from_dict(
+        diagnostics["charuco_board_config"])
+    topology = charuco_topology(board_cfg)
+    assert topology["checker_squares_x"] == 11
+    assert topology["checker_squares_y"] == 7
+    assert topology["charuco_corner_columns"] == 10
+    assert topology["charuco_corner_rows"] == 6
+    assert topology["maximum_charuco_corners"] == 60
+    assert np.isclose(topology["checker_width_mm"], 275.0)
+    assert np.isclose(topology["checker_height_mm"], 175.0)
     assert diagnostics["n_cube_observations"] == 99
     assert diagnostics["n_board_observations"] == 147
     assert len(observations) == 246
+
+
+def _write_manifest(tmp_path, payload):
+    path = tmp_path / "manifest.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def test_manifest_rejects_board_config_or_topology_drift(tmp_path):
+    payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
+
+    changed_config = copy.deepcopy(payload)
+    changed_config["source"]["charuco_board_config"][
+        "square_length_m"] = 0.0275
+    path = _write_manifest(tmp_path, changed_config)
+    with np.testing.assert_raises_regex(ValueError, "config SHA-256 mismatch"):
+        load_pixel_observations_from_manifest(
+            str(path), policy="standard", validate_sources=False)
+
+    changed_corner = copy.deepcopy(payload)
+    board_record = next(
+        record for record in changed_corner["observations"]
+        if record["target"] == "board"
+        and record["selected_by_policy"]["standard"])
+    board_record["object_points"][0][0] += 0.0025
+    path = _write_manifest(tmp_path, changed_corner)
+    with np.testing.assert_raises_regex(ValueError, "ChArUco topology"):
+        load_pixel_observations_from_manifest(
+            str(path), policy="standard", validate_sources=False)
+
+
+def test_manifest_rejects_cube_marker_block_reordering(tmp_path):
+    payload = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    cube_record = next(
+        record for record in payload["observations"]
+        if record["target"] == "cube"
+        and len(record.get("marker_ids", [])) >= 2
+        and record["selected_by_policy"]["standard"])
+    cube_record["marker_ids"] = list(reversed(cube_record["marker_ids"]))
+    path = _write_manifest(tmp_path, payload)
+    with np.testing.assert_raises_regex(ValueError, "marker order"):
+        load_pixel_observations_from_manifest(
+            str(path), policy="standard", validate_sources=False)
 
 
 def test_session04_strict_population_is_a_standard_subset():
@@ -53,9 +112,9 @@ def test_session04_strict_population_is_a_standard_subset():
         observation.marker, observation.event, observation.cam)
     assert {identity(observation) for observation in strict} <= {
         identity(observation) for observation in standard}
-    assert diagnostics["n_cube_observations"] == 90
+    assert diagnostics["n_cube_observations"] == 97
     assert diagnostics["n_board_observations"] == 146
-    assert len(strict) == 236
+    assert len(strict) == 243
 
 
 def test_board_metric_scale_is_opt_in_diagnostic_only():
@@ -80,8 +139,8 @@ def test_board_metric_scale_is_opt_in_diagnostic_only():
 
     assert result["heldout_observations_used"] is False
     assert result["robot_fk_used"] is False
-    assert 1.01 < result["scale"] < 1.03
-    assert 25.25 < result["effective_square_length_mm"] < 25.75
+    assert 1.005 < result["scale"] < 1.015
+    assert 25.1 < result["effective_square_length_mm"] < 25.4
     for camera in ("1", "3"):
         detail = result["per_camera"][camera]
         assert (detail["translation_disagreement_after_mm"]

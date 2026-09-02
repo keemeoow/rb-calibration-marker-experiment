@@ -141,7 +141,7 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Predict blind target poses without reading GT")
     parser.add_argument(
         "--table1_result_json", required=True,
-        help="Unified table1_methods.json produced by Run_calibration_comparison.py table1")
+        help="Unified table1_methods.json produced by 05_calibrate.py")
     parser.add_argument("--method", required=True)
     parser.add_argument("--run_index", type=int, default=0)
     parser.add_argument("--blind_root", required=True)

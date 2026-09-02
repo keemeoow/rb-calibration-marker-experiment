@@ -2,9 +2,10 @@
 """Evaluate every Table 1 row on held-out board and cube observations.
 
 The calibration transforms are loaded from stored runs and never refitted.
-Before external GT exists, two scopes are reported.  Fixed-to-fixed transfer
-isolates fixed-camera calibration without FK.  Gripper-to-fixed transfer uses the
-same measured board/cube corners but evaluates the full hand-eye+FK chain.
+Before external GT exists, two scopes are reported.  Fixed-to-fixed transfer is
+a supplementary, method-specific held-out consistency diagnostic without FK.
+Gripper-to-fixed transfer uses the same measured board/cube corners but
+evaluates the full hand-eye+FK chain.
 
 Reprojection against shared train-only board/cube poses is retained as a
 secondary diagnostic.  Sharing a reference and observation population does
@@ -21,8 +22,14 @@ from typing import Mapping
 
 import numpy as np
 
+from calibration_pipeline.runtime import (
+    DEFAULT_SESSION_ROOT, apply_session_defaults)
+
 from calibration_pipeline import table1
-from calibration_pipeline.schema import DEFAULT_SPLIT_SEED
+from calibration_pipeline.schema import (
+    DEFAULT_SPLIT_SEED,
+    RELATIVE_POSE_REPORTING_CONTRACT,
+)
 from calibration_pipeline.path_evaluation import (
     E_CROSS_CONTRACT,
     E_CROSS_PIXEL_TRANSFER_CONTRACT,
@@ -40,7 +47,7 @@ from calibration_pipeline.evaluation import (
 )
 
 
-METHOD_ORDER = ("A0", "A1", "A2", "A3", "A4", "B1", "B2", "B3")
+METHOD_ORDER = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
 
 
 def _json_sha256(value) -> str:
@@ -133,7 +140,7 @@ def summarize(method: str, run_results: list[dict], status: str):
 
 def validate_result_contract(result: Mapping) -> None:
     """Fail closed if a reference-dependent value is promoted as neutral."""
-    if result.get("artifact_schema") != "internal_heldout_evaluation_v7":
+    if result.get("artifact_schema") != "internal_heldout_evaluation_v8":
         raise ValueError("unexpected internal held-out evaluation schema")
     protocol = result.get("protocol", {})
     if protocol.get("external_ground_truth_used") is not False:
@@ -143,6 +150,16 @@ def validate_result_contract(result: Mapping) -> None:
     if (not mask_sha256
             or primary.get("definition") != FIXED_TO_FIXED_CROSS_TARGET_CONTRACT):
         raise ValueError("fixed-to-fixed board/cube evaluation contract is missing")
+    applicability = protocol.get("metric_applicability", {}).get(
+        "fixed_to_fixed_board_cube", {})
+    if (applicability.get("reporting_tier") != "supplementary"
+            or applicability.get(
+                "may_rank_methods_before_external_gt") is not False):
+        raise ValueError(
+            "fixed-to-fixed consistency was promoted above supplementary")
+    if protocol.get("relative_pose_reporting") != \
+            RELATIVE_POSE_REPORTING_CONTRACT:
+        raise ValueError("relative-pose reporting policy drift")
     gripper_to_fixed_protocol = protocol.get("gripper_to_fixed_evaluation", {})
     gripper_mask_sha256 = gripper_to_fixed_protocol.get(
         "evaluation_mask_sha256")
@@ -194,9 +211,10 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         description=(
             "Pre-GT fixed-to-fixed and gripper-to-fixed board/cube evaluation"))
-    parser.add_argument("--root_folder", default="data/session02/calib_train")
+    parser.add_argument("--root_folder", default=DEFAULT_SESSION_ROOT)
     parser.add_argument("--intrinsics_dir", default="intrinsics")
-    parser.add_argument("--calib_dir", default="data/session02/calib_train/calib_out")
+    parser.add_argument("--calib_dir", default=None,
+                        help="Default: <session>/calib_out from --root_folder.")
     parser.add_argument("--include_sets", default="5-12")
     parser.add_argument("--test_fraction", type=float, default=0.2)
     parser.add_argument("--split_seed", type=int, default=DEFAULT_SPLIT_SEED)
@@ -223,11 +241,15 @@ def parse_args(argv=None):
     parser.add_argument("--loss", choices=["huber", "soft_l1", "linear"], default="soft_l1")
     parser.add_argument("--f_scale_px", type=float, default=2.0)
     parser.add_argument(
-        "--table1_result",
-        default="CP_result/session02/late_table1/table1_methods.json")
+        "--table1_result", default=None,
+        help="Default: CP_result/<session>/late_table1/table1_methods.json.")
     parser.add_argument(
-        "--out_dir", default="CP_result/session02/cross_target_evaluation")
-    return parser.parse_args(argv)
+        "--out_dir", default=None,
+        help="Default: CP_result/<session>/cross_target_evaluation.")
+    args = parser.parse_args(argv)
+    return apply_session_defaults(args, {'calib_dir': 'calib_dir', 'table1_result': 'table1_result',
+         'out_dir': 'cross_target_dir',
+         'observation_manifest': 'observation_manifest'})
 
 
 def main(argv=None) -> None:
@@ -293,7 +315,9 @@ def main(argv=None) -> None:
         ]
         summary.append(summarize(
             method, per_run[method],
-            "preflight_simulation_prior" if method in {"A4", "B1", "B2"} else "complete"))
+            ("preflight_simulation_prior" if method in {"A4", "B1", "B2"}
+             else "posthoc_diagnostic" if method == "A5"
+             else "complete")))
 
     support = {}
     for group, group_observations in observations.items():
@@ -303,7 +327,7 @@ def main(argv=None) -> None:
             "events": sorted({int(observation.event) for observation in group_observations}),
         }
     result = {
-        "artifact_schema": "internal_heldout_evaluation_v7",
+        "artifact_schema": "internal_heldout_evaluation_v8",
         "protocol": {
             "question": (
                 "fixed-camera subsystem and gripper-to-fixed full-chain "
@@ -324,14 +348,17 @@ def main(argv=None) -> None:
                 "fixed-camera chain"),
             "external_ground_truth_used": False,
             "may_be_described_as_absolute_accuracy": False,
+            "relative_pose_reporting": RELATIVE_POSE_REPORTING_CONTRACT,
             "metric_applicability": {
                 "fixed_to_fixed_board_cube": {
                     "all_methods": True,
-                    "role": "fixed_camera_subsystem_internal_metric",
+                    "role": "method_specific_heldout_consistency",
+                    "reporting_tier": "supplementary",
+                    "may_rank_methods_before_external_gt": False,
                     "limitation": (
-                        "cannot measure absolute physical accuracy or detect a "
-                        "systematic calibration error shared by every fixed "
-                        "camera"),
+                        "uses each method's fitted camera poses, cannot measure "
+                        "absolute physical accuracy, and cannot detect a "
+                        "systematic error shared by every fixed camera"),
                 },
                 "gripper_to_fixed_board_cube": {
                     "all_methods": True,
@@ -352,7 +379,9 @@ def main(argv=None) -> None:
                 },
                 "legacy_cube_e_cross_pose_consistency": {
                     "all_methods": True,
-                    "role": "backward_compatible_cube_only_diagnostic",
+                    "role": "method_specific_heldout_consistency",
+                    "reporting_tier": "supplementary",
+                    "may_rank_methods_before_external_gt": False,
                     "limitation": (
                         "cannot detect a systematic calibration error shared "
                         "by every fixed camera"),

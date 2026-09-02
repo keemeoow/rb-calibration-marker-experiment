@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Session04 Calibration Evaluation (캘리브레이션 평가)</title>
+<style>
+:root{--ink:#18212f;--muted:#627083;--line:#dce3ea;--paper:#f5f7fa;--card:#fff;--blue:#2066c7;--teal:#087f78}
+*{box-sizing:border-box} body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 system-ui,-apple-system,sans-serif}
+main{max-width:1180px;margin:auto;padding:32px 20px 72px} h1{font-size:30px;margin:0 0 8px} h2{font-size:20px;margin:0 0 16px}
+.subtitle{color:var(--muted);margin-bottom:22px} .badge{display:inline-block;background:#fff3cd;color:#755600;border:1px solid #efd582;border-radius:999px;padding:5px 11px;font-weight:700}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px} .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-top:18px;box-shadow:0 4px 14px #25364d0d}
+.controls{display:flex;gap:8px;margin-top:18px} button{border:1px solid var(--line);background:white;border-radius:9px;padding:9px 13px;cursor:pointer;font-weight:650} button.active{background:var(--blue);color:white;border-color:var(--blue)}
+.table-wrap{overflow:auto} table{border-collapse:collapse;width:100%;min-width:680px} th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap} th:first-child,td:first-child{text-align:left} th{color:var(--muted);font-size:12px}
+.note{border-left:4px solid var(--teal);padding-left:14px} code{background:#edf2f7;padding:2px 5px;border-radius:5px}
+@media(max-width:760px){.grid{grid-template-columns:1fr} main{padding:22px 12px 50px}}
+</style></head><body><main>
+<span class="badge">Pre-GT Internal Evaluation (외부 GT 전 내부 평가)</span>
+<h1>Session04 Calibration Evaluation (캘리브레이션 평가)</h1>
+<p class="subtitle">A2는 현재 검증된 대표 행, A4는 measured-covariance 전 preflight, A5는 post-hoc diagnostic입니다. Table 1의 굵은 값은 Complete 행만 대상으로 하며 실제 물리 순위는 External GT 이후 결정합니다.</p>
+<section class="panel"><h2>Table 1 Optimization Results (표 1 최적화 결과)</h2><div class="table-wrap"><table>
+<thead><tr><th>Method (방법)</th><th>Label (설명)</th><th>Own Held-out Overall px</th><th>Board px</th><th>Cube px</th><th>Convergence (수렴)</th><th>Status (상태)</th></tr></thead>
+<tbody><tr><td>A0</td><td>baseline</td><td>4.0530</td><td>4.0530</td><td>N/A</td><td>3/3</td><td>Complete (완료)</td></tr><tr><td>A1</td><td>+cube</td><td>4.0837</td><td>4.0645</td><td>4.1402</td><td>3/3</td><td>Complete (완료)</td></tr><tr><td>A2</td><td>+unified</td><td>3.8901</td><td><strong>3.9840</strong></td><td><strong>3.5958</strong></td><td>3/3</td><td>Complete (완료)</td></tr><tr><td>A3</td><td>Ours (raw-FK-fixed target)</td><td>4.7835</td><td>4.1026</td><td>6.3959</td><td>3/3</td><td>Complete (완료)</td></tr><tr><td>A4</td><td>Ours (corrected-FK factor)</td><td>3.8899</td><td>3.9884</td><td>3.5805</td><td>3/3</td><td>Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값)</td></tr><tr><td>A5</td><td>Post-hoc diagnostic (vision-aligned FK fixed)</td><td>3.7270</td><td>3.8804</td><td>3.2274</td><td>3/3</td><td>Post-hoc Diagnostic (사후 원인 진단)</td></tr><tr><td>B1</td><td>−Unified</td><td>4.0783</td><td>4.0648</td><td>4.1182</td><td>3/3</td><td>Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값)</td></tr><tr><td>B2</td><td>−board</td><td>4.4827</td><td>N/A</td><td>4.4827</td><td>3/3</td><td>Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값)</td></tr><tr><td>B3</td><td>−cube</td><td>4.0530</td><td>4.0530</td><td>N/A</td><td>3/3</td><td>Complete (완료)</td></tr></tbody></table></div></section>
+<div class="controls"><button class="active" data-show="all">Both Scopes (두 범위)</button><button data-show="fixed_to_fixed">Fixed-to-Fixed</button><button data-show="gripper_to_fixed">Gripper-to-Fixed</button></div>
+<div class="grid">
+    <section class="panel scope" data-scope="fixed_to_fixed">
+      <h2>A — Fixed-to-Fixed Supplementary Consistency</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Method (방법)</th><th>Board px</th><th>Board mm</th>
+        <th>Board deg</th><th>Cube px</th><th>Cube mm</th><th>Cube deg</th></tr></thead>
+        <tbody><tr><td>A0</td><td>1.1851</td><td>1.7186</td><td><strong>0.1926</strong></td><td>6.6803</td><td>10.1150</td><td>0.6312</td></tr><tr><td>A1</td><td>2.8468</td><td>3.8417</td><td>0.3316</td><td>6.3167</td><td>9.2291</td><td>0.8210</td></tr><tr><td>A2</td><td>3.0243</td><td>4.3201</td><td>0.4218</td><td>3.9992</td><td>5.9598</td><td>0.6322</td></tr><tr><td>A3</td><td>2.4999</td><td>2.6499</td><td>1.7229</td><td>5.8562</td><td>9.0238</td><td>2.1769</td></tr><tr><td>A4</td><td>3.1156</td><td>4.4295</td><td>0.4118</td><td>4.0375</td><td>5.9500</td><td>0.6294</td></tr><tr><td>A5</td><td>4.8563</td><td>7.3005</td><td>0.4917</td><td><strong>3.4706</strong></td><td><strong>4.4892</strong></td><td>0.8073</td></tr><tr><td>B1</td><td>2.9129</td><td>3.9581</td><td>0.3474</td><td>6.2871</td><td>9.1546</td><td>0.8406</td></tr><tr><td>B2</td><td>4.1681</td><td>5.7157</td><td>0.3533</td><td>3.5610</td><td>4.8703</td><td><strong>0.4866</strong></td></tr><tr><td>B3</td><td><strong>1.1829</strong></td><td><strong>1.7159</strong></td><td>0.1931</td><td>6.6767</td><td>10.1095</td><td>0.6309</td></tr></tbody>
+      </table></div>
+    </section>
+    <section class="panel scope" data-scope="gripper_to_fixed">
+      <h2>Gripper-to-Fixed (그리퍼카메라–고정카메라 간)</h2>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Method (방법)</th><th>Board px</th><th>Board mm</th>
+        <th>Board deg</th><th>Cube px</th><th>Cube mm</th><th>Cube deg</th></tr></thead>
+        <tbody><tr><td>A0</td><td><strong>4.5445</strong></td><td>5.4811</td><td>0.7966</td><td>7.4402</td><td>8.1421</td><td>0.9779</td></tr><tr><td>A1</td><td>4.8356</td><td>6.1045</td><td>0.9829</td><td>7.6100</td><td>8.6914</td><td>1.1164</td></tr><tr><td>A2</td><td>5.2890</td><td>7.2539</td><td>1.0833</td><td>6.8987</td><td>7.6781</td><td>1.1296</td></tr><tr><td>A3</td><td>4.8364</td><td><strong>4.5646</strong></td><td>1.9454</td><td>7.1666</td><td>8.0966</td><td>2.0590</td></tr><tr><td>A4</td><td>5.3034</td><td>7.2305</td><td>1.0633</td><td>6.9064</td><td>7.7073</td><td>1.1144</td></tr><tr><td>A5</td><td>5.6332</td><td>6.8618</td><td><strong>0.7790</strong></td><td><strong>6.2895</strong></td><td><strong>7.2581</strong></td><td><strong>0.9110</strong></td></tr><tr><td>B1</td><td>4.8536</td><td>6.0976</td><td>0.9803</td><td>7.5907</td><td>8.6865</td><td>1.1161</td></tr><tr><td>B2</td><td>5.4611</td><td>7.9540</td><td>1.1039</td><td>7.2526</td><td>8.1046</td><td>1.1786</td></tr><tr><td>B3</td><td>4.5447</td><td>5.4821</td><td>0.7966</td><td>7.4385</td><td>8.1401</td><td>0.9777</td></tr></tbody>
+      </table></div>
+    </section></div>
+<section class="panel"><h2>Marker-system End-to-End (마커 시스템 전체 경로)</h2><div class="table-wrap"><table>
+<thead><tr><th>System (시스템)</th><th>Own Held-out px</th><th>Fixed-to-Fixed Board/Cube px</th><th>Gripper-to-Fixed Board/Cube px</th><th>Convergence (수렴)</th></tr></thead>
+<tbody><tr><td>Board-only end-to-end</td><td>4.0530</td><td><strong>1.1832</strong> / 6.6778</td><td><strong>4.5447</strong> / 7.4389</td><td>3/3</td></tr><tr><td>Cube-only end-to-end</td><td>4.6038</td><td>3.8587 / <strong>3.5977</strong></td><td>5.3888 / 7.4576</td><td>3/3</td></tr><tr><td>Board+Cube end-to-end</td><td>3.8901</td><td>3.0243 / 3.9992</td><td>5.2890 / <strong>6.8987</strong></td><td>3/3</td></tr></tbody></table></div></section>
+<section class="panel note"><h2>Interpretation (해석)</h2><p>Fixed-to-Fixed는 Robot FK 없이 고정카메라 부분을 평가합니다. Gripper-to-Fixed는 set 최초 fixed anchor를 같은 set의 모든 held-out gripper Event와 연결하고 Event→set→set 동일가중 순서로 집계합니다. 실제 영상 코너를 사용하지만 <code>T^B_G(e)T^G_C</code> 경로 때문에 Robot FK와 Hand–Eye에 의존합니다. 공식 표는 nominal metric scale 1.0만 사용하며, 두 지표 모두 External Absolute Accuracy (외부 절대 정확도)가 아닙니다.</p></section>
+<section class="panel"><h2>Terminology (용어 설명)</h2><ul>
+<li><b>PnP, Perspective-n-Point (3D–2D 자세 추정)</b>: 영상 코너로 카메라–표적 자세를 계산합니다.</li>
+<li><b>FK, Forward Kinematics (순기구학)</b>: 이벤트별 Base-to-Gripper Transform (베이스–그리퍼 변환)을 계산합니다.</li>
+<li><b>Hand–Eye Transform (핸드–아이 변환)</b>: Gripper-to-Camera Transform (그리퍼–카메라 변환)입니다.</li>
+<li><b>RMSE, Root Mean Squared Error (평균제곱근오차)</b>: px, mm, deg 단위를 분리해 해석합니다.</li>
+<li><b>Reference-dependent Reprojection (기준 의존 재투영)</b>: 학습 표적 자세를 쓰는 보조 진단이며 순위 지표가 아닙니다.</li>
+</ul></section>
+<script>document.querySelectorAll('button[data-show]').forEach(b=>b.onclick=()=>{document.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');const s=b.dataset.show;document.querySelectorAll('.scope').forEach(p=>p.style.display=s==='all'||p.dataset.scope===s?'block':'none')});</script>
+</main></body></html>

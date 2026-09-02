@@ -123,7 +123,10 @@ def _support_metadata(cube: AprilTagCubeTarget,
                       marker_ids: List[int],
                       object_points: np.ndarray) -> Dict[str, Any]:
     """Describe one event-camera cube observation before calibration fitting."""
-    ids = tuple(sorted({int(marker_id) for marker_id in marker_ids}))
+    # Preserve detector/correspondence block order.  Downstream diagnostics use
+    # marker_ids[k] to identify object_points[4*k:4*k+4]; sorting here silently
+    # broke that association whenever the detector returned a different order.
+    ids = tuple(dict.fromkeys(int(marker_id) for marker_id in marker_ids))
     faces = tuple(sorted({
         str(cube.model.marker_face_name(marker_id)) for marker_id in ids
     }))

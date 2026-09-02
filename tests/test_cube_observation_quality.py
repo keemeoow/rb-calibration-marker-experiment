@@ -53,6 +53,16 @@ def test_two_differently_oriented_faces_are_core_nonplanar():
     assert support["quality_tier"] == "nonplanar_multiface"
 
 
+def test_support_marker_ids_preserve_corner_block_order():
+    target = _target()
+    points = np.concatenate([
+        target.model.marker_corners_in_rig(2),
+        target.model.marker_corners_in_rig(0),
+    ])
+    support = _support_metadata(target, [2, 0], points)
+    assert support["marker_ids"] == (2, 0)
+
+
 def test_session04_core_policy_excludes_single_face_observations():
     with (SESSION_ROOT / "meta.json").open("r", encoding="utf-8") as stream:
         meta = json.load(stream)
@@ -92,16 +102,20 @@ def test_session04_core_policy_excludes_single_face_observations():
         if record.get("recovered_core_observation")
     ]
     assert {(record["event_id"], record["camera_id"])
-            for record in recovered} == {(9, 2), (25, 2), (47, 2)}
+            for record in recovered} == {
+                (6, 3), (9, 2), (12, 3), (22, 2), (25, 2), (29, 2),
+                (42, 1), (47, 2), (48, 3), (63, 2), (77, 2),
+            }
     assert all(record["pnp_rmse_px"] <= 3.0 for record in recovered)
     assert all(record["detection_method"] != "default"
                for record in recovered)
 
-    rejected_by_event = {
+    edge_cases_by_event = {
         record["event_id"]: record
         for record in diagnostics["observation_quality_by_event_camera"]
         if record["event_id"] in (11, 15)
     }
-    assert set(rejected_by_event) == {11, 15}
-    assert all(not record["pnp_accepted"]
-               for record in rejected_by_event.values())
+    assert set(edge_cases_by_event) == {11, 15}
+    assert edge_cases_by_event[11]["pnp_accepted"] is True
+    assert edge_cases_by_event[11]["pnp_rmse_px"] > 3.0
+    assert edge_cases_by_event[15]["pnp_accepted"] is False

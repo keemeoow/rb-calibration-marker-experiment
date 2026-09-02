@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate the canonical CSV, Markdown, and HTML from current result JSON.
 
-Only the v7 set-anchor camera-scope evaluation and v5 marker-system evaluation are
+Only the v8 set-anchor camera-scope evaluation and v5 marker-system evaluation are
 accepted. This prevents older metric definitions from entering a new report.
 """
 
@@ -14,8 +14,9 @@ import json
 from pathlib import Path
 from statistics import fmean
 
-
-METHOD_ORDER = ("A0", "A1", "A2", "A3", "A4", "B1", "B2", "B3")
+METHOD_ORDER = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
+# Label-only migrations for numerical artifacts that predate corrected prose.
+CANONICAL_LABEL_OVERRIDES = {"A3": "Ours (raw-FK-fixed target)"}
 SYSTEM_ORDER = ("board_only", "cube_only", "board_cube")
 TARGETS = ("board", "cube")
 SCOPE_FIELDS = (
@@ -41,11 +42,27 @@ def _fmt(value, digits: int = 4) -> str:
     return f"{float(value):.{digits}f}"
 
 
+def _minimum(rows, key: str):
+    values = [row.get(key) for row in rows]
+    numeric = [float(value) for value in values if value not in (None, "")]
+    return None if not numeric else min(numeric)
+
+
+def _fmt_best(value, best, digits: int = 4, html: bool = False) -> str:
+    """Bold a displayed minimum, including values tied after rounding."""
+    formatted = _fmt(value, digits)
+    if best is None or formatted == "N/A" or formatted != _fmt(best, digits):
+        return formatted
+    return (f"<strong>{formatted}</strong>" if html
+            else f"**{formatted}**")
+
+
 def _status_label(value: str) -> str:
     return {
         "complete": "Complete (완료)",
         "preflight_simulation_prior": (
             "Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값)"),
+        "posthoc_diagnostic": "Post-hoc Diagnostic (사후 원인 진단)",
     }.get(value, value)
 
 
@@ -83,7 +100,10 @@ def _method_rows(table1: dict, cross: dict) -> list[dict]:
         cross_row = cross_rows[method]
         row = {
             "method": method,
-            "label": source["condition"]["label"],
+            # Numerical artifacts created before a label-only schema correction
+            # may still contain stale prose such as A3="Ours (full)".
+            "label": CANONICAL_LABEL_OVERRIDES.get(
+                method, source["condition"]["label"]),
             "target_set": source["condition"]["target_set"],
             "optimization": source["condition"].get(
                 "optimization_label",
@@ -158,10 +178,10 @@ def _objective_block_table(rows: list[dict]) -> str:
         "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
     ]
     for row in rows:
-        if row["method"] not in {"A2", "A3", "A4", "B1", "B2"}:
+        if row["method"] not in {"A2", "A3", "A4", "A5", "B1", "B2"}:
             continue
         fk_description = row["cube_pose_handling"]
-        if row["method"] == "A3":
+        if row["method"] in {"A3", "A5"}:
             fk_description += " (hard constant; residual 없음)"
         fraction = row["final_fk_robust_cost_fraction_mean"]
         fraction_text = (
@@ -193,7 +213,7 @@ def _write_csv(path: Path, rows: list[dict]) -> None:
 
 def _scope_table(rows: list[dict], scope: str) -> str:
     scope_label = (
-        "Fixed-to-Fixed (고정카메라 간)" if scope == "fixed_to_fixed"
+        "A — Fixed-to-Fixed 보조 Held-out 일관성" if scope == "fixed_to_fixed"
         else "Gripper-to-Fixed (그리퍼카메라–고정카메라 간)")
     lines = [
         f"### {scope_label}",
@@ -204,21 +224,34 @@ def _scope_table(rows: list[dict], scope: str) -> str:
         "(큐브 회전 deg) |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
+    best = {
+        (target, field): _minimum(rows, f"{scope}_{target}_{field}")
+        for target in TARGETS for field in SCOPE_FIELDS
+    }
     for row in rows:
         values = []
         for target in TARGETS:
-            values.extend([
-                row[f"{scope}_{target}_cross_view_pixel_transfer_rmse_px"],
-                row[f"{scope}_{target}_pose_consistency_translation_rmse_mm"],
-                row[f"{scope}_{target}_pose_consistency_rotation_rmse_deg"],
-            ])
+            for field in SCOPE_FIELDS:
+                key = f"{scope}_{target}_{field}"
+                values.append(_fmt_best(
+                    row[key], best[(target, field)]))
         lines.append("| " + " | ".join(
-            [row["method"], *(_fmt(value) for value in values)]) + " |")
+            [row["method"], *values]) + " |")
     return "\n".join(lines)
 
 
 def _marker_table(marker: dict) -> str:
     by_system = {row["system"]: row for row in marker["summary"]}
+    marker_rows = list(by_system.values())
+    best = {
+        key: _minimum(marker_rows, key)
+        for key in (
+            "fixed_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean",
+            "fixed_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean",
+            "gripper_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean",
+            "gripper_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean",
+        )
+    }
     lines = [
         "### Marker-system End-to-End (마커 시스템 전체 경로)",
         "",
@@ -230,14 +263,82 @@ def _marker_table(marker: dict) -> str:
     ]
     for system in SYSTEM_ORDER:
         row = by_system[system]
+        fixed_board = "fixed_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean"
+        fixed_cube = "fixed_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean"
+        gripper_board = "gripper_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean"
+        gripper_cube = "gripper_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean"
         lines.append(
             f"| {row['label']} | {_fmt(row['own_heldout_overall_rmse_px_mean'])} | "
-            f"{_fmt(row['fixed_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean'])} / "
-            f"{_fmt(row['fixed_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean'])} | "
-            f"{_fmt(row['gripper_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean'])} / "
-            f"{_fmt(row['gripper_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean'])} | "
+            f"{_fmt_best(row[fixed_board], best[fixed_board])} / "
+            f"{_fmt_best(row[fixed_cube], best[fixed_cube])} | "
+            f"{_fmt_best(row[gripper_board], best[gripper_board])} / "
+            f"{_fmt_best(row[gripper_cube], best[gripper_cube])} | "
             f"{row['converged_runs']}/{row['total_runs']} |")
     return "\n".join(lines)
+
+
+def _implementation_audit() -> str:
+    return "\n".join([
+        "## Code-consistency Audit (코드 일치성 검증)",
+        "",
+        "### 카메라 간 Relative Pose",
+        "",
+        "메인 A0–A5·B1–B3 optimizer에는 camera-to-camera transform을 "
+        "추정·평균·연결하는 함수, observation, residual, objective term이 "
+        "**0개**다. 카메라는 오직 shared target-pose variables "
+        "(공유 타깃 자세 변수)를 통해 결합된다.",
+        "",
+        "$$T_{C_iC_j}=T_{BC_i}^{-1}T_{BC_j}$$",
+        "",
+        "위 transform은 solve 이후 camera pose에서 유도하는 값이다. 단, "
+        "저장소 전체에 relative-pose 계산이 0개인 것은 아니다. 평가 A는 "
+        "방법별 supplementary held-out consistency를 사후 계산하고, 평가 B는 "
+        "메인 추정값과 독립적인 OpenCV direct relative-pose baseline을 계산한다.",
+        "",
+        "> **판정:** ‘cube pose로 대표 camera-relative pose를 만든 뒤 "
+        "optimizer에 통합한다’는 서술은 코드와 불일치한다.",
+        "",
+        "### 3항 Weighted-sum Loss",
+        "",
+        "현재 목적함수의 additive term은 최대 **2개**다.",
+        "",
+        "- A0·A1·A2·A3·A5·B3: robust visual reprojection **1항**",
+        "- A4·B1·B2: robust visual reprojection + whitened robust FK factor "
+        "**2항**",
+        "- `pose_error`와 `FK_constraint`: 서로 다른 두 항이 아니라 동일한 "
+        "FK factor의 두 표현",
+        "- `w1`, `w2`, `w3`: 사용하지 않음",
+        "- 상대 scale: visual pixel `f_scale`과 FK covariance whitening "
+        "`Sigma^(-1/2)`로 결정",
+        "",
+        "> **판정:** `w1·reprojection + w2·pose_error + w3·FK_constraint`는 "
+        "현재 코드에 없는 부정확한 서술이다.",
+        "",
+        "### A3의 raw-FK-fixed 의미",
+        "",
+        r"$$T_{B\,cube}(s)=F_s^{raw}T_{cube\ center\rightarrow object}^{mech}$$",
+        "",
+        "A3가 고정하는 cube pose는 set별 controller raw FK pose에 영상과 "
+        "무관하게 사전 등록한 mechanical frame map `R_y(180°)`를 적용한 "
+        "pose다. cube-center 원점 이동은 0이고, `Delta_train`이나 aligned FK "
+        "artifact를 사용하지 않는다. A3 최종 optimizer에서는 이 pose를 "
+        "상수로 고정하고 visual reprojection 1항만 최소화한다.",
+        "",
+        "> **판정:** A3는 pure raw-FK hard constraint이지만 external GT는 "
+        "아니다. tool4/CAD frame 정의 오차가 그대로 결과에 들어간다.",
+        "",
+        "### A5의 vision-aligned-FK-fixed 의미",
+        "",
+        r"$$T_{B\,cube}(s)=F_s^{raw}\Delta_{train}$$",
+        "",
+        "A5는 board와 held-out을 제외한 train eye-in-hand cube 영상으로 "
+        "추정한 `Delta_train`을 적용한 뒤 set별 cube pose를 상수로 "
+        "고정한다. A4와 동일한 aligned-FK artifact를 사용하지만 A4처럼 "
+        "covariance factor로 완화하지 않는다.",
+        "",
+        "> **판정:** A5는 이전 A3 결과의 원인을 분리하는 post-hoc "
+        "diagnostic이다. 독립 실측 correction이나 external GT가 아니다.",
+    ])
 
 
 def _markdown(rows: list[dict], marker: dict, detailed: bool,
@@ -254,8 +355,12 @@ def _markdown(rows: list[dict], marker: dict, detailed: bool,
         "",
         "## Evaluation Decision (평가 구성 결정)",
         "",
-        "- Fixed-to-Fixed (고정카메라 간)는 Robot FK (로봇 순기구학) 없이 "
-        "고정카메라 부분만 평가한다.",
+        "- A — Fixed-to-Fixed/e_cross는 각 방법이 추정한 카메라 자세로 "
+        "계산하는 방법별 Supplementary Held-out Consistency (보조 홀드아웃 "
+        "일관성)다. Robot FK는 쓰지 않지만 독립 기준선이나 순위 지표는 아니다.",
+        "- B — OpenCV Relative-pose Baseline은 Main-method Transform, Robot "
+        "FK, Hand–Eye, Shared Target Pose를 쓰지 않는 Independent Reference "
+        "(독립 기준선)이며 별도 결과 파일로 보고한다.",
         "- Gripper-to-Fixed (그리퍼카메라–고정카메라 간)는 실제 Board/Cube "
         "Image Corners (보드/큐브 영상 코너)를 사용하지만, 예측 경로에는 "
         "Robot FK와 Hand–Eye (핸드–아이 변환)가 포함된다.",
@@ -268,31 +373,54 @@ def _markdown(rows: list[dict], marker: dict, detailed: bool,
         "캘리브레이션에 사용한 마커 종류와 평가 표적 종류를 동일시하지 않는다.",
         "- Reference-dependent Reprojection (기준 의존 재투영)은 Secondary "
         "Diagnostic (보조 진단)이며 방법 순위에 사용하지 않는다.",
+        "- 현재 결론의 대표 행은 A2다. A4는 measured FK covariance 전 "
+        "preflight이고, A5는 이전 A3의 성능 원인을 설명하는 post-hoc "
+        "diagnostic이다. 실제 물리 순위는 External GT 이후 결정한다.",
+        "",
+        _implementation_audit(),
         "",
         "## Table 1 Optimization Results (표 1 최적화 결과)",
         "",
-        "| Method (방법) | Marker Set (마커 구성) | Optimization "
-        "(최적화) | Cube Pose (큐브 자세 처리) | Train Overall "
+        "> **굵은 값**은 `Complete` 행 중 Board/Cube별 held-out RMSE "
+        "최솟값이다. Preflight와 post-hoc 행은 수치가 더 낮아도 "
+        "확증 결과로 강조하지 않는다. Train/Own "
+        "Overall은 marker population이 달라 전체 최솟값을 강조하지 않는다.",
+        "",
+        "| Method (방법) | 기여도2 - Marker Set (마커 구성) | 기여도1 - "
+        "Optimization (최적화) | 기여도3 - Cube Pose (큐브 자세 처리) | Train Overall "
         "(학습 전체 px) | Own Held-out Overall (자체 홀드아웃 전체 px) | "
         "Board/Cube Held-out (보드/큐브 홀드아웃 px) | Convergence (수렴) | "
         "Status (상태) |",
         "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |",
     ]
+    complete_rows = [row for row in rows if row["status"] == "complete"]
+    board_best = _minimum(complete_rows, "heldout_board_reprojection_rmse_px")
+    cube_best = _minimum(complete_rows, "heldout_cube_reprojection_rmse_px")
     for row in rows:
         lines.append(
             f"| {row['method']} ({row['label']}) | {row['target_set']} | "
             f"{row['optimization']} | {row['cube_pose_handling']} | "
             f"{_fmt(row['train_overall_reprojection_rmse_px'])} | "
             f"{_fmt(row['heldout_overall_reprojection_rmse_px'])} | "
-            f"{_fmt(row['heldout_board_reprojection_rmse_px'])} / "
-            f"{_fmt(row['heldout_cube_reprojection_rmse_px'])} | "
+            f"{_fmt_best(row['heldout_board_reprojection_rmse_px'], board_best)} / "
+            f"{_fmt_best(row['heldout_cube_reprojection_rmse_px'], cube_best)} | "
             f"{row['converged_runs']}/{row['total_runs']} | "
             f"{_status_label(row['status'])} |")
     lines.extend([
         "",
+        "> `Convergence 3/3`은 서로 다른 초기화 seed 3회 모두에서 "
+        "SciPy solver가 `success=True`로 종료됐다는 뜻이다. Sequential "
+        "행은 두 stage가 모두 성공해야 하며, B1은 stage 1과 모든 fixed-camera "
+        "stage 2가 성공해야 1회 수렴으로 센다. 이는 solver 종료 조건 충족을 "
+        "뜻할 뿐, 절대 정확도나 전역 최적해를 보장하지 않는다.",
+        "",
         _objective_block_table(rows),
         "",
-        "## Camera-scope Evaluation (카메라 범위 평가)",
+        "## Camera-scope Diagnostics (카메라 범위 진단)",
+        "",
+        "> **굵은 값**은 각 target·단위 열의 최솟값이다. A의 "
+        "Fixed-to-Fixed는 보조 일관성 지표이므로 굵은 값이 절대 정확도 "
+        "순위를 뜻하지 않는다.",
         "",
         _scope_table(rows, "fixed_to_fixed"),
         "",
@@ -320,8 +448,9 @@ def _markdown(rows: list[dict], marker: dict, detailed: bool,
         "",
         "## Interpretation Limit (해석 한계)",
         "",
-        "Fixed-to-Fixed는 모든 고정카메라에 함께 존재하는 Systematic Error "
-        "(계통 오차)를 검출할 수 없다. Gripper-to-Fixed는 Hand–Eye Error "
+        "A의 Fixed-to-Fixed는 방법별 추정값에 의존하고 모든 고정카메라에 "
+        "함께 존재하는 Systematic Error (계통 오차)를 검출할 수 없으므로 "
+        "보조 일관성 진단으로만 해석한다. Gripper-to-Fixed는 Hand–Eye Error "
         "(핸드–아이 오차)와 FK Error (순기구학 오차)를 분리할 수 없다. "
         "따라서 두 범위는 함께 보고하되 External Absolute Accuracy "
         "(외부 절대 정확도)로 부르지 않는다.",
@@ -356,17 +485,21 @@ def _markdown(rows: list[dict], marker: dict, detailed: bool,
 
 def _html_scope_table(rows: list[dict], scope: str) -> str:
     title = (
-        "Fixed-to-Fixed (고정카메라 간)" if scope == "fixed_to_fixed"
+        "A — Fixed-to-Fixed Supplementary Consistency"
+        if scope == "fixed_to_fixed"
         else "Gripper-to-Fixed (그리퍼카메라–고정카메라 간)")
     body = []
+    best = {
+        (target, field): _minimum(rows, f"{scope}_{target}_{field}")
+        for target in TARGETS for field in SCOPE_FIELDS
+    }
     for row in rows:
         cells = [escape(row["method"])]
         for target in TARGETS:
-            cells.extend([
-                _fmt(row[f"{scope}_{target}_cross_view_pixel_transfer_rmse_px"]),
-                _fmt(row[f"{scope}_{target}_pose_consistency_translation_rmse_mm"]),
-                _fmt(row[f"{scope}_{target}_pose_consistency_rotation_rmse_deg"]),
-            ])
+            for field in SCOPE_FIELDS:
+                key = f"{scope}_{target}_{field}"
+                cells.append(_fmt_best(
+                    row[key], best[(target, field)], html=True))
         body.append("<tr>" + "".join(
             f"<td>{value}</td>" for value in cells) + "</tr>")
     return f"""
@@ -383,27 +516,44 @@ def _html_scope_table(rows: list[dict], scope: str) -> str:
 def _html(rows: list[dict], marker: dict,
           session_label: str = "Session") -> str:
     method_rows = []
+    complete_rows = [row for row in rows if row["status"] == "complete"]
+    board_best = _minimum(complete_rows, "heldout_board_reprojection_rmse_px")
+    cube_best = _minimum(complete_rows, "heldout_cube_reprojection_rmse_px")
     for row in rows:
         method_rows.append(
             "<tr>"
             f"<td>{escape(row['method'])}</td><td>{escape(row['label'])}</td>"
             f"<td>{_fmt(row['heldout_overall_reprojection_rmse_px'])}</td>"
-            f"<td>{_fmt(row['heldout_board_reprojection_rmse_px'])}</td>"
-            f"<td>{_fmt(row['heldout_cube_reprojection_rmse_px'])}</td>"
+            f"<td>{_fmt_best(row['heldout_board_reprojection_rmse_px'], board_best, html=True)}</td>"
+            f"<td>{_fmt_best(row['heldout_cube_reprojection_rmse_px'], cube_best, html=True)}</td>"
             f"<td>{row['converged_runs']}/{row['total_runs']}</td>"
             f"<td>{escape(_status_label(row['status']))}</td></tr>")
     marker_rows = []
     by_system = {row["system"]: row for row in marker["summary"]}
+    marker_values = list(by_system.values())
+    marker_best = {
+        key: _minimum(marker_values, key)
+        for key in (
+            "fixed_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean",
+            "fixed_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean",
+            "gripper_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean",
+            "gripper_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean",
+        )
+    }
     for system in SYSTEM_ORDER:
         row = by_system[system]
+        fixed_board = "fixed_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean"
+        fixed_cube = "fixed_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean"
+        gripper_board = "gripper_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean"
+        gripper_cube = "gripper_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean"
         marker_rows.append(
             "<tr>"
             f"<td>{escape(row['label'])}</td>"
             f"<td>{_fmt(row['own_heldout_overall_rmse_px_mean'])}</td>"
-            f"<td>{_fmt(row['fixed_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean'])} / "
-            f"{_fmt(row['fixed_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean'])}</td>"
-            f"<td>{_fmt(row['gripper_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean'])} / "
-            f"{_fmt(row['gripper_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean'])}</td>"
+            f"<td>{_fmt_best(row[fixed_board], marker_best[fixed_board], html=True)} / "
+            f"{_fmt_best(row[fixed_cube], marker_best[fixed_cube], html=True)}</td>"
+            f"<td>{_fmt_best(row[gripper_board], marker_best[gripper_board], html=True)} / "
+            f"{_fmt_best(row[gripper_cube], marker_best[gripper_cube], html=True)}</td>"
             f"<td>{row['converged_runs']}/{row['total_runs']}</td></tr>")
     return f"""<!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -421,7 +571,7 @@ main{{max-width:1180px;margin:auto;padding:32px 20px 72px}} h1{{font-size:30px;m
 </style></head><body><main>
 <span class="badge">Pre-GT Internal Evaluation (외부 GT 전 내부 평가)</span>
 <h1>{escape(session_label)} Calibration Evaluation (캘리브레이션 평가)</h1>
-<p class="subtitle">Fixed-to-Fixed (고정카메라 간)와 Gripper-to-Fixed (그리퍼카메라–고정카메라 간)를 분리해 표시합니다. External GT (외부 정답) 순위가 아닙니다.</p>
+<p class="subtitle">A2는 현재 검증된 대표 행, A4는 measured-covariance 전 preflight, A5는 post-hoc diagnostic입니다. Table 1의 굵은 값은 Complete 행만 대상으로 하며 실제 물리 순위는 External GT 이후 결정합니다.</p>
 <section class="panel"><h2>Table 1 Optimization Results (표 1 최적화 결과)</h2><div class="table-wrap"><table>
 <thead><tr><th>Method (방법)</th><th>Label (설명)</th><th>Own Held-out Overall px</th><th>Board px</th><th>Cube px</th><th>Convergence (수렴)</th><th>Status (상태)</th></tr></thead>
 <tbody>{''.join(method_rows)}</tbody></table></div></section>
@@ -446,19 +596,20 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Regenerate current CSV/Markdown/HTML evaluation artifacts")
     parser.add_argument(
-        "--table1", default="CP_result/session02/late_table1/table1_methods.json")
+        "--table1", default="CP_result/session04/late_table1/table1_methods.json")
     parser.add_argument(
         "--cross", default=(
-            "CP_result/session02/cross_target_evaluation/"
+            "CP_result/session04/cross_target_evaluation/"
             "cross_target_evaluation.json"))
     parser.add_argument(
         "--marker", default=(
-            "CP_result/session02/marker_system_end_to_end/"
+            "CP_result/session04/marker_system_end_to_end/"
             "marker_system_end_to_end.json"))
     parser.add_argument(
-        "--late_dir", default="CP_result/session02/late_table1")
-    parser.add_argument("--root_report", default="session02_result_table1.md")
-    parser.add_argument("--html", default="_TABLE1_INTERACTIVE.html")
+        "--late_dir", default="CP_result/session04/late_table1")
+    parser.add_argument(
+        "--html",
+        default="CP_result/session04/late_table1/TABLE1_INTERACTIVE.html")
     return parser.parse_args()
 
 
@@ -467,8 +618,8 @@ def main() -> None:
     table1_path, cross_path, marker_path = map(
         Path, (args.table1, args.cross, args.marker))
     table1, cross, marker = map(_load, (table1_path, cross_path, marker_path))
-    if cross.get("artifact_schema") != "internal_heldout_evaluation_v7":
-        raise RuntimeError("cross-target result is not the current v7 schema")
+    if cross.get("artifact_schema") != "internal_heldout_evaluation_v8":
+        raise RuntimeError("cross-target result is not the current v8 schema")
     if marker.get("artifact_schema") != "marker_system_end_to_end_v5":
         raise RuntimeError("marker-system result is not the current v5 schema")
     metric_scale = table1.get("protocol", {}).get("board_metric_scale", {})
@@ -495,8 +646,6 @@ def main() -> None:
     late_dir.mkdir(parents=True, exist_ok=True)
     _write_csv(late_dir / "table1_results.csv", rows)
     (late_dir / "TABLE1_RESULTS.md").write_text(
-        _markdown(rows, marker, detailed=False, session_label=session_label))
-    Path(args.root_report).write_text(
         _markdown(rows, marker, detailed=True, session_label=session_label))
     Path(args.html).write_text(
         _html(rows, marker, session_label=session_label))

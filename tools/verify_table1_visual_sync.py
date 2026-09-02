@@ -18,21 +18,24 @@ if str(ROOT) not in sys.path:
 
 from calibration_pipeline.cross_target import validate_result_contract
 from calibration_pipeline.marker_system import validate_end_to_end_contract
-from tools.sync_table1_canonical_data import METHOD_ORDER, _method_rows
+from tools.sync_table1_canonical_data import (
+    CANONICAL_LABEL_OVERRIDES,
+    METHOD_ORDER,
+    _method_rows,
+)
 
 
-TABLE1_JSON = ROOT / "CP_result/session02/late_table1/table1_methods.json"
+TABLE1_JSON = ROOT / "CP_result/session04/late_table1/table1_methods.json"
 CROSS_JSON = (
-    ROOT / "CP_result/session02/cross_target_evaluation/"
+    ROOT / "CP_result/session04/cross_target_evaluation/"
     "cross_target_evaluation.json")
 MARKER_JSON = (
-    ROOT / "CP_result/session02/marker_system_end_to_end/"
+    ROOT / "CP_result/session04/marker_system_end_to_end/"
     "marker_system_end_to_end.json")
-CANONICAL_CSV = ROOT / "CP_result/session02/late_table1/table1_results.csv"
+CANONICAL_CSV = ROOT / "CP_result/session04/late_table1/table1_results.csv"
 REPORTS = (
-    ROOT / "CP_result/session02/late_table1/TABLE1_RESULTS.md",
-    ROOT / "session02_result_table1.md",
-    ROOT / "_TABLE1_INTERACTIVE.html",
+    ROOT / "CP_result/session04/late_table1/TABLE1_RESULTS.md",
+    ROOT / "CP_result/session04/late_table1/TABLE1_INTERACTIVE.html",
 )
 
 
@@ -74,13 +77,14 @@ def _verify_reports(table1: dict, marker: dict,
     forbidden = re.compile(r"(?i)(?<![a-z])common(?![a-z])|reference[_ -]free|공통")
     required = (
         "Pre-GT Internal Evaluation (외부 GT 전 내부 평가)",
-        "Fixed-to-Fixed (고정카메라 간)",
+        "A — Fixed-to-Fixed",
         "Gripper-to-Fixed (그리퍼카메라–고정카메라 간)",
         "Terminology (용어 설명)",
         "Reference-dependent Reprojection (기준 의존 재투영)",
     )
     labels = [
-        table1["rows"][method]["condition"]["label"]
+        CANONICAL_LABEL_OVERRIDES.get(
+            method, table1["rows"][method]["condition"]["label"])
         for method in METHOD_ORDER
     ] + [row["label"] for row in marker["summary"]]
     for path in reports:
@@ -124,8 +128,7 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--marker", default=str(MARKER_JSON))
     parser.add_argument("--csv", default=str(CANONICAL_CSV))
     parser.add_argument("--late_report", default=str(REPORTS[0]))
-    parser.add_argument("--root_report", default=str(REPORTS[1]))
-    parser.add_argument("--html", default=str(REPORTS[2]))
+    parser.add_argument("--html", default=str(REPORTS[1]))
     return parser.parse_args(argv)
 
 
@@ -135,7 +138,7 @@ def main(argv=None) -> None:
     cross_json = Path(args.cross)
     marker_json = Path(args.marker)
     canonical_csv = Path(args.csv)
-    reports = tuple(map(Path, (args.late_report, args.root_report, args.html)))
+    reports = tuple(map(Path, (args.late_report, args.html)))
     paths = (table1_json, cross_json, marker_json, canonical_csv, *reports)
     missing = [str(path) for path in paths if not path.is_file()]
     if missing:

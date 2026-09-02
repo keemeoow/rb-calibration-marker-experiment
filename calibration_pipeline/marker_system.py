@@ -12,10 +12,10 @@ All systems still share the event split, raw detections, K/D, solver options,
 random seeds, held-out observations, and evaluation masks.  The cube-only
 initializer is board-free but uses the preregistered train-only robot-FK cube
 artifact to initialize hand-eye; its final visual objective has no FK factor.
-Pre-GT reporting has two complementary scopes: fixed-to-fixed cross-view isolates
-fixed-camera calibration without FK, while gripper-to-fixed cross-view evaluates
-the full hand-eye+FK+fixed-camera chain.  Both use board/cube image corners and
-no shared target pose.  Shared-pose reprojection remains diagnostic only.
+Pre-GT reporting keeps fixed-to-fixed cross-view as supplementary,
+method-specific held-out consistency without FK.  Gripper-to-fixed cross-view
+evaluates the full hand-eye+FK+fixed-camera chain.  Both use board/cube image
+corners and no shared target pose.  Shared-pose reprojection remains diagnostic.
 """
 
 from __future__ import annotations
@@ -28,8 +28,15 @@ from typing import Mapping, Sequence
 
 import numpy as np
 
+from calibration_pipeline.runtime import (
+    DEFAULT_SESSION_ROOT, apply_session_defaults)
+
 from calibration_pipeline import table1
-from calibration_pipeline.schema import DEFAULT_SPLIT_SEED, MARKER_COMPARISON_CONTRACT
+from calibration_pipeline.schema import (
+    DEFAULT_SPLIT_SEED,
+    MARKER_COMPARISON_CONTRACT,
+    RELATIVE_POSE_REPORTING_CONTRACT,
+)
 from calibration_pipeline.path_evaluation import (
     GRIPPER_TO_FIXED_CROSS_TARGET_CONTRACT,
     FIXED_TO_FIXED_CROSS_TARGET_CONTRACT,
@@ -205,7 +212,7 @@ def run_system_once(system: str, initial: PoseState, data,
     serialized = serialize_state(state)
     internal_evaluation = evaluate_internal_run(
         serialized, evaluation_cameras, evaluation_observations,
-        data.board_initial, data.fixed_cubes,
+        data.board_initial, data.aligned_fk_cubes,
         list(data.train_obs) + list(data.test_obs), data.robot_T,
         data.K_map, data.D_map, data.gripper, data.path_evaluation_mask,
         fixed_to_fixed_cross_target_mask, gripper_to_fixed_cross_target_mask)
@@ -317,6 +324,14 @@ def validate_end_to_end_contract(result: Mapping) -> None:
     if fixed_evaluation.get("definition") != FIXED_TO_FIXED_CROSS_TARGET_CONTRACT:
         raise ValueError(
             "marker systems lack the fixed-to-fixed board/cube contract")
+    if (fixed_evaluation.get("reporting_tier") != "supplementary"
+            or fixed_evaluation.get(
+                "may_rank_methods_before_external_gt") is not False):
+        raise ValueError(
+            "marker-system fixed-to-fixed evaluation must remain supplementary")
+    if protocol.get("relative_pose_reporting") != \
+            RELATIVE_POSE_REPORTING_CONTRACT:
+        raise ValueError("marker-system relative-pose reporting policy drift")
     evaluation_mask_sha256 = fixed_evaluation.get("evaluation_mask_sha256")
     if not evaluation_mask_sha256:
         raise ValueError("fixed-to-fixed board/cube mask hash is missing")
@@ -387,11 +402,13 @@ def write_outputs(result: dict, output_dir: str) -> None:
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(
         description="Modality-specific end-to-end marker-system comparison")
-    parser.add_argument("--root_folder", default="data/session02/calib_train")
+    parser.add_argument("--root_folder", default=DEFAULT_SESSION_ROOT)
     parser.add_argument("--intrinsics_dir", default="intrinsics")
-    parser.add_argument("--calib_dir", default="data/session02/calib_train/calib_out")
+    parser.add_argument("--calib_dir", default=None,
+                        help="Default: <session>/calib_out from --root_folder.")
     parser.add_argument("--include_sets", default="5-12")
-    parser.add_argument("--out_dir", default="CP_result/session02/marker_system_end_to_end")
+    parser.add_argument("--out_dir", default=None,
+                        help="Default: CP_result/<session>/marker_system_end_to_end.")
     parser.add_argument("--test_fraction", type=float, default=0.2)
     parser.add_argument("--split_seed", type=int, default=DEFAULT_SPLIT_SEED)
     parser.add_argument("--min_train_eih_cube_events", type=int, default=3)
@@ -405,6 +422,7 @@ def parse_args(argv=None):
     parser.add_argument("--x_scale_mode", choices=["unit", "jac"], default="jac")
     parser.add_argument("--loss", choices=["huber", "soft_l1", "linear"], default="soft_l1")
     parser.add_argument("--f_scale_px", type=float, default=2.0)
+    table1.add_frame_prune_arguments(parser)
     parser.add_argument("--image_scale", type=float, default=1.0)
     parser.add_argument(
         "--observation-manifest", "--observation_manifest",
@@ -416,7 +434,9 @@ def parse_args(argv=None):
     parser.add_argument(
         "--align-board-metric-scale", "--align_board_metric_scale",
         dest="align_board_metric_scale", action="store_true")
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    return apply_session_defaults(args, {'calib_dir': 'calib_dir', 'out_dir': 'marker_system_dir',
+         'observation_manifest': 'observation_manifest'})
 
 
 def main(argv=None) -> None:
@@ -476,6 +496,8 @@ def main(argv=None) -> None:
             "initialization_policy": "marker_modality_specific_train_only",
             "optimization_policy": "same_marker_modality_unified_visual_objective",
             "solver_options": table1.canonical_solver_options(args).to_dict(),
+            "frame_prune_refit": table1.canonical_frame_prune_options(
+                args).to_dict(),
             "evaluation_fixed_camera_intersection": sorted(evaluation_cameras),
             "camera_intersection_reason": (
                 "all marker systems must use identical fixed-camera pairs"),
@@ -487,7 +509,9 @@ def main(argv=None) -> None:
                 for group, observations in evaluation_observations.items()
             },
             "fixed_camera_subsystem_evaluation": {
-                "role": "FK_free_fixed_camera_relative_comparison",
+                "role": "method_specific_heldout_consistency",
+                "reporting_tier": "supplementary",
+                "may_rank_methods_before_external_gt": False,
                 "definition": FIXED_TO_FIXED_CROSS_TARGET_CONTRACT,
                 "evaluation_mask_sha256": fixed_to_fixed_cross_target_mask[
                     "evaluation_mask_sha256"],
@@ -515,6 +539,7 @@ def main(argv=None) -> None:
             },
             "external_ground_truth_used": False,
             "may_be_described_as_absolute_accuracy": False,
+            "relative_pose_reporting": RELATIVE_POSE_REPORTING_CONTRACT,
             "schema_contract": MARKER_COMPARISON_CONTRACT["end_to_end_system"],
             "cube_only_initialization_caveat": (
                 "board-free train-only FK cube artifact initializes hand-eye; "

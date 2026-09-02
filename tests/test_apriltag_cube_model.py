@@ -13,13 +13,24 @@ import cv2
 import numpy as np
 
 from calibration_pipeline.apriltag_cube import (
+    CUBE_CORNER_REFINEMENT_MODES,
     AprilTagCubeModel,
     AprilTagCubeTarget,
     FACE_OUTWARD_NORMAL,
     inv_T,
     validate_cube_config,
 )
-from calibration_pipeline.config import CharucoBoardConfig, get_default_cube_config
+from calibration_pipeline.config import (
+    CUBE_BODY_HEIGHT_M,
+    CUBE_DEPTH_M,
+    CUBE_OVERALL_HEIGHT_M,
+    CUBE_WIDTH_M,
+    SIDE_MARKER_CENTER_Z_M,
+    TOP_MARKER_PLANE_Z_M,
+    TOP_PROTRUSION_HEIGHT_M,
+    CharucoBoardConfig,
+    get_default_cube_config,
+)
 from calibration_pipeline.cube_config import (
     cube_configs_equivalent,
     load_cube_config_from_meta,
@@ -55,6 +66,16 @@ def _camera_maps(meta):
 def test_default_geometry_is_physically_self_consistent():
     cfg = get_default_cube_config()
     model = AprilTagCubeModel(cfg)
+
+    assert CUBE_WIDTH_M == 0.059
+    assert CUBE_DEPTH_M == 0.059
+    assert CUBE_BODY_HEIGHT_M == 0.057
+    assert TOP_PROTRUSION_HEIGHT_M == 0.002
+    assert np.isclose(CUBE_OVERALL_HEIGHT_M, 0.059)
+    assert np.isclose(TOP_MARKER_PLANE_Z_M, 0.0295)
+    assert np.isclose(SIDE_MARKER_CENTER_Z_M, -0.001)
+    assert np.isclose(
+        CUBE_BODY_HEIGHT_M + TOP_PROTRUSION_HEIGHT_M, cfg.cube_side_m)
 
     expected = {
         0: ("+Z", 25.0, (0.0, -14.0, 29.5), 0.0),
@@ -108,6 +129,53 @@ def test_default_geometry_is_physically_self_consistent():
         polygon_normal = np.cross(corners[1] - corners[0], corners[2] - corners[1])
         polygon_normal /= np.linalg.norm(polygon_normal)
         assert np.allclose(polygon_normal, -pose[:3, 2])
+
+
+def test_default_cube_detector_refines_apriltag_corners():
+    target = AprilTagCubeTarget(get_default_cube_config())
+    expected = getattr(
+        cv2.aruco, "CORNER_REFINE_APRILTAG",
+        cv2.aruco.CORNER_REFINE_SUBPIX)
+    assert target.params.cornerRefinementMethod == expected
+
+
+def test_cube_corner_refinement_mode_is_explicit_and_validated():
+    cfg = get_default_cube_config()
+    assert CUBE_CORNER_REFINEMENT_MODES == ("apriltag", "line_intersection")
+    assert AprilTagCubeTarget(cfg).corner_refinement_mode == "apriltag"
+    assert (AprilTagCubeTarget(
+        cfg, corner_refinement_mode="line_intersection")
+        .corner_refinement_mode == "line_intersection")
+    try:
+        AprilTagCubeTarget(cfg, corner_refinement_mode="unknown")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("unknown corner-refinement mode was accepted")
+
+
+def test_line_intersection_refiner_recovers_synthetic_black_border():
+    image = np.full((200, 200), 230, dtype=np.uint8)
+    true_corners = np.array(
+        [[40.0, 40.0], [160.0, 40.0], [160.0, 160.0], [40.0, 160.0]],
+        dtype=np.float32,
+    )
+    cv2.fillConvexPoly(image, true_corners.astype(np.int32), 20)
+    image = cv2.GaussianBlur(image, (0, 0), 0.8)
+    initial = np.array(
+        [[40.9, 40.7], [159.1, 40.8], [159.2, 159.1], [40.8, 159.2]],
+        dtype=np.float32,
+    )
+
+    refined = AprilTagCubeTarget.refine_quad_by_line_intersections(
+        image, initial)
+
+    initial_error = np.mean(np.linalg.norm(initial - true_corners, axis=1))
+    refined_error = np.mean(np.linalg.norm(refined - true_corners, axis=1))
+    assert refined.shape == (4, 2)
+    assert np.all(np.isfinite(refined))
+    assert cv2.isContourConvex(refined)
+    assert refined_error < initial_error
 
 
 def test_id_overlap_is_only_an_error_for_the_same_dictionary():

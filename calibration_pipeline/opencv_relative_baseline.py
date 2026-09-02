@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""OpenCV PnP fixed-camera relative-pose reference baseline.
+"""Independent OpenCV PnP fixed-camera relative-pose reference baseline.
 
 This diagnostic deliberately avoids the repository's joint optimizer, robot
 FK, hand-eye transform, and shared base-frame target pose.  Each train target
@@ -8,7 +8,8 @@ transform.  OpenCV PnP plus a preregistered robust SE(3) average produces the
 calibration, which is then frozen and evaluated on the same held-out
 fixed-to-fixed board/cube mask used by the main methods.
 
-It is a transparent public-library reference, not a SOTA claim.
+This is policy B: an independent FK-free reference baseline.  It is a
+transparent public-library reference, not external GT or a SOTA claim.
 """
 
 from __future__ import annotations
@@ -32,11 +33,16 @@ from calibration_pipeline.path_evaluation import (
     solve_observed_pose,
 )
 from calibration_pipeline.reprojection import PixelObs, pose_delta
-from calibration_pipeline.schema import DEFAULT_SPLIT_SEED
+from calibration_pipeline.schema import (
+    DEFAULT_SPLIT_SEED,
+    RELATIVE_POSE_REPORTING_CONTRACT,
+)
 from calibration_pipeline.se3 import robust_se3_average
 from calibration_pipeline.runtime import (
     filter_meta_by_set_indices,
     load_intrinsics_with_depth_scale,
+    DEFAULT_SESSION_ROOT,
+    apply_session_defaults,
 )
 from calibration_pipeline import table1
 
@@ -117,13 +123,37 @@ def summarize(name: str, result: dict, diagnostics: dict) -> dict:
 
 
 def markdown_report(summary: Sequence[Mapping], conflict: Mapping) -> str:
+    score_fields = (
+        "board_cross_view_pixel_transfer_rmse_px",
+        "board_pose_consistency_translation_rmse_mm",
+        "cube_cross_view_pixel_transfer_rmse_px",
+        "cube_pose_consistency_translation_rmse_mm",
+    )
+    best = {
+        field: min(float(row[field]) for row in summary)
+        for field in score_fields
+    }
+
+    def fmt_score(row: Mapping, field: str) -> str:
+        formatted = f"{float(row[field]):.4f}"
+        best_formatted = f"{best[field]:.4f}"
+        return f"**{formatted}**" if formatted == best_formatted else formatted
+
     lines = [
-        "# OpenCV Relative-pose Reference Baseline",
+        "# B — Independent OpenCV Relative-pose Reference Baseline",
         "",
         "이 기준선은 OpenCV PnP로 학습 영상의 고정카메라 상대 자세를 직접 "
-        "계산한 FK-free 진단이다. Joint optimizer, Robot FK, Hand–Eye, "
+        "계산하는 독립 FK-free 기준선이다. Main-method transform, Joint "
+        "optimizer, Robot FK, Hand–Eye, "
         "shared target pose를 사용하지 않는다. SOTA 비교나 절대 정확도 "
         "주장이 아니다.",
+        "",
+        "A의 방법별 Fixed-to-Fixed/e_cross는 held-out 자기 일관성을 보는 "
+        "보조 지표이고, 이 B가 그 값과 독립적으로 계산되는 relative-pose "
+        "기준선이다.",
+        "",
+        "> **굵은 값**은 Board 또는 Cube 평가 열의 최솟값이다. 외부 GT "
+        "정확도 순위를 뜻하지 않는다.",
         "",
         "| Train target | Board transfer px | Board translation mm | "
         "Cube transfer px | Cube translation mm | Train candidates/inliers |",
@@ -137,10 +167,10 @@ def markdown_report(summary: Sequence[Mapping], conflict: Mapping) -> str:
     for row in summary:
         lines.append(
             f"| {labels.get(row['baseline'], row['baseline'])} | "
-            f"{float(row['board_cross_view_pixel_transfer_rmse_px']):.4f} | "
-            f"{float(row['board_pose_consistency_translation_rmse_mm']):.4f} | "
-            f"{float(row['cube_cross_view_pixel_transfer_rmse_px']):.4f} | "
-            f"{float(row['cube_pose_consistency_translation_rmse_mm']):.4f} | "
+            f"{fmt_score(row, 'board_cross_view_pixel_transfer_rmse_px')} | "
+            f"{fmt_score(row, 'board_pose_consistency_translation_rmse_mm')} | "
+            f"{fmt_score(row, 'cube_cross_view_pixel_transfer_rmse_px')} | "
+            f"{fmt_score(row, 'cube_pose_consistency_translation_rmse_mm')} | "
             f"{row['n_train_relative_candidates']} / "
             f"{row['n_train_relative_inliers']} |")
     lines.extend([
@@ -172,10 +202,27 @@ def markdown_report(summary: Sequence[Mapping], conflict: Mapping) -> str:
     return "\n".join(lines) + "\n"
 
 
+def validate_payload(payload: Mapping) -> None:
+    """Keep baseline B independent from every fitted main-method transform."""
+    protocol = payload.get("protocol", {})
+    if protocol.get("relative_pose_reporting") != \
+            RELATIVE_POSE_REPORTING_CONTRACT:
+        raise ValueError("relative-pose reporting policy drift")
+    expected = RELATIVE_POSE_REPORTING_CONTRACT[
+        "independent_reference_baseline"]
+    if protocol.get("independent_reference_contract") != expected:
+        raise ValueError("independent relative-pose baseline contract is missing")
+    for key in (
+            "uses_fitted_main_method_camera_poses", "uses_joint_optimizer",
+            "uses_robot_fk", "uses_handeye", "uses_shared_target_pose"):
+        if protocol.get(key) is not False:
+            raise ValueError(f"independent baseline dependency violation: {key}")
+
+
 def parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="OpenCV PnP FK-free fixed-camera reference baseline")
-    parser.add_argument("--root_folder", default="data/session02/calib_train")
+    parser.add_argument("--root_folder", default=DEFAULT_SESSION_ROOT)
     parser.add_argument("--intrinsics_dir", default="intrinsics")
     parser.add_argument("--calib_dir", default="data/session/calib_out")
     parser.add_argument("--include_sets", default="5-12")
@@ -194,8 +241,11 @@ def parse_args(argv=None) -> argparse.Namespace:
         "--align-board-metric-scale", "--align_board_metric_scale",
         dest="align_board_metric_scale", action="store_true")
     parser.add_argument(
-        "--out_dir", default="CP_result/session02/opencv_relative_baseline")
-    return parser.parse_args(argv)
+        "--out_dir", default=None,
+        help="Default: CP_result/<session>/opencv_relative_baseline.")
+    args = parser.parse_args(argv)
+    return apply_session_defaults(args, {'out_dir': 'opencv_relative_dir',
+         'observation_manifest': 'observation_manifest'})
 
 
 def prepare_visual_only_data(args) -> SimpleNamespace:
@@ -315,12 +365,17 @@ def main(argv=None) -> None:
     payload = {
         "artifact_schema": "opencv_relative_reference_baseline_v1",
         "protocol": {
-            "role": "public_library_reference_for_data_vs_custom_code_diagnosis",
+            "role": "independent_FK_free_relative_pose_reference_baseline",
+            "reporting_tier": "independent_reference",
+            "relative_pose_reporting": RELATIVE_POSE_REPORTING_CONTRACT,
+            "independent_reference_contract": RELATIVE_POSE_REPORTING_CONTRACT[
+                "independent_reference_baseline"],
             "not_a_sota_claim": True,
             "calibration": (
                 "OpenCV measurement-only PnP direct anchor-camera relative "
                 "transforms plus preregistered MAD-trimmed SE3 average"),
             "uses_joint_optimizer": False,
+            "uses_fitted_main_method_camera_poses": False,
             "uses_robot_fk": False,
             "uses_handeye": False,
             "uses_shared_target_pose": False,
@@ -337,6 +392,7 @@ def main(argv=None) -> None:
         "board_vs_cube_relative_transform_conflict": conflict,
         "summary": summary,
     }
+    validate_payload(payload)
     os.makedirs(args.out_dir, exist_ok=True)
     json_path = os.path.join(args.out_dir, "opencv_relative_baseline.json")
     csv_path = os.path.join(args.out_dir, "opencv_relative_baseline.csv")

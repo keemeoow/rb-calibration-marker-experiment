@@ -1,19 +1,20 @@
-# Step2b Post-capture Observation Filter
+# 04 Post-capture Observation Filter
 
 - Session: `/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session04/calib_train`
-- 생성 시각(UTC): `2026-08-26T13:57:24.688243+00:00`
+- 생성 시각(UTC): `2026-09-01T05:51:58.930820+00:00`
 - 원본 RGB/meta/intrinsics: **수정하지 않음**
 - Calibration 입력: 재검출 결과의 native-pixel 2D corner를 manifest에 고정
+- Cube corner refinement: `apriltag`
 
 ## 결과 요약
 
 | 항목 | Standard | Strict |
 |---|---:|---:|
-| Cube 선택 관측 | 99 | 90 |
+| Cube 선택 관측 | 99 | 97 |
 | Board 선택 관측 | 147 | 146 |
-| Cube 재검출 복구 | 3 | 3 |
+| Cube 재검출 복구 | 11 | 9 |
 
-Cube standard disposition: `quarantine` 9, `recovered` 3, `rejected` 9, `selected` 96
+Cube standard disposition: `quarantine` 10, `recovered` 11, `rejected` 8, `selected` 88
 
 ## 정책
 
@@ -25,28 +26,28 @@ Cube standard disposition: `quarantine` 9, `recovered` 3, `rejected` 9, `selecte
 
 ## 시각 검토
 
-Standard의 recovered/quarantine/rejected cube 관측 21개를 한 장에 모았습니다.
+Standard의 recovered/quarantine/rejected cube 관측 29개를 한 장에 모았습니다.
 초록은 recovered, 주황은 quarantine, 빨강은 rejected입니다. Rejected에 보라색 선이 있으면 촬영 당시 meta에 저장된 구형 검출 corner입니다.
 
-![Step2b review overlay](Step2b_review_overlay.jpg)
+![04 review overlay](Step2b_review_overlay.jpg)
 
 ## Standard 제외 cube 관측
 
 | Event/camera | 결과 | Marker IDs | Faces | RMSE | 이유 |
 |---|---|---|---|---:|---|
-| E01/cam2 | quarantine | 1 | +Z | 0.291 px | `noncore_single_marker` |
+| E01/cam2 | quarantine | 1 | +Z | 0.427 px | `noncore_single_marker` |
 | E03/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E04/cam2 | quarantine | 3 | +Y | 0.349 px | `noncore_single_marker` |
-| E05/cam2 | quarantine | 3 | +Y | 0.356 px | `noncore_single_marker` |
+| E04/cam2 | quarantine | 3 | +Y | 0.267 px | `noncore_single_marker` |
+| E05/cam2 | quarantine | 3 | +Y | 0.036 px | `noncore_single_marker` |
 | E07/cam2 | quarantine | 3 | +Y | 0.099 px | `noncore_single_marker` |
 | E10/cam2 | quarantine | 3 | +Y | 0.125 px | `noncore_single_marker` |
-| E11/cam2 | rejected | 0, 1, 3, 4 | +Y, +Z, -X | 5.418 px | `pnp_rmse_rejected` |
+| E11/cam2 | quarantine | 4, 3, 0, 1 | +Y, +Z, -X | 4.794 px | `pnp_rmse_above_3px` |
 | E14/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E15/cam2 | rejected | 0, 1, 5 | +Z, -Y | 17.185 px | `pnp_rmse_rejected` |
+| E15/cam2 | rejected | 5, 0, 1 | +Z, -Y | 19.023 px | `pnp_rmse_rejected` |
 | E17/cam2 | rejected | — | — | — | `no_markers_detected` |
 | E19/cam2 | quarantine | 0 | +Z | 0.465 px | `noncore_single_marker` |
 | E20/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E21/cam2 | quarantine | 4 | -X | 1.372 px | `noncore_single_marker` |
+| E21/cam2 | quarantine | 4 | -X | 1.244 px | `noncore_single_marker` |
 | E23/cam2 | rejected | — | — | — | `no_markers_detected` |
 | E28/cam2 | rejected | — | — | — | `no_markers_detected` |
 | E34/cam2 | rejected | — | — | — | `no_markers_detected` |
@@ -74,15 +75,8 @@ Standard는 통과했지만 strict RMSE/inlier/board-corner 기준에서 추가 
 | Target | Event/camera | Corner 수 | RMSE | Inlier | 이유 |
 |---|---|---:|---:|---:|---|
 | board | E86/cam3 | 11 | — | — | `charuco_corners_below_12` |
-| cube | E00/cam0 | 16 | 2.031 px | 0.938 | `pnp_rmse_above_2px` |
-| cube | E00/cam2 | 12 | 2.397 px | 0.917 | `pnp_rmse_above_2px` |
-| cube | E06/cam3 | 8 | 1.646 px | 0.875 | `inlier_fraction_below_0.9` |
-| cube | E08/cam2 | 16 | 2.366 px | 0.938 | `pnp_rmse_above_2px` |
-| cube | E18/cam3 | 8 | 1.580 px | 0.875 | `inlier_fraction_below_0.9` |
-| cube | E27/cam2 | 16 | 2.447 px | 0.938 | `pnp_rmse_above_2px` |
-| cube | E38/cam2 | 16 | 2.264 px | 0.938 | `pnp_rmse_above_2px` |
-| cube | E66/cam3 | 8 | 2.128 px | 0.875 | `pnp_rmse_above_2px` |
-| cube | E77/cam2 | 16 | 2.847 px | 0.938 | `pnp_rmse_above_2px` |
+| cube | E63/cam2 | 16 | 2.100 px | 0.875 | `pnp_rmse_above_2px` |
+| cube | E77/cam2 | 16 | 1.819 px | 0.875 | `inlier_fraction_below_0.9` |
 
 ## 재촬영 후보
 
@@ -121,7 +115,7 @@ Standard는 통과했지만 strict RMSE/inlier/board-corner 기준에서 추가 
 | 05 | 0 | A_placement | board_only | — | cam2 | board_only |
 | 06 | 1 | A_placement | selected_cube_and_board | cam0, cam1, cam2, cam3 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
 | 07 | 1 | A_placement | board_only | — | cam2 | board_only |
-| 08 | 1 | A_placement | selected_cube_and_board | cam2 | cam2 | board_only |
+| 08 | 1 | A_placement | selected_cube_and_board | cam2 | cam2 | selected_cube_and_board |
 | 09 | 1 | A_placement | selected_cube_and_board | cam2 | cam2 | selected_cube_and_board |
 | 10 | 1 | A_placement | board_only | — | cam2 | board_only |
 | 11 | 1 | A_placement | board_only | — | cam2 | board_only |
@@ -140,7 +134,7 @@ Standard는 통과했지만 strict RMSE/inlier/board-corner 기준에서 추가 
 | 24 | 4 | A_placement | selected_cube_and_board | cam0, cam1, cam2, cam3 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
 | 25 | 4 | A_placement | selected_cube_and_board | cam2 | cam2 | selected_cube_and_board |
 | 26 | 4 | A_placement | selected_cube_and_board | cam2 | cam2 | selected_cube_and_board |
-| 27 | 4 | A_placement | selected_cube_and_board | cam2 | cam2 | board_only |
+| 27 | 4 | A_placement | selected_cube_and_board | cam2 | cam2 | selected_cube_and_board |
 | 28 | 4 | A_placement | board_only | — | cam2 | board_only |
 | 29 | 4 | A_placement | selected_cube_and_board | cam2 | cam2 | selected_cube_and_board |
 | 30 | 5 | A_placement | selected_cube_and_board | cam0, cam1, cam2, cam3 | cam0, cam1, cam2 | selected_cube_and_board |
@@ -151,7 +145,7 @@ Standard는 통과했지만 strict RMSE/inlier/board-corner 기준에서 추가 
 | 35 | 5 | A_placement | selected_cube_and_board | cam2 | cam2 | selected_cube_and_board |
 | 36 | 6 | A_placement | selected_cube_and_board | cam0, cam1, cam2, cam3 | cam0, cam1, cam2 | selected_cube_and_board |
 | 37 | 6 | A_placement | selected_cube_and_board | cam2 | cam2 | selected_cube_and_board |
-| 38 | 6 | A_placement | selected_cube_and_board | cam2 | cam2 | board_only |
+| 38 | 6 | A_placement | selected_cube_and_board | cam2 | cam2 | selected_cube_and_board |
 | 39 | 6 | A_placement | selected_cube_and_board | cam2 | cam2 | selected_cube_and_board |
 | 40 | 6 | A_placement | board_only | — | cam2 | board_only |
 | 41 | 6 | A_placement | selected_cube_and_board | cam2 | cam2 | selected_cube_and_board |
@@ -176,7 +170,7 @@ Standard는 통과했지만 strict RMSE/inlier/board-corner 기준에서 추가 
 | 60 | 10 | A_placement | selected_cube_and_board | cam0, cam1, cam2, cam3 | cam0, cam1, cam2 | selected_cube_and_board |
 | 61 | 10 | A_placement | selected_cube_and_board | cam2 | cam2 | selected_cube_and_board |
 | 62 | 10 | A_placement | selected_cube_and_board | cam2 | cam2 | selected_cube_and_board |
-| 63 | 10 | A_placement | selected_cube_and_board | cam2 | cam2 | selected_cube_and_board |
+| 63 | 10 | A_placement | selected_cube_and_board | cam2 | cam2 | board_only |
 | 64 | 10 | A_placement | selected_cube_and_board | cam2 | cam2 | selected_cube_and_board |
 | 65 | 10 | A_placement | selected_cube_and_board | cam2 | cam2 | selected_cube_and_board |
 | 66 | 11 | A_placement | selected_cube_and_board | cam0, cam1, cam2, cam3 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
@@ -208,14 +202,14 @@ Standard는 통과했지만 strict RMSE/inlier/board-corner 기준에서 추가 
 ## Calibration에서 frozen manifest 사용
 
 ```bash
-python3 Step3_calibration.py \
+python3 05_calibrate.py \
   --root_folder /Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session04/calib_train \
   --intrinsics_dir /Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/intrinsics \
   --observation-manifest /Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session04/calib_out/capture_filter/Step2b_observation_manifest.json \
   --observation-filter-policy standard
 ```
 
-`strict` 비교 시 마지막 값만 `strict`로 바꾸면 됩니다. Manifest를 사용할 때 Step3/Table1은 detector를 다시 실행하지 않으며, meta/intrinsics/선택 RGB의 SHA-256이 달라지면 중단합니다.
+`strict` 비교 시 마지막 값만 `strict`로 바꾸면 됩니다. Manifest를 사용할 때 05 calibration은 detector를 다시 실행하지 않으며, meta/intrinsics/선택 RGB의 SHA-256이 달라지면 중단합니다.
 
 ## 산출물
 

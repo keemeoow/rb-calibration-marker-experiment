@@ -1,8 +1,8 @@
-# Calibration Simulation — 7-Experiment Ablation
+# Calibration Simulation — 8-Experiment Ablation
 
 ## 목차
 
-- [7개 실험 (확정 리스트)](#toc-section-1)
+- [8개 실험 (확정 리스트)](#toc-section-1)
 - [실행](#toc-section-2)
 - [지표 (Table 2a 열)](#toc-section-3)
 - [폴더 구조](#toc-section-4)
@@ -13,14 +13,15 @@
 기하 시뮬레이션**(렌더링 없음, ground-truth 보유)으로 검증한다. **자체 완결 패키지** — 부모
 저장소에 의존하지 않는다(numpy + scipy 만 필요).
 
-> 설계: **통합 코드(core) 하나 + 7개 얇은 실험 스크립트.** 각 실험은 core 의 `ExpConfig`
+> 설계: **통합 코드(core) 하나 + 8개 `ExpConfig`.** EXP1–EXP7은 개별 실행 스크립트가 있고,
+> EXP8은 legacy Ridge 비교군으로 전체 러너에서 함께 실행한다. 각 실험은 `ExpConfig`
 > 설정만 다르다.
 
 ---
 
 <a id="toc-section-1"></a>
 
-## 7개 실험 (확정 리스트)
+## 8개 실험 (확정 리스트)
 
 기본 = **EXP1 (Ours)** = 통합 BA + 큐브+보드 + **공분산 가중 robust FK factor**.
 여기서 하나씩 제거:
@@ -68,7 +69,7 @@ cd Simulation
 # 개별 실험
 python experiments/exp1.py --seeds 20
 
-# 7개 전체 → Table 2a
+# 8개 전체 → Table 2a
 python run_all.py --seeds 20 --dump results/tables/table2a.json
 ```
 
@@ -133,9 +134,9 @@ Simulation/
 │   ├── methods.py          # 통합/독립 × FK 3-값 × 마커
 │   ├── metrics.py          # e_X, e_task, e_cross, N_reg
 │   └── experiment.py       # run_config(cfg): 통합 러너
-├── configs.py              # 7개 ExpConfig
-├── experiments/exp1..7.py  # 7개 얇은 스크립트
-├── run_all.py              # 7개 전체 → Table 2a
+├── configs.py              # 8개 ExpConfig
+├── experiments/exp1..7.py  # EXP1–EXP7 개별 실행 스크립트
+├── run_all.py              # 8개 전체 → Table 2a
 └── results/tables|figures/ # 산출물
 ```
 
@@ -167,4 +168,4 @@ Simulation/
 - **e_task 는 GT 기반**이므로 실데이터로 그대로 옮길 수 없다. 실데이터에서는
   reproj_test / e_cross 만 대응되고, 절대 정확도는 **독립 물리 GT** 가 있어야 한다.
 
-자세한 감사·계획: [PLAN_AND_AUDIT.md](PLAN_AND_AUDIT.md).
+실데이터 backend와의 통합 계획: [MIGRATION_PLAN.md](MIGRATION_PLAN.md).

@@ -43,15 +43,17 @@ from calibration_pipeline.evaluation import deserialize_state  # noqa: E402
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root_folder", default="data/session02/calib_train")
+    parser.add_argument("--root_folder", default="data/session04/calib_train")
     parser.add_argument("--intrinsics_dir", default="intrinsics")
     parser.add_argument(
-        "--calib_dir", default="data/session02/calib_train/calib_out")
-    parser.add_argument("--include_sets", default="5-12")
+        "--calib_dir", default="data/session04/calib_out")
+    parser.add_argument("--include_sets", default="0-12")
     parser.add_argument("--split_seed", type=int, default=DEFAULT_SPLIT_SEED)
     parser.add_argument("--min_train_eih_cube_events", type=int, default=3)
     parser.add_argument(
-        "--observation-manifest", "--observation_manifest", default=None)
+        "--observation-manifest", "--observation_manifest",
+        default=("data/session04/calib_out/capture_filter/"
+                 "Step2b_observation_manifest.json"))
     parser.add_argument(
         "--observation-filter-policy", "--observation_filter_policy",
         choices=("standard", "strict"), default="standard")
@@ -60,10 +62,10 @@ def parse_args():
         action="store_true")
     parser.add_argument(
         "--table1_result",
-        default="CP_result/session02/late_table1/table1_methods.json")
+        default="CP_result/session04/late_table1/table1_methods.json")
     parser.add_argument(
         "--evaluation_json",
-        default=("CP_result/session02/cross_target_evaluation/"
+        default=("CP_result/session04/cross_target_evaluation/"
                  "cross_target_evaluation.json"))
     return parser.parse_args()
 

@@ -22,7 +22,7 @@ from scipy.spatial import cKDTree
 from scipy.spatial.transform import Rotation
 
 
-MANIFEST_SCHEMA = "external_gt_eval_manifest_v1"
+MANIFEST_SCHEMA = "external_gt_eval_manifest_v2"
 POSE_SCHEMA = "base_cube_pose_predictions_v1"
 
 
@@ -109,8 +109,14 @@ def load_manifest(path: str) -> tuple[dict, list[SessionData]]:
         raise ValueError("unknown external-GT evaluation manifest schema")
     if manifest.get("blind_gt_used_for_training") is not False:
         raise ValueError("manifest must explicitly state blind_gt_used_for_training=false")
-    if manifest.get("gt_independent_of_fk_factor") is not True:
-        raise ValueError("external GT must be independent of the A4 FK factor")
+    if manifest.get("gt_independent_of_all_compared_methods") is not True:
+        raise ValueError(
+            "external GT must be independent of every compared calibration method")
+    if manifest.get("preregistered_before_gt_unlock") is not True:
+        raise ValueError("external GT protocol and margins must be preregistered")
+    if manifest.get("calibration_and_predictions_frozen_before_gt_unlock") is not True:
+        raise ValueError(
+            "calibration artifacts and blind predictions must be frozen before GT unlock")
     base_dir = os.path.dirname(os.path.abspath(path))
     methods = tuple(map(str, manifest.get("methods", [])))
     if str(manifest.get("ours_method")) not in methods or len(methods) < 2:
@@ -391,6 +397,7 @@ def evaluate(manifest: Mapping, sessions: Sequence[SessionData], metrics: Mappin
         }
     return {
         "protocol": {
+            "ours_method": ours,
             "independent_unit": "camera_installation_session",
             "bootstrap": "paired_hierarchical_session_then_pose",
             "bootstrap_repetitions": repetitions,
@@ -401,7 +408,7 @@ def evaluate(manifest: Mapping, sessions: Sequence[SessionData], metrics: Mappin
         },
         "method_summaries": {
             method: summarize_method(metrics, method) for method in manifest["methods"]},
-        "comparisons_A4_minus_baseline": comparisons,
+        "comparisons_ours_minus_baseline": comparisons,
         "decisions": decisions,
         "overall_claim_pass": bool(decisions and all(item["claim_pass"] for item in decisions.values())),
     }
@@ -412,7 +419,7 @@ def write_outputs(result: Mapping, output_dir: str) -> None:
     with open(os.path.join(output_dir, "external_gt_evaluation.json"), "w") as handle:
         json.dump(result, handle, indent=2)
     rows = []
-    for baseline, metrics in result["comparisons_A4_minus_baseline"].items():
+    for baseline, metrics in result["comparisons_ours_minus_baseline"].items():
         for metric, values in metrics.items():
             rows.append({"baseline": baseline, "metric": metric, **values})
     fields = sorted({key for row in rows for key in row}) if rows else ["baseline", "metric"]
@@ -431,12 +438,13 @@ def write_outputs(result: Mapping, output_dir: str) -> None:
         "",
         f"Overall claim gate: **{'PASS' if result['overall_claim_pass'] else 'FAIL'}**.",
         "",
-        "Negative estimates favor A4. A claim passes only when every preregistered gate passes.",
+        f"Negative estimates favor {result['protocol']['ours_method']}. "
+        "A claim passes only when every preregistered gate passes.",
         "",
         "| Baseline | ΔTRE mean [95% CI] mm | Δrotation mean upper CI ° | ΔP95 upper CI mm | Δfailure upper CI | Claim |",
         "| --- | ---: | ---: | ---: | ---: | --- |",
     ]
-    for baseline, metrics in result["comparisons_A4_minus_baseline"].items():
+    for baseline, metrics in result["comparisons_ours_minus_baseline"].items():
         tre = metrics["mean_tre_mm"]
         decision = result["decisions"][baseline]
         if tre.get("available"):

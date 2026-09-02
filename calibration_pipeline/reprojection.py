@@ -10,12 +10,21 @@ SciPy TRF with ``soft_l1``, ``f_scale=2 px``, and ``x_scale='jac'``.  These
 settings were selected using noise-free synthetic and calibration-train
 diagnostics only.  With ``loss='linear'`` the same residual is the usual
 pixel-Gaussian maximum-likelihood objective.
+
+Every residual built here is one observation's corner reprojection.  There is
+no camera-to-camera residual and no target-pose residual: two fixed cameras
+influence each other only by reprojecting onto the same shared target-pose
+variable, so ``T_Ci_Cj`` is derived from a converged solution rather than
+estimated or constrained.  The objective minimized by this module therefore has
+exactly one additive term; the optional second (FK) term lives in
+:mod:`calibration_pipeline.fk_factor` and nowhere else.
 """
 
 from __future__ import annotations
 
 import hashlib
 import time
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 
@@ -30,6 +39,38 @@ from calibration_pipeline.apriltag_cube import inv_T
 
 TransformKey = Tuple[str, int]
 
+# Machine-readable statement of what this backend minimizes.  It is serialized
+# into every solve's diagnostics so a downstream description cannot silently
+# drift from the implementation.
+VISUAL_OBJECTIVE_CONTRACT = {
+    "n_objective_terms": 1,
+    "terms": ("robust_corner_reprojection",),
+    "residual": "predicted_corner_uv_minus_measured_corner_uv",
+    "residual_domain": "distorted_native_image_pixels",
+    "residual_granularity": "one_2D_block_per_detected_corner",
+    "robustification": "scipy_global_loss_applied_per_scalar_residual_component",
+    "scalar_term_weights_used": False,
+    "pose_error_term": False,
+    "fk_constraint_term": False,
+    "camera_to_camera_residual": False,
+    "camera_coupling_mechanism": "shared_target_pose_variables_only",
+}
+
+FRAME_PRUNE_REFIT_CONTRACT = {
+    "selection_scope": "training_observations_only",
+    "frame_unit": "event_id_x_camera_id_all_target_observations",
+    "selection_metric": "per_frame_euclidean_corner_reprojection_RMSE_px",
+    "threshold": "max(minimum_rmse_px, median + mad_multiplier*1.4826*MAD)",
+    "maximum_pruned_fraction": 0.30,
+    "coverage_guard": "retain_minimum_observations_for_every_free_transform",
+    "refit_initialization": "accepted_first_fit_state_without_perturbation",
+    "acceptance_population": "original_unpruned_training_observations",
+    "acceptance_metric": "same_full_robust_objective_as_the_first_fit",
+    "rollback": "keep_first_fit_unless_successful_refit_strictly_improves_full_objective",
+    "heldout_observations_used": False,
+    "heldout_observations_pruned": False,
+}
+
 # How a gripped-cube observation gets its target pose.  This is the FK axis in
 # its sharpest form: the cube is bolted to the gripper, so either FK carries it
 # (one constant per grasp) or it does not (six free DoF per event).  A placement
@@ -38,6 +79,13 @@ TransformKey = Tuple[str, int]
 GRIPPED_TARGET_GRASP = "grasp"        # T_base_cube[e] = FK(q_e) @ T_gripper_cube[g]
 GRIPPED_TARGET_EVENT = "event_free"   # T_base_cube[e] free, FK unused
 GRIPPED_TARGET_MODELS = frozenset({GRIPPED_TARGET_GRASP, GRIPPED_TARGET_EVENT})
+
+RESIDUAL_WEIGHT_PER_CORNER = "per_corner"
+RESIDUAL_WEIGHT_EQUAL_OBSERVATION = "equal_observation_total"
+RESIDUAL_WEIGHTING_MODES = frozenset({
+    RESIDUAL_WEIGHT_PER_CORNER,
+    RESIDUAL_WEIGHT_EQUAL_OBSERVATION,
+})
 
 
 def robust_least_squares_cost(
@@ -167,6 +215,7 @@ class SolverOptions:
     gtol: float = 1e-8
     scaling: SE3Scaling = SE3Scaling()
     x_scale_mode: str = "jac"
+    residual_weighting: str = RESIDUAL_WEIGHT_PER_CORNER
 
     def validate(self) -> None:
         if self.method != "trf":
@@ -175,6 +224,10 @@ class SolverOptions:
             raise ValueError("canonical backend loss must be linear, huber, or soft_l1")
         if self.x_scale_mode not in {"unit", "jac"}:
             raise ValueError("x_scale_mode must be 'unit' or 'jac'")
+        if self.residual_weighting not in RESIDUAL_WEIGHTING_MODES:
+            raise ValueError(
+                "residual_weighting must be one of "
+                f"{sorted(RESIDUAL_WEIGHTING_MODES)}")
         if self.f_scale_px <= 0 or self.max_nfev <= 0:
             raise ValueError("invalid solver options")
         self.scaling.validate()
@@ -192,6 +245,53 @@ class SolverOptions:
             "rotation_scale_rad": float(self.scaling.rotation_scale_rad),
             "translation_scale_m": float(self.scaling.translation_scale_m),
             "scipy_x_scale": ("jac" if self.x_scale_mode == "jac" else 1.0),
+            "residual_weighting": self.residual_weighting,
+        }
+
+
+@dataclass(frozen=True)
+class FramePruneRefitOptions:
+    """Deterministic training-frame prune/refit policy.
+
+    A frame is every target observation stored for one ``(event, camera)``
+    image.  Pruning therefore removes board and cube blocks together instead
+    of cherry-picking individual corners or one target from the same image.
+    """
+
+    enabled: bool = True
+    mad_multiplier: float = 3.0
+    minimum_rmse_px: float = 4.0
+    maximum_fraction: float = 0.30
+    minimum_observations_per_variable: int = 2
+    minimum_relative_improvement: float = 1e-6
+
+    def validate(self) -> None:
+        if not np.isfinite(self.mad_multiplier) or self.mad_multiplier <= 0.0:
+            raise ValueError("frame-prune MAD multiplier must be positive")
+        if not np.isfinite(self.minimum_rmse_px) or self.minimum_rmse_px < 0.0:
+            raise ValueError("frame-prune minimum RMSE must be non-negative")
+        if (not np.isfinite(self.maximum_fraction)
+                or not 0.0 <= self.maximum_fraction < 1.0):
+            raise ValueError("frame-prune maximum fraction must be in [0, 1)")
+        if int(self.minimum_observations_per_variable) < 1:
+            raise ValueError(
+                "frame-prune minimum observations per variable must be >= 1")
+        if (not np.isfinite(self.minimum_relative_improvement)
+                or self.minimum_relative_improvement < 0.0):
+            raise ValueError(
+                "frame-prune minimum relative improvement must be non-negative")
+
+    def to_dict(self) -> dict:
+        return {
+            **FRAME_PRUNE_REFIT_CONTRACT,
+            "enabled": bool(self.enabled),
+            "mad_multiplier": float(self.mad_multiplier),
+            "minimum_rmse_px": float(self.minimum_rmse_px),
+            "maximum_fraction": float(self.maximum_fraction),
+            "minimum_observations_per_variable": int(
+                self.minimum_observations_per_variable),
+            "minimum_relative_improvement": float(
+                self.minimum_relative_improvement),
         }
 
 
@@ -318,12 +418,18 @@ class CornerReprojectionProblem:
                  robot_T: Mapping[int, np.ndarray], K_map: Mapping[int, np.ndarray],
                  D_map: Mapping[int, np.ndarray], gripper_cam_idx: int,
                  scaling: SE3Scaling = SE3Scaling(),
-                 gripped_target: str = GRIPPED_TARGET_GRASP):
+                 gripped_target: str = GRIPPED_TARGET_GRASP,
+                 residual_weighting: str = RESIDUAL_WEIGHT_PER_CORNER):
         scaling.validate()
         if gripped_target not in GRIPPED_TARGET_MODELS:
             raise ValueError(
                 f"gripped_target must be one of {sorted(GRIPPED_TARGET_MODELS)}")
         self.gripped_target = str(gripped_target)
+        if residual_weighting not in RESIDUAL_WEIGHTING_MODES:
+            raise ValueError(
+                "residual_weighting must be one of "
+                f"{sorted(RESIDUAL_WEIGHTING_MODES)}")
+        self.residual_weighting = str(residual_weighting)
         self.obs = list(observations)
         self.variable_keys = list(variable_keys_)
         if len(self.variable_keys) != len(set(self.variable_keys)):
@@ -339,10 +445,15 @@ class CornerReprojectionProblem:
         self.n_params = 6 * len(self.variable_keys)
         self.x0 = np.zeros(self.n_params, dtype=np.float64)
         self.row_offsets: List[Tuple[int, int]] = []
+        self.observation_weights: List[float] = []
         row = 0
         for obs in self.obs:
-            n = 2 * len(np.asarray(obs.image_points).reshape(-1, 2))
+            corner_count = len(np.asarray(obs.image_points).reshape(-1, 2))
+            n = 2 * corner_count
             self.row_offsets.append((row, row + n))
+            self.observation_weights.append(
+                1.0 if self.residual_weighting == RESIDUAL_WEIGHT_PER_CORNER
+                else 1.0 / np.sqrt(float(corner_count)))
             row += n
         self.n_residuals = row
         if not self.obs or not self.n_residuals:
@@ -360,10 +471,10 @@ class CornerReprojectionProblem:
             )
         return state
 
-    def residual_vector(self, x: np.ndarray) -> np.ndarray:
+    def _residual_vector(self, x: np.ndarray, *, apply_weighting: bool) -> np.ndarray:
         state = self.unpack(x)
         chunks = []
-        for obs in self.obs:
+        for obs, weight in zip(self.obs, self.observation_weights):
             if obs.marker == "board":
                 if state.board is None:
                     raise RuntimeError("board observation with no board pose")
@@ -401,8 +512,19 @@ class CornerReprojectionProblem:
                 inv_T(T_base_cam) @ target, obs.object_points,
                 self.K[int(obs.cam)], self.D[int(obs.cam)],
             )
-            chunks.append((prediction - np.asarray(obs.image_points).reshape(-1, 2)).reshape(-1))
+            residual = (
+                prediction - np.asarray(obs.image_points).reshape(-1, 2)
+            ).reshape(-1)
+            chunks.append(residual * weight if apply_weighting else residual)
         return np.concatenate(chunks).astype(np.float64)
+
+    def raw_residual_vector(self, x: np.ndarray) -> np.ndarray:
+        """Unweighted native-pixel residual used for comparable reporting."""
+        return self._residual_vector(x, apply_weighting=False)
+
+    def residual_vector(self, x: np.ndarray) -> np.ndarray:
+        """Objective residual, optionally normalized per observation block."""
+        return self._residual_vector(x, apply_weighting=True)
 
     # Alias keeps scipy call sites terse and makes the public residual explicit.
     residual = residual_vector
@@ -410,21 +532,226 @@ class CornerReprojectionProblem:
     def jacobian_sparsity(self):
         matrix = lil_matrix((self.n_residuals, self.n_params), dtype=np.int8)
         for obs, (r0, r1) in zip(self.obs, self.row_offsets):
-            camera_key = (("gtc", -1) if int(obs.cam) == self.gripper
-                          else ("cam", int(obs.cam)))
-            if obs.marker == "board":
-                target_key = ("board", -1)
-            elif obs.grasp_idx is not None:
-                target_key = (("grasp", int(obs.grasp_idx))
-                              if self.gripped_target == GRIPPED_TARGET_GRASP
-                              else ("cube_event", int(obs.event)))
-            else:
-                target_key = ("cube", int(obs.set_idx))
-            if camera_key in self.slices:
-                matrix[r0:r1, self.slices[camera_key]] = 1
-            if target_key in self.slices:
-                matrix[r0:r1, self.slices[target_key]] = 1
+            for key in observation_dependency_keys(
+                    obs, self.gripper, self.gripped_target):
+                if key in self.slices:
+                    matrix[r0:r1, self.slices[key]] = 1
         return matrix.tocsr()
+
+
+def observation_dependency_keys(
+        observation: PixelObs, gripper_cam_idx: int,
+        gripped_target: str = GRIPPED_TARGET_GRASP) -> Tuple[TransformKey, ...]:
+    """Return the camera and target variables touched by one observation."""
+    if gripped_target not in GRIPPED_TARGET_MODELS:
+        raise ValueError(
+            f"gripped_target must be one of {sorted(GRIPPED_TARGET_MODELS)}")
+    camera_key = (
+        ("gtc", -1) if int(observation.cam) == int(gripper_cam_idx)
+        else ("cam", int(observation.cam)))
+    if observation.marker == "board":
+        target_key = ("board", -1)
+    elif observation.grasp_idx is not None:
+        target_key = (
+            ("grasp", int(observation.grasp_idx))
+            if gripped_target == GRIPPED_TARGET_GRASP
+            else ("cube_event", int(observation.event)))
+    else:
+        if observation.set_idx is None:
+            raise ValueError("placed-cube observation has no set index")
+        target_key = ("cube", int(observation.set_idx))
+    return camera_key, target_key
+
+
+def visual_objective_cost(
+        observations: Sequence[PixelObs],
+        variable_keys_: Sequence[TransformKey],
+        state: PoseState,
+        robot_T: Mapping[int, np.ndarray],
+        K_map: Mapping[int, np.ndarray],
+        D_map: Mapping[int, np.ndarray],
+        gripper_cam_idx: int,
+        options: SolverOptions,
+        gripped_target: str = GRIPPED_TARGET_GRASP) -> float:
+    """Evaluate the canonical robust visual objective without optimizing."""
+    options.validate()
+    problem = CornerReprojectionProblem(
+        observations, variable_keys_, state, robot_T, K_map, D_map,
+        gripper_cam_idx, scaling=options.scaling,
+        gripped_target=gripped_target,
+        residual_weighting=options.residual_weighting,
+    )
+    return robust_least_squares_cost(
+        problem.residual_vector(problem.x0), options.loss, options.f_scale_px)
+
+
+def _frame_label(frame_key: Tuple[int, int]) -> str:
+    return f"E{int(frame_key[0]):06d}:cam{int(frame_key[1])}"
+
+
+def select_frame_prune_subset(
+        observations: Sequence[PixelObs],
+        variable_keys_: Sequence[TransformKey],
+        fitted_state: PoseState,
+        robot_T: Mapping[int, np.ndarray],
+        K_map: Mapping[int, np.ndarray],
+        D_map: Mapping[int, np.ndarray],
+        gripper_cam_idx: int,
+        solver_options: SolverOptions,
+        prune_options: FramePruneRefitOptions,
+        gripped_target: str = GRIPPED_TARGET_GRASP,
+        ) -> Tuple[List[PixelObs], dict]:
+    """Choose coverage-safe high-residual training frames for one refit."""
+    solver_options.validate()
+    prune_options.validate()
+    population = observation_population(observations, gripper_cam_idx)
+    base_report = {
+        "contract": prune_options.to_dict(),
+        "enabled": bool(prune_options.enabled),
+        "selection_population": population,
+        "n_input_observations": int(len(observations)),
+    }
+    if not prune_options.enabled:
+        return list(observations), {
+            **base_report,
+            "attempted": False,
+            "reason": "disabled",
+            "n_pruned_frames": 0,
+            "n_pruned_observations": 0,
+        }
+
+    problem = CornerReprojectionProblem(
+        observations, variable_keys_, fitted_state, robot_T, K_map, D_map,
+        gripper_cam_idx, scaling=solver_options.scaling,
+        gripped_target=gripped_target,
+        residual_weighting=solver_options.residual_weighting,
+    )
+    raw = problem.raw_residual_vector(problem.x0)
+    frames: Dict[Tuple[int, int], dict] = {}
+    for observation, (row0, row1) in zip(problem.obs, problem.row_offsets):
+        frame_key = (int(observation.event), int(observation.cam))
+        block = np.asarray(raw[row0:row1], dtype=np.float64).reshape(-1, 2)
+        frame = frames.setdefault(frame_key, {
+            "sum_squared_euclidean_px": 0.0,
+            "n_corners": 0,
+            "n_observations": 0,
+            "markers": set(),
+        })
+        frame["sum_squared_euclidean_px"] += float(np.sum(np.square(block)))
+        frame["n_corners"] += int(len(block))
+        frame["n_observations"] += 1
+        frame["markers"].add(str(observation.marker))
+
+    for frame in frames.values():
+        frame["rmse_px"] = float(np.sqrt(
+            frame["sum_squared_euclidean_px"] / max(1, frame["n_corners"])))
+    frame_rmses = np.asarray(
+        [frame["rmse_px"] for frame in frames.values()], dtype=np.float64)
+    median = float(np.median(frame_rmses))
+    mad = float(np.median(np.abs(frame_rmses - median)))
+    robust_sigma = float(1.4826 * mad)
+    threshold = float(max(
+        prune_options.minimum_rmse_px,
+        median + prune_options.mad_multiplier * robust_sigma,
+    ))
+    candidates = sorted(
+        (key for key, frame in frames.items()
+         if float(frame["rmse_px"]) > threshold),
+        key=lambda key: (-float(frames[key]["rmse_px"]), key[0], key[1]),
+    )
+    max_pruned_frames = int(np.floor(
+        prune_options.maximum_fraction * len(frames)))
+
+    free_keys = set(variable_keys_)
+    dependencies = [
+        tuple(key for key in observation_dependency_keys(
+            observation, gripper_cam_idx, gripped_target)
+              if key in free_keys)
+        for observation in observations
+    ]
+    support_before: Counter = Counter()
+    frame_support: Dict[Tuple[int, int], Counter] = defaultdict(Counter)
+    for observation, keys in zip(observations, dependencies):
+        frame_key = (int(observation.event), int(observation.cam))
+        support_before.update(keys)
+        frame_support[frame_key].update(keys)
+    minimum_support = {
+        key: min(int(prune_options.minimum_observations_per_variable),
+                 int(support_before[key]))
+        for key in free_keys
+    }
+    support_after = Counter(support_before)
+    removed = []
+    blocked = []
+    for frame_key in candidates:
+        if len(removed) >= max_pruned_frames:
+            blocked.append((frame_key, "maximum_fraction"))
+            continue
+        unsafe = [
+            key for key, decrement in frame_support[frame_key].items()
+            if support_after[key] - decrement < minimum_support[key]
+        ]
+        if unsafe:
+            blocked.append((
+                frame_key,
+                "coverage_guard:" + ",".join(
+                    f"{key[0]}:{key[1]}" for key in sorted(unsafe)),
+            ))
+            continue
+        removed.append(frame_key)
+        support_after.subtract(frame_support[frame_key])
+
+    removed_set = set(removed)
+    kept = [
+        observation for observation in observations
+        if (int(observation.event), int(observation.cam)) not in removed_set
+    ]
+    pruned_observations = len(observations) - len(kept)
+
+    def frame_record(frame_key: Tuple[int, int]) -> dict:
+        frame = frames[frame_key]
+        return {
+            "frame": _frame_label(frame_key),
+            "event_id": int(frame_key[0]),
+            "camera_id": int(frame_key[1]),
+            "rmse_px": float(frame["rmse_px"]),
+            "n_corners": int(frame["n_corners"]),
+            "n_observations": int(frame["n_observations"]),
+            "markers": sorted(frame["markers"]),
+        }
+
+    return kept, {
+        **base_report,
+        "attempted": bool(removed),
+        "reason": "candidate_frames_selected" if removed else "no_safe_candidate",
+        "n_input_frames": int(len(frames)),
+        "n_input_corners": int(population["corners"]),
+        "median_frame_rmse_px": median,
+        "mad_frame_rmse_px": mad,
+        "robust_sigma_px": robust_sigma,
+        "threshold_px": threshold,
+        "maximum_pruned_frames": max_pruned_frames,
+        "candidate_frames": [frame_record(key) for key in candidates],
+        "pruned_frames": [frame_record(key) for key in removed],
+        "blocked_frames": [
+            {**frame_record(key), "reason": reason}
+            for key, reason in blocked
+        ],
+        "n_pruned_frames": int(len(removed)),
+        "n_pruned_observations": int(pruned_observations),
+        "n_kept_frames": int(len(frames) - len(removed)),
+        "n_kept_observations": int(len(kept)),
+        "actual_pruned_frame_fraction": float(
+            len(removed) / max(1, len(frames))),
+        "support_before": {
+            f"{key[0]}:{key[1]}": int(support_before[key])
+            for key in sorted(free_keys)
+        },
+        "support_after": {
+            f"{key[0]}:{key[1]}": int(support_after[key])
+            for key in sorted(free_keys)
+        },
+    }
 
 
 def _key_seed(key: TransformKey) -> int:
@@ -546,9 +873,11 @@ def solve_corner_reprojection(
     problem = CornerReprojectionProblem(
         observations, variable_keys_, reference_state, robot_T, K_map, D_map,
         gripper_cam_idx, scaling=options.scaling,
+        residual_weighting=options.residual_weighting,
     )
     x0 = perturbed_x(problem, seed, init_translation_mm, init_rotation_deg)
-    initial_residual = problem.residual_vector(x0)
+    initial_objective_residual = problem.residual_vector(x0)
+    initial_raw_residual = problem.raw_residual_vector(x0)
     started = time.perf_counter()
     solution = least_squares(
         problem.residual_vector,
@@ -564,7 +893,8 @@ def solve_corner_reprojection(
         gtol=float(options.gtol),
     )
     elapsed = float(time.perf_counter() - started)
-    final_residual = problem.residual_vector(solution.x)
+    final_objective_residual = problem.residual_vector(solution.x)
+    final_raw_residual = problem.raw_residual_vector(solution.x)
     state = problem.unpack(solution.x)
     # Optimizer-coordinate gradients/conditions cannot be compared across
     # parameter scalings.  Report an additional fixed physical coordinate:
@@ -577,6 +907,19 @@ def solve_corner_reprojection(
     common_gradient = optimizer_gradient * common_factors
     diagnostics = {
         "backend": "canonical_corner_reprojection_v1",
+        "objective_contract": {
+            **VISUAL_OBJECTIVE_CONTRACT,
+            "visual_loss": options.loss,
+            "visual_f_scale_px": float(options.f_scale_px),
+            "residual_weighting": options.residual_weighting,
+            "observation_block_scale": (
+                "1/sqrt(n_detected_corners)"
+                if options.residual_weighting == RESIDUAL_WEIGHT_EQUAL_OBSERVATION
+                else "1"),
+            "scalar_term_weights_used": bool(
+                options.residual_weighting
+                == RESIDUAL_WEIGHT_EQUAL_OBSERVATION),
+        },
         "solver_options": options.to_dict(),
         "success": bool(solution.success),
         "status": int(solution.status),
@@ -595,26 +938,36 @@ def solve_corner_reprojection(
             observations, gripper_cam_idx),
         "freeze_manifest": freeze_manifest(reference_state, variable_keys_),
         "variable_keys": [f"{kind}:{idx}" for kind, idx in problem.variable_keys],
-        "initial_reprojection_rmse_px": float(np.sqrt(np.mean(np.square(initial_residual)))),
-        "train_reprojection_rmse_px": float(np.sqrt(np.mean(np.square(final_residual)))),
+        "initial_reprojection_rmse_px": float(np.sqrt(
+            np.mean(np.square(initial_raw_residual)))),
+        "train_reprojection_rmse_px": float(np.sqrt(
+            np.mean(np.square(final_raw_residual)))),
+        "initial_objective_residual_rmse": float(np.sqrt(
+            np.mean(np.square(initial_objective_residual)))),
+        "train_objective_residual_rmse": float(np.sqrt(
+            np.mean(np.square(final_objective_residual)))),
         "objective_block_costs": {
             "cost_definition": "0.5 * sum(rho((residual / scale)^2) * scale^2)",
             "visual": {
-                "n_residual_components": int(len(final_residual)),
+                "n_residual_components": int(len(final_objective_residual)),
                 "loss": str(options.loss),
                 "scale_px": float(options.f_scale_px),
+                "residual_weighting": options.residual_weighting,
                 "initial_raw_l2_cost": float(
-                    0.5 * np.sum(np.square(initial_residual))),
+                    0.5 * np.sum(np.square(initial_objective_residual))),
                 "final_raw_l2_cost": float(
-                    0.5 * np.sum(np.square(final_residual))),
+                    0.5 * np.sum(np.square(final_objective_residual))),
                 "initial_robust_cost": robust_least_squares_cost(
-                    initial_residual, options.loss, options.f_scale_px),
+                    initial_objective_residual, options.loss,
+                    options.f_scale_px),
                 "final_robust_cost": robust_least_squares_cost(
-                    final_residual, options.loss, options.f_scale_px),
+                    final_objective_residual, options.loss,
+                    options.f_scale_px),
                 "final_robust_cost_per_component": float(
                     robust_least_squares_cost(
-                        final_residual, options.loss, options.f_scale_px)
-                    / max(1, len(final_residual))),
+                        final_objective_residual, options.loss,
+                        options.f_scale_px)
+                    / max(1, len(final_objective_residual))),
             },
             "fk": {
                 "active": False,

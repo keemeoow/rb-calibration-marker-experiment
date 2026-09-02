@@ -161,6 +161,7 @@ class FactorizedFKProblem:
         fk_covariances: Mapping[int, np.ndarray],
         fk_spec: FKFactorSpec,
         scaling: SE3Scaling,
+        residual_weighting: str,
     ):
         if visual_loss not in _LOSSES or float(visual_scale_px) <= 0.0:
             raise ValueError("invalid visual loss configuration")
@@ -168,6 +169,7 @@ class FactorizedFKProblem:
         self.visual = CornerReprojectionProblem(
             observations, variable_keys_, reference_state, robot_T, K_map, D_map,
             gripper_cam_idx, scaling=scaling,
+            residual_weighting=residual_weighting,
         )
         self.visual_loss = str(visual_loss)
         self.visual_scale_px = float(visual_scale_px)
@@ -223,11 +225,15 @@ class FactorizedFKProblem:
         return self.visual.unpack(x)
 
     def visual_raw(self, x: np.ndarray) -> np.ndarray:
+        return self.visual.raw_residual_vector(x)
+
+    def visual_objective(self, x: np.ndarray) -> np.ndarray:
         return self.visual.residual_vector(x)
 
     def visual_residual(self, x: np.ndarray) -> np.ndarray:
         return robustify_elementwise(
-            self.visual_raw(x), self.visual_loss, self.visual_scale_px)
+            self.visual_objective(x), self.visual_loss,
+            self.visual_scale_px)
 
     def factor_raw_blocks(self, x: np.ndarray):
         if not self.factor_keys:
@@ -271,6 +277,52 @@ class FactorizedFKProblem:
             )
             extra[rows, self.visual.slices[key]] = 1
         return csr_matrix(sparse_vstack([visual, extra.tocsr()]))
+
+
+def factorized_objective_cost(
+    observations: Sequence[PixelObs],
+    variable_keys_: Sequence[TransformKey],
+    state: PoseState,
+    robot_T,
+    K_map,
+    D_map,
+    gripper_cam_idx: int,
+    options: SolverOptions,
+    fk_targets: Optional[Mapping[int, np.ndarray]] = None,
+    fk_covariances: Optional[Mapping[int, np.ndarray]] = None,
+    fk_spec: FKFactorSpec = FKFactorSpec(),
+) -> float:
+    """Evaluate the exact visual-plus-FK robust objective without fitting."""
+    options.validate()
+    fk_spec.validate()
+    problem = FactorizedFKProblem(
+        observations=observations,
+        variable_keys_=variable_keys_,
+        reference_state=state,
+        robot_T=robot_T,
+        K_map=K_map,
+        D_map=D_map,
+        gripper_cam_idx=gripper_cam_idx,
+        visual_loss=options.loss,
+        visual_scale_px=options.f_scale_px,
+        fk_targets={} if fk_targets is None else fk_targets,
+        fk_covariances={} if fk_covariances is None else fk_covariances,
+        fk_spec=fk_spec,
+        scaling=options.scaling,
+        residual_weighting=options.residual_weighting,
+    )
+    visual_cost = robust_least_squares_cost(
+        problem.visual_objective(problem.x0),
+        options.loss,
+        options.f_scale_px,
+    )
+    factor_blocks = problem.factor_raw_blocks(problem.x0)
+    factor_residual = (
+        np.concatenate([block for _, block in factor_blocks])
+        if factor_blocks else np.zeros(0, dtype=np.float64))
+    factor_cost = robust_least_squares_cost(
+        factor_residual, fk_spec.loss, fk_spec.robust_scale)
+    return float(visual_cost + factor_cost)
 
 
 def solve_factorized_fk(
@@ -322,9 +374,11 @@ def solve_factorized_fk(
         fk_covariances={} if fk_covariances is None else fk_covariances,
         fk_spec=fk_spec,
         scaling=options.scaling,
+        residual_weighting=options.residual_weighting,
     )
     x0 = perturbed_x(problem.visual, seed, init_translation_mm, init_rotation_deg)
     initial_visual = problem.visual_raw(x0)
+    initial_visual_objective = problem.visual_objective(x0)
     started = time.perf_counter()
     solution = least_squares(
         problem.residual,
@@ -342,6 +396,7 @@ def solve_factorized_fk(
     elapsed = float(time.perf_counter() - started)
     state = problem.unpack(solution.x)
     final_visual = problem.visual_raw(solution.x)
+    final_visual_objective = problem.visual_objective(solution.x)
     initial_factor_blocks = problem.factor_raw_blocks(x0)
     factor_blocks = problem.factor_raw_blocks(solution.x)
     initial_factor_raw = (
@@ -351,9 +406,9 @@ def solve_factorized_fk(
         np.concatenate([block for _, block in factor_blocks])
         if factor_blocks else np.zeros(0, dtype=np.float64))
     visual_initial_robust_cost = robust_least_squares_cost(
-        initial_visual, options.loss, options.f_scale_px)
+        initial_visual_objective, options.loss, options.f_scale_px)
     visual_final_robust_cost = robust_least_squares_cost(
-        final_visual, options.loss, options.f_scale_px)
+        final_visual_objective, options.loss, options.f_scale_px)
     factor_initial_robust_cost = robust_least_squares_cost(
         initial_factor_raw, fk_spec.loss, fk_spec.robust_scale)
     factor_final_robust_cost = robust_least_squares_cost(
@@ -366,6 +421,22 @@ def solve_factorized_fk(
     diagnostics = {
         "backend": "factorized_visual_plus_fk_v1",
         "objective_contract": {
+            # Two additive terms, never three, and never scalar-weighted.  The
+            # FK factor IS the pose-error term; they are not separate terms.
+            "n_objective_terms": 2,
+            "terms": ("robust_corner_reprojection", "whitened_robust_FK_factor"),
+            "scalar_term_weights_used": bool(
+                options.residual_weighting != "per_corner"),
+            "residual_weighting": options.residual_weighting,
+            "observation_block_scale": (
+                "1/sqrt(n_detected_corners)"
+                if options.residual_weighting == "equal_observation_total"
+                else "1"),
+            "relative_weighting": (
+                "visual f_scale in pixels and FK Sigma^(-1/2) only; no w1/w2/w3"),
+            "pose_error_term": "same_term_as_the_fk_factor_not_a_third_term",
+            "camera_to_camera_residual": False,
+            "camera_coupling_mechanism": "shared_target_pose_variables_only",
             "visual_loss": options.loss,
             "visual_f_scale_px": float(options.f_scale_px),
             "fk_mode": fk_spec.mode,
@@ -392,20 +463,26 @@ def solve_factorized_fk(
         "variable_keys": [f"{kind}:{idx}" for kind, idx in problem.variable_keys],
         "initial_reprojection_rmse_px": float(np.sqrt(np.mean(np.square(initial_visual)))),
         "train_reprojection_rmse_px": float(np.sqrt(np.mean(np.square(final_visual)))),
+        "initial_objective_residual_rmse": float(np.sqrt(
+            np.mean(np.square(initial_visual_objective)))),
+        "train_objective_residual_rmse": float(np.sqrt(
+            np.mean(np.square(final_visual_objective)))),
         "objective_block_costs": {
             "cost_definition": "0.5 * sum(rho((residual / scale)^2) * scale^2)",
             "visual": {
-                "n_residual_components": int(len(final_visual)),
+                "n_residual_components": int(len(final_visual_objective)),
                 "loss": str(options.loss),
                 "scale_px": float(options.f_scale_px),
+                "residual_weighting": options.residual_weighting,
                 "initial_raw_l2_cost": float(
-                    0.5 * np.sum(np.square(initial_visual))),
+                    0.5 * np.sum(np.square(initial_visual_objective))),
                 "final_raw_l2_cost": float(
-                    0.5 * np.sum(np.square(final_visual))),
+                    0.5 * np.sum(np.square(final_visual_objective))),
                 "initial_robust_cost": visual_initial_robust_cost,
                 "final_robust_cost": visual_final_robust_cost,
                 "final_robust_cost_per_component": float(
-                    visual_final_robust_cost / max(1, len(final_visual))),
+                    visual_final_robust_cost
+                    / max(1, len(final_visual_objective))),
                 "fraction_of_total_robust_cost": float(
                     visual_final_robust_cost
                     / max(np.finfo(float).eps, final_total_robust_cost)),
