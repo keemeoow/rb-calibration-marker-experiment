@@ -38,8 +38,8 @@
 | A0 | baseline | board | — | 3/3 | 3.8202 ± 0.0000 | 4.0530 ± 0.0001 | 0 / 0 / 0 | 0.00607 / 0.000569 |
 | A1 | +cube | cube+board | estimated | 3/3 | 3.7923 ± 0.0000 | 4.0837 ± 0.0001 | 3 / 0 / 3 | 0.02175 / 0.001709 |
 | A2 | +unified | cube+board | estimated | 3/3 | 3.7421 ± 0.0000 | 3.8901 ± 0.0001 | 3 / 0 / 3 | 0.01016 / 0.000856 |
-| A3 | Ours (raw-FK-fixed target) | cube+board | raw-FK-fixed | 3/3 | 5.1587 ± 0.0000 | 4.7835 ± 0.0000 | 0 / 0 / 0 | 0.03946 / 0.003438 |
-| A4 | Ours (corrected-FK factor) | cube+board | corrected-FK-factor | 3/3 | 3.7441 ± 0.0000 | 3.8899 ± 0.0001 | 3 / 0 / 3 | 0.00313 / 0.000314 |
+| A3 | raw-FK hard fixed | cube+board | raw-FK-fixed | 3/3 | 5.1587 ± 0.0000 | 4.7835 ± 0.0000 | 0 / 0 / 0 | 0.03946 / 0.003438 |
+| A4 | corrected-FK soft factor | cube+board | corrected-FK-factor | 3/3 | 3.7441 ± 0.0000 | 3.8899 ± 0.0001 | 3 / 0 / 3 | 0.00313 / 0.000314 |
 | A5 | Post-hoc diagnostic (vision-aligned FK fixed) | cube+board | vision-aligned-FK-fixed | 3/3 | 3.9648 ± 0.0000 | 3.7270 ± 0.0001 | 3 / 0 / 3 | 0.03781 / 0.003149 |
 | B1 | −Unified | cube+board | corrected-FK-factor | 3/3 | 3.7887 ± 0.0000 | 4.0783 ± 0.0000 | 0 / 0 / 0 | 0.00575 / 0.000473 |
 | B2 | −board | cube | corrected-FK-factor | 3/3 | 3.0269 ± 0.0000 | 4.4827 ± 0.0002 | 3 / 0 / 3 | 0.00860 / 0.000734 |
@@ -216,7 +216,7 @@ Converged: `True` · train `3.7421 px` · held-out `3.8900 px`
 ]
 ```
 
-### A3 — Ours (raw-FK-fixed target)
+### A3 — raw-FK hard fixed
 
 Converged: `True` · train `5.1587 px` · held-out `4.7835 px`
 
@@ -264,7 +264,7 @@ Converged: `True` · train `5.1587 px` · held-out `4.7835 px`
 ]
 ```
 
-### A4 — Ours (corrected-FK factor)
+### A4 — corrected-FK soft factor
 
 Converged: `True` · train `3.7441 px` · held-out `3.8899 px`
 

@@ -2,6 +2,13 @@
 
 > Status: Pre-GT Internal Evaluation (외부 GT 전 내부 평가). 이 문서는 External GT (외부 정답)를 사용한 절대 정확도 순위를 제시하지 않는다.
 
+## Current Data Warnings (현재 데이터 경고)
+
+- Evaluation support: fixed cameras `0, 1, 3`, overall 17 obs / 340 corners; board 8 / 232, cube 9 / 108.
+- Split support: 9 eligible sets; dropped sets `0, 1, 2, 3`.
+- Cube detection: 117 images read, 108 accepted PnP observations, 99 core multiface selected, 2 PnP-RMSE rejections.
+- Board-Cube conflict: direct PnP disagreement is 10.8077 mm translation RMSE and 0.5270 deg max rotation; joint solve mitigates it but does not remove the cause.
+
 ## Evaluation Decision (평가 구성 결정)
 
 - A — Fixed-to-Fixed/e_cross는 각 방법이 추정한 카메라 자세로 계산하는 방법별 Supplementary Held-out Consistency (보조 홀드아웃 일관성)다. Robot FK는 쓰지 않지만 독립 기준선이나 순위 지표는 아니다.
@@ -57,17 +64,35 @@ A5는 board와 held-out을 제외한 train eye-in-hand cube 영상으로 추정�
 
 > **굵은 값**은 `Complete` 행 중 Board/Cube별 held-out RMSE 최솟값이다. Preflight와 post-hoc 행은 수치가 더 낮아도 확증 결과로 강조하지 않는다. Train/Own Overall은 marker population이 달라 전체 최솟값을 강조하지 않는다.
 
+### Confirmatory Internal (확증 내부)
+
+코드 내부 ablation과 calibration 안정성 검증에 쓰는 Complete 행이다.
+
 | Method (방법) | 기여도2 - Marker Set (마커 구성) | 기여도1 - Optimization (최적화) | 기여도3 - Cube Pose (큐브 자세 처리) | Train Overall (학습 전체 px) | Own Held-out Overall (자체 홀드아웃 전체 px) | Board/Cube Held-out (보드/큐브 홀드아웃 px) | Convergence (수렴) | Status (상태) |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |
 | A0 (baseline) | board | sequential_frozen_stage | — | 3.8202 | 4.0530 | 4.0530 / N/A | 3/3 | Complete (완료) |
 | A1 (+cube) | cube+board | sequential_frozen_stage | estimated | 3.7923 | 4.0837 | 4.0645 / 4.1402 | 3/3 | Complete (완료) |
 | A2 (+unified) | cube+board | unified_joint_optimization | estimated | 3.7421 | 3.8901 | **3.9840** / **3.5958** | 3/3 | Complete (완료) |
-| A3 (Ours (raw-FK-fixed target)) | cube+board | unified_joint_optimization | raw-FK-fixed | 5.1587 | 4.7835 | 4.1026 / 6.3959 | 3/3 | Complete (완료) |
-| A4 (Ours (corrected-FK factor)) | cube+board | unified_joint_optimization | corrected-FK-factor | 3.7441 | 3.8899 | 3.9884 / 3.5805 | 3/3 | Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값) |
-| A5 (Post-hoc diagnostic (vision-aligned FK fixed)) | cube+board | unified_joint_optimization | vision-aligned-FK-fixed | 3.9648 | 3.7270 | 3.8804 / 3.2274 | 3/3 | Post-hoc Diagnostic (사후 원인 진단) |
+| A3 (raw-FK hard fixed) | cube+board | unified_joint_optimization | raw-FK-fixed | 5.1587 | 4.7835 | 4.1026 / 6.3959 | 3/3 | Complete (완료) |
+| B3 (−cube) | board | unified_joint_optimization | — | 3.8202 | 4.0530 | 4.0530 / N/A | 3/3 | Complete (완료) |
+
+### Preflight (예비실험)
+
+Simulation prior FK covariance를 쓰므로 물리 우월성 주장에는 쓰지 않는다.
+
+| Method (방법) | 기여도2 - Marker Set (마커 구성) | 기여도1 - Optimization (최적화) | 기여도3 - Cube Pose (큐브 자세 처리) | Train Overall (학습 전체 px) | Own Held-out Overall (자체 홀드아웃 전체 px) | Board/Cube Held-out (보드/큐브 홀드아웃 px) | Convergence (수렴) | Status (상태) |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |
+| A4 (corrected-FK soft factor) | cube+board | unified_joint_optimization | corrected-FK-factor | 3.7441 | 3.8899 | 3.9884 / 3.5805 | 3/3 | Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값) |
 | B1 (−Unified) | cube+board | sequential_frozen_stage | corrected-FK-factor | 3.7887 | 4.0783 | 4.0648 / 4.1182 | 3/3 | Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값) |
 | B2 (−board) | cube | unified_joint_optimization | corrected-FK-factor | 3.0269 | 4.4827 | N/A / 4.4827 | 3/3 | Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값) |
-| B3 (−cube) | board | unified_joint_optimization | — | 3.8202 | 4.0530 | 4.0530 / N/A | 3/3 | Complete (완료) |
+
+### Post-hoc Diagnostics (사후 원인 진단)
+
+결과 해석 뒤 원인을 분리하기 위한 진단 행이며 메인 순위에서 제외한다.
+
+| Method (방법) | 기여도2 - Marker Set (마커 구성) | 기여도1 - Optimization (최적화) | 기여도3 - Cube Pose (큐브 자세 처리) | Train Overall (학습 전체 px) | Own Held-out Overall (자체 홀드아웃 전체 px) | Board/Cube Held-out (보드/큐브 홀드아웃 px) | Convergence (수렴) | Status (상태) |
+| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |
+| A5 (Post-hoc diagnostic (vision-aligned FK fixed)) | cube+board | unified_joint_optimization | vision-aligned-FK-fixed | 3.9648 | 3.7270 | 3.8804 / 3.2274 | 3/3 | Post-hoc Diagnostic (사후 원인 진단) |
 
 > `Convergence 3/3`은 서로 다른 초기화 seed 3회 모두에서 SciPy solver가 `success=True`로 종료됐다는 뜻이다. Sequential 행은 두 stage가 모두 성공해야 하며, B1은 stage 1과 모든 fixed-camera stage 2가 성공해야 1회 수렴으로 센다. 이는 solver 종료 조건 충족을 뜻할 뿐, 절대 정확도나 전역 최적해를 보장하지 않는다.
 

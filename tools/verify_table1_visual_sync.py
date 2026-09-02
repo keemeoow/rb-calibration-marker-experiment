@@ -77,6 +77,10 @@ def _verify_reports(table1: dict, marker: dict,
     forbidden = re.compile(r"(?i)(?<![a-z])common(?![a-z])|reference[_ -]free|공통")
     required = (
         "Pre-GT Internal Evaluation (외부 GT 전 내부 평가)",
+        "Current Data Warnings (현재 데이터 경고)",
+        "Confirmatory Internal (확증 내부)",
+        "Preflight (예비실험)",
+        "Post-hoc Diagnostics (사후 원인 진단)",
         "A — Fixed-to-Fixed",
         "Gripper-to-Fixed (그리퍼카메라–고정카메라 간)",
         "Terminology (용어 설명)",

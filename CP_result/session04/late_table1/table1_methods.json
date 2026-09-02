@@ -1148,6 +1148,17 @@
       }
     },
     "comparison_component_contract": {
+      "A0_to_B3": {
+        "rows": [
+          "A0",
+          "B3"
+        ],
+        "components": [
+          "heldout_reprojection.board"
+        ],
+        "evidence_tier": "confirmatory_internal",
+        "causal_interpretation": "board_only_sequential_vs_unified_feedback_with_identical_marker_population"
+      },
       "A0_to_A1": {
         "rows": [
           "A0",
@@ -1178,6 +1189,19 @@
           "heldout_reprojection.overall"
         ],
         "causal_interpretation": "unified_feedback_with_identical_soft_FK_factor"
+      },
+      "A2_to_A4": {
+        "rows": [
+          "A2",
+          "A4"
+        ],
+        "components": [
+          "heldout_reprojection.board",
+          "heldout_reprojection.cube"
+        ],
+        "evidence_tier": "preflight_until_measured_FK_covariance",
+        "causal_interpretation": "soft_FK_factor_added_to_unified_estimated_cube_pose",
+        "reporting_limit": "A4_uses_simulation_prior_covariance_until_measured_FK_covariance_is_supplied"
       },
       "A2_to_A3": {
         "rows": [
@@ -41190,7 +41214,7 @@
         "optimization_label": "unified_joint_optimization",
         "fk_to_cube": "raw-FK-fixed",
         "fk_to_board": "estimated",
-        "label": "Ours (raw-FK-fixed target)"
+        "label": "raw-FK hard fixed"
       },
       "initialization": {
         "baseline_schema": "table1_shared_train_only_baseline_v2",
@@ -46845,7 +46869,7 @@
         "optimization_label": "unified_joint_optimization",
         "fk_to_cube": "corrected-FK-factor",
         "fk_to_board": "estimated",
-        "label": "Ours (corrected-FK factor)"
+        "label": "corrected-FK soft factor"
       },
       "initialization": {
         "baseline_schema": "table1_shared_train_only_baseline_v2",

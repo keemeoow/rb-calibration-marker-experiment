@@ -15,6 +15,10 @@ from calibration_pipeline.runtime import DEFAULT_SESSION_ROOT, session_paths
 
 
 METHOD_ORDER = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
+CANONICAL_LABEL_OVERRIDES = {
+    "A3": "raw-FK hard fixed",
+    "A4": "corrected-FK soft factor",
+}
 
 MATRIX_SEMANTICS = {
     "T_base_Ci": (
@@ -62,6 +66,13 @@ def _fmt(value: Any, digits: int = 4) -> str:
     if value is None:
         return "—"
     return f"{float(value):.{digits}f}"
+
+
+def _display_condition(method: str, row: Mapping[str, Any]) -> dict:
+    condition = dict(row["condition"])
+    if method in CANONICAL_LABEL_OVERRIDES:
+        condition["label"] = CANONICAL_LABEL_OVERRIDES[method]
+    return condition
 
 
 def _matrix_text(matrix: list[list[float]]) -> str:
@@ -113,7 +124,7 @@ def _row_summary(method: str, row: dict,
     transform = representative["transforms"]
     heldout = representative["heldout_reprojection"]["overall"]
     train = representative["train_reprojection"]["overall"]
-    condition = row["condition"]
+    condition = _display_condition(method, row)
     return {
         "method": method,
         "label": condition["label"],
@@ -160,7 +171,7 @@ def _matrix_artifact(payload: dict, source: Path,
         "matrix_semantics": MATRIX_SEMANTICS,
         "rows": {
             method: {
-                "condition": payload["rows"][method]["condition"],
+                "condition": _display_condition(method, payload["rows"][method]),
                 "initialization_dispersion": payload["rows"][method].get(
                     "initialization_dispersion", {}),
                 "runs": [

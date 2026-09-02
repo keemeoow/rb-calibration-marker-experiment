@@ -1,6 +1,6 @@
 {
   "artifact_schema": "calibration_matrices_v1",
-  "source_table1": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/CP_result/session04/late_table1/table1_methods.json",
+  "source_table1": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/CP_result/session04/late_table1/table1_methods.json",
   "dataset": "data/session04/calib_train",
   "representative_seed": 0,
   "representative_seed_contract": "seed 0 is the unperturbed shared initialization; it is fixed before held-out evaluation and is not chosen by held-out score",
@@ -2811,7 +2811,7 @@
         "optimization_label": "unified_joint_optimization",
         "fk_to_cube": "raw-FK-fixed",
         "fk_to_board": "estimated",
-        "label": "Ours (raw-FK-fixed target)"
+        "label": "raw-FK hard fixed"
       },
       "initialization_dispersion": {
         "T_gripper_cam": {
@@ -3977,7 +3977,7 @@
         "optimization_label": "unified_joint_optimization",
         "fk_to_cube": "corrected-FK-factor",
         "fk_to_board": "estimated",
-        "label": "Ours (corrected-FK factor)"
+        "label": "corrected-FK soft factor"
       },
       "initialization_dispersion": {
         "T_gripper_cam": {

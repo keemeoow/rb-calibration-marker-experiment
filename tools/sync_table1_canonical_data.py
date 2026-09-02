@@ -16,7 +16,10 @@ from statistics import fmean
 
 METHOD_ORDER = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
 # Label-only migrations for numerical artifacts that predate corrected prose.
-CANONICAL_LABEL_OVERRIDES = {"A3": "Ours (raw-FK-fixed target)"}
+CANONICAL_LABEL_OVERRIDES = {
+    "A3": "raw-FK hard fixed",
+    "A4": "corrected-FK soft factor",
+}
 SYSTEM_ORDER = ("board_only", "cube_only", "board_cube")
 TARGETS = ("board", "cube")
 SCOPE_FIELDS = (
@@ -24,6 +27,7 @@ SCOPE_FIELDS = (
     "pose_consistency_translation_rmse_mm",
     "pose_consistency_rotation_rmse_deg",
 )
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def _load(path: Path) -> dict:
@@ -66,6 +70,30 @@ def _status_label(value: str) -> str:
     }.get(value, value)
 
 
+def _display_label(method: str, source_label: str) -> str:
+    return CANONICAL_LABEL_OVERRIDES.get(method, source_label)
+
+
+def _result_sections(rows: list[dict]) -> list[tuple[str, str, list[dict]]]:
+    return [
+        (
+            "Confirmatory Internal (확증 내부)",
+            "코드 내부 ablation과 calibration 안정성 검증에 쓰는 Complete 행이다.",
+            [row for row in rows if row["status"] == "complete"],
+        ),
+        (
+            "Preflight (예비실험)",
+            "Simulation prior FK covariance를 쓰므로 물리 우월성 주장에는 쓰지 않는다.",
+            [row for row in rows if row["status"] == "preflight_simulation_prior"],
+        ),
+        (
+            "Post-hoc Diagnostics (사후 원인 진단)",
+            "결과 해석 뒤 원인을 분리하기 위한 진단 행이며 메인 순위에서 제외한다.",
+            [row for row in rows if row["status"] == "posthoc_diagnostic"],
+        ),
+    ]
+
+
 def _reprojection_mean(runs: list[dict], split: str,
                        target: str) -> float | None:
     key = f"{split}_reprojection"
@@ -91,6 +119,106 @@ def _primary_objective_diagnostic(run: dict) -> tuple[str | None, dict | None]:
     return None, None
 
 
+def _session_root(table1: dict) -> Path | None:
+    dataset = str(table1.get("protocol", {}).get("dataset", ""))
+    if not dataset:
+        return None
+    path = Path(dataset)
+    if not path.is_absolute():
+        path = ROOT / path
+    if path.name == "calib_train":
+        return path.parent
+    return path
+
+
+def _load_optional_json(path: Path) -> dict:
+    if not path.is_file():
+        return {}
+    with path.open() as handle:
+        return json.load(handle)
+
+
+def _data_warnings(table1: dict, cross: dict) -> dict:
+    protocol = cross.get("protocol", {})
+    split = protocol.get("split", {})
+    support = protocol.get("support", {})
+    dropped = split.get("dropped_sets", {})
+    warnings = {
+        "eligible_sets": split.get("eligible_sets", []),
+        "dropped_sets": sorted(dropped, key=lambda value: int(value)),
+        "support": support,
+        "evaluation_fixed_camera_intersection": protocol.get(
+            "evaluation_fixed_camera_intersection", []),
+    }
+    session_root = _session_root(table1)
+    if session_root is None:
+        return warnings
+
+    board_cube = _load_optional_json(
+        session_root / "calib_out/verify/board_cube_relative_pose/"
+        "board_cube_relative_pose_diagnostic.json")
+    conflict = board_cube.get("systematic_conflict_contract", {})
+    if conflict:
+        warnings["board_cube_conflict"] = {
+            "translation_rmse_mm": conflict.get("translation_rmse_mm"),
+            "maximum_rotation_deg": conflict.get("maximum_rotation_deg"),
+            "status": conflict.get("resolution_status"),
+        }
+
+    cube_quality = _load_optional_json(
+        session_root / "calib_out/verify/cube_observation_quality/"
+        "cube_observation_quality.json")
+    diagnostics = cube_quality.get("diagnostics", {})
+    if diagnostics:
+        warnings["cube_quality"] = {
+            "counts": diagnostics.get("counts", {}),
+            "selected_quality_tier_counts": diagnostics.get(
+                "selected_quality_tier_counts", {}),
+        }
+    return warnings
+
+
+def _markdown_data_warnings(data_warnings: dict) -> str:
+    support = data_warnings.get("support", {})
+    overall = support.get("overall", {})
+    board = support.get("board", {})
+    cube = support.get("cube", {})
+    cameras = ", ".join(str(value) for value in data_warnings.get(
+        "evaluation_fixed_camera_intersection", [])) or "N/A"
+    dropped = ", ".join(data_warnings.get("dropped_sets", [])) or "none"
+    eligible = data_warnings.get("eligible_sets", [])
+    conflict = data_warnings.get("board_cube_conflict", {})
+    quality = data_warnings.get("cube_quality", {})
+    counts = quality.get("counts", {})
+    selected = quality.get("selected_quality_tier_counts", {})
+    lines = [
+        "## Current Data Warnings (현재 데이터 경고)",
+        "",
+        f"- Evaluation support: fixed cameras `{cameras}`, overall "
+        f"{overall.get('n_observations', 'N/A')} obs / "
+        f"{overall.get('n_corners', 'N/A')} corners; board "
+        f"{board.get('n_observations', 'N/A')} / "
+        f"{board.get('n_corners', 'N/A')}, cube "
+        f"{cube.get('n_observations', 'N/A')} / "
+        f"{cube.get('n_corners', 'N/A')}.",
+        f"- Split support: {len(eligible)} eligible sets; dropped sets `{dropped}`.",
+    ]
+    if counts:
+        lines.append(
+            "- Cube detection: "
+            f"{counts.get('images_read', 'N/A')} images read, "
+            f"{counts.get('accepted_observations', 'N/A')} accepted PnP observations, "
+            f"{selected.get('nonplanar_multiface', 'N/A')} core multiface selected, "
+            f"{counts.get('pnp_rmse_rejections', 'N/A')} PnP-RMSE rejections.")
+    if conflict:
+        lines.append(
+            "- Board-Cube conflict: direct PnP disagreement is "
+            f"{_fmt(conflict.get('translation_rmse_mm'))} mm translation RMSE "
+            f"and {_fmt(conflict.get('maximum_rotation_deg'))} deg max rotation; "
+            "joint solve mitigates it but does not remove the cause.")
+    return "\n".join(lines)
+
+
 def _method_rows(table1: dict, cross: dict) -> list[dict]:
     cross_rows = {row["method"]: row for row in cross["summary"]}
     rows = []
@@ -102,8 +230,7 @@ def _method_rows(table1: dict, cross: dict) -> list[dict]:
             "method": method,
             # Numerical artifacts created before a label-only schema correction
             # may still contain stale prose such as A3="Ours (full)".
-            "label": CANONICAL_LABEL_OVERRIDES.get(
-                method, source["condition"]["label"]),
+            "label": _display_label(method, source["condition"]["label"]),
             "target_set": source["condition"]["target_set"],
             "optimization": source["condition"].get(
                 "optimization_label",
@@ -165,6 +292,35 @@ def _method_rows(table1: dict, cross: dict) -> list[dict]:
                     f"reference_dependent_{target}_reprojection_rmse_px_mean"])
         rows.append(row)
     return rows
+
+
+def _optimization_result_table(
+        rows: list[dict], board_best, cube_best,
+        highlight_complete_best: bool) -> str:
+    lines = [
+        "| Method (방법) | 기여도2 - Marker Set (마커 구성) | 기여도1 - "
+        "Optimization (최적화) | 기여도3 - Cube Pose (큐브 자세 처리) | Train Overall "
+        "(학습 전체 px) | Own Held-out Overall (자체 홀드아웃 전체 px) | "
+        "Board/Cube Held-out (보드/큐브 홀드아웃 px) | Convergence (수렴) | "
+        "Status (상태) |",
+        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |",
+    ]
+    for row in rows:
+        board = row["heldout_board_reprojection_rmse_px"]
+        cube = row["heldout_cube_reprojection_rmse_px"]
+        board_text = (_fmt_best(board, board_best)
+                      if highlight_complete_best else _fmt(board))
+        cube_text = (_fmt_best(cube, cube_best)
+                     if highlight_complete_best else _fmt(cube))
+        lines.append(
+            f"| {row['method']} ({row['label']}) | {row['target_set']} | "
+            f"{row['optimization']} | {row['cube_pose_handling']} | "
+            f"{_fmt(row['train_overall_reprojection_rmse_px'])} | "
+            f"{_fmt(row['heldout_overall_reprojection_rmse_px'])} | "
+            f"{board_text} / {cube_text} | "
+            f"{row['converged_runs']}/{row['total_runs']} | "
+            f"{_status_label(row['status'])} |")
+    return "\n".join(lines)
 
 
 def _objective_block_table(rows: list[dict]) -> str:
@@ -342,6 +498,7 @@ def _implementation_audit() -> str:
 
 
 def _markdown(rows: list[dict], marker: dict, detailed: bool,
+              data_warnings: dict | None = None,
               session_label: str = "Session") -> str:
     title = (
         f"# {session_label} Calibration Evaluation (캘리브레이션 평가)"
@@ -352,6 +509,8 @@ def _markdown(rows: list[dict], marker: dict, detailed: bool,
         "> Status: Pre-GT Internal Evaluation (외부 GT 전 내부 평가). "
         "이 문서는 External GT (외부 정답)를 사용한 절대 정확도 순위를 "
         "제시하지 않는다.",
+        "",
+        _markdown_data_warnings(data_warnings or {}),
         "",
         "## Evaluation Decision (평가 구성 결정)",
         "",
@@ -385,27 +544,23 @@ def _markdown(rows: list[dict], marker: dict, detailed: bool,
         "최솟값이다. Preflight와 post-hoc 행은 수치가 더 낮아도 "
         "확증 결과로 강조하지 않는다. Train/Own "
         "Overall은 marker population이 달라 전체 최솟값을 강조하지 않는다.",
-        "",
-        "| Method (방법) | 기여도2 - Marker Set (마커 구성) | 기여도1 - "
-        "Optimization (최적화) | 기여도3 - Cube Pose (큐브 자세 처리) | Train Overall "
-        "(학습 전체 px) | Own Held-out Overall (자체 홀드아웃 전체 px) | "
-        "Board/Cube Held-out (보드/큐브 홀드아웃 px) | Convergence (수렴) | "
-        "Status (상태) |",
-        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |",
     ]
     complete_rows = [row for row in rows if row["status"] == "complete"]
     board_best = _minimum(complete_rows, "heldout_board_reprojection_rmse_px")
     cube_best = _minimum(complete_rows, "heldout_cube_reprojection_rmse_px")
-    for row in rows:
-        lines.append(
-            f"| {row['method']} ({row['label']}) | {row['target_set']} | "
-            f"{row['optimization']} | {row['cube_pose_handling']} | "
-            f"{_fmt(row['train_overall_reprojection_rmse_px'])} | "
-            f"{_fmt(row['heldout_overall_reprojection_rmse_px'])} | "
-            f"{_fmt_best(row['heldout_board_reprojection_rmse_px'], board_best)} / "
-            f"{_fmt_best(row['heldout_cube_reprojection_rmse_px'], cube_best)} | "
-            f"{row['converged_runs']}/{row['total_runs']} | "
-            f"{_status_label(row['status'])} |")
+    for title, note, section_rows in _result_sections(rows):
+        if not section_rows:
+            continue
+        lines.extend([
+            "",
+            f"### {title}",
+            "",
+            note,
+            "",
+            _optimization_result_table(
+                section_rows, board_best, cube_best,
+                highlight_complete_best=section_rows[0]["status"] == "complete"),
+        ])
     lines.extend([
         "",
         "> `Convergence 3/3`은 서로 다른 초기화 seed 3회 모두에서 "
@@ -513,21 +668,100 @@ def _html_scope_table(rows: list[dict], scope: str) -> str:
     </section>"""
 
 
+def _html_data_warnings(data_warnings: dict) -> str:
+    support = data_warnings.get("support", {})
+    overall = support.get("overall", {})
+    board = support.get("board", {})
+    cube = support.get("cube", {})
+    cameras = ", ".join(str(value) for value in data_warnings.get(
+        "evaluation_fixed_camera_intersection", [])) or "N/A"
+    dropped = ", ".join(data_warnings.get("dropped_sets", [])) or "none"
+    eligible = data_warnings.get("eligible_sets", [])
+    items = [
+        f"Evaluation support: fixed cameras <code>{escape(cameras)}</code>, "
+        f"overall {overall.get('n_observations', 'N/A')} obs / "
+        f"{overall.get('n_corners', 'N/A')} corners; board "
+        f"{board.get('n_observations', 'N/A')} / "
+        f"{board.get('n_corners', 'N/A')}, cube "
+        f"{cube.get('n_observations', 'N/A')} / "
+        f"{cube.get('n_corners', 'N/A')}.",
+        f"Split support: {len(eligible)} eligible sets; dropped sets "
+        f"<code>{escape(dropped)}</code>.",
+    ]
+    quality = data_warnings.get("cube_quality", {})
+    counts = quality.get("counts", {})
+    selected = quality.get("selected_quality_tier_counts", {})
+    if counts:
+        items.append(
+            "Cube detection: "
+            f"{counts.get('images_read', 'N/A')} images read, "
+            f"{counts.get('accepted_observations', 'N/A')} accepted PnP observations, "
+            f"{selected.get('nonplanar_multiface', 'N/A')} core multiface selected, "
+            f"{counts.get('pnp_rmse_rejections', 'N/A')} PnP-RMSE rejections.")
+    conflict = data_warnings.get("board_cube_conflict", {})
+    if conflict:
+        items.append(
+            "Board-Cube conflict: direct PnP disagreement is "
+            f"{_fmt(conflict.get('translation_rmse_mm'))} mm translation RMSE "
+            f"and {_fmt(conflict.get('maximum_rotation_deg'))} deg max rotation; "
+            "joint solve mitigates it but does not remove the cause.")
+    return (
+        '<section class="panel warning"><h2>Current Data Warnings '
+        '(현재 데이터 경고)</h2><ul>'
+        + "".join(f"<li>{item}</li>" for item in items)
+        + "</ul></section>"
+    )
+
+
+def _html_method_section(
+        title: str, note: str, section_rows: list[dict],
+        board_best, cube_best) -> str:
+    status = section_rows[0]["status"] if section_rows else ""
+    highlight = status == "complete"
+    body = []
+    for row in section_rows:
+        board = row["heldout_board_reprojection_rmse_px"]
+        cube = row["heldout_cube_reprojection_rmse_px"]
+        board_text = (_fmt_best(board, board_best, html=True)
+                      if highlight else _fmt(board))
+        cube_text = (_fmt_best(cube, cube_best, html=True)
+                     if highlight else _fmt(cube))
+        body.append(
+            "<tr>"
+            f"<td>{escape(row['method'])}</td><td>{escape(row['label'])}</td>"
+            f"<td>{escape(row['target_set'])}</td>"
+            f"<td>{escape(row['optimization'])}</td>"
+            f"<td>{escape(row['cube_pose_handling'])}</td>"
+            f"<td>{_fmt(row['heldout_overall_reprojection_rmse_px'])}</td>"
+            f"<td>{board_text}</td>"
+            f"<td>{cube_text}</td>"
+            f"<td>{row['converged_runs']}/{row['total_runs']}</td>"
+            f"<td>{escape(_status_label(row['status']))}</td></tr>")
+    return f"""
+    <section class="method-section">
+      <h3>{escape(title)}</h3>
+      <p>{escape(note)}</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Method (방법)</th><th>Label (설명)</th>
+        <th>Marker Set</th><th>Optimization</th><th>Cube Pose</th>
+        <th>Own Held-out Overall px</th><th>Board px</th><th>Cube px</th>
+        <th>Convergence (수렴)</th><th>Status (상태)</th></tr></thead>
+        <tbody>{''.join(body)}</tbody>
+      </table></div>
+    </section>"""
+
+
 def _html(rows: list[dict], marker: dict,
+          data_warnings: dict | None = None,
           session_label: str = "Session") -> str:
-    method_rows = []
     complete_rows = [row for row in rows if row["status"] == "complete"]
     board_best = _minimum(complete_rows, "heldout_board_reprojection_rmse_px")
     cube_best = _minimum(complete_rows, "heldout_cube_reprojection_rmse_px")
-    for row in rows:
-        method_rows.append(
-            "<tr>"
-            f"<td>{escape(row['method'])}</td><td>{escape(row['label'])}</td>"
-            f"<td>{_fmt(row['heldout_overall_reprojection_rmse_px'])}</td>"
-            f"<td>{_fmt_best(row['heldout_board_reprojection_rmse_px'], board_best, html=True)}</td>"
-            f"<td>{_fmt_best(row['heldout_cube_reprojection_rmse_px'], cube_best, html=True)}</td>"
-            f"<td>{row['converged_runs']}/{row['total_runs']}</td>"
-            f"<td>{escape(_status_label(row['status']))}</td></tr>")
+    method_sections = [
+        _html_method_section(title, note, section_rows, board_best, cube_best)
+        for title, note, section_rows in _result_sections(rows)
+        if section_rows
+    ]
     marker_rows = []
     by_system = {row["system"]: row for row in marker["summary"]}
     marker_values = list(by_system.values())
@@ -561,20 +795,19 @@ def _html(rows: list[dict], marker: dict,
 <style>
 :root{{--ink:#18212f;--muted:#627083;--line:#dce3ea;--paper:#f5f7fa;--card:#fff;--blue:#2066c7;--teal:#087f78}}
 *{{box-sizing:border-box}} body{{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 system-ui,-apple-system,sans-serif}}
-main{{max-width:1180px;margin:auto;padding:32px 20px 72px}} h1{{font-size:30px;margin:0 0 8px}} h2{{font-size:20px;margin:0 0 16px}}
+main{{max-width:1180px;margin:auto;padding:32px 20px 72px}} h1{{font-size:30px;margin:0 0 8px}} h2{{font-size:20px;margin:0 0 16px}} h3{{font-size:16px;margin:20px 0 6px}}
 .subtitle{{color:var(--muted);margin-bottom:22px}} .badge{{display:inline-block;background:#fff3cd;color:#755600;border:1px solid #efd582;border-radius:999px;padding:5px 11px;font-weight:700}}
 .grid{{display:grid;grid-template-columns:1fr 1fr;gap:18px}} .panel{{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-top:18px;box-shadow:0 4px 14px #25364d0d}}
 .controls{{display:flex;gap:8px;margin-top:18px}} button{{border:1px solid var(--line);background:white;border-radius:9px;padding:9px 13px;cursor:pointer;font-weight:650}} button.active{{background:var(--blue);color:white;border-color:var(--blue)}}
 .table-wrap{{overflow:auto}} table{{border-collapse:collapse;width:100%;min-width:680px}} th,td{{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}} th:first-child,td:first-child{{text-align:left}} th{{color:var(--muted);font-size:12px}}
-.note{{border-left:4px solid var(--teal);padding-left:14px}} code{{background:#edf2f7;padding:2px 5px;border-radius:5px}}
+.method-section p{{color:var(--muted);margin:0 0 8px}} .warning{{border-left:4px solid #c05621}} .warning li{{margin:6px 0}} .note{{border-left:4px solid var(--teal);padding-left:14px}} code{{background:#edf2f7;padding:2px 5px;border-radius:5px}}
 @media(max-width:760px){{.grid{{grid-template-columns:1fr}} main{{padding:22px 12px 50px}}}}
 </style></head><body><main>
 <span class="badge">Pre-GT Internal Evaluation (외부 GT 전 내부 평가)</span>
 <h1>{escape(session_label)} Calibration Evaluation (캘리브레이션 평가)</h1>
 <p class="subtitle">A2는 현재 검증된 대표 행, A4는 measured-covariance 전 preflight, A5는 post-hoc diagnostic입니다. Table 1의 굵은 값은 Complete 행만 대상으로 하며 실제 물리 순위는 External GT 이후 결정합니다.</p>
-<section class="panel"><h2>Table 1 Optimization Results (표 1 최적화 결과)</h2><div class="table-wrap"><table>
-<thead><tr><th>Method (방법)</th><th>Label (설명)</th><th>Own Held-out Overall px</th><th>Board px</th><th>Cube px</th><th>Convergence (수렴)</th><th>Status (상태)</th></tr></thead>
-<tbody>{''.join(method_rows)}</tbody></table></div></section>
+{_html_data_warnings(data_warnings or {})}
+<section class="panel"><h2>Table 1 Optimization Results (표 1 최적화 결과)</h2>{''.join(method_sections)}</section>
 <div class="controls"><button class="active" data-show="all">Both Scopes (두 범위)</button><button data-show="fixed_to_fixed">Fixed-to-Fixed</button><button data-show="gripper_to_fixed">Gripper-to-Fixed</button></div>
 <div class="grid">{_html_scope_table(rows, 'fixed_to_fixed')}{_html_scope_table(rows, 'gripper_to_fixed')}</div>
 <section class="panel"><h2>Marker-system End-to-End (마커 시스템 전체 경로)</h2><div class="table-wrap"><table>
@@ -642,13 +875,17 @@ def main() -> None:
     session_label = session_name[0].upper() + session_name[1:]
 
     rows = _method_rows(table1, cross)
+    data_warnings = _data_warnings(table1, cross)
     late_dir = Path(args.late_dir)
     late_dir.mkdir(parents=True, exist_ok=True)
     _write_csv(late_dir / "table1_results.csv", rows)
     (late_dir / "TABLE1_RESULTS.md").write_text(
-        _markdown(rows, marker, detailed=True, session_label=session_label))
+        _markdown(
+            rows, marker, detailed=True, data_warnings=data_warnings,
+            session_label=session_label))
     Path(args.html).write_text(
-        _html(rows, marker, session_label=session_label))
+        _html(rows, marker, data_warnings=data_warnings,
+              session_label=session_label))
     print("[DONE] Generated current CSV, Markdown, and HTML artifacts")
 
 

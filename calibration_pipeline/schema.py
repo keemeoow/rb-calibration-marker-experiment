@@ -57,10 +57,10 @@ MAIN_ABLATION_CONDITIONS = (
     # NOT "Ours (full)": A3 is the most *constrained* row, not the one that
     # uses the most.  It removes 6 DoF per set from the optimizer.
     AblationCondition("A3", "cube+board", "U", POSE_SOURCE_FK_FIXED, "estimated",
-                      "Ours (raw-FK-fixed target)"),
+                      "raw-FK hard fixed"),
     AblationCondition(
         "A4", "cube+board", "U", "corrected-FK-factor", "estimated",
-        "Ours (corrected-FK factor)",
+        "corrected-FK soft factor",
     ),
     AblationCondition(
         "A5", "cube+board", "U", POSE_SOURCE_ALIGNED_FK_FIXED, "estimated",
@@ -468,6 +468,14 @@ MARKER_COMPARISON_CONTRACT = {
 # not contain the same measurements.  Each declared contrast therefore names
 # the only shared component that may support that interpretation.
 EVALUATION_COMPARISON_CONTRACT = {
+    "A0_to_B3": {
+        "rows": ("A0", "B3"),
+        "components": ("heldout_reprojection.board",),
+        "evidence_tier": "confirmatory_internal",
+        "causal_interpretation": (
+            "board_only_sequential_vs_unified_feedback_with_identical_marker_population"
+        ),
+    },
     "A0_to_A1": {
         "rows": ("A0", "A1"),
         "components": ("heldout_reprojection.board", "N_reg"),
@@ -484,6 +492,18 @@ EVALUATION_COMPARISON_CONTRACT = {
         "rows": ("B1", "A4"),
         "components": ("heldout_reprojection.overall",),
         "causal_interpretation": "unified_feedback_with_identical_soft_FK_factor",
+    },
+    "A2_to_A4": {
+        "rows": ("A2", "A4"),
+        "components": (
+            "heldout_reprojection.board",
+            "heldout_reprojection.cube",
+        ),
+        "evidence_tier": "preflight_until_measured_FK_covariance",
+        "causal_interpretation": (
+            "soft_FK_factor_added_to_unified_estimated_cube_pose"),
+        "reporting_limit": (
+            "A4_uses_simulation_prior_covariance_until_measured_FK_covariance_is_supplied"),
     },
     "A2_to_A3": {
         "rows": ("A2", "A3"),
@@ -613,6 +633,12 @@ def validate_main_runner_contract() -> None:
     if EVALUATION_COMPARISON_CONTRACT["B2_to_A4"]["components"][0] != \
             "heldout_reprojection.cube":
         raise ValueError("B2/A4 must be compared on the shared cube component")
+    if EVALUATION_COMPARISON_CONTRACT["A0_to_B3"]["components"] != \
+            ("heldout_reprojection.board",):
+        raise ValueError("A0/B3 must be compared on the shared board component")
+    if EVALUATION_COMPARISON_CONTRACT["A2_to_A4"]["components"] != (
+            "heldout_reprojection.board", "heldout_reprojection.cube"):
+        raise ValueError("A2/A4 must report board and cube separately")
     for name in ("B2_to_A4", "B3_to_A2"):
         comparison = EVALUATION_COMPARISON_CONTRACT[name]
         if "e_cross" in comparison["components"]:
