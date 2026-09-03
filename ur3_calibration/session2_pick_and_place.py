@@ -74,7 +74,7 @@ DESCEND_ACCEL = 0.20
 JOINT_SPEED = 0.30             # rad/s -- 큰 재배치 이동 (moveJ)
 JOINT_ACCEL = 0.30
 ROTVEC_JUMP_THRESHOLD = 1.0    # 이 이상이면 moveL 대신 moveJ+IK 사용
-RELEASE_STEP_DEFAULT = 20      # place 때 close-pos에서 이 정도만 풀어줌 (완전개방 금지)
+RELEASE_STEP_DEFAULT = 10      # place 때 close-pos에서 이 정도만 풀어줌 (완전개방 금지)
 IK_MAX_POS_ERROR = 1e-4        # m -- 기본값(1e-10)은 너무 타이트해서 먼 qnear에서 수렴 실패가 잦음
 IK_MAX_ORI_ERROR = 1e-3        # rad
 
@@ -136,9 +136,12 @@ def build_plan(items, grasp_pose, cam_pose, approach_mm, pick_lift_mm, place_lif
     current = list(grasp_pose)
 
     def pick_place_block(label, source_pose, dest_pose):
-        steps.append(grip(open_pos, f"[{label}] 그리퍼 열기"))
+        # 그리퍼를 완전히 여는 건 아직 촬영 위치에 있는 지금이 아니라, 거기서
+        # 벗어나 pick approach 로 이동한 뒤에 한다 (촬영 자세에서 불필요하게
+        # 크게 움직이지 않도록).
         steps.append(mv(approach_of(source_pose, approach_mm), MOVE_SPEED, MOVE_ACCEL,
                         f"[{label}] pick approach 이동"))
+        steps.append(grip(open_pos, f"[{label}] 그리퍼 열기"))
         # source_pose까지 완전히 내려가지 않고 pick_lift_mm 만큼 남기고 멈춘다 --
         # 바닥/큐브에 세게 눌러붙지 않도록.
         steps.append(mv(approach_of(source_pose, pick_lift_mm), DESCEND_SPEED, DESCEND_ACCEL,
