@@ -129,19 +129,31 @@ def cap(desc):
     return {"kind": "capture", "desc": desc}
 
 
+def checkpoint(desc):
+    """--no-step 여부와 무관하게 항상 Enter를 기다리는 필수 확인 지점."""
+    return {"kind": "checkpoint", "desc": desc}
+
+
 def build_plan(items, grasp_pose, cam_pose, approach_mm, pick_lift_mm, place_lift_mm,
                open_pos, close_pos, release_pos, return_home):
     """전체 실행 계획을 스텝(dict) 리스트로 만든다."""
     steps = []
     current = list(grasp_pose)
 
-    def pick_place_block(label, source_pose, dest_pose):
+    def pick_place_block(label, source_pose, dest_pose, manual_checkpoint=False):
         # 그리퍼를 완전히 여는 건 아직 촬영 위치에 있는 지금이 아니라, 거기서
         # 벗어나 pick approach 로 이동한 뒤에 한다 (촬영 자세에서 불필요하게
         # 크게 움직이지 않도록).
         steps.append(mv(approach_of(source_pose, approach_mm), MOVE_SPEED, MOVE_ACCEL,
                         f"[{label}] pick approach 이동"))
         steps.append(grip(open_pos, f"[{label}] 그리퍼 열기"))
+        if manual_checkpoint:
+            # 맨 처음 pick만: 로봇은 pick 바로 위(approach)에서 대기하고,
+            # 사람이 큐브를 grasp 위치에 정확히 맞춰놓은 뒤 Enter를 눌러야
+            # 다음(하강+grasp)으로 진행한다. --no-step 이어도 여기는 항상 멈춘다.
+            steps.append(checkpoint(
+                f"[{label}] 큐브를 grasp 위치에 정확히 놓은 뒤 Enter를 누르세요 (필수 확인)"
+            ))
         # source_pose까지 완전히 내려가지 않고 pick_lift_mm 만큼 남기고 멈춘다 --
         # 바닥/큐브에 세게 눌러붙지 않도록.
         steps.append(mv(approach_of(source_pose, pick_lift_mm), DESCEND_SPEED, DESCEND_ACCEL,
@@ -166,7 +178,7 @@ def build_plan(items, grasp_pose, cam_pose, approach_mm, pick_lift_mm, place_lif
 
     for order, item in enumerate(items):
         label = f"{order + 1}/{len(items)} (원본 #{item['orig_index'] + 1})"
-        pick_place_block(label, current, item["target"])
+        pick_place_block(label, current, item["target"], manual_checkpoint=(order == 0))
         current = item["target"]
 
     if return_home:
@@ -208,6 +220,8 @@ def print_plan(steps, grasp_pose, cam_pose, approach_mm, warnings):
             print(f"[{i + 1:3d}] {tag} {step['desc']:<40s} {fmt_pose(step['pose'])}")
         elif step["kind"] == "gripper":
             print(f"[{i + 1:3d}] grip   {step['desc']:<40s} pos={step['pos']}")
+        elif step["kind"] == "checkpoint":
+            print(f"[{i + 1:3d}] ✋WAIT {step['desc']}")
         else:
             print(f"[{i + 1:3d}] ----   {step['desc']}")
     print("\n(moveJ* = orientation 변화가 커서 moveL 대신 IK+moveJ로 실행되는 스텝)")
@@ -264,20 +278,29 @@ def main():
     if args.skip_steps:
         print(f"\n처음 {args.skip_steps}스텝은 이미 실행된 것으로 보고 건너뜁니다.")
 
-    rtde_c = rtde_control.RTDEControlInterface(args.robot_ip)
-    rtde_r = rtde_receive.RTDEReceiveInterface(args.robot_ip)
-    gripper = RobotiqGripper(args.robot_ip)
+    execute_plan(steps, args.robot_ip, skip_steps=args.skip_steps, no_step=args.no_step)
+
+
+def execute_plan(steps, robot_ip, skip_steps=0, no_step=False, on_capture=None):
+    """계획을 실제로 실행한다. capture_run.py 등 다른 스크립트에서도 재사용.
+
+    on_capture(step, index) 콜백을 주면 "capture" 스텝에서 그걸 호출한다
+    (실제 카메라 캡처는 아직 이 파일 자체에는 없음 -- 콜백이 없으면 그냥 지나감).
+    """
+    rtde_c = rtde_control.RTDEControlInterface(robot_ip)
+    rtde_r = rtde_receive.RTDEReceiveInterface(robot_ip)
+    gripper = RobotiqGripper(robot_ip)
     # 연결 직후 바로 IK 계열 함수를 부르면 "RTDE control script is not
     # running!" 로 실패하는 경우가 있어(컨트롤 스크립트가 아직 완전히
     # 뜨기 전) 잠깐 대기해준다.
     time.sleep(1.0)
     try:
         for i, step in enumerate(steps):
-            if i < args.skip_steps:
+            if i < skip_steps:
                 continue
             desc = step["desc"]
             kind = step["kind"]
-            if i == args.skip_steps and kind == "moveL" and args.skip_steps > 0:
+            if i == skip_steps and kind == "moveL" and skip_steps > 0:
                 # --skip-steps로 재개할 때는 실제 로봇이 계획이 가정한 위치가
                 # 아니라 임의의 자세(예: 촬영 위치)에서 시작할 수 있다. 사전
                 # rotvec 점프 점검은 "계획대로 순서대로 실행"을 가정하고
@@ -285,7 +308,8 @@ def main():
                 # 안전하게 moveJ+IK로 강제 전환한다.
                 kind = "moveJ_risky"
                 print("  [INFO] 재개 지점의 첫 이동이라 안전하게 moveJ로 전환합니다.")
-            if not args.no_step:
+            # checkpoint는 --no-step이어도 항상 멈춰서 사람 확인을 받는다.
+            if not no_step or kind == "checkpoint":
                 cmd = input(f"\n[{i + 1}/{len(steps)}] {desc}\nEnter=진행 / q=중단 > ").strip().lower()
                 if cmd == "q":
                     print("중단했습니다.")
@@ -317,13 +341,16 @@ def main():
                     print(f"  [ERROR] IK 계산이 계속 실패합니다 -- 중단합니다: {exc}")
                     break
                 rtde_c.moveJ(q_target, JOINT_SPEED, JOINT_ACCEL)
-            elif step["kind"] == "gripper":
+            elif kind == "gripper":
                 gripper.set_pos(step["pos"])
                 # 물리적으로 멈출 때까지 기다린다 (OBJ==0 은 아직 움직이는 중) --
                 # 안 그러면 그리퍼가 다 닫히기/풀리기 전에 팔이 먼저 움직여버린다.
                 gripper.wait_until_stopped()
-            else:
-                pass  # capture placeholder -- 카메라 캡처는 아직 미구현
+            elif kind == "checkpoint":
+                pass  # 이미 위에서 Enter로 확인받음, 로봇 동작 없음
+            elif kind == "capture":
+                if on_capture is not None:
+                    on_capture(step, i, rtde_c=rtde_c, rtde_r=rtde_r)
     finally:
         gripper.close()
         rtde_c.stopScript()
