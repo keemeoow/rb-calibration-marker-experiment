@@ -150,17 +150,18 @@ def build_plan(items, grasp_pose, cam_pose, approach_mm, pick_lift_mm, place_lif
         steps.append(mv(approach_of(source_pose, approach_mm), MOVE_SPEED, MOVE_ACCEL,
                         f"[{label}] pick approach 이동"))
         steps.append(grip(open_pos, f"[{label}] 그리퍼 열기"))
-        if manual_checkpoint:
-            # 맨 처음 pick만: 로봇은 pick 바로 위(approach)에서 대기하고,
-            # 사람이 큐브를 grasp 위치에 정확히 맞춰놓은 뒤 Enter를 눌러야
-            # 다음(하강+grasp)으로 진행한다. --no-step 이어도 여기는 항상 멈춘다.
-            steps.append(checkpoint(
-                f"[{label}] 큐브를 grasp 위치에 정확히 놓은 뒤 Enter를 누르세요 (필수 확인)"
-            ))
         # source_pose까지 완전히 내려가지 않고 pick_lift_mm 만큼 남기고 멈춘다 --
         # 바닥/큐브에 세게 눌러붙지 않도록.
         steps.append(mv(approach_of(source_pose, pick_lift_mm), DESCEND_SPEED, DESCEND_ACCEL,
                         f"[{label}] pick 수직 하강 (-{pick_lift_mm:.0f}mm 남기고 정지)"))
+        if manual_checkpoint:
+            # 맨 처음 pick만: 그리퍼 닫기 직전(이미 다 내려온 상태)에서
+            # 대기하고, 사람이 큐브를 정확히 맞춰놓은 뒤 Enter를 눌러야
+            # 닫힌다. approach 높이가 아니라 여기서 멈춰야 실제로 맞출 수
+            # 있다. --no-step 이어도 여기는 항상 멈춘다.
+            steps.append(checkpoint(
+                f"[{label}] 그리퍼 닫기 직전 -- 큐브를 정확히 맞춘 뒤 Enter (필수 확인)"
+            ))
         steps.append(grip(close_pos, f"[{label}] 그리퍼 닫기 (pick)"))
         steps.append(mv(approach_of(source_pose, approach_mm), DESCEND_SPEED, DESCEND_ACCEL,
                         f"[{label}] pick 수직 상승"))
