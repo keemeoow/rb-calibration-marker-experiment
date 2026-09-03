@@ -69,7 +69,8 @@ def main():
     ap.add_argument("--grasp-pose", default=str(GRASP_POSE_DEFAULT))
     ap.add_argument("--approach-mm", type=float, default=80.0, help="grasp pose 위 approach 높이 (기본 80mm)")
     ap.add_argument("--open-pos", type=int, default=0, help="그리퍼 열림 값 0-255 (기본 0=완전개방)")
-    ap.add_argument("--close-pos", type=int, default=255, help="그리퍼 닫힘 값 0-255 (큐브 두께에 맞춰 조정)")
+    ap.add_argument("--close-pos", type=int, default=150,
+                    help="그리퍼 닫힘 값 0-255 (실측: 큐브를 딱 잡은 상태의 POS)")
     ap.add_argument("--execute", action="store_true", help="실제로 로봇을 움직인다 (없으면 dry-run)")
     ap.add_argument("--yes", action="store_true", help="--execute 시 재확인 프롬프트 생략")
     args = ap.parse_args()

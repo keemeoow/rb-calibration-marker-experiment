@@ -65,6 +65,7 @@ CAM_POSE_DEFAULT = Path(__file__).resolve().parent / "data" / "gripper_cam_pose.
 SESSION_ID = 2
 
 APPROACH_MM_DEFAULT = 50.0     # 5cm -- pick/place 직후 수직 유지 거리
+PLACE_LIFT_MM_DEFAULT = 3.0    # place 하강을 이만큼 남기고 멈춤 (완전히 안 눌러줌, 큐브가 자연히 얹힘)
 MOVE_SPEED = 0.10              # m/s -- approach/카메라 자세 등 수평 이동 (moveL)
 MOVE_ACCEL = 0.30
 DESCEND_SPEED = 0.03           # m/s -- pick/place 수직 하강/상승 (moveL, 더 느리게)
@@ -127,7 +128,8 @@ def cap(desc):
     return {"kind": "capture", "desc": desc}
 
 
-def build_plan(items, grasp_pose, cam_pose, approach_mm, open_pos, close_pos, release_pos, return_home):
+def build_plan(items, grasp_pose, cam_pose, approach_mm, place_lift_mm,
+               open_pos, close_pos, release_pos, return_home):
     """전체 실행 계획을 스텝(dict) 리스트로 만든다."""
     steps = []
     current = list(grasp_pose)
@@ -142,7 +144,11 @@ def build_plan(items, grasp_pose, cam_pose, approach_mm, open_pos, close_pos, re
                         f"[{label}] pick 수직 상승"))
         steps.append(mv(approach_of(dest_pose, approach_mm), MOVE_SPEED, MOVE_ACCEL,
                         f"[{label}] place approach 이동"))
-        steps.append(mv(dest_pose, DESCEND_SPEED, DESCEND_ACCEL, f"[{label}] place 수직 하강"))
+        # dest_pose까지 완전히 내려가지 않고 place_lift_mm 만큼 남기고 멈춘다 --
+        # 큐브를 바닥에 눌러붙이지 않고 그 높이에서 놓아 자연히 얹히게 한다.
+        # (다음 pick의 source_pose 등 다른 곳에서는 원래 dest_pose 그대로 쓴다.)
+        steps.append(mv(approach_of(dest_pose, place_lift_mm), DESCEND_SPEED, DESCEND_ACCEL,
+                        f"[{label}] place 수직 하강 (-{place_lift_mm:.0f}mm 남기고 정지)"))
         # 완전 개방이 아니라 살짝만 풀어서 블럭과의 마찰/위치 틀어짐을 줄인다.
         steps.append(grip(release_pos, f"[{label}] 그리퍼 살짝 풀기 (place)"))
         steps.append(mv(approach_of(dest_pose, approach_mm), DESCEND_SPEED, DESCEND_ACCEL,
@@ -214,8 +220,11 @@ def main():
         default=str(session_path(Path(__file__).resolve().parent / "data", SESSION_ID)),
     )
     ap.add_argument("--approach-mm", type=float, default=APPROACH_MM_DEFAULT)
+    ap.add_argument("--place-lift-mm", type=float, default=PLACE_LIFT_MM_DEFAULT,
+                    help="place 하강을 이만큼 남기고 멈춤 (기본 3mm, 큐브를 바닥에 누르지 않음)")
     ap.add_argument("--open-pos", type=int, default=0)
-    ap.add_argument("--close-pos", type=int, default=255)
+    ap.add_argument("--close-pos", type=int, default=150,
+                    help="그리퍼 닫힘 값 0-255 (실측: 큐브를 딱 잡은 상태의 POS)")
     ap.add_argument("--release-pos", type=int, default=None,
                     help="place 때 살짝만 풀 위치 0-255 (기본: close-pos에서 RELEASE_STEP_DEFAULT만큼만 완화)")
     ap.add_argument("--execute", action="store_true", help="실제로 이동/그리퍼 조작 (없으면 dry-run)")
@@ -234,7 +243,7 @@ def main():
     grasp_pose = load_pose(Path(args.grasp_pose))
     cam_pose = load_pose(Path(args.cam_pose))
     items = compute_ordered_targets(Path(args.session_poses), grasp_pose[3:6], grasp_pose[2])
-    steps = build_plan(items, grasp_pose, cam_pose, args.approach_mm,
+    steps = build_plan(items, grasp_pose, cam_pose, args.approach_mm, args.place_lift_mm,
                         args.open_pos, args.close_pos, release_pos, args.return_home)
     warnings = mark_risky_moveL_as_moveJ(steps)
     print_plan(steps, grasp_pose, cam_pose, args.approach_mm, warnings)
