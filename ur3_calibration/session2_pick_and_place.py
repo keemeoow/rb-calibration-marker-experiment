@@ -16,8 +16,11 @@ session2_sweep.py 는 큐브를 들지 않고 팔만 움직여 경로를 검증�
      위 approach 높이로 이동
   5. 수직으로 하강해 그리퍼 열기 (place)
   6. 수직으로 approach 높이까지 상승
-  7. gripper_cam_pose.json 자세로 이동 (그리퍼 카메라 고정 촬영 위치 --
-     실제 이미지 캡처 코드는 아직 없음, 자리 확인용)
+  7. gripper_cam_pose.json 자세로 이동 (그리퍼 카메라 고정 촬영 위치)
+
+이 파일 자체는 로봇/그리퍼만 다루고 실제 이미지 캡처는 하지 않는다.
+카메라까지 연결해서 실제로 찍는 건 capture_run.py (같은 build_plan/
+execute_plan을 재사용하고 "촬영 자리" 스텝에서 카메라를 캡처한다).
 
 approach 높이(수직 접근/후퇴 거리)는 기본 50mm(5cm) -- "잡고 놓기 직후
 수직 방향은 5cm만 유지" 요청대로.
@@ -174,7 +177,7 @@ def build_plan(items, grasp_pose, cam_pose, approach_mm, pick_lift_mm, place_lif
                         f"[{label}] place 수직 상승"))
         steps.append(mv(cam_pose, MOVE_SPEED, MOVE_ACCEL,
                         f"[{label}] 그리퍼캠 고정 촬영 위치로 이동"))
-        steps.append(cap(f"[{label}] 촬영 자리 (실제 캡처 코드는 아직 없음)"))
+        steps.append(cap(f"[{label}] 촬영 자리"))
 
     for order, item in enumerate(items):
         label = f"{order + 1}/{len(items)} (원본 #{item['orig_index'] + 1})"
