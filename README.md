@@ -4,6 +4,7 @@
 
 ## 바로가기
 
+- [논문 스토리라인 기준 문서](RESEARCH_STORYLINE.md)
 - [Session04 canonical 결과 인덱스](CP_result/README.md)
 - [Session04 Board–Cube systematic error 진단](data/session04/calib_out/verify/board_cube_relative_pose/BOARD_CUBE_RELATIVE_POSE.md)
 - [문서 지도](#문서-지도)
@@ -31,6 +32,7 @@
 | 기능 | 기준 문서 | 관리 원칙 |
 | --- | --- | --- |
 | 실행·데이터·코드 계약 | `README.md` | 사람이 편집하는 저장소 진입점 |
+| 논문 기여도·스토리라인 | `RESEARCH_STORYLINE.md` | 초기 기여도와 실제 데이터 기반 수정 사항을 함께 관리하는 최상위 서사 기준 |
 | 수식·방법·논문 서술 | `CALIBRATION_EXPLANATION_LATEX.md` | 사람이 편집하는 이론 및 paper-ready 문서 |
 | Session04 결과 | `CP_result/README.md` | 결과 인덱스; `TABLE1_RESULTS.md`와 `TABLE1_INTERACTIVE.html`은 생성기로 갱신 |
 | Simulation | `Simulation/README.md` | 실행 진입점; backend 통합 계획은 `Simulation/MIGRATION_PLAN.md`, 결과는 `SIM_RESULTS.md`와 `results/` |

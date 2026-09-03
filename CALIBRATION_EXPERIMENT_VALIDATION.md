@@ -4,6 +4,8 @@
 상태: Pre-GT internal evaluation  
 검증일: 2026-09-03
 
+논문 기여도와 스토리라인의 최상위 기준은 [RESEARCH_STORYLINE.md](RESEARCH_STORYLINE.md)를 따른다.
+
 ## 최종 판정
 
 현재 구성은 **코드 내부 ablation과 calibration 안정성 검증에는 타당**하다.
@@ -94,6 +96,7 @@ contrast로 해석한다.
 
 ## 관련 문서
 
+- 논문 스토리라인 기준: [RESEARCH_STORYLINE.md](RESEARCH_STORYLINE.md)
 - 실행 순서: [RUN_PIPELINE.md](RUN_PIPELINE.md)
 - 비교실험 및 지표 정의: [README.md](README.md)
 - Calibration 수식: [CALIBRATION_EXPLANATION_LATEX.md](CALIBRATION_EXPLANATION_LATEX.md)
