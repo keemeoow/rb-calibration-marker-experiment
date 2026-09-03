@@ -163,7 +163,8 @@ def _disposition(selected: bool, reason: str, recovered: bool = False) -> str:
 
 def _cube_records(session_root: Path, meta: dict, cube, K_map, D_map,
                   camera_ids: Sequence[int], gripper: int,
-                  image_scale: float, policies: Mapping[str, dict]):
+                  image_scale: float, policies: Mapping[str, dict],
+                  exclude_gripped: bool = True):
     observations, diagnostics = detect_corner_observations(
         root=str(session_root),
         meta=meta,
@@ -176,7 +177,7 @@ def _cube_records(session_root: Path, meta: dict, cube, K_map, D_map,
         max_err_gripper=5.0,
         min_aspect_fixed=0.0,
         min_aspect_gripper=0.35,
-        exclude_gripped=True,
+        exclude_gripped=exclude_gripped,
         image_scale=float(image_scale),
     )
     observation_map = {
@@ -786,7 +787,8 @@ def run_filter(args) -> dict:
     }
     cube_records, cube_diagnostics = _cube_records(
         session_root, meta, cube, K_map, D_map, camera_ids, gripper,
-        float(args.image_scale), policies)
+        float(args.image_scale), policies,
+        exclude_gripped=not bool(getattr(args, "include_gripped_cube", False)))
     board_records = _board_records(
         session_root, meta, board_cfg, float(args.image_scale), policies)
     records = sorted(cube_records + board_records, key=lambda record: (
@@ -892,6 +894,12 @@ def parse_args(argv=None):
     parser.add_argument("--strict-min-inlier-fraction", type=float, default=0.9)
     parser.add_argument("--strict-board-min-corners", type=int, default=12)
     parser.add_argument("--max-overlay-panels", type=int, default=48)
+    parser.add_argument(
+        "--include-gripped-cube", action="store_true",
+        help=("Also keep cube_gripped=True observations instead of dropping "
+              "them (needed when fixed-camera cube views only exist while "
+              "the cube is gripped, e.g. UR3 session1). Off by default to "
+              "preserve prior runs' behavior."))
     return parser.parse_args(argv)
 
 
