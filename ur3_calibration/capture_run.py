@@ -15,9 +15,13 @@
 실제로 4대 카메라 + 로봇 데이터를 저장한다. 첫 pick 직전에는 사람이
 큐브를 정확히 놓을 때까지 기다리는 필수 확인 지점이 그대로 포함된다.
 
-카메라가 고정캠/그리퍼캠 중 무엇인지는 이 스크립트가 자동으로 구분하지
-못한다 -- 기본은 시리얼 번호로 저장하고, view_cameras.py로 미리 확인해서
-필요하면 --camera-label SERIAL=이름 으로 라벨을 붙일 수 있다.
+카메라 라벨은 모델로 자동 인식한다 -- 그리퍼캠은 D435(IMU 없는 모델),
+고정캠 3대는 D435I. 필요하면 --camera-label SERIAL=이름 으로 덮어쓸 수
+있다.
+
+--execute 시 4대를 2x2로 붙인 미리보기 창을 하나 띄운다(--no-preview로
+끄기 가능). 로봇이 움직이는 동안에도 백그라운드 스레드에서 계속
+갱신되며, 실제 저장되는 캡처와는 별개로 확인용이다.
 
 출력: data/session{N}_.../capture/<index:03d>/
   cam_<라벨 또는 serial>.png (카메라별 컬러 프레임) + robot.json
@@ -33,6 +37,7 @@
 import argparse
 import json
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -114,6 +119,54 @@ def connect_cameras(no_reset=False):
 def stop_cameras(cams):
     for cam in cams.values():
         cam.stop()
+
+
+class LiveView:
+    """4대 카메라를 2x2로 붙여 한 창에 계속 보여주는 백그라운드 미리보기.
+
+    로봇 이동(moveL/moveJ)이 메인 스레드를 블로킹하는 동안에도 화면이
+    계속 갱신되도록 별도 스레드에서 돈다. 실제 저장되는 캡처(save_capture)
+    와는 무관한 확인용 라이브 뷰다.
+    """
+
+    TILE_W, TILE_H = 640, 360
+
+    def __init__(self, cams: dict, labels: dict, window_name: str = "capture_run (q/ESC=닫기)"):
+        self.cams = cams
+        self.labels = labels
+        self.window_name = window_name
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+
+    def start(self):
+        cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
+        self._thread.start()
+
+    def _loop(self):
+        order = sorted(self.cams.keys(), key=lambda s: self.labels.get(s, s))
+        while not self._stop.is_set():
+            tiles = []
+            for serial in order:
+                color, _depth, _ts = self.cams[serial].get_latest()
+                label = self.labels.get(serial, serial)
+                if color is None:
+                    tile = np.zeros((self.TILE_H, self.TILE_W, 3), dtype=np.uint8)
+                else:
+                    tile = cv2.resize(color, (self.TILE_W, self.TILE_H))
+                cv2.putText(tile, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                tiles.append(tile)
+            while len(tiles) < 4:
+                tiles.append(np.zeros((self.TILE_H, self.TILE_W, 3), dtype=np.uint8))
+            grid = np.vstack([np.hstack(tiles[0:2]), np.hstack(tiles[2:4])])
+            cv2.imshow(self.window_name, grid)
+            key = cv2.waitKey(30) & 0xFF
+            if key in (ord("q"), 27):
+                self._stop.set()
+        cv2.destroyWindow(self.window_name)
+
+    def stop(self):
+        self._stop.set()
+        self._thread.join(timeout=2.0)
 
 
 def read_robot_state(rtde_r, extra=None):
@@ -264,18 +317,23 @@ def main():
     ap.add_argument("--no-cam-reset", action="store_true", help="카메라 시작 전 하드웨어 리셋 생략")
     ap.add_argument("--camera-label", action="append",
                     help="SERIAL=이름 형식으로 카메라 라벨 지정 (여러 번 사용 가능)")
+    ap.add_argument("--no-preview", action="store_true", help="4대 미리보기 창을 띄우지 않음")
     args = ap.parse_args()
 
     user_labels = parse_labels(args.camera_label)
 
     cams = {}
     labels = dict(user_labels)
+    view = None
     if args.execute:
         cams, devices = connect_cameras(no_reset=args.no_cam_reset)
         labels = auto_labels(devices, user_labels)
         print("카메라 라벨:")
         for serial, name in sorted(devices.items()):
             print(f"  {serial}  {name}  -> {labels[serial]}")
+        if not args.no_preview:
+            view = LiveView(cams, labels)
+            view.start()
 
     try:
         if args.session in (1, 3):
@@ -283,6 +341,8 @@ def main():
         else:
             run_session2(args, cams, labels)
     finally:
+        if view is not None:
+            view.stop()
         stop_cameras(cams)
 
 
