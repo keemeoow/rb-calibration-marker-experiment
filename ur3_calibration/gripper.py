@@ -13,12 +13,13 @@ import time
 import numpy as np
 
 DEFAULT_PORT = 63352
+DEFAULT_SPEED = 30  # 0(가장 느림)-255(가장 빠름). 낮게 잡아 열고/닫을 때 다 천천히 움직이게 한다.
 
 
 class RobotiqGripper:
     """POS(0=open .. 255=closed)만 제어하는 최소 래퍼."""
 
-    def __init__(self, host: str, port: int = DEFAULT_PORT):
+    def __init__(self, host: str, port: int = DEFAULT_PORT, speed: int = DEFAULT_SPEED):
         self.sock = socket.create_connection((host, port), timeout=2.0)
         self.sock.settimeout(1.0)
         if self._get("ACT") != 1:
@@ -26,6 +27,7 @@ class RobotiqGripper:
                 "그리퍼가 activate(ACT)되지 않았습니다. 티치펜던트에서 먼저 activate 하세요."
             )
         self._set("GTO", 1)
+        self._set("SPE", int(np.clip(speed, 0, 255)))
 
     def _cmd(self, line: str) -> str:
         self.sock.sendall((line + "\n").encode("ascii"))

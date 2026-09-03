@@ -65,7 +65,8 @@ CAM_POSE_DEFAULT = Path(__file__).resolve().parent / "data" / "gripper_cam_pose.
 SESSION_ID = 2
 
 APPROACH_MM_DEFAULT = 50.0     # 5cm -- pick/place 직후 수직 유지 거리
-PLACE_LIFT_MM_DEFAULT = 3.0    # place 하강을 이만큼 남기고 멈춤 (완전히 안 눌러줌, 큐브가 자연히 얹힘)
+PICK_LIFT_MM_DEFAULT = 1.0     # pick 하강도 이만큼 남기고 멈춤 (바닥/큐브에 세게 눌러붙지 않게)
+PLACE_LIFT_MM_DEFAULT = 1.0    # place 하강을 이만큼 남기고 멈춤 (완전히 안 눌러줌, 큐브가 자연히 얹힘)
 MOVE_SPEED = 0.10              # m/s -- approach/카메라 자세 등 수평 이동 (moveL)
 MOVE_ACCEL = 0.30
 DESCEND_SPEED = 0.03           # m/s -- pick/place 수직 하강/상승 (moveL, 더 느리게)
@@ -128,7 +129,7 @@ def cap(desc):
     return {"kind": "capture", "desc": desc}
 
 
-def build_plan(items, grasp_pose, cam_pose, approach_mm, place_lift_mm,
+def build_plan(items, grasp_pose, cam_pose, approach_mm, pick_lift_mm, place_lift_mm,
                open_pos, close_pos, release_pos, return_home):
     """전체 실행 계획을 스텝(dict) 리스트로 만든다."""
     steps = []
@@ -138,7 +139,10 @@ def build_plan(items, grasp_pose, cam_pose, approach_mm, place_lift_mm,
         steps.append(grip(open_pos, f"[{label}] 그리퍼 열기"))
         steps.append(mv(approach_of(source_pose, approach_mm), MOVE_SPEED, MOVE_ACCEL,
                         f"[{label}] pick approach 이동"))
-        steps.append(mv(source_pose, DESCEND_SPEED, DESCEND_ACCEL, f"[{label}] pick 수직 하강"))
+        # source_pose까지 완전히 내려가지 않고 pick_lift_mm 만큼 남기고 멈춘다 --
+        # 바닥/큐브에 세게 눌러붙지 않도록.
+        steps.append(mv(approach_of(source_pose, pick_lift_mm), DESCEND_SPEED, DESCEND_ACCEL,
+                        f"[{label}] pick 수직 하강 (-{pick_lift_mm:.0f}mm 남기고 정지)"))
         steps.append(grip(close_pos, f"[{label}] 그리퍼 닫기 (pick)"))
         steps.append(mv(approach_of(source_pose, approach_mm), DESCEND_SPEED, DESCEND_ACCEL,
                         f"[{label}] pick 수직 상승"))
@@ -220,8 +224,10 @@ def main():
         default=str(session_path(Path(__file__).resolve().parent / "data", SESSION_ID)),
     )
     ap.add_argument("--approach-mm", type=float, default=APPROACH_MM_DEFAULT)
+    ap.add_argument("--pick-lift-mm", type=float, default=PICK_LIFT_MM_DEFAULT,
+                    help="pick 하강을 이만큼 남기고 멈춤 (기본 1mm)")
     ap.add_argument("--place-lift-mm", type=float, default=PLACE_LIFT_MM_DEFAULT,
-                    help="place 하강을 이만큼 남기고 멈춤 (기본 3mm, 큐브를 바닥에 누르지 않음)")
+                    help="place 하강을 이만큼 남기고 멈춤 (기본 1mm, 큐브를 바닥에 누르지 않음)")
     ap.add_argument("--open-pos", type=int, default=0)
     ap.add_argument("--close-pos", type=int, default=150,
                     help="그리퍼 닫힘 값 0-255 (실측: 큐브를 딱 잡은 상태의 POS)")
@@ -243,7 +249,7 @@ def main():
     grasp_pose = load_pose(Path(args.grasp_pose))
     cam_pose = load_pose(Path(args.cam_pose))
     items = compute_ordered_targets(Path(args.session_poses), grasp_pose[3:6], grasp_pose[2])
-    steps = build_plan(items, grasp_pose, cam_pose, args.approach_mm, args.place_lift_mm,
+    steps = build_plan(items, grasp_pose, cam_pose, args.approach_mm, args.pick_lift_mm, args.place_lift_mm,
                         args.open_pos, args.close_pos, release_pos, args.return_home)
     warnings = mark_risky_moveL_as_moveJ(steps)
     print_plan(steps, grasp_pose, cam_pose, args.approach_mm, warnings)
@@ -267,6 +273,15 @@ def main():
             if i < args.skip_steps:
                 continue
             desc = step["desc"]
+            kind = step["kind"]
+            if i == args.skip_steps and kind == "moveL" and args.skip_steps > 0:
+                # --skip-steps로 재개할 때는 실제 로봇이 계획이 가정한 위치가
+                # 아니라 임의의 자세(예: 촬영 위치)에서 시작할 수 있다. 사전
+                # rotvec 점프 점검은 "계획대로 순서대로 실행"을 가정하고
+                # 계산된 것이라 이 첫 스텝에는 적용되지 않았을 수 있으니,
+                # 안전하게 moveJ+IK로 강제 전환한다.
+                kind = "moveJ_risky"
+                print("  [INFO] 재개 지점의 첫 이동이라 안전하게 moveJ로 전환합니다.")
             if not args.no_step:
                 cmd = input(f"\n[{i + 1}/{len(steps)}] {desc}\nEnter=진행 / q=중단 > ").strip().lower()
                 if cmd == "q":
@@ -275,9 +290,9 @@ def main():
             else:
                 print(f"[{i + 1}/{len(steps)}] {desc}")
 
-            if step["kind"] == "moveL":
+            if kind == "moveL":
                 rtde_c.moveL(step["pose"], step["speed"], step["accel"])
-            elif step["kind"] == "moveJ_risky":
+            elif kind == "moveJ_risky":
                 q_near = rtde_r.getActualQ()
                 try:
                     has_solution = call_with_retry(
