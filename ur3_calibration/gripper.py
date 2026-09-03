@@ -13,7 +13,7 @@ import time
 import numpy as np
 
 DEFAULT_PORT = 63352
-DEFAULT_SPEED = 30  # 0(가장 느림)-255(가장 빠름). 낮게 잡아 열고/닫을 때 다 천천히 움직이게 한다.
+DEFAULT_SPEED = 0   # 0(가장 느림)-255(가장 빠름). 최대로 느리게(0) 열고/닫는다.
 
 
 class RobotiqGripper:
