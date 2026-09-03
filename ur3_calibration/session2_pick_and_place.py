@@ -284,19 +284,27 @@ def main():
     execute_plan(steps, args.robot_ip, skip_steps=args.skip_steps, no_step=args.no_step)
 
 
-def execute_plan(steps, robot_ip, skip_steps=0, no_step=False, on_capture=None):
+def execute_plan(steps, robot_ip, skip_steps=0, no_step=False, on_capture=None,
+                  rtde_c=None, rtde_r=None, gripper=None):
     """계획을 실제로 실행한다. capture_run.py 등 다른 스크립트에서도 재사용.
 
     on_capture(step, index) 콜백을 주면 "capture" 스텝에서 그걸 호출한다
     (실제 카메라 캡처는 아직 이 파일 자체에는 없음 -- 콜백이 없으면 그냥 지나감).
+
+    rtde_c/rtde_r/gripper를 미리 연결해서 넘기면 그걸 그대로 쓰고 이
+    함수가 끝나도 연결을 닫지 않는다 (여러 세션을 하나의 연결로 이어서
+    실행하고 싶을 때, 예: capture_run.py의 결합 실행 모드). 넘기지 않으면
+    이 함수가 직접 연결하고 끝에서 정리한다(기존 동작과 동일).
     """
-    rtde_c = rtde_control.RTDEControlInterface(robot_ip)
-    rtde_r = rtde_receive.RTDEReceiveInterface(robot_ip)
-    gripper = RobotiqGripper(robot_ip)
-    # 연결 직후 바로 IK 계열 함수를 부르면 "RTDE control script is not
-    # running!" 로 실패하는 경우가 있어(컨트롤 스크립트가 아직 완전히
-    # 뜨기 전) 잠깐 대기해준다.
-    time.sleep(1.0)
+    owns_connection = rtde_c is None
+    if owns_connection:
+        rtde_c = rtde_control.RTDEControlInterface(robot_ip)
+        rtde_r = rtde_receive.RTDEReceiveInterface(robot_ip)
+        gripper = RobotiqGripper(robot_ip)
+        # 연결 직후 바로 IK 계열 함수를 부르면 "RTDE control script is not
+        # running!" 로 실패하는 경우가 있어(컨트롤 스크립트가 아직 완전히
+        # 뜨기 전) 잠깐 대기해준다.
+        time.sleep(1.0)
     try:
         for i, step in enumerate(steps):
             if i < skip_steps:
@@ -355,10 +363,11 @@ def execute_plan(steps, robot_ip, skip_steps=0, no_step=False, on_capture=None):
                 if on_capture is not None:
                     on_capture(step, i, rtde_c=rtde_c, rtde_r=rtde_r)
     finally:
-        gripper.close()
-        rtde_c.stopScript()
-        rtde_c.disconnect()
-        rtde_r.disconnect()
+        if owns_connection:
+            gripper.close()
+            rtde_c.stopScript()
+            rtde_c.disconnect()
+            rtde_r.disconnect()
 
 
 if __name__ == "__main__":

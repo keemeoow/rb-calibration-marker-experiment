@@ -29,11 +29,14 @@
   robot.json                       (tcp_pose, joint_radians/degrees, timestamp)
 
 사용법:
-  python capture_run.py --session 1                          # dry-run
-  python capture_run.py --session 1 --execute --no-step
-  python capture_run.py --session 2 --execute --no-step
+  python capture_run.py --session 0 --execute --no-step       # 처음 시작:
+      # session2 grasp 위치로 가서 대기 -> 사람이 큐브 올려놓고 Enter ->
+      # 잡고 -> 세션1(손에 든 채) -> 이어서 세션2(내려놓으며 pick-and-place)
+  python capture_run.py --session 1 --execute --no-step        # 세션1만 단독
+  python capture_run.py --session 2 --execute --no-step        # 세션2만 단독
+      # (이 경우 큐브가 이미 session2 grasp 위치에 있다고 가정)
   python capture_run.py --session 3 --execute
-  python capture_run.py --session 2 --execute --camera-label 123456789=gripper
+  python capture_run.py --session 0                            # dry-run(계획만 출력)
 """
 
 import argparse
@@ -51,6 +54,7 @@ from capture_pipeline.camera import RealSenseCamera  # noqa: E402
 
 import rtde_control
 import rtde_receive
+from gripper import RobotiqGripper
 
 from capture_poses import SESSIONS, session_path
 from session2_pick_and_place import (
@@ -206,12 +210,57 @@ def save_capture(cams, labels, out_dir: Path, robot_state: dict):
     return saved
 
 
-def run_simple_session(session_id, args, cams, labels):
-    """세션 1/3: poses.json 순서대로 이동 후 촬영 (그리퍼는 건드리지 않음)."""
-    info = SESSIONS[session_id]
+def move_and_capture_poses(session_id, args, cams, labels, rtde_c, rtde_r, start_index=0):
+    """세션 1/3의 실제 동작: poses.json 순서대로 이동 후 촬영 (그리퍼는 건드리지 않음).
+
+    이미 연결된 rtde_c/rtde_r을 받아서 쓴다 -- run_simple_session(단독 실행)과
+    run_full_pipeline(결합 실행, 큐브를 든 채로 이어옴) 양쪽에서 재사용.
+    """
     poses_path = session_path(Path(__file__).resolve().parent / "data", session_id)
     poses = json.loads(poses_path.read_text())["poses"]
     out_root = poses_path.parent / "capture"
+
+    last_pose = None
+    for idx, p in enumerate(poses):
+        if idx < start_index:
+            last_pose = list(p["tcp_pose"])
+            continue
+        target = list(p["tcp_pose"])
+        if not args.no_step:
+            cmd = input(f"\n[{idx + 1}/{len(poses)}] 이동+촬영. Enter=진행 / q=중단 > ").strip().lower()
+            if cmd == "q":
+                print("중단했습니다.")
+                break
+        else:
+            print(f"[{idx + 1}/{len(poses)}] 이동+촬영")
+
+        risky = last_pose is not None and np.linalg.norm(
+            np.array(target[3:6]) - np.array(last_pose[3:6])) > ROTATION_JUMP_THRESHOLD
+        if risky:
+            q_near = rtde_r.getActualQ()
+            try:
+                q_target = call_with_retry(rtde_c.getInverseKinematics, target, q_near,
+                                            IK_MAX_POS_ERROR, IK_MAX_ORI_ERROR)
+            except RuntimeError as exc:
+                print(f"  [ERROR] IK 계산 실패 -- 중단: {exc}")
+                break
+            rtde_c.moveJ(q_target, JOINT_SPEED, JOINT_ACCEL)
+        else:
+            rtde_c.moveL(target, MOVE_SPEED, MOVE_ACCEL)
+        last_pose = target
+        time.sleep(SETTLE_S)
+
+        robot_state = read_robot_state(rtde_r, {"pose_index": idx})
+        out_dir = out_root / f"{idx:03d}"
+        saved = save_capture(cams, labels, out_dir, robot_state)
+        print(f"  저장됨 -> {out_dir}  (카메라 {len(saved)}대: {', '.join(saved)})")
+
+
+def run_simple_session(session_id, args, cams, labels):
+    """세션 1/3 단독 실행: poses.json 순서대로 이동 후 촬영."""
+    info = SESSIONS[session_id]
+    poses_path = session_path(Path(__file__).resolve().parent / "data", session_id)
+    poses = json.loads(poses_path.read_text())["poses"]
 
     print(f"=== 세션 {session_id}: {info['name']} ===  {len(poses)}개 자세")
     print(info["description"])
@@ -226,47 +275,15 @@ def run_simple_session(session_id, args, cams, labels):
     rtde_r = rtde_receive.RTDEReceiveInterface(args.robot_ip)
     time.sleep(1.0)
     try:
-        last_pose = None
-        for idx, p in enumerate(poses):
-            if idx < args.skip_steps:
-                last_pose = list(p["tcp_pose"])
-                continue
-            target = list(p["tcp_pose"])
-            if not args.no_step:
-                cmd = input(f"\n[{idx + 1}/{len(poses)}] 이동+촬영. Enter=진행 / q=중단 > ").strip().lower()
-                if cmd == "q":
-                    print("중단했습니다.")
-                    break
-            else:
-                print(f"[{idx + 1}/{len(poses)}] 이동+촬영")
-
-            risky = last_pose is not None and np.linalg.norm(
-                np.array(target[3:6]) - np.array(last_pose[3:6])) > ROTATION_JUMP_THRESHOLD
-            if risky:
-                q_near = rtde_r.getActualQ()
-                try:
-                    q_target = call_with_retry(rtde_c.getInverseKinematics, target, q_near,
-                                                IK_MAX_POS_ERROR, IK_MAX_ORI_ERROR)
-                except RuntimeError as exc:
-                    print(f"  [ERROR] IK 계산 실패 -- 중단: {exc}")
-                    break
-                rtde_c.moveJ(q_target, JOINT_SPEED, JOINT_ACCEL)
-            else:
-                rtde_c.moveL(target, MOVE_SPEED, MOVE_ACCEL)
-            last_pose = target
-            time.sleep(SETTLE_S)
-
-            robot_state = read_robot_state(rtde_r, {"pose_index": idx})
-            out_dir = out_root / f"{idx:03d}"
-            saved = save_capture(cams, labels, out_dir, robot_state)
-            print(f"  저장됨 -> {out_dir}  (카메라 {len(saved)}대: {', '.join(saved)})")
+        move_and_capture_poses(session_id, args, cams, labels, rtde_c, rtde_r,
+                                start_index=args.skip_steps)
     finally:
         rtde_c.stopScript()
         rtde_c.disconnect()
         rtde_r.disconnect()
 
 
-def run_session2(args, cams, labels):
+def build_session2_steps(args):
     grasp_pose = load_pose(Path(args.grasp_pose))
     cam_pose = load_pose(Path(args.cam_pose))
     session_poses = session_path(Path(__file__).resolve().parent / "data", 2)
@@ -281,7 +298,10 @@ def run_session2(args, cams, labels):
     steps = build_plan(items, grasp_pose, cam_pose, args.approach_mm, args.pick_lift_mm, args.place_lift_mm,
                         args.open_pos, args.close_pos, release_pos, args.return_home)
     mark_risky_moveL_as_moveJ(steps)
+    return steps, session_poses
 
+
+def make_session2_capture_callback(session_poses, cams, labels):
     out_root = session_poses.parent / "capture"
     capture_counter = {"n": 0}
 
@@ -295,19 +315,79 @@ def run_session2(args, cams, labels):
         print(f"  저장됨 -> {out_dir}  (카메라 {len(saved)}대: {', '.join(saved)})")
         capture_counter["n"] += 1
 
+    return on_capture
+
+
+def run_session2(args, cams, labels):
+    steps, session_poses = build_session2_steps(args)
+
     if not args.execute:
         for i, step in enumerate(steps):
             print(f"[{i + 1:3d}] {step['kind']:12s} {step['desc']}")
         print(f"\n(dry-run) 총 {len(steps)}스텝. --execute 를 주면 실행합니다.")
         return
 
+    on_capture = make_session2_capture_callback(session_poses, cams, labels)
     execute_plan(steps, args.robot_ip, skip_steps=args.skip_steps, no_step=args.no_step,
                  on_capture=on_capture)
 
 
+# 세션2 계획의 맨 앞, 첫 pick 사이클의 "집기" 구간(길이 고정):
+#   pick approach -> 그리퍼 열기 -> [필수 확인 checkpoint] -> pick 수직 하강
+#   -> 그리퍼 닫기 -> pick 수직 상승   (그 다음이 "place approach")
+GRASP_PHASE_LEN = 6
+
+
+def run_full_pipeline(args, cams, labels):
+    """처음 시작할 때 쓰는 결합 실행: session2 초기 위치에서 큐브를 잡고(사람이
+    큐브를 놓고 Enter), 그 상태로 세션1(손에 든 채 이동+촬영)을 마친 뒤,
+    이어서 세션2(바닥에 내려놓으며 pick-and-place+촬영)를 계속한다.
+
+    연결(rtde_c/rtde_r/gripper)을 한 번만 맺고 세 단계 내내 그대로 쓴다.
+    """
+    steps2, session_poses = build_session2_steps(args)
+    grasp_phase = steps2[:GRASP_PHASE_LEN]
+    on_capture = make_session2_capture_callback(session_poses, cams, labels)
+
+    if not args.execute:
+        print("=== 0단계: 큐브 잡기 (session2 grasp 위치) ===")
+        for i, step in enumerate(grasp_phase):
+            print(f"[{i + 1:3d}] {step['kind']:12s} {step['desc']}")
+        print("\n=== 1단계: 세션1 (손에 든 채 이동+촬영) ===")
+        run_simple_session(1, args, cams, labels)
+        print("\n=== 2단계: 세션2 이어서 (바닥에 내려놓으며 pick-and-place+촬영) ===")
+        for i, step in enumerate(steps2):
+            tag = "(건너뜀)" if i < GRASP_PHASE_LEN else ""
+            print(f"[{i + 1:3d}] {step['kind']:12s} {step['desc']} {tag}")
+        print(f"\n(dry-run) 실제로 움직이거나 촬영하지 않았습니다. --execute 를 주면 실행합니다.")
+        return
+
+    rtde_c = rtde_control.RTDEControlInterface(args.robot_ip)
+    rtde_r = rtde_receive.RTDEReceiveInterface(args.robot_ip)
+    gripper = RobotiqGripper(args.robot_ip)
+    time.sleep(1.0)
+    try:
+        print("=== 0단계: 큐브 잡기 (session2 grasp 위치) ===")
+        execute_plan(grasp_phase, args.robot_ip, no_step=args.no_step,
+                     rtde_c=rtde_c, rtde_r=rtde_r, gripper=gripper)
+
+        print("\n=== 1단계: 세션1 (손에 든 채 이동+촬영) ===")
+        move_and_capture_poses(1, args, cams, labels, rtde_c, rtde_r)
+
+        print("\n=== 2단계: 세션2 이어서 (바닥에 내려놓으며 pick-and-place+촬영) ===")
+        execute_plan(steps2, args.robot_ip, skip_steps=GRASP_PHASE_LEN, no_step=args.no_step,
+                     on_capture=on_capture, rtde_c=rtde_c, rtde_r=rtde_r, gripper=gripper)
+    finally:
+        gripper.close()
+        rtde_c.stopScript()
+        rtde_c.disconnect()
+        rtde_r.disconnect()
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--session", type=int, required=True, choices=(1, 2, 3))
+    ap.add_argument("--session", type=int, required=True, choices=(0, 1, 2, 3),
+                    help="0=처음 시작용 결합 실행(큐브 잡기 -> 세션1 -> 세션2 이어서), 1/2/3=개별 세션")
     ap.add_argument("--robot-ip", default=ROBOT_IP_DEFAULT)
     ap.add_argument("--grasp-pose", default=str(GRASP_POSE_DEFAULT))
     ap.add_argument("--cam-pose", default=str(CAM_POSE_DEFAULT))
@@ -344,7 +424,9 @@ def main():
             view.start()
 
     try:
-        if args.session in (1, 3):
+        if args.session == 0:
+            run_full_pipeline(args, cams, labels)
+        elif args.session in (1, 3):
             run_simple_session(args.session, args, cams, labels)
         else:
             run_session2(args, cams, labels)
