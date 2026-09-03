@@ -42,7 +42,6 @@
 import argparse
 import json
 import sys
-import threading
 import time
 from pathlib import Path
 
@@ -129,11 +128,14 @@ def stop_cameras(cams):
 
 
 class LiveView:
-    """4대 카메라를 2x2로 붙여 한 창에 계속 보여주는 백그라운드 미리보기.
+    """4대 카메라를 2x2로 붙여 한 창에 보여주는 미리보기.
 
-    로봇 이동(moveL/moveJ)이 메인 스레드를 블로킹하는 동안에도 화면이
-    계속 갱신되도록 별도 스레드에서 돈다. 실제 저장되는 캡처(save_capture)
-    와는 무관한 확인용 라이브 뷰다.
+    OpenCV(Qt5 GUI 백엔드)는 창을 메인 스레드가 아닌 곳에서 다루면 창은
+    뜨지만 내용이 그려지지 않는다(검은 화면). 그래서 백그라운드 스레드로
+    돌리지 않고, show()를 메인 스레드에서 로봇이 블로킹되지 않는 지점마다
+    (스텝 사이, 촬영 직후 등) 직접 호출해 갱신한다 -- 로봇이 moveL/moveJ로
+    실제 움직이는 도중에는 화면이 잠깐 멈춰 보일 수 있지만, 최소한 뜨고
+    실제로 갱신은 된다. 실제 저장되는 캡처(save_capture)와는 무관하다.
     """
 
     TILE_W, TILE_H = 640, 360
@@ -142,33 +144,39 @@ class LiveView:
         self.cams = cams
         self.labels = labels
         self.window_name = window_name
-        self._stop = threading.Event()
-        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self.order = sorted(self.cams.keys(), key=lambda s: self.labels.get(s, s))
+        self._closed = False
 
     def start(self):
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
-        self._thread.start()
+        self.show()
 
-    def _loop(self):
-        order = sorted(self.cams.keys(), key=lambda s: self.labels.get(s, s))
-        while not self._stop.is_set():
-            tiles = []
-            for serial in order:
-                color, _depth, _ts = self.cams[serial].get_latest()
-                label = self.labels.get(serial, serial)
-                if color is None:
-                    tile = np.zeros((self.TILE_H, self.TILE_W, 3), dtype=np.uint8)
-                else:
-                    tile = cv2.resize(color, (self.TILE_W, self.TILE_H))
-                cv2.putText(tile, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-                tiles.append(tile)
-            while len(tiles) < 4:
-                tiles.append(np.zeros((self.TILE_H, self.TILE_W, 3), dtype=np.uint8))
-            grid = np.vstack([np.hstack(tiles[0:2]), np.hstack(tiles[2:4])])
-            cv2.imshow(self.window_name, grid)
-            key = cv2.waitKey(30) & 0xFF
-            if key in (ord("q"), 27):
-                self._stop.set()
+    def show(self):
+        """메인 스레드에서 호출: 최신 프레임으로 한 번 갱신하고 이벤트를 처리한다."""
+        if self._closed:
+            return
+        tiles = []
+        for serial in self.order:
+            color, _depth, _ts = self.cams[serial].get_latest()
+            label = self.labels.get(serial, serial)
+            if color is None:
+                tile = np.zeros((self.TILE_H, self.TILE_W, 3), dtype=np.uint8)
+            else:
+                tile = cv2.resize(color, (self.TILE_W, self.TILE_H))
+            cv2.putText(tile, label, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+            tiles.append(tile)
+        while len(tiles) < 4:
+            tiles.append(np.zeros((self.TILE_H, self.TILE_W, 3), dtype=np.uint8))
+        grid = np.vstack([np.hstack(tiles[0:2]), np.hstack(tiles[2:4])])
+        cv2.imshow(self.window_name, grid)
+        key = cv2.waitKey(1) & 0xFF
+        if key in (ord("q"), 27):
+            self.stop()
+
+    def stop(self):
+        if self._closed:
+            return
+        self._closed = True
         cv2.destroyWindow(self.window_name)
 
     def stop(self):
@@ -210,7 +218,7 @@ def save_capture(cams, labels, out_dir: Path, robot_state: dict):
     return saved
 
 
-def move_and_capture_poses(session_id, args, cams, labels, rtde_c, rtde_r, start_index=0):
+def move_and_capture_poses(session_id, args, cams, labels, rtde_c, rtde_r, start_index=0, view=None):
     """세션 1/3의 실제 동작: poses.json 순서대로 이동 후 촬영 (그리퍼는 건드리지 않음).
 
     이미 연결된 rtde_c/rtde_r을 받아서 쓴다 -- run_simple_session(단독 실행)과
@@ -254,9 +262,11 @@ def move_and_capture_poses(session_id, args, cams, labels, rtde_c, rtde_r, start
         out_dir = out_root / f"{idx:03d}"
         saved = save_capture(cams, labels, out_dir, robot_state)
         print(f"  저장됨 -> {out_dir}  (카메라 {len(saved)}대: {', '.join(saved)})")
+        if view is not None:
+            view.show()
 
 
-def run_simple_session(session_id, args, cams, labels):
+def run_simple_session(session_id, args, cams, labels, view=None):
     """세션 1/3 단독 실행: poses.json 순서대로 이동 후 촬영."""
     info = SESSIONS[session_id]
     poses_path = session_path(Path(__file__).resolve().parent / "data", session_id)
@@ -276,7 +286,7 @@ def run_simple_session(session_id, args, cams, labels):
     time.sleep(1.0)
     try:
         move_and_capture_poses(session_id, args, cams, labels, rtde_c, rtde_r,
-                                start_index=args.skip_steps)
+                                start_index=args.skip_steps, view=view)
     finally:
         rtde_c.stopScript()
         rtde_c.disconnect()
@@ -318,7 +328,7 @@ def make_session2_capture_callback(session_poses, cams, labels):
     return on_capture
 
 
-def run_session2(args, cams, labels):
+def run_session2(args, cams, labels, view=None):
     steps, session_poses = build_session2_steps(args)
 
     if not args.execute:
@@ -328,29 +338,43 @@ def run_session2(args, cams, labels):
         return
 
     on_capture = make_session2_capture_callback(session_poses, cams, labels)
+    on_tick = view.show if view is not None else None
     execute_plan(steps, args.robot_ip, skip_steps=args.skip_steps, no_step=args.no_step,
-                 on_capture=on_capture)
+                 on_capture=on_capture, on_tick=on_tick)
 
 
 # 세션2 계획의 맨 앞, 첫 pick 사이클의 "집기" 구간(길이 고정):
-#   pick approach -> 그리퍼 열기 -> [필수 확인 checkpoint] -> pick 수직 하강
+#   pick approach -> 그리퍼 열기 -> pick 수직 하강 -> [필수 확인 checkpoint]
 #   -> 그리퍼 닫기 -> pick 수직 상승   (그 다음이 "place approach")
 GRASP_PHASE_LEN = 6
 
 
-def run_full_pipeline(args, cams, labels):
+def full_close_grasp_phase(grasp_phase, full_close_pos):
+    """세션1 시작 전 큐브를 잡을 때는 (session2 자체 pick-place 재그립과
+    달리) 그리퍼를 끝까지 닫아서 세션1 내내 확실히 물고 있게 한다."""
+    phase = [dict(step) for step in grasp_phase]
+    for step in phase:
+        if step["kind"] == "gripper" and "닫기" in step["desc"]:
+            step["pos"] = full_close_pos
+    return phase
+
+
+def run_full_pipeline(args, cams, labels, view=None):
     """처음 시작할 때 쓰는 결합 실행: session2 초기 위치에서 큐브를 잡고(사람이
     큐브를 놓고 Enter), 그 상태로 세션1(손에 든 채 이동+촬영)을 마친 뒤,
     이어서 세션2(바닥에 내려놓으며 pick-and-place+촬영)를 계속한다.
 
     연결(rtde_c/rtde_r/gripper)을 한 번만 맺고 세 단계 내내 그대로 쓴다.
+    세션1은 큐브를 완전히 닫아서 잡고(--session1-close-pos), 세션2의 각
+    pick은 기존처럼 --close-pos(그립 폭 실측값)를 쓴다.
     """
     steps2, session_poses = build_session2_steps(args)
-    grasp_phase = steps2[:GRASP_PHASE_LEN]
+    grasp_phase = full_close_grasp_phase(steps2[:GRASP_PHASE_LEN], args.session1_close_pos)
     on_capture = make_session2_capture_callback(session_poses, cams, labels)
+    on_tick = view.show if view is not None else None
 
     if not args.execute:
-        print("=== 0단계: 큐브 잡기 (session2 grasp 위치) ===")
+        print("=== 0단계: 큐브 잡기 (session2 grasp 위치, 완전히 닫아서 잡음) ===")
         for i, step in enumerate(grasp_phase):
             print(f"[{i + 1:3d}] {step['kind']:12s} {step['desc']}")
         print("\n=== 1단계: 세션1 (손에 든 채 이동+촬영) ===")
@@ -367,16 +391,16 @@ def run_full_pipeline(args, cams, labels):
     gripper = RobotiqGripper(args.robot_ip)
     time.sleep(1.0)
     try:
-        print("=== 0단계: 큐브 잡기 (session2 grasp 위치) ===")
-        execute_plan(grasp_phase, args.robot_ip, no_step=args.no_step,
+        print("=== 0단계: 큐브 잡기 (session2 grasp 위치, 완전히 닫아서 잡음) ===")
+        execute_plan(grasp_phase, args.robot_ip, no_step=args.no_step, on_tick=on_tick,
                      rtde_c=rtde_c, rtde_r=rtde_r, gripper=gripper)
 
         print("\n=== 1단계: 세션1 (손에 든 채 이동+촬영) ===")
-        move_and_capture_poses(1, args, cams, labels, rtde_c, rtde_r)
+        move_and_capture_poses(1, args, cams, labels, rtde_c, rtde_r, view=view)
 
         print("\n=== 2단계: 세션2 이어서 (바닥에 내려놓으며 pick-and-place+촬영) ===")
         execute_plan(steps2, args.robot_ip, skip_steps=GRASP_PHASE_LEN, no_step=args.no_step,
-                     on_capture=on_capture, rtde_c=rtde_c, rtde_r=rtde_r, gripper=gripper)
+                     on_capture=on_capture, on_tick=on_tick, rtde_c=rtde_c, rtde_r=rtde_r, gripper=gripper)
     finally:
         gripper.close()
         rtde_c.stopScript()
@@ -395,7 +419,10 @@ def main():
     ap.add_argument("--pick-lift-mm", type=float, default=PICK_LIFT_MM_DEFAULT)
     ap.add_argument("--place-lift-mm", type=float, default=PLACE_LIFT_MM_DEFAULT)
     ap.add_argument("--open-pos", type=int, default=0)
-    ap.add_argument("--close-pos", type=int, default=150)
+    ap.add_argument("--close-pos", type=int, default=150,
+                    help="세션2 자체 pick-place 재그립 시 그리퍼 닫힘 값 (실측 그립 폭)")
+    ap.add_argument("--session1-close-pos", type=int, default=255,
+                    help="세션1 시작 전 최초로 큐브를 잡을 때는 완전히 닫아서(기본 255) 세션1 내내 확실히 문다")
     ap.add_argument("--release-pos", type=int, default=None)
     ap.add_argument("--return-home", action="store_true")
     ap.add_argument("--skip-steps", type=int, default=0,
@@ -425,11 +452,11 @@ def main():
 
     try:
         if args.session == 0:
-            run_full_pipeline(args, cams, labels)
+            run_full_pipeline(args, cams, labels, view=view)
         elif args.session in (1, 3):
-            run_simple_session(args.session, args, cams, labels)
+            run_simple_session(args.session, args, cams, labels, view=view)
         else:
-            run_session2(args, cams, labels)
+            run_session2(args, cams, labels, view=view)
     finally:
         if view is not None:
             view.stop()

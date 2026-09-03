@@ -285,12 +285,15 @@ def main():
     execute_plan(steps, args.robot_ip, skip_steps=args.skip_steps, no_step=args.no_step)
 
 
-def execute_plan(steps, robot_ip, skip_steps=0, no_step=False, on_capture=None,
+def execute_plan(steps, robot_ip, skip_steps=0, no_step=False, on_capture=None, on_tick=None,
                   rtde_c=None, rtde_r=None, gripper=None):
     """계획을 실제로 실행한다. capture_run.py 등 다른 스크립트에서도 재사용.
 
     on_capture(step, index) 콜백을 주면 "capture" 스텝에서 그걸 호출한다
     (실제 카메라 캡처는 아직 이 파일 자체에는 없음 -- 콜백이 없으면 그냥 지나감).
+
+    on_tick()은 인자 없이 스텝마다(로봇 동작 직후) 호출된다 -- 카메라
+    미리보기 창을 메인 스레드에서 갱신하는 용도(capture_run.py의 LiveView).
 
     rtde_c/rtde_r/gripper를 미리 연결해서 넘기면 그걸 그대로 쓰고 이
     함수가 끝나도 연결을 닫지 않는다 (여러 세션을 하나의 연결로 이어서
@@ -322,6 +325,8 @@ def execute_plan(steps, robot_ip, skip_steps=0, no_step=False, on_capture=None,
                 print("  [INFO] 재개 지점의 첫 이동이라 안전하게 moveJ로 전환합니다.")
             # checkpoint는 --no-step이어도 항상 멈춰서 사람 확인을 받는다.
             if not no_step or kind == "checkpoint":
+                if kind == "checkpoint" and on_tick is not None:
+                    on_tick()  # 확인 대기 중에도 최신 카메라 화면을 보여준다
                 cmd = input(f"\n[{i + 1}/{len(steps)}] {desc}\nEnter=진행 / q=중단 > ").strip().lower()
                 if cmd == "q":
                     print("중단했습니다.")
@@ -363,6 +368,8 @@ def execute_plan(steps, robot_ip, skip_steps=0, no_step=False, on_capture=None,
             elif kind == "capture":
                 if on_capture is not None:
                     on_capture(step, i, rtde_c=rtde_c, rtde_r=rtde_r)
+            if on_tick is not None:
+                on_tick()
     finally:
         if owns_connection:
             gripper.close()
