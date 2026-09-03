@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""ur3_calibration/save_cube_pose.py — 바닥에 큐브를 놓는(=집는) 고정 위치 저장
+"""ur3_calibration/save_grasp_flange_pose.py — 큐브를 집는 순간의 flange 자세 저장
 
-세션 2의 pick_place.py 가 사용할 큐브의 고정 그립 위치를 저장한다.
-로봇을 프리드라이브로 "지금 큐브를 놓을/집을 위치"(그리퍼가 큐브를 문 채
-바닥까지 내려간 자세)로 옮긴 뒤 Enter를 누르면 그 순간의 TCP pose가
-cube_pose.json 으로 저장된다. 이 자세의 Z 값이 곧 큐브의 바닥 높이(그립 높이)로
-pick_place.py 의 하강 목표가 된다.
+이 스크립트는 "큐브의 3D 좌표"를 저장하는 게 아니라, 그 순간의
+로봇 flange(TCP) 자세와 조인트 값을 그대로 저장한다. 로봇을 프리드라이브로
+그리퍼가 큐브를 무는 위치(바닥까지 내려간 자세)로 옮긴 뒤 Enter를 누르면
+그 순간의 flange 자세가 grasp_flange_pose.json 으로 저장되고, pick_place.py가
+이 자세를 그대로 다시 목표로 삼아 반복 재현한다.
+
+이 자세는 세션 2(바닥에 큐브를 두고 고정 카메라 + 그리퍼 카메라로 촬영)
+전용이다 — 세션 1(손으로 들고 이동), 세션 3(손목만 움직임)은 이 그립 자세를
+쓰지 않는다.
 
 사용법:
-  python save_cube_pose.py
-  python save_cube_pose.py --robot-ip 192.168.1.101
+  python save_grasp_flange_pose.py
+  python save_grasp_flange_pose.py --robot-ip 192.168.1.101
 """
 
 import argparse
@@ -21,8 +25,11 @@ from pathlib import Path
 import numpy as np
 import rtde_receive
 
+from capture_poses import SESSIONS
+
 ROBOT_IP_DEFAULT = "192.168.1.101"
-OUT_DEFAULT = Path(__file__).resolve().parent / "data" / "cube_pose.json"
+OUT_DEFAULT = Path(__file__).resolve().parent / "data" / "grasp_flange_pose.json"
+TARGET_SESSION_ID = 2
 
 
 def main():
@@ -33,6 +40,11 @@ def main():
 
     out_path = Path(args.out)
     out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    info = SESSIONS[TARGET_SESSION_ID]
+    print(f"=== 이 자세는 세션 {TARGET_SESSION_ID}: {info['name']} 전용입니다 ===")
+    print(info["description"])
+    print("(세션 1/3은 촬영 목적이 달라 이 그립 자세를 쓰지 않습니다.)\n")
 
     r = rtde_receive.RTDEReceiveInterface(args.robot_ip)
     print("로봇을 프리드라이브로 큐브를 집을/놓을 위치(바닥까지 내려간 자세)로 옮긴 뒤 Enter.")

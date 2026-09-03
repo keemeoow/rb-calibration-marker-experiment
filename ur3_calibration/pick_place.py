@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 """ur3_calibration/pick_place.py — 바닥에 고정된 큐브를 집고/내려놓기
 
-save_cube_pose.py 로 저장해둔 cube_pose.json(그리퍼가 큐브 위치까지 내려간
-자세)을 목표(grasp pose)로 삼아:
+save_grasp_flange_pose.py 로 저장해둔 grasp_flange_pose.json(그리퍼가 큐브
+위치까지 내려간 순간의 flange 자세 — 큐브의 3D 좌표가 아니라 그때의 로봇
+flange 자세/조인트 값)를 목표(grasp pose)로 삼아:
 
   pick  : (그리퍼 열기) -> approach 높이로 이동(xy/방향 정렬) -> 수직 하강
           -> 그리퍼 닫기 -> 수직 상승(approach 높이로 복귀)
@@ -13,8 +14,8 @@ approach 높이에서 먼저 xy/방향을 맞추고 마지막 구간은 순수 �
 하도록 두 단계로 나눈다 (대각선 하강 금지 — 이 프로젝트의 Zeus
 grasp_target.py 와 동일한 규칙).
 
-큐브 위치가 하나로 고정되어 있으므로 pick/place 모두 같은 cube_pose.json을
-목표로 사용한다. 안전을 위해 --execute 를 주지 않으면 실제로 움직이지
+큐브 위치가 하나로 고정되어 있으므로 pick/place 모두 같은
+grasp_flange_pose.json을 목표로 사용한다. 안전을 위해 --execute 를 주지 않으면 실제로 움직이지
 않고 계획(pose 값)만 출력하는 dry-run으로 동작한다.
 
 사용법:
@@ -34,7 +35,7 @@ import rtde_control
 import rtde_receive
 
 ROBOT_IP_DEFAULT = "192.168.1.101"
-CUBE_POSE_DEFAULT = Path(__file__).resolve().parent / "data" / "cube_pose.json"
+GRASP_POSE_DEFAULT = Path(__file__).resolve().parent / "data" / "grasp_flange_pose.json"
 
 MOVE_SPEED = 0.10       # m/s, approach 이동
 MOVE_ACCEL = 0.30       # m/s^2
@@ -65,7 +66,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("action", choices=["pick", "place"])
     ap.add_argument("--robot-ip", default=ROBOT_IP_DEFAULT)
-    ap.add_argument("--cube-pose", default=str(CUBE_POSE_DEFAULT))
+    ap.add_argument("--grasp-pose", default=str(GRASP_POSE_DEFAULT))
     ap.add_argument("--approach-mm", type=float, default=80.0, help="grasp pose 위 approach 높이 (기본 80mm)")
     ap.add_argument("--open-pos", type=int, default=0, help="그리퍼 열림 값 0-255 (기본 0=완전개방)")
     ap.add_argument("--close-pos", type=int, default=255, help="그리퍼 닫힘 값 0-255 (큐브 두께에 맞춰 조정)")
@@ -73,7 +74,7 @@ def main():
     ap.add_argument("--yes", action="store_true", help="--execute 시 재확인 프롬프트 생략")
     args = ap.parse_args()
 
-    grasp = load_grasp_pose(Path(args.cube_pose))
+    grasp = load_grasp_pose(Path(args.grasp_pose))
     approach = approach_pose(grasp, args.approach_mm)
 
     print(f"=== {args.action} ===")
