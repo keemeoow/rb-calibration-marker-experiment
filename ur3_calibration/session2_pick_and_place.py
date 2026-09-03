@@ -71,8 +71,24 @@ DESCEND_SPEED = 0.03           # m/s -- pick/place 수직 하강/상승 (moveL, 
 DESCEND_ACCEL = 0.20
 JOINT_SPEED = 0.30             # rad/s -- 큰 재배치 이동 (moveJ)
 JOINT_ACCEL = 0.30
-GRIP_SETTLE_S = 1.0
 ROTVEC_JUMP_THRESHOLD = 1.0    # 이 이상이면 moveL 대신 moveJ+IK 사용
+RELEASE_STEP_DEFAULT = 20      # place 때 close-pos에서 이 정도만 풀어줌 (완전개방 금지)
+IK_MAX_POS_ERROR = 1e-4        # m -- 기본값(1e-10)은 너무 타이트해서 먼 qnear에서 수렴 실패가 잦음
+IK_MAX_ORI_ERROR = 1e-3        # rad
+
+
+def call_with_retry(fn, *args, attempts=4, delay_s=0.5):
+    """RuntimeError("... did not succeed!") 는 로봇 컨트롤 스크립트가
+    막 시작된 직후처럼 일시적인 상태에서도 나서 몇 번 재시도해본다."""
+    last_exc = None
+    for attempt in range(attempts):
+        try:
+            return fn(*args)
+        except RuntimeError as exc:
+            last_exc = exc
+            if attempt < attempts - 1:
+                time.sleep(delay_s)
+    raise last_exc
 
 
 def approach_of(pose, offset_mm):
@@ -111,7 +127,7 @@ def cap(desc):
     return {"kind": "capture", "desc": desc}
 
 
-def build_plan(items, grasp_pose, cam_pose, approach_mm, open_pos, close_pos, return_home):
+def build_plan(items, grasp_pose, cam_pose, approach_mm, open_pos, close_pos, release_pos, return_home):
     """전체 실행 계획을 스텝(dict) 리스트로 만든다."""
     steps = []
     current = list(grasp_pose)
@@ -127,7 +143,8 @@ def build_plan(items, grasp_pose, cam_pose, approach_mm, open_pos, close_pos, re
         steps.append(mv(approach_of(dest_pose, approach_mm), MOVE_SPEED, MOVE_ACCEL,
                         f"[{label}] place approach 이동"))
         steps.append(mv(dest_pose, DESCEND_SPEED, DESCEND_ACCEL, f"[{label}] place 수직 하강"))
-        steps.append(grip(open_pos, f"[{label}] 그리퍼 열기 (place)"))
+        # 완전 개방이 아니라 살짝만 풀어서 블럭과의 마찰/위치 틀어짐을 줄인다.
+        steps.append(grip(release_pos, f"[{label}] 그리퍼 살짝 풀기 (place)"))
         steps.append(mv(approach_of(dest_pose, approach_mm), DESCEND_SPEED, DESCEND_ACCEL,
                         f"[{label}] place 수직 상승"))
         steps.append(mv(cam_pose, MOVE_SPEED, MOVE_ACCEL,
@@ -199,16 +216,26 @@ def main():
     ap.add_argument("--approach-mm", type=float, default=APPROACH_MM_DEFAULT)
     ap.add_argument("--open-pos", type=int, default=0)
     ap.add_argument("--close-pos", type=int, default=255)
+    ap.add_argument("--release-pos", type=int, default=None,
+                    help="place 때 살짝만 풀 위치 0-255 (기본: close-pos에서 RELEASE_STEP_DEFAULT만큼만 완화)")
     ap.add_argument("--execute", action="store_true", help="실제로 이동/그리퍼 조작 (없으면 dry-run)")
     ap.add_argument("--no-step", action="store_true", help="스텝마다 Enter로 확인하지 않고 연속 실행")
     ap.add_argument("--return-home", action="store_true", help="마지막에 큐브를 grasp_flange_pose 위치로 복귀")
+    ap.add_argument("--skip-steps", type=int, default=0,
+                    help="이미 실제로 실행된 스텝 수 -- 이어서 재실행할 때 그만큼 건너뜀")
     args = ap.parse_args()
+
+    if args.release_pos is None:
+        direction = -1 if args.close_pos > args.open_pos else 1
+        release_pos = int(np.clip(args.close_pos + direction * RELEASE_STEP_DEFAULT, 0, 255))
+    else:
+        release_pos = args.release_pos
 
     grasp_pose = load_pose(Path(args.grasp_pose))
     cam_pose = load_pose(Path(args.cam_pose))
     items = compute_ordered_targets(Path(args.session_poses), grasp_pose[3:6], grasp_pose[2])
     steps = build_plan(items, grasp_pose, cam_pose, args.approach_mm,
-                        args.open_pos, args.close_pos, args.return_home)
+                        args.open_pos, args.close_pos, release_pos, args.return_home)
     warnings = mark_risky_moveL_as_moveJ(steps)
     print_plan(steps, grasp_pose, cam_pose, args.approach_mm, warnings)
 
@@ -216,11 +243,20 @@ def main():
         print(f"\n(dry-run) 총 {len(steps)}스텝 계획. 실제로 움직이지 않았습니다. --execute 를 주면 실행합니다.")
         return
 
+    if args.skip_steps:
+        print(f"\n처음 {args.skip_steps}스텝은 이미 실행된 것으로 보고 건너뜁니다.")
+
     rtde_c = rtde_control.RTDEControlInterface(args.robot_ip)
     rtde_r = rtde_receive.RTDEReceiveInterface(args.robot_ip)
     gripper = RobotiqGripper(args.robot_ip)
+    # 연결 직후 바로 IK 계열 함수를 부르면 "RTDE control script is not
+    # running!" 로 실패하는 경우가 있어(컨트롤 스크립트가 아직 완전히
+    # 뜨기 전) 잠깐 대기해준다.
+    time.sleep(1.0)
     try:
         for i, step in enumerate(steps):
+            if i < args.skip_steps:
+                continue
             desc = step["desc"]
             if not args.no_step:
                 cmd = input(f"\n[{i + 1}/{len(steps)}] {desc}\nEnter=진행 / q=중단 > ").strip().lower()
@@ -234,14 +270,31 @@ def main():
                 rtde_c.moveL(step["pose"], step["speed"], step["accel"])
             elif step["kind"] == "moveJ_risky":
                 q_near = rtde_r.getActualQ()
-                if not rtde_c.getInverseKinematicsHasSolution(step["pose"], q_near):
+                try:
+                    has_solution = call_with_retry(
+                        rtde_c.getInverseKinematicsHasSolution,
+                        step["pose"], q_near, IK_MAX_POS_ERROR, IK_MAX_ORI_ERROR,
+                    )
+                except RuntimeError as exc:
+                    print(f"  [ERROR] IK 계산이 계속 실패합니다 -- 중단합니다: {exc}")
+                    break
+                if not has_solution:
                     print(f"  [ERROR] 이 자세에 대한 관절해가 없습니다 -- 중단합니다: {fmt_pose(step['pose'])}")
                     break
-                q_target = rtde_c.getInverseKinematics(step["pose"], q_near)
+                try:
+                    q_target = call_with_retry(
+                        rtde_c.getInverseKinematics,
+                        step["pose"], q_near, IK_MAX_POS_ERROR, IK_MAX_ORI_ERROR,
+                    )
+                except RuntimeError as exc:
+                    print(f"  [ERROR] IK 계산이 계속 실패합니다 -- 중단합니다: {exc}")
+                    break
                 rtde_c.moveJ(q_target, JOINT_SPEED, JOINT_ACCEL)
             elif step["kind"] == "gripper":
                 gripper.set_pos(step["pos"])
-                time.sleep(GRIP_SETTLE_S)
+                # 물리적으로 멈출 때까지 기다린다 (OBJ==0 은 아직 움직이는 중) --
+                # 안 그러면 그리퍼가 다 닫히기/풀리기 전에 팔이 먼저 움직여버린다.
+                gripper.wait_until_stopped()
             else:
                 pass  # capture placeholder -- 카메라 캡처는 아직 미구현
     finally:

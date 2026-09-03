@@ -8,6 +8,7 @@ activate(ACT) 된 상태여야 한다.
 """
 
 import socket
+import time
 
 import numpy as np
 
@@ -42,6 +43,21 @@ class RobotiqGripper:
 
     def set_pos(self, pos: float) -> None:
         self._set("POS", int(round(np.clip(pos, 0, 255))))
+
+    def wait_until_stopped(self, timeout: float = 3.0, poll_interval: float = 0.05) -> int:
+        """물리적으로 움직임이 멈출 때까지 대기하고 마지막 OBJ 상태를 반환.
+
+        set_pos()는 명령만 보내고 바로 리턴하므로, 그 직후 바로 다음 이동
+        명령을 내리면 그리퍼가 다 닫히기/열리기 전에 팔이 움직여버린다.
+        OBJ 레지스터(0=이동 중, 1/2=물체에 걸려 정지, 3=접촉 없이 목표 도달)가
+        0이 아니게 될 때까지 기다리면 실제로 멈춘 뒤에만 다음 동작으로 넘어간다.
+        """
+        start = time.time()
+        obj = self._get("OBJ")
+        while obj == 0 and time.time() - start < timeout:
+            time.sleep(poll_interval)
+            obj = self._get("OBJ")
+        return obj
 
     def close(self) -> None:
         try:
