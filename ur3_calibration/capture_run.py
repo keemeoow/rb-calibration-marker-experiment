@@ -71,6 +71,29 @@ def parse_labels(pairs):
     return labels
 
 
+def is_gripper_cam_name(name: str) -> bool:
+    """그리퍼 카메라는 D435(IMU 없는 모델)이고, 고정 카메라들은 D435I다.
+    'D435'는 'D435I'의 부분 문자열이라 I가 붙었는지까지 확인해야 한다."""
+    upper = name.upper()
+    return "D435" in upper and "D435I" not in upper
+
+
+def auto_labels(devices: dict, user_labels: dict) -> dict:
+    """시리얼 -> 라벨. --camera-label로 준 값이 최우선, 나머지는 이름으로
+    그리퍼캠(D435, non-I)을 자동 인식하고 남은 건 fixed1, fixed2... 로 붙인다."""
+    labels = dict(user_labels)
+    fixed_n = 1
+    for serial, name in sorted(devices.items()):
+        if serial in labels:
+            continue
+        if is_gripper_cam_name(name):
+            labels[serial] = "gripper"
+        else:
+            labels[serial] = f"fixed{fixed_n}"
+            fixed_n += 1
+    return labels
+
+
 def connect_cameras(no_reset=False):
     if not no_reset:
         RealSenseCamera.reset_all_devices()
@@ -85,7 +108,7 @@ def connect_cameras(no_reset=False):
                                use_color=True, use_depth=False, lock_color_exposure=False)
         cam.start()
         cams[serial] = cam
-    return cams
+    return cams, devices
 
 
 def stop_cameras(cams):
@@ -243,11 +266,16 @@ def main():
                     help="SERIAL=이름 형식으로 카메라 라벨 지정 (여러 번 사용 가능)")
     args = ap.parse_args()
 
-    labels = parse_labels(args.camera_label)
+    user_labels = parse_labels(args.camera_label)
 
     cams = {}
+    labels = dict(user_labels)
     if args.execute:
-        cams = connect_cameras(no_reset=args.no_cam_reset)
+        cams, devices = connect_cameras(no_reset=args.no_cam_reset)
+        labels = auto_labels(devices, user_labels)
+        print("카메라 라벨:")
+        for serial, name in sorted(devices.items()):
+            print(f"  {serial}  {name}  -> {labels[serial]}")
 
     try:
         if args.session in (1, 3):
