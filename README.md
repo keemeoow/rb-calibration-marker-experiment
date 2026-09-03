@@ -654,7 +654,9 @@ translation mm와 SO(3) rotation deg RMSE를 보고한다. robot FK가 포함되
 
 ### 11.10 External-GT 절대 정확도
 
-물리 정확도는 calibration과 분리된 blind 데이터에서만 평가한다.
+물리 정확도는 calibration과 분리된 blind 데이터에서만 평가한다. 현재 Session04
+Table 1에는 포함하지 않고, 다음주 Independent External GT 태스크에서 별도
+산출한다.
 
 1. 독립 tracker/CMM/jig로 $T^B_{\mathrm{cube,GT}}$를 측정하되 RGB calibration camera, controller FK, A4 factor, A5 alignment를 GT 생성에 사용하지 않는다.
 2. `blind-predict`: GT를 읽지 않고 A2/A3/A4/A5의 $T^B_{\mathrm{cube}}$ 예측을 동일 `run_index=0`으로 저장하고 해시를 동결한다.
@@ -704,7 +706,7 @@ Canonical 결과 인덱스는 [CP_result/README.md](CP_result/README.md), 상세
 - A3 raw-FK-fixed의 held-out cube는 `6.3958 px`로 증가했으므로 raw tool4/mechanical pose를 외부 GT처럼 취급하지 않는다.
 - A2와 A4의 own held-out overall은 `3.8901`, `3.8899 px`로 사실상 동일하다. A4/B1/B2는 Simulation Prior 기반 preflight이므로 corrected-FK factor의 우월성을 주장하지 않는다.
 - A5의 own held-out overall은 `3.7270 px`로 A4보다 낮다. 그러나 Fixed-to-Fixed cube는 `3.4706 px`로 개선되는 반면 board는 `4.8563 px`로 A4의 `3.1156 px`보다 악화되어 내부 지표에서도 일관된 승자가 아니다. 또한 train 영상으로 만든 aligned FK를 hard-fixed한 post-hoc 진단이므로 이전 A3 성능의 원인을 설명할 뿐 실제 물리 정확도 우월성을 입증하지 않는다.
-- 따라서 현재 확증 대표 행은 A2, 방법론적 확장 후보는 A4, 원인 진단은 A5다. A4/A5의 실제 순위는 blind external GT 이후 결정한다.
+- 따라서 현재 확증 대표 행은 A2, 방법론적 확장 후보는 A4, 원인 진단은 A5다. A4/A5의 실제 순위는 다음주 Independent External GT 이후 결정한다.
 - 모든 현재 수치는 동일 marker population 내부 held-out reprojection 또는 내부 경로 일관성이다. External GT 전에는 절대 정확도 순위를 만들지 않는다.
 
 ## 14. 출력 파일과 시각화 데이터 흐름
@@ -926,9 +928,9 @@ python3 tools/verify_camera_scope_evaluation.py
 8. Shared train-only target pose reprojection은 reference-dependent 보조 진단값이며, 외부 GT 전 공정한 방법 순위에 사용하지 않는다.
 9. Session02에서 board 기반 상대 자세와 cube 기반 상대 자세가 camera 1에서 21.9 mm, camera 3에서 19.5 mm 다르다. FK 실험보다 먼저 cube geometry, corner ordering, target별 PnP 편향을 확인해야 한다.
 
-직접 수행해야 하는 다음 실험은 다음과 같다.
+다음주 또는 후속으로 직접 수행해야 하는 실험은 다음과 같다.
 
-1. 5개 독립 camera-installation session에서 session당 30개의 새 cube pose를 모든 카메라로 동시에 blind capture한다.
+1. 다음주 Independent External GT 태스크에서 새 cube pose를 모든 카메라로 동시에 blind capture하고, full design은 5개 독립 camera-installation session×30 blind poses를 목표로 한다.
 2. tracker/CMM/6-DoF kinematic jig로 robot base와 cube pose를 독립 측정하고 반복성으로 GT uncertainty floor를 먼저 결정한다.
 3. 별도 세션에서 peg-in-hole 또는 grasp success/접촉 위치 오차를 측정한다. 이때 인식 알고리즘과 target은 모든 방법에 고정한다.
 4. 후속 단계에서 MATLAB/기존 multiview toolbox 또는 COLMAP을 동일 원본과 동일 held-out split으로 별도 실행한다. 현재 캘리브레이션 완성 마일스톤에는 포함하지 않는다.

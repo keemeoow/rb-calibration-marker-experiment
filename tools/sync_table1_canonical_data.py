@@ -12,6 +12,7 @@ import csv
 from html import escape
 import json
 from pathlib import Path
+import random
 from statistics import fmean
 
 METHOD_ORDER = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
@@ -28,6 +29,9 @@ SCOPE_FIELDS = (
     "pose_consistency_rotation_rmse_deg",
 )
 ROOT = Path(__file__).resolve().parents[1]
+BOOTSTRAP_REPETITIONS = 10000
+BOOTSTRAP_SEED = 20260903
+CSV_EXCLUDED_FIELD_SUFFIXES = ("_set_mean_square_px2",)
 
 
 def _load(path: Path) -> dict:
@@ -116,8 +120,31 @@ def _reprojection_field_mean(runs: list[dict], split: str, target: str,
 
 def _corner_count(runs: list[dict], split: str, target: str) -> int | None:
     """Corner counts are frozen by the split, so every seed reports the same."""
-    entry = runs[0][f"{split}_reprojection"].get(target)
-    return None if entry is None else int(entry["n_corners"])
+    for run in runs:
+        entry = run[f"{split}_reprojection"].get(target)
+        if entry is not None:
+            return int(entry["n_corners"])
+    return None
+
+
+def _per_set_mean_squares(runs: list[dict], split: str,
+                          target: str) -> dict[int, float]:
+    by_set: dict[int, list[float]] = {}
+    for run in runs:
+        entry = run[f"{split}_reprojection"].get(target)
+        if entry is None:
+            continue
+        per_set = entry.get("set_equal_weight_per_set")
+        if not per_set:
+            continue
+        for item in per_set:
+            by_set.setdefault(int(item["set"]), []).append(
+                float(item["mean_square_px2"]))
+    return {
+        set_index: fmean(values)
+        for set_index, values in sorted(by_set.items())
+        if values
+    }
 
 
 def _primary_objective_diagnostic(run: dict) -> tuple[str | None, dict | None]:
@@ -303,6 +330,8 @@ def _method_rows(table1: dict, cross: dict) -> list[dict]:
                     runs, "heldout", target, "set_equal_weight_rmse_px"))
             row[f"heldout_{target}_n_corners"] = _corner_count(
                 runs, "heldout", target)
+            row[f"heldout_{target}_set_mean_square_px2"] = (
+                _per_set_mean_squares(runs, "heldout", target))
         for scope in ("fixed_to_fixed", "gripper_to_fixed"):
             for target in TARGETS:
                 for field in SCOPE_FIELDS:
@@ -382,11 +411,23 @@ def _objective_block_table(rows: list[dict]) -> str:
 
 
 def _write_csv(path: Path, rows: list[dict]) -> None:
+    csv_rows = _csv_rows(rows)
     with path.open("w", newline="") as handle:
         writer = csv.DictWriter(
-            handle, fieldnames=list(rows[0]), lineterminator="\n")
+            handle, fieldnames=list(csv_rows[0]), lineterminator="\n")
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows(csv_rows)
+
+
+def _csv_rows(rows: list[dict]) -> list[dict]:
+    return [
+        {
+            key: value
+            for key, value in row.items()
+            if not key.endswith(CSV_EXCLUDED_FIELD_SUFFIXES)
+        }
+        for row in rows
+    ]
 
 
 def _scope_table(rows: list[dict], scope: str) -> str:
@@ -560,87 +601,118 @@ def _heldout_pair(by_method: dict[str, dict], first: str, second: str,
     return "; ".join(values)
 
 
-def _matched_contrast_records(rows: list[dict]) -> list[tuple[str, str, str, str, str, str]]:
-    by_method = {row["method"]: row for row in rows}
+def _contrast_definitions() -> list[tuple[str, str, str, str, str, tuple[str, ...], str]]:
     return [
         (
             "Confirmatory internal",
+            "A0",
+            "B3",
             "A0 <-> B3",
             "Board-only에서 sequential freeze와 unified feedback 차이가 있는가",
-            "held-out board px",
-            _heldout_pair(by_method, "A0", "B3", ("board",)),
+            ("board",),
             "동률. Board-only에서는 통합 자체가 추가 이득을 만들지 않는다.",
         ),
         (
             "Confirmatory internal",
+            "A0",
+            "A1",
             "A0 -> A1",
             "순차법에 cube residual을 추가하면 board 성능이 좋아지는가",
-            "held-out board px, N_reg",
-            _heldout_pair(by_method, "A0", "A1", ("board",))
-            + f"; N_reg {by_method['A0']['n_registered_fixed_cameras']} -> "
-            f"{by_method['A1']['n_registered_fixed_cameras']}",
+            ("board",),
             "Board는 미세 악화. 순차 구조에서는 cube 추가 이득이 보이지 않는다.",
         ),
         (
             "Confirmatory internal",
+            "A1",
+            "A2",
             "A1 -> A2",
             "Vision-only 조건에서 unified feedback이 도움이 되는가",
-            "held-out board/cube px",
-            _heldout_pair(by_method, "A1", "A2", ("board", "cube")),
+            ("board", "cube"),
             "두 target 모두 개선. 현재 내부 확증에서 가장 강한 긍정 contrast다.",
         ),
         (
             "Confirmatory internal",
+            "B3",
+            "A2",
             "B3 -> A2",
             "Unified 조건에서 cube residual이 board calibration에도 도움이 되는가",
-            "held-out board px",
-            _heldout_pair(by_method, "B3", "A2", ("board",)),
+            ("board",),
             "Board shared component가 개선. 단 marker-system 전체 성능 주장은 아니다.",
         ),
         (
             "Confirmatory internal",
+            "A2",
+            "A3",
             "A2 -> A3",
             "Vision-estimated cube pose를 raw-FK hard fixed로 바꾸면 어떤가",
-            "held-out board/cube px",
-            _heldout_pair(by_method, "A2", "A3", ("board", "cube")),
+            ("board", "cube"),
             "특히 cube가 크게 악화. raw FK를 GT로 해석하면 안 된다.",
         ),
         (
             "Preflight",
+            "B1",
+            "A4",
             "B1 -> A4",
             "같은 soft FK factor에서 sequential과 unified 중 무엇이 나은가",
-            "held-out board/cube px",
-            _heldout_pair(by_method, "B1", "A4", ("board", "cube")),
-            "통합 개선 경향. measured covariance 전까지는 preflight다.",
+            ("board", "cube"),
+            "통합 개선 경향. measured covariance 없이 내부 preflight로만 해석한다.",
         ),
         (
             "Preflight",
+            "A2",
+            "A4",
             "A2 -> A4",
             "Unified vision-only에 soft FK factor를 추가하면 이득이 있는가",
-            "held-out board/cube px",
-            _heldout_pair(by_method, "A2", "A4", ("board", "cube")),
+            ("board", "cube"),
             "사실상 동률. A4는 방법 확장 후보지만 현재 우월성 주장은 금지.",
         ),
         (
             "Preflight",
+            "B2",
+            "A4",
             "B2 -> A4",
             "Soft FK 조건에서 board residual이 cube 보정에 도움 되는가",
-            "held-out cube px",
-            _heldout_pair(by_method, "B2", "A4", ("cube",)),
+            ("cube",),
             "Cube가 개선. board residual은 soft-FK cube 추정에 도움이 된다.",
         ),
         (
             "Post-hoc",
-            "A3 <-> A5, A4 <-> A5",
-            "Raw/aligned FK, soft/hard 원인을 분리할 수 있는가",
-            "internal metrics only",
-            "A3->A5 "
-            + _heldout_pair(by_method, "A3", "A5", ("board", "cube"))
-            + "; A4->A5 "
-            + _heldout_pair(by_method, "A4", "A5", ("board", "cube")),
+            "A3",
+            "A5",
+            "A3 -> A5",
+            "Raw FK hard fixed와 vision-aligned FK hard fixed의 차이는 무엇인가",
+            ("board", "cube"),
             "A5는 원인 진단 전용. 독립 correction 또는 물리 순위가 아니다.",
         ),
+        (
+            "Post-hoc",
+            "A4",
+            "A5",
+            "A4 -> A5",
+            "같은 aligned FK를 soft factor와 hard fixed로 쓰면 무엇이 달라지는가",
+            ("board", "cube"),
+            "A5는 원인 진단 전용. 내부 px 하나로 물리 우열을 정하지 않는다.",
+        ),
     ]
+
+
+def _matched_contrast_records(rows: list[dict]) -> list[tuple[str, str, str, str, str, str]]:
+    by_method = {row["method"]: row for row in rows}
+    records = []
+    for tier, first, second, label, question, targets, decision in _contrast_definitions():
+        metric = (
+            "held-out board px, N_reg" if label == "A0 -> A1"
+            else "internal metrics only" if tier == "Post-hoc"
+            else "held-out board/cube px" if targets == ("board", "cube")
+            else "held-out cube px" if targets == ("cube",)
+            else "held-out board px")
+        result = _heldout_pair(by_method, first, second, targets)
+        if label == "A0 -> A1":
+            result += (
+                f"; N_reg {by_method[first]['n_registered_fixed_cameras']} -> "
+                f"{by_method[second]['n_registered_fixed_cameras']}")
+        records.append((tier, label, question, metric, result, decision))
+    return records
 
 
 def _matched_contrast_table(rows: list[dict]) -> str:
@@ -746,10 +818,10 @@ def _metric_decision_records(rows: list[dict],
         ),
         (
             "External TRE/rotation/P95/failure",
-            "Future final primary metric",
-            "blind external GT 확보 후 최종 물리 정확도",
-            "현재 Session04에는 GT가 없어 계산 불가.",
-            "future capture required",
+            "Scheduled next-week external validation",
+            "다음주 예정 태스크",
+            "현재 보고서 생성 시점에는 미계산. 다음주 Independent External GT로 Translation Error, Rotation Error, P95, Failure Rate를 산출한다.",
+            "planned external validation boundary",
         ),
     ]
 
@@ -767,6 +839,117 @@ def _metric_decision_table(rows: list[dict], data_warnings: dict) -> str:
         lines.append(
             f"| {metric} | {tier} | {use} | {limit} | {support_text} |")
     return "\n".join(lines)
+
+
+def _rmse_from_mean_squares(values: list[float]) -> float | None:
+    if not values:
+        return None
+    return float(fmean(values) ** 0.5)
+
+
+def _percentile(sorted_values: list[float], quantile: float) -> float:
+    if not sorted_values:
+        return float("nan")
+    index = quantile * (len(sorted_values) - 1)
+    lo = int(index)
+    hi = min(lo + 1, len(sorted_values) - 1)
+    weight = index - lo
+    return float(sorted_values[lo] * (1.0 - weight) + sorted_values[hi] * weight)
+
+
+def _paired_set_bootstrap(
+        rows: list[dict]) -> list[tuple[str, str, str, str, str, str, str]]:
+    by_method = {row["method"]: row for row in rows}
+    out = []
+    for tier, first, second, label, _, targets, decision in _contrast_definitions():
+        if label == "A0 <-> B3":
+            direction_label = "B3 - A0"
+        else:
+            direction_label = f"{second} - {first}"
+        for target in targets:
+            first_ms = by_method[first].get(
+                f"heldout_{target}_set_mean_square_px2", {})
+            second_ms = by_method[second].get(
+                f"heldout_{target}_set_mean_square_px2", {})
+            set_ids = sorted(set(first_ms) & set(second_ms))
+            if not set_ids:
+                continue
+            pooled_delta = (
+                by_method[second][f"heldout_{target}_reprojection_rmse_px"]
+                - by_method[first][f"heldout_{target}_reprojection_rmse_px"])
+            observed = (
+                _rmse_from_mean_squares([second_ms[set_id] for set_id in set_ids])
+                - _rmse_from_mean_squares([first_ms[set_id] for set_id in set_ids]))
+            rng_seed = BOOTSTRAP_SEED + sum(
+                ord(char) for char in f"{label}:{target}")
+            rng = random.Random(rng_seed)
+            samples = []
+            for _ in range(BOOTSTRAP_REPETITIONS):
+                sample = [rng.choice(set_ids) for _ in set_ids]
+                samples.append(
+                    _rmse_from_mean_squares([second_ms[set_id] for set_id in sample])
+                    - _rmse_from_mean_squares([first_ms[set_id] for set_id in sample]))
+            samples.sort()
+            lo = _percentile(samples, 0.025)
+            hi = _percentile(samples, 0.975)
+            if hi < 0.0:
+                stability = "negative interval; internal improvement direction is stable"
+            elif lo > 0.0:
+                stability = "positive interval; internal degradation direction is stable"
+            else:
+                stability = "interval crosses 0; direction is exploratory"
+            out.append((
+                tier,
+                label,
+                target,
+                direction_label,
+                f"{_fmt(pooled_delta)} / {_fmt(observed)}",
+                f"[{_fmt(lo)}, {_fmt(hi)}]",
+                f"n={len(set_ids)}; {stability}; {decision}",
+            ))
+    return out
+
+
+def _bootstrap_contrast_table(rows: list[dict]) -> str:
+    lines = [
+        "## Exploratory Paired Set Bootstrap CI (탐색적 paired set bootstrap CI)",
+        "",
+        f"각 contrast는 같은 held-out set을 paired unit으로 묶고, set을 "
+        f"{BOOTSTRAP_REPETITIONS:,}회 replacement resampling했다. 값은 "
+        "`second - first` RMSE 차이이며 음수는 두 번째 방법의 내부 px가 더 낮다는 "
+        "뜻이다. `n=9 sets`라 유의성 검정이 아니라 방향성 민감도 점검이다.",
+        "",
+        "| Tier | Contrast | Target | Direction | Δ pooled / set-equal px | "
+        "Set-bootstrap 95% CI px | Interpretation |",
+        "| --- | --- | --- | --- | ---: | ---: | --- |",
+    ]
+    for tier, label, target, direction, delta, interval, interpretation in (
+            _paired_set_bootstrap(rows)):
+        lines.append(
+            f"| {tier} | {label} | {target} | {direction} | {delta} | "
+            f"{interval} | {interpretation} |")
+    lines.extend([
+        "",
+        "> 이 표에서 0을 지나지 않는 contrast도 external physical accuracy를 "
+        "증명하지 않는다. 내부 held-out set에서 방향이 덜 흔들린다는 뜻까지만 허용한다.",
+    ])
+    return "\n".join(lines)
+
+
+def _internal_only_claim_envelope() -> str:
+    return "\n".join([
+        "## Internal-Only Claim Envelope (현재 가능한 최대 결론)",
+        "",
+        "| Claim Type | Allowed Now (지금 가능) | Not Allowed Now (지금 금지) |",
+        "| --- | --- | --- |",
+        "| Main result | A2 is the strongest confirmatory internal row under matched held-out pixel contrasts. | A2 is physically most accurate in robot base. |",
+        "| Method extension | A4 is a preflight extension candidate; A2->A4 is practically tied on internal held-out px. | Corrected-FK soft factor is superior before measured FK covariance. |",
+        "| FK diagnosis | A3 shows raw-FK hard fixing hurts cube reprojection; A5 separates raw/aligned and soft/hard causes. | Raw FK or vision-aligned FK is external GT. |",
+        "| Metric scope | Report board/cube held-out px, set-equal-weight px, paired set bootstrap CI, Fixed-to-Fixed, Gripper-to-Fixed. | Merge all metrics into one final physical ranking. |",
+        "| Data risk | Surface dropped sets, support imbalance, detection failures, and 10.8077 mm Board-Cube disagreement. | Say the joint solve removed the systematic disagreement. |",
+        "",
+        "Independent External GT is scheduled as a next-week task. Until then, this report stops at the strongest internally defensible evidence.",
+    ])
 
 
 def _markdown(rows: list[dict], marker: dict, detailed: bool,
@@ -807,11 +990,16 @@ def _markdown(rows: list[dict], marker: dict, detailed: bool,
         "Diagnostic (보조 진단)이며 방법 순위에 사용하지 않는다.",
         "- 현재 결론의 대표 행은 A2다. A4는 measured FK covariance 전 "
         "preflight이고, A5는 이전 A3의 성능 원인을 설명하는 post-hoc "
-        "diagnostic이다. 실제 물리 순위는 External GT 이후 결정한다.",
+        "diagnostic이다. Independent External GT는 다음주 예정 태스크이므로 "
+        "실제 물리 순위는 현재 산출하지 않는다.",
+        "",
+        _internal_only_claim_envelope(),
         "",
         _matched_contrast_table(rows),
         "",
         _metric_decision_table(rows, data_warnings),
+        "",
+        _bootstrap_contrast_table(rows),
         "",
         _implementation_audit(),
         "",
@@ -932,12 +1120,12 @@ def _markdown(rows: list[dict], marker: dict, detailed: bool,
     if detailed:
         lines.extend([
             "",
-            "## Required Next Experiment (다음 필수 실험)",
+            "## Scheduled External GT Task (다음주 예정 태스크)",
             "",
-            "Independent External GT (독립 외부 정답)가 확정되면 Blind "
-            "Position Holdout (비공개 위치 홀드아웃)으로 Translation Error "
-            "(이동 오차), Rotation Error (회전 오차), P95, Failure Rate "
-            "(실패율)를 다시 계산한다. 그 전에는 내부 지표만 유지한다.",
+            "Independent External GT (독립 외부 정답)는 다음주 예정 태스크로 "
+            "진행한다. 따라서 현재 문서는 내부 지표로 가능한 최대 보고서이며, "
+            "다음주 외부 GT 수집/평가 후 Translation Error, Rotation Error, "
+            "P95, Failure Rate 같은 최종 물리 정확도 지표를 별도 산출한다.",
         ])
     return "\n".join(lines) + "\n"
 
@@ -1128,6 +1316,74 @@ def _html_metric_decision(rows: list[dict], data_warnings: dict) -> str:
 <tbody>{''.join(body)}</tbody></table></div></section>"""
 
 
+def _html_bootstrap_contrast(rows: list[dict]) -> str:
+    body = []
+    for tier, label, target, direction, delta, interval, interpretation in (
+            _paired_set_bootstrap(rows)):
+        body.append(
+            "<tr>"
+            f"<td>{escape(tier)}</td>"
+            f"<td>{escape(label)}</td>"
+            f"<td>{escape(target)}</td>"
+            f"<td>{escape(direction)}</td>"
+            f"<td>{escape(delta)}</td>"
+            f"<td>{escape(interval)}</td>"
+            f"<td>{escape(interpretation)}</td></tr>")
+    return f"""
+<section class="panel"><h2>Exploratory Paired Set Bootstrap CI (탐색적 paired set bootstrap CI)</h2>
+<p>각 contrast는 같은 held-out set을 paired unit으로 묶고, set을 {BOOTSTRAP_REPETITIONS:,}회 replacement resampling했습니다.
+값은 <code>second - first</code> RMSE 차이이며 음수는 두 번째 방법의 내부 px가 더 낮다는 뜻입니다.
+<code>n=9 sets</code>라 유의성 검정이 아니라 방향성 민감도 점검입니다.</p>
+<div class="table-wrap"><table>
+<thead><tr><th>Tier</th><th>Contrast</th><th>Target</th><th>Direction</th>
+<th>Δ pooled / set-equal px</th><th>Set-bootstrap 95% CI px</th>
+<th>Interpretation</th></tr></thead>
+<tbody>{''.join(body)}</tbody></table></div></section>"""
+
+
+def _html_internal_only_claim_envelope() -> str:
+    rows = [
+        (
+            "Main result",
+            "A2 is the strongest confirmatory internal row under matched held-out pixel contrasts.",
+            "A2 is physically most accurate in robot base.",
+        ),
+        (
+            "Method extension",
+            "A4 is a preflight extension candidate; A2->A4 is practically tied on internal held-out px.",
+            "Corrected-FK soft factor is superior before measured FK covariance.",
+        ),
+        (
+            "FK diagnosis",
+            "A3 shows raw-FK hard fixing hurts cube reprojection; A5 separates raw/aligned and soft/hard causes.",
+            "Raw FK or vision-aligned FK is external GT.",
+        ),
+        (
+            "Metric scope",
+            "Report board/cube held-out px, set-equal-weight px, paired set bootstrap CI, Fixed-to-Fixed, Gripper-to-Fixed.",
+            "Merge all metrics into one final physical ranking.",
+        ),
+        (
+            "Data risk",
+            "Surface dropped sets, support imbalance, detection failures, and 10.8077 mm Board-Cube disagreement.",
+            "Say the joint solve removed the systematic disagreement.",
+        ),
+    ]
+    body = "".join(
+        "<tr>"
+        f"<td>{escape(kind)}</td><td>{escape(allowed)}</td><td>{escape(blocked)}</td>"
+        "</tr>"
+        for kind, allowed, blocked in rows)
+    return f"""
+<section class="panel note"><h2>Internal-Only Claim Envelope (현재 가능한 최대 결론)</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Claim Type</th><th>Allowed Now (지금 가능)</th>
+<th>Not Allowed Now (지금 금지)</th></tr></thead>
+<tbody>{body}</tbody></table></div>
+<p>Independent External GT is scheduled as a next-week task. Until then, this report stops at the strongest internally defensible evidence.</p>
+</section>"""
+
+
 def _html(rows: list[dict], marker: dict,
           data_warnings: dict | None = None,
           session_label: str = "Session") -> str:
@@ -1183,11 +1439,13 @@ main{{max-width:1180px;margin:auto;padding:32px 20px 72px}} h1{{font-size:30px;m
 </style></head><body><main>
 <span class="badge">Pre-GT Internal Evaluation (외부 GT 전 내부 평가)</span>
 <h1>{escape(session_label)} Calibration Evaluation (캘리브레이션 평가)</h1>
-<p class="subtitle">A2는 현재 검증된 대표 행, A4는 measured-covariance 전 preflight, A5는 post-hoc diagnostic입니다. Table 1의 굵은 값은 Complete 행만 대상으로 하며 실제 물리 순위는 External GT 이후 결정합니다.</p>
+<p class="subtitle">A2는 현재 검증된 대표 행, A4는 measured-covariance 전 preflight, A5는 post-hoc diagnostic입니다. Independent External GT는 다음주 예정 태스크이므로 실제 물리 순위는 현재 산출하지 않습니다.</p>
 {_html_data_warnings(data_warnings or {})}
+{_html_internal_only_claim_envelope()}
 <section class="panel"><h2>Table 1 Optimization Results (표 1 최적화 결과)</h2>{''.join(method_sections)}</section>
 {_html_matched_contrast(rows)}
 {_html_metric_decision(rows, data_warnings)}
+{_html_bootstrap_contrast(rows)}
 {_html_set_equal_weight(rows)}
 <div class="controls"><button class="active" data-show="all">Both Scopes (두 범위)</button><button data-show="fixed_to_fixed">Fixed-to-Fixed</button><button data-show="gripper_to_fixed">Gripper-to-Fixed</button></div>
 <div class="grid">{_html_scope_table(rows, 'fixed_to_fixed')}{_html_scope_table(rows, 'gripper_to_fixed')}</div>
@@ -1195,6 +1453,7 @@ main{{max-width:1180px;margin:auto;padding:32px 20px 72px}} h1{{font-size:30px;m
 <thead><tr><th>System (시스템)</th><th>Own Held-out px</th><th>Fixed-to-Fixed Board/Cube px</th><th>Gripper-to-Fixed Board/Cube px</th><th>Convergence (수렴)</th></tr></thead>
 <tbody>{''.join(marker_rows)}</tbody></table></div></section>
 <section class="panel note"><h2>Interpretation (해석)</h2><p>Fixed-to-Fixed는 Robot FK 없이 고정카메라 부분을 평가합니다. Gripper-to-Fixed는 set 최초 fixed anchor를 같은 set의 모든 held-out gripper Event와 연결하고 Event→set→set 동일가중 순서로 집계합니다. 실제 영상 코너를 사용하지만 <code>T^B_G(e)T^G_C</code> 경로 때문에 Robot FK와 Hand–Eye에 의존합니다. 공식 표는 nominal metric scale 1.0만 사용하며, 두 지표 모두 External Absolute Accuracy (외부 절대 정확도)가 아닙니다.</p></section>
+<section class="panel note"><h2>Scheduled External GT Task (다음주 예정 태스크)</h2><p>Independent External GT (독립 외부 정답)는 다음주 예정 태스크로 진행합니다. 따라서 현재 문서는 내부 지표로 가능한 최대 보고서이며, 다음주 외부 GT 수집/평가 후 Translation Error, Rotation Error, P95, Failure Rate 같은 최종 물리 정확도 지표를 별도 산출합니다.</p></section>
 <section class="panel"><h2>Terminology (용어 설명)</h2><ul>
 <li><b>PnP, Perspective-n-Point (3D–2D 자세 추정)</b>: 영상 코너로 카메라–표적 자세를 계산합니다.</li>
 <li><b>FK, Forward Kinematics (순기구학)</b>: 이벤트별 Base-to-Gripper Transform (베이스–그리퍼 변환)을 계산합니다.</li>

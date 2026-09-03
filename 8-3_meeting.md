@@ -1,18 +1,20 @@
-# 8/3 미팅 피드백 반영 현황 (2026-09-02 확인)
+# 8/3 미팅 피드백 반영 현황 (2026-09-03 확인)
 
 원본: [`8-3_meeting.txt`](8-3_meeting.txt) (1,584줄). 발언 시각 기준으로 피드백 19건을
 추출하고 현재 코드와 Session04 산출물에서 직접 확인했다. 상태는 **코드와 실행 계약 기준**이며,
-2026-09-02에 새 frame-prune 코드로 Session04 canonical 결과까지 다시 생성했다.
+2026-09-02에 새 frame-prune 코드로 Session04 canonical 결과까지 다시 생성했고,
+2026-09-03에 내부 지표 기반 보고 범위와 다음주 External GT 태스크 표현을 갱신했다.
 
 **요약: ✅ 반영 11건 · ⚠️ 부분 반영 7건 · ❌ 미반영 1건**
 
-> **현재 실행 제약:** 실제 로봇 사용과 신규 촬영은 불가하다. 따라서 #6 Track A와 #14–#16은
-> 코드·스키마·분석기 준비까지만 진행하고 실험 완료로 표시하지 않는다. 기존 Session04 데이터로
-> 가능한 재실행/진단만 수행한다. Session04에는 aligned depth가 있지만, 이는 독립 물리 GT가
-> 아니므로 robot task 정확도의 대체 증거로 사용하지 않는다.
+> **현재 실행 제약:** 현재 저장된 Session04 데이터만으로는 독립 물리 GT를 계산할 수 없다.
+> 따라서 #6 Track A와 #14–#16은 코드·스키마·분석기 준비까지만 완료로 보고하고,
+> 실측 GT 평가는 다음주 예정 태스크로 둔다. Session04에는 aligned depth가 있지만, 이는
+> 독립 물리 GT가 아니므로 robot task 정확도의 대체 증거로 사용하지 않는다.
 >
 > **현재 마일스톤:** 캘리브레이션 파이프라인 완성까지를 현재 범위로 한다. COLMAP/MATLAB
-> external baseline, point cloud, robot task, 신규 촬영 및 외부 GT는 모두 후속 단계로 미룬다.
+> external baseline과 point cloud는 후속 단계로 미루고, Independent External GT는 다음주
+> 예정 태스크로 진행한다.
 
 | # | 시각 | 피드백 | 상태 | 근거 / 남은 것 |
 | ---: | --- | --- | :---: | --- |
@@ -29,23 +31,24 @@
 | 11 | 1:01:06–1:03:31 | 마커 구성이 다른 행끼리 직접 비교하지 말고 공통 지표를 써라 | ✅ | Own-heldout은 동일 marker population끼리만 비교하고, 공통 frozen evaluation mask와 두 camera scope를 별도로 보고한다. |
 | 12 | 1:11:11–1:15:46 | 고정카메라만 보는 공통 지표 외에 **손목 카메라 포함 지표**도 필요하다 | ✅ | Fixed-to-Fixed와 Gripper-to-Fixed를 모두 구현했고 camera-scope 검증을 통과한다. |
 | 13 | 1:33:26–1:34:18 | FK 없는 “독립” 방식을 굳이 기여로 둘 필요가 있는가 | ⚠️ | A1은 제안 방법이 아니라 A2와 동일 cube+board 관측에서 Sequential→Unified 효과만 분리하는 ablation으로 유지 중이다. 교수님도 “해도 되지만 굳이 기여는 아니다”라는 취지였으므로 삭제보다 **기여 방법으로 부르지 않는 것**이 현재 판단이다. 논문 지면에서 행을 뺄지는 최종 표 편집 결정이다. |
-| 14 | 1:36:51–1:37:24 | 핵심은 카메라 간 오차보다 **로봇 그리퍼의 작업 정확도**다 | ⚠️ | Blind prediction·외부 GT 채점 코드와 Track C 계약은 준비됐지만, 독립 GT/재파지/작업 데이터가 없어 핵심 실험은 아직 실행하지 못했다. [`CAPTURE_CAMPAIGN_PROTOCOL.md`](protocol_templates/CAPTURE_CAMPAIGN_PROTOCOL.md#4-track-c--외부-gt) |
-| 15 | 1:37:24–1:39:01 | **눈금 큐브** 재파지로 x/y/z 오차를 실측하라 | ⚠️ | Track C에 독립 pose/GT 측정 절차는 정의돼 있다. 눈금 큐브 전용 입력 포맷과 실측 데이터는 없으며, 눈금자 translation만으로는 6-DoF 최종 GT가 되지 않는다는 제한을 기록했다. |
-| 16 | 1:41:41–1:42:47 | **peg-in-hole 또는 grasp success rate/정밀도**를 평가하라 | ⚠️ | Paired task-trial schema와 evaluator를 구현했다. 모든 방법의 동일 pair 기록을 강제하고 success rate/Wilson 95% CI, XYZ contact error, P95, paired 차이를 출력한다. 실측 robot trial은 아직 없다. [`task_trial.py`](calibration_pipeline/task_trial.py) |
+| 14 | 1:36:51–1:37:24 | 핵심은 카메라 간 오차보다 **로봇 그리퍼의 작업 정확도**다 | ⚠️ | Blind prediction·외부 GT 채점 코드와 Track C 계약은 준비됐다. 독립 GT/재파지/작업 데이터는 다음주 예정 태스크에서 수집·평가한다. [`CAPTURE_CAMPAIGN_PROTOCOL.md`](protocol_templates/CAPTURE_CAMPAIGN_PROTOCOL.md#4-track-c--외부-gt) |
+| 15 | 1:37:24–1:39:01 | **눈금 큐브** 재파지로 x/y/z 오차를 실측하라 | ⚠️ | Track C에 독립 pose/GT 측정 절차는 정의돼 있다. 눈금 큐브 기반 실측은 다음주 예정 태스크로 진행하며, 눈금자 translation만으로는 6-DoF 최종 GT가 되지 않는다는 제한을 유지한다. |
+| 16 | 1:41:41–1:42:47 | **peg-in-hole 또는 grasp success rate/정밀도**를 평가하라 | ⚠️ | Paired task-trial schema와 evaluator를 구현했다. 모든 방법의 동일 pair 기록을 강제하고 success rate/Wilson 95% CI, XYZ contact error, P95, paired 차이를 출력한다. 실측 robot trial은 다음주 외부 GT/robot-task 일정에서 재개한다. [`task_trial.py`](calibration_pipeline/task_trial.py) |
 | 17 | 1:42:47–1:44:28 | **point cloud 정합을 로봇 관점**에서 표현하라 | ❌ | 전용 point-cloud/robot-contact 평가 코드와 데이터가 없다. |
 | 18 | 1:40:07–1:40:33 | 오버레이로 마커 검출 정확도를 정성 확인하라 | ✅ | Cube 재검출 overlay 도구가 있다. 전사 취지대로 이는 **검출 QA**이며 로봇 작업 정확도 지표로 승격하지 않는다. [`render_cube_redetection_overlays.py`](tools/render_cube_redetection_overlays.py) |
-| 19 | 1:47:12 | FK를 어떻게 쓸지, 무엇을 제안 방법으로 둘지 정해야 한다 | ⚠️ | 현재 결정은 **A2=확증 대표행, A4=불확실성-aware 확장 preflight, A5=post-hoc 원인 진단**이다. A4는 Simulation covariance라 A2 대비 우월성을 주장하지 않는다. 최종 물리 순위는 measured FK covariance와 blind external GT 뒤에 확정한다. |
+| 19 | 1:47:12 | FK를 어떻게 쓸지, 무엇을 제안 방법으로 둘지 정해야 한다 | ⚠️ | 현재 결정은 **A2=확증 대표행, A4=불확실성-aware 확장 preflight, A5=post-hoc 원인 진단**이다. A4는 Simulation covariance라 A2 대비 우월성을 주장하지 않는다. 최종 물리 순위는 다음주 Independent External GT 이후에만 확정한다. |
 
 ## 남은 작업의 성격과 순서
 
 1. **완료:** 새 frame-prune 코드로 Table 1 전체, cross-target, marker-system, OpenCV reference를 재실행하고 CSV/Markdown/HTML을 동기화했다.
 2. **현재 범위:** 캘리브레이션 입력 검증, 최적화, frame-prune/refit/rollback, 평가 산출물과 재현성 검증만 마무리한다.
 3. **후속 — external baseline:** #7의 MATLAB multiview/COLMAP adapter와 실행은 현재 급한 작업에서 제외한다. 기존 OpenCV reference까지만 유지한다.
-4. **후속 — robot task/GT:** #6 Track A, #14–#16 Track C는 코드 scaffold만 유지하고 신규 촬영이 가능해질 때 재개한다.
+4. **다음주 예정 — robot task/GT:** #6 Track A, #14–#16 Track C는 코드 scaffold를 유지하고 Independent External GT 수집/평가로 재개한다.
 5. **후속 — point cloud:** #17의 robot-base point-cloud 진단도 현재 캘리브레이션 범위가 완성된 뒤 진행한다.
 
 ## 판정
 
 기존 문서는 frame-prune 구현 전 상태와 현재 저장소를 섞어 기록했고, OpenCV baseline과 external-GT
 scaffold를 누락했으며, 공개 baseline 대비 우위도 잘못 해석했다. 위 표가 현재 코드 기준의 수정된
-tracking이다. 가장 큰 미완료 항목은 여전히 **독립 물리 GT를 사용한 robot task 정확도 실험**이다.
+tracking이다. 가장 큰 미완료 항목은 여전히 **독립 물리 GT를 사용한 robot task 정확도 실험**이며,
+이는 다음주 예정 태스크로 분리한다.

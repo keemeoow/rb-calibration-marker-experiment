@@ -21,6 +21,7 @@ from calibration_pipeline.marker_system import validate_end_to_end_contract
 from tools.sync_table1_canonical_data import (
     CANONICAL_LABEL_OVERRIDES,
     METHOD_ORDER,
+    _csv_rows,
     _method_rows,
 )
 
@@ -78,12 +79,15 @@ def _verify_reports(table1: dict, marker: dict,
     required = (
         "Pre-GT Internal Evaluation (외부 GT 전 내부 평가)",
         "Current Data Warnings (현재 데이터 경고)",
+        "Internal-Only Claim Envelope (현재 가능한 최대 결론)",
         "Confirmatory Internal (확증 내부)",
         "Preflight (예비실험)",
         "Post-hoc Diagnostics (사후 원인 진단)",
         "Matched Contrast Decision Table (비교실험 구성 확정표)",
         "Metric Decision Matrix (평가지표 판정표)",
+        "Exploratory Paired Set Bootstrap CI (탐색적 paired set bootstrap CI)",
         "Set-equal-weight Held-out RMSE (set 동일가중 홀드아웃)",
+        "Scheduled External GT Task (다음주 예정 태스크)",
         "A — Fixed-to-Fixed",
         "Gripper-to-Fixed (그리퍼카메라–고정카메라 간)",
         "Terminology (용어 설명)",
@@ -103,6 +107,12 @@ def _verify_reports(table1: dict, marker: dict,
         for phrase in required:
             if phrase not in text:
                 raise AssertionError(f"{path.name}: missing {phrase!r}")
+        if "Required Next Experiment (다음 필수 실험)" in text:
+            raise AssertionError(
+                f"{path.name}: external-GT next experiment must not be required")
+        if "Internal-Only Stopping Point (현재 종료 지점)" in text:
+            raise AssertionError(
+                f"{path.name}: current state must be scheduled, not a stopping point")
         for label in labels:
             if label not in text:
                 raise AssertionError(f"{path.name}: missing result label {label!r}")
@@ -156,7 +166,7 @@ def main(argv=None) -> None:
     validate_result_contract(cross)
     validate_end_to_end_contract(marker)
     _verify_provenance(table1, cross, marker)
-    _compare_csv(_method_rows(table1, cross), canonical_csv)
+    _compare_csv(_csv_rows(_method_rows(table1, cross)), canonical_csv)
     _verify_reports(table1, marker, reports)
     print("[PASS] Current JSON, CSV, Markdown, and HTML are synchronized")
 

@@ -2,7 +2,7 @@
 
 검증 기준: Session04 `A0~A5/B1~B3` 결과 및 현재 calibration 코드  
 상태: Pre-GT internal evaluation  
-검증일: 2026-09-02
+검증일: 2026-09-03
 
 ## 최종 판정
 
@@ -28,15 +28,15 @@ contrast로 해석한다.
 
 | 구분 | 직접 비교 | 검증 질문 | 사용할 주 지표 | 판정 |
 | --- | --- | --- | --- | --- |
-| 내부 확증 | A0 ↔ B3 | Board-only에서 순차/통합 차이 | held-out board px | 유효, schema 계약 추가 필요 |
+| 내부 확증 | A0 ↔ B3 | Board-only에서 순차/통합 차이 | held-out board px | 유효, schema 계약 반영 완료 |
 | 내부 확증 | A0 → A1 | 순차법에 cube를 추가한 효과 | held-out board px, 등록 수 | 유효 |
 | 내부 확증 | A1 → A2 | Vision-only 순차/통합 차이 | board/cube px 각각 | 가장 타당 |
 | 내부 확증 | B3 → A2 | 통합법에서 cube residual 효과 | held-out board px | 유효 |
 | 내부 확증 | A2 → A3 | Vision cube pose와 raw-FK hard fixed 차이 | board/cube px 각각 | 유효, FK를 GT로 해석 금지 |
 | Preflight | B1 → A4 | 같은 soft FK factor에서 순차/통합 차이 | board/cube px 각각 | 구조는 유효, covariance가 simulation |
-| Preflight | A2 → A4 | soft FK factor 추가 효과 | board/cube px 각각 | 중요 비교이나 schema 계약 누락 |
+| Preflight | A2 → A4 | soft FK factor 추가 효과 | board/cube px 각각 | 중요 비교, schema 계약 반영 완료 |
 | Preflight | B2 → A4 | Board residual의 기여 | held-out cube px | 유효, covariance 한계 |
-| Post-hoc | A3 ↔ A5, A4 ↔ A5 | raw/aligned, soft/hard 원인 분리 | 모든 내부 지표 | 진단 전용 |
+| Post-hoc | A3 → A5, A4 → A5 | raw/aligned, soft/hard 원인 분리 | 모든 내부 지표 | 진단 전용 |
 
 따라서 메인 결론은 현재처럼 **A2**, 방법 확장 후보는 **A4**, 원인 진단은
 **A5**로 둔다. A3/A4의 `Ours` 명칭은 확증 전에는 `raw-FK hard`,
@@ -67,7 +67,7 @@ contrast로 해석한다.
 | Fixed-to-Fixed | 보조 지표로 적합 | 상대 일관성만 측정하며 공통 systematic error를 검출하지 못함 |
 | Gripper-to-Fixed / `e_e2e` | 내부 체인 진단만 가능 | FK가 포함되고 일부 fixed anchor가 train 관측임 |
 | Seed mean ± std | 안정성 지표로만 적합 | seed 3개는 독립 실험 표본이 아님 |
-| External TRE/rotation/P95 | 최종 주 지표로 적합 | 현재 GT가 없어 계산 불가 |
+| External TRE/rotation/P95/failure | 최종 주 지표로 적합 | 다음주 Independent External GT 태스크에서 산출 |
 
 특히 Gripper-to-Fixed는 held-out gripper event에 일부 train fixed-anchor를 연결한다.
 따라서 `held-out 성능`보다는 **mixed train-anchor/held-out internal closure**라고
@@ -75,16 +75,18 @@ contrast로 해석한다.
 
 ## 5. 개선 우선순위
 
-1. 코드로 지금 가능: `A0_to_B3`, `A2_to_A4` 비교 계약을 추가하고 결과표를
-   `확증 / preflight / post-hoc` 세 구역으로 분리한다.
-2. 코드로 지금 가능: corner-pooled RMSE 외에 `event → set 동일가중 RMSE`와
-   paired set bootstrap CI를 추가한다. 현재 `n=9 sets`이므로 CI도 exploratory로
+1. 완료: `A0_to_B3`, `A2_to_A4` 비교 계약을 추가하고 결과표를
+   `확증 / preflight / post-hoc` 세 구역으로 분리했다.
+2. 완료: corner-pooled RMSE 외에 `event → set 동일가중 RMSE`와
+   paired set bootstrap CI를 추가했다. 현재 `n=9 sets`이므로 CI는 exploratory로
    표시한다.
-3. 코드로 지금 가능: per-camera/target support, dropped sets `0~3`, detection
-   failure, Board–Cube 충돌 `10.808 mm`를 결과 첫 화면에 경고로 표시한다.
-4. 추후 촬영 필요: measured FK covariance, cam0/cam1 intrinsic view 보강,
+3. 완료: per-camera/target support, dropped sets `0~3`, detection
+   failure, Board–Cube 충돌 `10.808 mm`를 결과 첫 화면에 경고로 표시했다.
+4. 다음주 예정: Independent External GT로 Translation Error, Rotation Error,
+   P95, Failure Rate를 산출한다. 그 전에는 내부 지표 기반 결론만 유지한다.
+5. 후속 촬영/측정 필요: measured FK covariance, cam0/cam1 intrinsic view 보강,
    명시적인 robot pose convention, 독립 session과 unseen-position GT를 확보한다.
-5. 논문 비교 필요: A0 같은 내부 baseline 외에 Tsai/Park/Daniilidis 또는 공개
+6. 논문 비교 필요: A0 같은 내부 baseline 외에 Tsai/Park/Daniilidis 또는 공개
    robot-world/hand-eye 방법을 동일 입력·동일 평가로 추가한다.
 
 가장 큰 데이터 위험은 [Board–Cube 간 10.808 mm systematic disagreement](data/session04/calib_out/verify/board_cube_relative_pose/BOARD_CUBE_RELATIVE_POSE.md)다.
@@ -98,7 +100,9 @@ contrast로 해석한다.
 - 상세 결과: [TABLE1_RESULTS.md](CP_result/session04/late_table1/TABLE1_RESULTS.md)
 - 전체 calibration 행렬: [calibration_matrices.json](CP_result/session04/late_table1/calibration_matrices.json)
 
-## 다음 구현 작업
+## 현재 구현 상태와 다음 태스크
 
-우선순위 1은 비교 계약과 보고서 구조 정리다. 이후 event/set 균등 집계와 paired
-bootstrap을 추가한다.
+비교 계약, 보고서 구조, event/set 균등 집계, paired bootstrap, 데이터 경고 표시는
+현재 구현 완료 상태다. 다음 태스크는 다음주 Independent External GT 수집/평가이며,
+이후에만 robot-base Translation Error, Rotation Error, P95, Failure Rate를 최종
+물리 정확도 지표로 보고한다.

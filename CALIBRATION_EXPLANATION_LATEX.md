@@ -701,7 +701,7 @@ $\mathbf{O}_s$는 최적화 변수에서 제거되지 않는다. 또한 어떤 �
 
 ### 11.6 실측 covariance와 현재 결과의 경계
 
-`--fk_covariance_json`이 없으면 코드는 Simulation과 맞춘 등방성 prior인 이동 $2.0\,\mathrm{mm}$, 회전 $0.30^\circ$를 사용한다. 이 결과는 **preflight**이며 confirmatory 결과가 아니다. 최종 실험에는 blind external GT를 보지 않고 미리 등록한 물리 반복측정 covariance가 필요하다.
+`--fk_covariance_json`이 없으면 코드는 Simulation과 맞춘 등방성 prior인 이동 $2.0\,\mathrm{mm}$, 회전 $0.30^\circ$를 사용한다. 이 결과는 **preflight**이며 confirmatory 결과가 아니다. 다음주 Independent External GT 평가 전에는 GT를 보지 않고 미리 등록한 물리 반복측정 covariance가 필요하다.
 
 따라서 현재 A4 수치는 ``Simulation covariance를 사용한 동일 marker population의 held-out reprojection preflight''로만 기술한다. A2보다 절대 정확도가 높다거나 corrected-FK factor의 우월성이 입증됐다고 기술하지 않는다.
 
@@ -1101,7 +1101,7 @@ e_R=\operatorname{angle}\!\left(
 \mathbf{R}_{GT}^{\mathsf T}\widehat{\mathbf{R}}\right).
 $$
 
-코드 최소값은 독립 camera-installation session 2개지만, 최종 권장 설계는 5 sessions $\times$ 30 blind poses다. workspace 위치·거리·입사각 strata를 GT 공개 전에 고정하고 session을 먼저, pose를 두 번째로 재표집하는 paired hierarchical bootstrap을 사용한다. Primary contrast는 A4 대 A2, secondary contrast는 A4 대 A5이며, translation/rotation/P95/failure/ADD-S와 비열등성 margin도 GT 공개 전에 등록한다. 실행 계약은 `protocol_templates/CAPTURE_CAMPAIGN_PROTOCOL.md`와 `external_gt_eval_manifest_TEMPLATE.json`에 있다.
+코드 최소값은 독립 camera-installation session 2개지만, 최종 권장 설계는 5 sessions $\times$ 30 blind poses다. workspace 위치·거리·입사각 strata를 GT 공개 전에 고정하고 session을 먼저, pose를 두 번째로 재표집하는 paired hierarchical bootstrap을 사용한다. Primary contrast는 A4 대 A2, secondary contrast는 A4 대 A5이며, translation/rotation/P95/failure/ADD-S와 비열등성 margin도 GT 공개 전에 등록한다. 이 Independent External GT 평가는 다음주 예정 태스크로 분리하고, 실행 계약은 `protocol_templates/CAPTURE_CAMPAIGN_PROTOCOL.md`와 `external_gt_eval_manifest_TEMPLATE.json`에 있다.
 
 ### 18.4 현재 Session04에서 허용되는 비교 결론
 
@@ -1109,11 +1109,11 @@ Primary pixel 비교는 같은 marker population을 공유하는 행끼리만 �
 
 A2와 A4의 own held-out overall은 각각 $3.8901\,\mathrm{px}$와 $3.8899\,\mathrm{px}$이고, cube held-out은 $3.5958\,\mathrm{px}$와 $3.5805\,\mathrm{px}$다. 현재 A4는 실측 covariance가 아니라 Simulation prior를 사용하므로 이 작은 차이로 corrected-FK factor의 우월성을 주장하지 않는다. 허용되는 표현은 ``A4는 Simulation covariance 기반 preflight에서 A2와 유사한 동일-population held-out reprojection을 보였다''이다.
 
-A5의 own held-out overall은 $3.7270\,\mathrm{px}$, board/cube held-out은 각각 $3.8804/3.2274\,\mathrm{px}$로 현재 내부 수치상 A4보다 낮다. Fixed-to-Fixed cube transfer도 A5 $3.4706\,\mathrm{px}$가 A4 $4.0375\,\mathrm{px}$보다 낮지만, Fixed-to-Fixed board transfer는 A5 $4.8563\,\mathrm{px}$가 A4 $3.1156\,\mathrm{px}$보다 높다. 즉 내부 지표에서도 A5는 모든 표적·범위의 일관된 승자가 아니다. 또한 A5는 train EIH cube 영상으로 적합한 aligned FK를 hard-fixed하고 결과 확인 후 추가한 post-hoc 진단이다. 따라서 이 결과는 ``이전 A3의 낮은 오차가 vision-aligned hard constraint에서 왔다''는 원인 설명에는 사용할 수 있지만, A5가 A4보다 실제 공간에서 정확하다는 주장에는 사용할 수 없다. 현재 확증 대표 행은 A2, 불확실성을 다루는 방법론적 확장 후보는 A4, 원인 진단은 A5이며 A4/A5 물리 순위는 blind external GT 이후 결정한다.
+A5의 own held-out overall은 $3.7270\,\mathrm{px}$, board/cube held-out은 각각 $3.8804/3.2274\,\mathrm{px}$로 현재 내부 수치상 A4보다 낮다. Fixed-to-Fixed cube transfer도 A5 $3.4706\,\mathrm{px}$가 A4 $4.0375\,\mathrm{px}$보다 낮지만, Fixed-to-Fixed board transfer는 A5 $4.8563\,\mathrm{px}$가 A4 $3.1156\,\mathrm{px}$보다 높다. 즉 내부 지표에서도 A5는 모든 표적·범위의 일관된 승자가 아니다. 또한 A5는 train EIH cube 영상으로 적합한 aligned FK를 hard-fixed하고 결과 확인 후 추가한 post-hoc 진단이다. 따라서 이 결과는 ``이전 A3의 낮은 오차가 vision-aligned hard constraint에서 왔다''는 원인 설명에는 사용할 수 있지만, A5가 A4보다 실제 공간에서 정확하다는 주장에는 사용할 수 없다. 현재 확증 대표 행은 A2, 불확실성을 다루는 방법론적 확장 후보는 A4, 원인 진단은 A5이며 A4/A5 물리 순위는 다음주 Independent External GT 이후 결정한다.
 
 ### 18.5 논문 실험 결과 본문용 서술
 
-모든 비교행에 동일한 frozen corner 관측, event-grouped/set-stratified train–held-out split, camera intrinsic, target geometry, solver 설정 및 train-only shared initialization을 적용하였다. 동일한 board+cube marker population을 사용하는 vision 조건에서 Sequential Frozen-Stage Optimization인 A1의 held-out reprojection RMSE는 $4.0837\,\mathrm{px}$였고, Unified Joint Optimization인 A2는 $3.8901\,\mathrm{px}$로 $4.74\%$ 감소하였다. 표적별로는 board가 $4.0645\rightarrow3.9840\,\mathrm{px}$, cube가 $4.1402\rightarrow3.5958\,\mathrm{px}$로 감소했다. 두 행은 최적화 구조 외의 입력과 목적함수를 공유하므로, 이 결과는 Eye-in-Hand(EIH)와 Eye-to-Hand(E2H) 관측 사이의 양방향 Unified feedback이 동일 marker population의 held-out reprojection을 개선했음을 지원한다. 반면 raw FK cube pose를 set별 hard constraint로 고정한 A3는 held-out overall $4.7835\,\mathrm{px}$와 cube $6.3959\,\mathrm{px}$를 보여, raw tool4/mechanical pose를 외부 정답으로 간주할 수 없음을 확인했다. Corrected-FK factor를 추가한 A4의 held-out overall은 $3.8899\,\mathrm{px}$로 A2와 사실상 동일했으며, 현재 A4/B1/B2는 실측 FK covariance가 아닌 Simulation prior를 사용한 preflight다. Train-vision-aligned FK를 hard-fixed한 post-hoc A5는 held-out overall $3.7270\,\mathrm{px}$를 보였지만, 이는 이전 A3 성능의 원인을 설명하는 진단이지 독립 물리 정확도 증거가 아니다. 따라서 현재 확증 대표 행은 A2이고 A4는 방법론적 확장 preflight, A5는 원인 진단이다. 본 실험은 Unified feedback과 raw-FK hard-fix의 효과를 동일-population 내부 held-out reprojection에서 입증하지만, A4/A5 중 실제 공간에서 더 정확한 방법이나 새로운 작업 위치의 절대 물리 정확도는 blind external GT 전에는 결정하지 않는다.
+모든 비교행에 동일한 frozen corner 관측, event-grouped/set-stratified train–held-out split, camera intrinsic, target geometry, solver 설정 및 train-only shared initialization을 적용하였다. 동일한 board+cube marker population을 사용하는 vision 조건에서 Sequential Frozen-Stage Optimization인 A1의 held-out reprojection RMSE는 $4.0837\,\mathrm{px}$였고, Unified Joint Optimization인 A2는 $3.8901\,\mathrm{px}$로 $4.74\%$ 감소하였다. 표적별로는 board가 $4.0645\rightarrow3.9840\,\mathrm{px}$, cube가 $4.1402\rightarrow3.5958\,\mathrm{px}$로 감소했다. 두 행은 최적화 구조 외의 입력과 목적함수를 공유하므로, 이 결과는 Eye-in-Hand(EIH)와 Eye-to-Hand(E2H) 관측 사이의 양방향 Unified feedback이 동일 marker population의 held-out reprojection을 개선했음을 지원한다. 반면 raw FK cube pose를 set별 hard constraint로 고정한 A3는 held-out overall $4.7835\,\mathrm{px}$와 cube $6.3959\,\mathrm{px}$를 보여, raw tool4/mechanical pose를 외부 정답으로 간주할 수 없음을 확인했다. Corrected-FK factor를 추가한 A4의 held-out overall은 $3.8899\,\mathrm{px}$로 A2와 사실상 동일했으며, 현재 A4/B1/B2는 실측 FK covariance가 아닌 Simulation prior를 사용한 preflight다. Train-vision-aligned FK를 hard-fixed한 post-hoc A5는 held-out overall $3.7270\,\mathrm{px}$를 보였지만, 이는 이전 A3 성능의 원인을 설명하는 진단이지 독립 물리 정확도 증거가 아니다. 따라서 현재 확증 대표 행은 A2이고 A4는 방법론적 확장 preflight, A5는 원인 진단이다. 본 실험은 Unified feedback과 raw-FK hard-fix의 효과를 동일-population 내부 held-out reprojection에서 입증하지만, A4/A5 중 실제 공간에서 더 정확한 방법이나 새로운 작업 위치의 절대 물리 정확도는 다음주 Independent External GT 전에는 결정하지 않는다.
 
 ### 18.6 Paper-ready English Results paragraph
 

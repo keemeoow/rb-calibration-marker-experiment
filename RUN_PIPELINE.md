@@ -146,7 +146,9 @@ Table 1 Markdown/HTML을 갱신할 때만 `tools/sync_table1_canonical_data.py`�
 
 Session04 현재 결과는 9개 행×3개 seed 모두 수렴했다. Held-out reprojection은
 행마다 marker 모집단이 달라 외부 절대 정확도나 전체 방법 순위로 해석하면 안 된다.
-외부 GT와 robot task가 없으므로 실제 robot-base 절대 정확도는 후속 검증 대상이다.
+현재 보고서 생성 시점의 robot-base 절대 정확도는 계산하지 않고, 다음주
+Independent External GT 태스크에서 Translation Error, Rotation Error, P95,
+Failure Rate를 산출한다.
 
-COLMAP/MATLAB, robot task, point cloud, 신규 촬영/외부 GT는 현재 calibration 완료
-범위에서 제외하고 후속 작업으로 유지한다.
+COLMAP/MATLAB과 point cloud는 현재 calibration 완료 범위에서 제외하고 후속
+작업으로 유지한다. Robot task/외부 GT는 다음주 예정 태스크로 분리한다.

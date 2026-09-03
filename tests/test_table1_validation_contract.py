@@ -61,6 +61,7 @@ def test_table1_markdown_groups_tiers_and_surfaces_data_warnings():
         session_label="Session04")
 
     assert "## Current Data Warnings" in markdown
+    assert "## Internal-Only Claim Envelope" in markdown
     assert "dropped sets `0, 1, 2, 3`" in markdown
     assert "10.8077 mm translation RMSE" in markdown
     assert "### Confirmatory Internal" in markdown
@@ -70,6 +71,11 @@ def test_table1_markdown_groups_tiers_and_surfaces_data_warnings():
     assert "A0 <-> B3" in markdown
     assert "A2 -> A4" in markdown
     assert "## Metric Decision Matrix" in markdown
+    assert "## Exploratory Paired Set Bootstrap CI" in markdown
+    assert "A1 -> A2 | board" in markdown
+    assert "Scheduled External GT Task" in markdown
+    assert "Internal-Only Stopping Point" not in markdown
+    assert "Required Next Experiment" not in markdown
     assert "External TRE/rotation/P95/failure" in markdown
     assert "A3 (raw-FK hard fixed)" in markdown
     assert "A4 (corrected-FK soft factor)" in markdown

@@ -18,7 +18,19 @@
 - 공식 결과는 물리 config의 nominal metric scale `1.0`만 사용한다. 데이터에서 추정한 scale은 별도 diagnostic 결과로만 허용한다.
 - Board (보드)와 Cube (큐브)는 모두 촬영 원본에서 평가한다. 캘리브레이션에 사용한 마커 종류와 평가 표적 종류를 동일시하지 않는다.
 - Reference-dependent Reprojection (기준 의존 재투영)은 Secondary Diagnostic (보조 진단)이며 방법 순위에 사용하지 않는다.
-- 현재 결론의 대표 행은 A2다. A4는 measured FK covariance 전 preflight이고, A5는 이전 A3의 성능 원인을 설명하는 post-hoc diagnostic이다. 실제 물리 순위는 External GT 이후 결정한다.
+- 현재 결론의 대표 행은 A2다. A4는 measured FK covariance 전 preflight이고, A5는 이전 A3의 성능 원인을 설명하는 post-hoc diagnostic이다. Independent External GT는 다음주 예정 태스크이므로 실제 물리 순위는 현재 산출하지 않는다.
+
+## Internal-Only Claim Envelope (현재 가능한 최대 결론)
+
+| Claim Type | Allowed Now (지금 가능) | Not Allowed Now (지금 금지) |
+| --- | --- | --- |
+| Main result | A2 is the strongest confirmatory internal row under matched held-out pixel contrasts. | A2 is physically most accurate in robot base. |
+| Method extension | A4 is a preflight extension candidate; A2->A4 is practically tied on internal held-out px. | Corrected-FK soft factor is superior before measured FK covariance. |
+| FK diagnosis | A3 shows raw-FK hard fixing hurts cube reprojection; A5 separates raw/aligned and soft/hard causes. | Raw FK or vision-aligned FK is external GT. |
+| Metric scope | Report board/cube held-out px, set-equal-weight px, paired set bootstrap CI, Fixed-to-Fixed, Gripper-to-Fixed. | Merge all metrics into one final physical ranking. |
+| Data risk | Surface dropped sets, support imbalance, detection failures, and 10.8077 mm Board-Cube disagreement. | Say the joint solve removed the systematic disagreement. |
+
+Independent External GT is scheduled as a next-week task. Until then, this report stops at the strongest internally defensible evidence.
 
 ## Matched Contrast Decision Table (비교실험 구성 확정표)
 
@@ -31,10 +43,11 @@
 | Confirmatory internal | A1 -> A2 | Vision-only 조건에서 unified feedback이 도움이 되는가 | held-out board/cube px | Board 4.0645 -> 3.9840 (-0.0805); Cube 4.1402 -> 3.5958 (-0.5443) | 두 target 모두 개선. 현재 내부 확증에서 가장 강한 긍정 contrast다. |
 | Confirmatory internal | B3 -> A2 | Unified 조건에서 cube residual이 board calibration에도 도움이 되는가 | held-out board px | Board 4.0531 -> 3.9840 (-0.0690) | Board shared component가 개선. 단 marker-system 전체 성능 주장은 아니다. |
 | Confirmatory internal | A2 -> A3 | Vision-estimated cube pose를 raw-FK hard fixed로 바꾸면 어떤가 | held-out board/cube px | Board 3.9840 -> 4.1025 (+0.1185); Cube 3.5958 -> 6.3959 (+2.8000) | 특히 cube가 크게 악화. raw FK를 GT로 해석하면 안 된다. |
-| Preflight | B1 -> A4 | 같은 soft FK factor에서 sequential과 unified 중 무엇이 나은가 | held-out board/cube px | Board 4.0648 -> 3.9884 (-0.0764); Cube 4.1182 -> 3.5805 (-0.5378) | 통합 개선 경향. measured covariance 전까지는 preflight다. |
+| Preflight | B1 -> A4 | 같은 soft FK factor에서 sequential과 unified 중 무엇이 나은가 | held-out board/cube px | Board 4.0648 -> 3.9884 (-0.0764); Cube 4.1182 -> 3.5805 (-0.5378) | 통합 개선 경향. measured covariance 없이 내부 preflight로만 해석한다. |
 | Preflight | A2 -> A4 | Unified vision-only에 soft FK factor를 추가하면 이득이 있는가 | held-out board/cube px | Board 3.9840 -> 3.9884 (+0.0044); Cube 3.5958 -> 3.5805 (-0.0153) | 사실상 동률. A4는 방법 확장 후보지만 현재 우월성 주장은 금지. |
 | Preflight | B2 -> A4 | Soft FK 조건에서 board residual이 cube 보정에 도움 되는가 | held-out cube px | Cube 4.4827 -> 3.5805 (-0.9023) | Cube가 개선. board residual은 soft-FK cube 추정에 도움이 된다. |
-| Post-hoc | A3 <-> A5, A4 <-> A5 | Raw/aligned FK, soft/hard 원인을 분리할 수 있는가 | internal metrics only | A3->A5 Board 4.1025 -> 3.8804 (-0.2222); Cube 6.3959 -> 3.2274 (-3.1685); A4->A5 Board 3.9884 -> 3.8804 (-0.1080); Cube 3.5805 -> 3.2274 (-0.3531) | A5는 원인 진단 전용. 독립 correction 또는 물리 순위가 아니다. |
+| Post-hoc | A3 -> A5 | Raw FK hard fixed와 vision-aligned FK hard fixed의 차이는 무엇인가 | internal metrics only | Board 4.1025 -> 3.8804 (-0.2222); Cube 6.3959 -> 3.2274 (-3.1685) | A5는 원인 진단 전용. 독립 correction 또는 물리 순위가 아니다. |
+| Post-hoc | A4 -> A5 | 같은 aligned FK를 soft factor와 hard fixed로 쓰면 무엇이 달라지는가 | internal metrics only | Board 3.9884 -> 3.8804 (-0.1080); Cube 3.5805 -> 3.2274 (-0.3531) | A5는 원인 진단 전용. 내부 px 하나로 물리 우열을 정하지 않는다. |
 
 > 현재 메인 결론은 A2다. A4는 measured FK covariance가 들어오기 전까지 방법 확장 후보이고, A5는 post-hoc 원인 진단이다.
 
@@ -50,7 +63,32 @@
 | Gripper-to-Fixed Board/Cube | Supplementary FK-dependent closure metric | 전체 chain 내부 진단 | FK와 Hand-Eye가 섞이며 fixed anchor 일부는 train 관측이다. | mixed train-anchor/held-out internal closure |
 | Reference-dependent reprojection | Secondary diagnostic | 공유 target pose 기준의 보조 확인 | reference가 fitted target이므로 ranking 지표가 아니다. | cross-target v8 artifact |
 | Seed mean +/- std | Stability diagnostic | 3개 초기화 perturbation 안정성 확인 | 독립 실험 표본이 아니라 통계적 반복으로 해석하지 않는다. | 27/27 converged |
-| External TRE/rotation/P95/failure | Future final primary metric | blind external GT 확보 후 최종 물리 정확도 | 현재 Session04에는 GT가 없어 계산 불가. | future capture required |
+| External TRE/rotation/P95/failure | Scheduled next-week external validation | 다음주 예정 태스크 | 현재 보고서 생성 시점에는 미계산. 다음주 Independent External GT로 Translation Error, Rotation Error, P95, Failure Rate를 산출한다. | planned external validation boundary |
+
+## Exploratory Paired Set Bootstrap CI (탐색적 paired set bootstrap CI)
+
+각 contrast는 같은 held-out set을 paired unit으로 묶고, set을 10,000회 replacement resampling했다. 값은 `second - first` RMSE 차이이며 음수는 두 번째 방법의 내부 px가 더 낮다는 뜻이다. `n=9 sets`라 유의성 검정이 아니라 방향성 민감도 점검이다.
+
+| Tier | Contrast | Target | Direction | Δ pooled / set-equal px | Set-bootstrap 95% CI px | Interpretation |
+| --- | --- | --- | --- | ---: | ---: | --- |
+| Confirmatory internal | A0 <-> B3 | board | B3 - A0 | 0.0001 / 0.0001 | [-0.0000, 0.0001] | n=9; interval crosses 0; direction is exploratory; 동률. Board-only에서는 통합 자체가 추가 이득을 만들지 않는다. |
+| Confirmatory internal | A0 -> A1 | board | A1 - A0 | 0.0116 / -0.0027 | [-0.0568, 0.0523] | n=9; interval crosses 0; direction is exploratory; Board는 미세 악화. 순차 구조에서는 cube 추가 이득이 보이지 않는다. |
+| Confirmatory internal | A1 -> A2 | board | A2 - A1 | -0.0805 / -0.0597 | [-0.1223, 0.0076] | n=9; interval crosses 0; direction is exploratory; 두 target 모두 개선. 현재 내부 확증에서 가장 강한 긍정 contrast다. |
+| Confirmatory internal | A1 -> A2 | cube | A2 - A1 | -0.5443 / -0.7961 | [-1.6750, 0.0870] | n=9; interval crosses 0; direction is exploratory; 두 target 모두 개선. 현재 내부 확증에서 가장 강한 긍정 contrast다. |
+| Confirmatory internal | B3 -> A2 | board | A2 - B3 | -0.0690 / -0.0625 | [-0.1226, 0.0002] | n=9; interval crosses 0; direction is exploratory; Board shared component가 개선. 단 marker-system 전체 성능 주장은 아니다. |
+| Confirmatory internal | A2 -> A3 | board | A3 - A2 | 0.1185 / 0.1642 | [-0.3669, 0.6408] | n=9; interval crosses 0; direction is exploratory; 특히 cube가 크게 악화. raw FK를 GT로 해석하면 안 된다. |
+| Confirmatory internal | A2 -> A3 | cube | A3 - A2 | 2.8000 / 2.8956 | [-0.0196, 5.4695] | n=9; interval crosses 0; direction is exploratory; 특히 cube가 크게 악화. raw FK를 GT로 해석하면 안 된다. |
+| Preflight | B1 -> A4 | board | A4 - B1 | -0.0764 / -0.0563 | [-0.1139, 0.0096] | n=9; interval crosses 0; direction is exploratory; 통합 개선 경향. measured covariance 없이 내부 preflight로만 해석한다. |
+| Preflight | B1 -> A4 | cube | A4 - B1 | -0.5378 / -0.7811 | [-1.6341, 0.0550] | n=9; interval crosses 0; direction is exploratory; 통합 개선 경향. measured covariance 없이 내부 preflight로만 해석한다. |
+| Preflight | A2 -> A4 | board | A4 - A2 | 0.0044 / 0.0034 | [-0.0049, 0.0118] | n=9; interval crosses 0; direction is exploratory; 사실상 동률. A4는 방법 확장 후보지만 현재 우월성 주장은 금지. |
+| Preflight | A2 -> A4 | cube | A4 - A2 | -0.0153 / -0.0294 | [-0.0555, 0.0060] | n=9; interval crosses 0; direction is exploratory; 사실상 동률. A4는 방법 확장 후보지만 현재 우월성 주장은 금지. |
+| Preflight | B2 -> A4 | cube | A4 - B2 | -0.9023 / -0.6836 | [-2.0077, 0.6209] | n=9; interval crosses 0; direction is exploratory; Cube가 개선. board residual은 soft-FK cube 추정에 도움이 된다. |
+| Post-hoc | A3 -> A5 | board | A5 - A3 | -0.2222 / -0.2179 | [-0.5426, 0.0937] | n=9; interval crosses 0; direction is exploratory; A5는 원인 진단 전용. 독립 correction 또는 물리 순위가 아니다. |
+| Post-hoc | A3 -> A5 | cube | A5 - A3 | -3.1685 / -3.2827 | [-5.7887, -0.5075] | n=9; negative interval; internal improvement direction is stable; A5는 원인 진단 전용. 독립 correction 또는 물리 순위가 아니다. |
+| Post-hoc | A4 -> A5 | board | A5 - A4 | -0.1080 / -0.0571 | [-0.4869, 0.3263] | n=9; interval crosses 0; direction is exploratory; A5는 원인 진단 전용. 내부 px 하나로 물리 우열을 정하지 않는다. |
+| Post-hoc | A4 -> A5 | cube | A5 - A4 | -0.3531 / -0.3577 | [-1.1905, 0.4725] | n=9; interval crosses 0; direction is exploratory; A5는 원인 진단 전용. 내부 px 하나로 물리 우열을 정하지 않는다. |
+
+> 이 표에서 0을 지나지 않는 contrast도 external physical accuracy를 증명하지 않는다. 내부 held-out set에서 방향이 덜 흔들린다는 뜻까지만 허용한다.
 
 ## Code-consistency Audit (코드 일치성 검증)
 
@@ -226,6 +264,6 @@ A의 Fixed-to-Fixed는 방법별 추정값에 의존하고 모든 고정카메�
 - **RMSE, Root Mean Squared Error (평균제곱근오차)**: 잔차 제곱 평균의 제곱근. px, mm, deg는 서로 합치지 않는다.
 - **Reference-dependent Reprojection (기준 의존 재투영)**: 학습 표적 자세에 의존하는 보조 진단으로 External GT가 아니다.
 
-## Required Next Experiment (다음 필수 실험)
+## Scheduled External GT Task (다음주 예정 태스크)
 
-Independent External GT (독립 외부 정답)가 확정되면 Blind Position Holdout (비공개 위치 홀드아웃)으로 Translation Error (이동 오차), Rotation Error (회전 오차), P95, Failure Rate (실패율)를 다시 계산한다. 그 전에는 내부 지표만 유지한다.
+Independent External GT (독립 외부 정답)는 다음주 예정 태스크로 진행한다. 따라서 현재 문서는 내부 지표로 가능한 최대 보고서이며, 다음주 외부 GT 수집/평가 후 Translation Error, Rotation Error, P95, Failure Rate 같은 최종 물리 정확도 지표를 별도 산출한다.
