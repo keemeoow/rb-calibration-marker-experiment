@@ -10,7 +10,7 @@ from pathlib import Path
 from statistics import fmean
 
 
-METHODS = ("A0", "A1", "A2", "A3", "A4", "B1", "B2", "B3")
+METHODS = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
 
 
 def load(path: Path) -> dict:
@@ -125,6 +125,10 @@ def write(rows: list[dict], populations: dict, output_dir: Path) -> None:
         "따라서 robust loss가 모든 조건을 일괄 개선한다고 주장할 수 없으며, "
         "방법별·표적별 결과를 함께 보고해야 한다.",
         "",
+        "A5는 train-vision-aligned FK를 hard-fixed한 post-hoc diagnostic이다. "
+        "이 sensitivity 결과도 A5를 confirmatory winner나 외부 물리 정확도 "
+        "근거로 승격시키지 않는다.",
+        "",
         "한계: 이 결과는 이미 적용된 사전 PnP 품질 마스크를 고정한 실험이다. "
         "프레임/관측 hard rejection 자체의 민감도는 threshold를 사전 등록한 "
         "별도 실험으로 확인해야 한다.",
@@ -137,21 +141,21 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--soft_table",
-        default="CP_result/session02/late_table1/table1_methods.json")
+        default="CP_result/session04/late_table1/table1_methods.json")
     parser.add_argument(
         "--linear_table",
-        default=("CP_result/session02/outlier_ablation/linear_table1/"
+        default=("CP_result/session04/outlier_ablation/linear_table1/"
                  "table1_methods.json"))
     parser.add_argument(
         "--soft_cross",
-        default=("CP_result/session02/cross_target_evaluation/"
+        default=("CP_result/session04/cross_target_evaluation/"
                  "cross_target_evaluation.json"))
     parser.add_argument(
         "--linear_cross",
-        default=("CP_result/session02/outlier_ablation/linear_cross_target/"
+        default=("CP_result/session04/outlier_ablation/linear_cross_target/"
                  "cross_target_evaluation.json"))
     parser.add_argument(
-        "--out_dir", default="CP_result/session02/outlier_ablation")
+        "--out_dir", default="CP_result/session04/outlier_ablation")
     return parser.parse_args()
 
 

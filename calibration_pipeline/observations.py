@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 from collections import Counter, defaultdict
+from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 import cv2
@@ -15,11 +16,19 @@ from calibration_pipeline.cube_detection import detect_corner_observations
 from calibration_pipeline.reprojection import PixelObs
 from calibration_pipeline.runtime import get_capture_set_index
 from calibration_pipeline.charuco import CharucoTarget
-from calibration_pipeline.config import CharucoBoardConfig
+from calibration_pipeline.apriltag_cube import AprilTagCubeModel
+from calibration_pipeline.board_config import (
+    charuco_config_from_dict,
+    charuco_config_to_dict,
+)
+from calibration_pipeline.cube_config import (
+    cube_config_from_dict,
+    cube_config_to_dict,
+)
 
 
 CUBE_OBSERVATION_POLICIES = ("core_multiface", "legacy")
-POST_CAPTURE_MANIFEST_SCHEMA = "post_capture_observation_manifest_v1"
+POST_CAPTURE_MANIFEST_SCHEMA = "post_capture_observation_manifest_v2"
 POST_CAPTURE_FILTER_POLICIES = ("standard", "strict")
 
 
@@ -31,13 +40,138 @@ def _file_sha256(path: str) -> str:
     return digest.hexdigest()
 
 
-def _validate_manifest_file(entry: dict, label: str) -> None:
-    path = os.path.abspath(str(entry.get("path", "")))
+def _canonical_sha256(value: object) -> str:
+    encoded = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _validated_target_configs(source: dict):
+    board_data = source.get("charuco_board_config")
+    cube_data = source.get("cube_config")
+    if not isinstance(board_data, dict) or not isinstance(cube_data, dict):
+        raise ValueError(
+            "post-capture manifest lacks frozen board/cube geometry")
+    for name, data in (
+            ("charuco_board_config", board_data),
+            ("cube_config", cube_data)):
+        expected = str(source.get(f"{name}_sha256", ""))
+        if not expected or _canonical_sha256(data) != expected:
+            raise ValueError(
+                f"post-capture manifest {name} SHA-256 mismatch")
+    board_cfg = charuco_config_from_dict(board_data)
+    cube_cfg = cube_config_from_dict(cube_data)
+    return board_cfg, cube_cfg
+
+
+def _validate_frozen_geometry(record: dict, object_points: np.ndarray,
+                              board_target, cube_model) -> None:
+    target = str(record.get("target", ""))
+    if target == "board":
+        ids = np.asarray(record.get("charuco_ids", []), dtype=np.int64).reshape(-1)
+        if len(ids) != len(object_points):
+            raise ValueError(
+                "board charuco_ids do not match frozen object points")
+        if hasattr(board_target.board, "getChessboardCorners"):
+            all_points = np.asarray(
+                board_target.board.getChessboardCorners(), dtype=np.float64,
+            ).reshape(-1, 3)
+        else:
+            all_points = np.asarray(
+                board_target.board.chessboardCorners, dtype=np.float64,
+            ).reshape(-1, 3)
+        if (np.any(ids < 0) or np.any(ids >= len(all_points))
+                or not np.allclose(
+                    object_points, all_points[ids], rtol=0.0, atol=1e-8)):
+            raise ValueError(
+                "board object points disagree with frozen ChArUco topology")
+        return
+    if target == "cube":
+        marker_ids = [int(value) for value in record.get("marker_ids", [])]
+        if len(object_points) != 4 * len(marker_ids):
+            raise ValueError(
+                "cube marker_ids do not match frozen 4-corner blocks")
+        expected = np.concatenate([
+            cube_model.marker_corners_in_rig(marker_id)
+            for marker_id in marker_ids
+        ], axis=0)
+        if not np.allclose(
+                object_points, expected, rtol=0.0, atol=1e-8):
+            raise ValueError(
+                "cube object-point blocks disagree with frozen marker order")
+
+
+def _relocation(recorded_root: str, local_root: str):
+    """Map paths recorded on another machine onto this checkout.
+
+    The manifest stores absolute paths, so a session captured elsewhere cannot
+    be replayed here even when every byte is identical.  Only the prefix above
+    the shared trailing path differs, so strip the common suffix and swap the
+    two prefixes; the SHA-256 checks stay in force and remain the actual
+    integrity contract.
+    """
+    recorded_parts = Path(recorded_root).parts
+    local_parts = Path(local_root).parts
+    shared = 0
+    while (shared < min(len(recorded_parts), len(local_parts))
+           and recorded_parts[-1 - shared] == local_parts[-1 - shared]):
+        shared += 1
+    if shared == 0:
+        raise ValueError(
+            "cannot relocate the post-capture manifest: the recorded session "
+            f"root {recorded_root!r} shares no trailing path with "
+            f"{local_root!r}")
+    recorded_prefix = str(Path(*recorded_parts[:len(recorded_parts) - shared]))
+    local_prefix = str(Path(*local_parts[:len(local_parts) - shared]))
+
+    def relocate(path: str) -> str:
+        path = str(path)
+        if recorded_prefix and path.startswith(recorded_prefix):
+            return os.path.join(
+                local_prefix, os.path.relpath(path, recorded_prefix))
+        return path
+
+    return relocate, recorded_prefix, local_prefix
+
+
+def _identity_relocation(path: str) -> str:
+    return str(path)
+
+
+def _validate_manifest_file(entry: dict, label: str,
+                            relocate=_identity_relocation) -> None:
+    path = os.path.abspath(relocate(str(entry.get("path", ""))))
     expected = str(entry.get("sha256", ""))
     if not path or not expected or not os.path.isfile(path):
         raise ValueError(f"post-capture manifest {label} is unavailable: {path!r}")
     if _file_sha256(path) != expected:
         raise ValueError(f"post-capture manifest is stale: {label} changed: {path}")
+
+
+# Geometry constants are derived arithmetically (e.g. (0.057 + 0.002) / 2.0),
+# so a value that is physically identical to the one frozen in meta.json can
+# differ in the last floating-point bit (0.029500000000000002 vs 0.0295).
+# Exact dict equality made every freshly generated manifest unloadable.  The
+# guard exists to catch real geometry edits, which are never smaller than
+# micrometres, so floats compare within a nanometre and everything else exactly.
+CONFIG_FLOAT_ATOL_M = 1e-9
+
+
+def _configs_match(current, frozen, atol: float = CONFIG_FLOAT_ATOL_M) -> bool:
+    if isinstance(current, bool) or isinstance(frozen, bool):
+        return current is frozen
+    if isinstance(current, (int, float)) and isinstance(frozen, (int, float)):
+        return abs(float(current) - float(frozen)) <= atol
+    if isinstance(current, dict) and isinstance(frozen, dict):
+        if set(current) != set(frozen):
+            return False
+        return all(_configs_match(current[k], frozen[k], atol) for k in current)
+    if isinstance(current, (list, tuple)) and isinstance(frozen, (list, tuple)):
+        if len(current) != len(frozen):
+            return False
+        return all(_configs_match(a, b, atol) for a, b in zip(current, frozen))
+    return current == frozen
 
 
 def load_pixel_observations_from_manifest(
@@ -46,11 +180,12 @@ def load_pixel_observations_from_manifest(
         root: Optional[str] = None,
         intrinsics_dir: Optional[str] = None,
         allowed_event_ids: Optional[Sequence[int]] = None,
-        validate_sources: bool = True) -> Tuple[List[PixelObs], dict]:
-    """Load the immutable native-pixel corners selected by Step2b.
+        validate_sources: bool = True,
+        allow_relocated_root: bool = False) -> Tuple[List[PixelObs], dict]:
+    """Load the immutable native-pixel corners selected by step 04.
 
     Unlike the normal observation loader, this path never runs a detector.  It
-    validates the source hashes stored by ``Step2b_capture_filter.py`` and
+    validates the source hashes stored by ``04_filter_observations.py`` and
     reconstructs exactly the frozen corner population for ``standard`` or
     ``strict`` policy.
     """
@@ -67,22 +202,55 @@ def load_pixel_observations_from_manifest(
         raise ValueError(f"manifest does not define policy {policy!r}")
 
     source = payload.get("source", {})
-    recorded_root = os.path.realpath(str(source.get("session_root", "")))
-    if root is not None and recorded_root != os.path.realpath(root):
+    board_cfg, cube_cfg = _validated_target_configs(source)
+    board_target = CharucoTarget(board_cfg)
+    cube_model = AprilTagCubeModel(cube_cfg)
+    scope = payload.get("scope", {})
+    if scope.get("board_corner_refinement_mode") != "CORNER_REFINE_NONE":
         raise ValueError(
-            "post-capture manifest session root differs from --root_folder: "
-            f"{recorded_root!r} != {os.path.realpath(root)!r}")
+            "manifest board corner-refinement contract is missing or changed")
+    if scope.get("cube_corner_refinement_mode") not in {
+            "apriltag", "line_intersection"}:
+        raise ValueError(
+            "manifest cube corner-refinement contract is missing or invalid")
+    recorded_root = os.path.realpath(str(source.get("session_root", "")))
+    relocate = _identity_relocation
+    relocated = False
+    if root is not None and recorded_root != os.path.realpath(root):
+        if not allow_relocated_root:
+            raise ValueError(
+                "post-capture manifest session root differs from --root_folder: "
+                f"{recorded_root!r} != {os.path.realpath(root)!r}; pass "
+                "--allow-relocated-session-root to replay a manifest captured "
+                "in another checkout (every SHA-256 is still enforced)")
+        relocate, _, _ = _relocation(recorded_root, os.path.realpath(root))
+        relocated = True
     if validate_sources:
-        _validate_manifest_file(source.get("meta_json", {}), "meta.json")
+        _validate_manifest_file(
+            source.get("meta_json", {}), "meta.json", relocate)
+        with open(relocate(source["meta_json"]["path"]), "r",
+                  encoding="utf-8") as stream:
+            current_meta = json.load(stream)
+        if not _configs_match(current_meta.get("charuco_board_config"),
+                              charuco_config_to_dict(board_cfg)):
+            raise ValueError(
+                "manifest ChArUco config differs from frozen meta.json config")
+        if not _configs_match(current_meta.get("cube_config"),
+                              cube_config_to_dict(cube_cfg)):
+            raise ValueError(
+                "manifest cube config differs from frozen meta.json config")
         if intrinsics_dir is not None:
             for camera, entry in source.get("intrinsics", {}).items():
                 current = os.path.abspath(os.path.join(
                     intrinsics_dir, f"cam{int(camera)}.npz"))
-                if current != os.path.abspath(str(entry.get("path", ""))):
+                recorded = os.path.abspath(
+                    relocate(str(entry.get("path", ""))))
+                if current != recorded:
                     raise ValueError(
                         f"manifest cam{camera} intrinsic path differs from "
                         f"--intrinsics_dir: {current}")
-                _validate_manifest_file(entry, f"cam{camera} intrinsics")
+                _validate_manifest_file(
+                    entry, f"cam{camera} intrinsics", relocate)
 
     allowed = (
         None if allowed_event_ids is None
@@ -103,7 +271,8 @@ def load_pixel_observations_from_manifest(
             if not isinstance(image_entry, dict):
                 raise ValueError(
                     f"manifest lacks image provenance for {relative_path!r}")
-            _validate_manifest_file(image_entry, f"image {relative_path}")
+            _validate_manifest_file(
+                image_entry, f"image {relative_path}", relocate)
             validated_images.add(relative_path)
 
     observations: List[PixelObs] = []
@@ -128,6 +297,11 @@ def load_pixel_observations_from_manifest(
                 or not np.all(np.isfinite(object_points))
                 or not np.all(np.isfinite(image_points))):
             raise ValueError(f"invalid frozen corners for observation {key}")
+        try:
+            _validate_frozen_geometry(
+                record, object_points, board_target, cube_model)
+        except ValueError as error:
+            raise ValueError(f"{error}: observation {key}") from error
         set_index = record.get("set_idx")
         grasp_index = record.get("grasp_idx")
         observations.append(PixelObs(
@@ -156,6 +330,10 @@ def load_pixel_observations_from_manifest(
         "manifest_sha256": _file_sha256(manifest_path),
         "manifest_schema": POST_CAPTURE_MANIFEST_SCHEMA,
         "cube_config_source": str(source.get("cube_config_source", "unknown")),
+        "charuco_board_config_source": str(
+            source.get("charuco_board_config_source", "unknown")),
+        "charuco_board_config": charuco_config_to_dict(board_cfg),
+        "cube_config": cube_config_to_dict(cube_cfg),
         "observation_policy": policy,
         "quality_contract": payload["policies"][policy],
         "observation_quality_by_event_camera": cube_records,
@@ -163,6 +341,10 @@ def load_pixel_observations_from_manifest(
         "n_cube_observations": int(counts.get("cube", 0)),
         "n_board_observations": int(counts.get("board", 0)),
         "source_hashes_validated": bool(validate_sources),
+        "session_root_relocated": bool(relocated),
+        "manifest_recorded_session_root": recorded_root,
+        "local_session_root": (
+            None if root is None else os.path.realpath(root)),
     }
     return observations, diagnostics
 
@@ -193,7 +375,12 @@ def load_board_pixel_observations(root: str, meta: dict,
     image_scale = float(image_scale)
     if not np.isfinite(image_scale) or image_scale <= 0.0:
         raise ValueError("image_scale must be finite and positive")
-    detector = CharucoTarget(CharucoBoardConfig())
+    board_data = meta.get("charuco_board_config")
+    if not isinstance(board_data, dict):
+        raise ValueError(
+            "meta.json has no frozen charuco_board_config; refusing to "
+            "reinterpret captures with current code defaults")
+    detector = CharucoTarget(charuco_config_from_dict(board_data))
     output: List[PixelObs] = []
     allowed = {int(ci) for ci in all_cam_ids}
     for capture in meta.get("captures", []):

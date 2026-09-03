@@ -3,12 +3,13 @@
 Robot pose helpers for the calibration capture workflow.
 
 euler_deg_to_matrix(): convert a robot 6-DoF pose (x,y,z in mm, rz,ry,rx in deg)
-to a 4x4 homogeneous transform (translation in meters). Used by Step2_capture.py
-and the Step3 calibration to turn robot TCP poses into matrices.
+to a 4x4 homogeneous transform (translation in meters). Used by
+``03_capture.py``
+and the calibration pipeline to turn robot TCP poses into matrices.
 
 The live capture protocol itself (request_waypoints / capture / save_waypoints,
 newline-delimited JSON) is implemented directly with a raw socket in
-Step2_capture.py's manual-robot mode against server/robot_calb.py.
+the capture pipeline's manual-robot mode against server/robot_calb.py.
 """
 
 import numpy as np

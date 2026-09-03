@@ -1018,3 +1018,70 @@ def build_event_cube_selection(meta: dict,
                 for ci, cand in refined.items()
             }
     return selection_by_event
+
+
+# ---------------------------------------------------------------------------
+# Session-derived default paths
+#
+# Every runner used to hardcode its own session in each derived default.
+# Passing --root_folder for one session could then silently read or write
+# another session's directory.  All session-dependent defaults are now derived
+# from --root_folder through these helpers.
+# ---------------------------------------------------------------------------
+
+DEFAULT_SESSION_ROOT = "data/session04/calib_train"
+
+
+def infer_session_name(root_folder: str) -> str:
+    """Return the ``sessionNN`` component of a dataset root."""
+    parts = os.path.normpath(str(root_folder)).split(os.sep)
+    return next((part for part in reversed(parts)
+                 if part.startswith("session")), "session")
+
+
+def session_paths(root_folder: str) -> Dict[str, str]:
+    """Derive every session-dependent default path from the dataset root."""
+    root = os.path.normpath(str(root_folder))
+    session = infer_session_name(root)
+    session_dir = os.path.dirname(root) or root
+    calib_dir = os.path.join(session_dir, "calib_out")
+    cp_dir = os.path.join("CP_result", session)
+    return {
+        "session": session,
+        "session_dir": session_dir,
+        "calib_dir": calib_dir,
+        "observation_manifest": os.path.join(
+            calib_dir, "capture_filter", "Step2b_observation_manifest.json"),
+        "cp_dir": cp_dir,
+        "table1_dir": os.path.join(cp_dir, "late_table1"),
+        "table1_result": os.path.join(
+            cp_dir, "late_table1", "table1_methods.json"),
+        "cross_target_dir": os.path.join(cp_dir, "cross_target_evaluation"),
+        "cross_target_result": os.path.join(
+            cp_dir, "cross_target_evaluation", "cross_target_evaluation.json"),
+        "marker_system_dir": os.path.join(cp_dir, "marker_system_end_to_end"),
+        "opencv_relative_dir": os.path.join(cp_dir, "opencv_relative_baseline"),
+    }
+
+
+def apply_session_defaults(args, mapping: Dict[str, str]):
+    """Fill unset path arguments from the session derived from --root_folder.
+
+    ``mapping`` maps an argparse destination to a :func:`session_paths` key.
+    Only arguments left as ``None`` are filled, so an explicit flag always wins.
+
+    ``observation_manifest`` is special: leaving it unset used to mean "re-run
+    the detectors", which silently produced a run with no frozen-corner
+    provenance whenever the operator forgot the flag.  It now defaults to the
+    session's frozen observation manifest when that file exists, and only falls back to
+    detection when the session genuinely has no manifest yet.
+    """
+    paths = session_paths(getattr(args, "root_folder", DEFAULT_SESSION_ROOT))
+    for dest, key in mapping.items():
+        if getattr(args, dest, None) is not None:
+            continue
+        value = paths[key]
+        if key == "observation_manifest" and not os.path.exists(value):
+            continue
+        setattr(args, dest, value)
+    return args

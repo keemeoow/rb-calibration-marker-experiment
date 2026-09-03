@@ -1,5 +1,5 @@
 # config.py
-"""Project configuration and the single source of truth for the 59mm AprilTag cube.
+"""Project configuration and the single source of truth for the AprilTag cube.
 
 Units: every field ending with ``_m`` is meters.
 Only edit the marker-ID block when the cube is reprinted with different IDs.
@@ -18,12 +18,23 @@ from typing import Dict, Tuple
 # Top face has two 25mm tags on +Z, centered at y=-14mm and y=+14mm.
 # Four side faces have one 51mm tag each.
 # =============================================================================
-TOP_MARKER_NEG_Y_ID = 0   # +Z top face, center: (0, -14, +29.5) mm
-TOP_MARKER_POS_Y_ID = 1   # +Z top face, center: (0, +14, +29.5) mm
-SIDE_MARKER_POS_X_ID = 2  # +X side face, center: (+29.5, 0, -1) mm
-SIDE_MARKER_POS_Y_ID = 3  # +Y side face, center: (0, +29.5, -1) mm
-SIDE_MARKER_NEG_X_ID = 4  # -X side face, center: (-29.5, 0, -1) mm
-SIDE_MARKER_NEG_Y_ID = 5  # -Y side face, center: (0, -29.5, -1) mm
+CUBE_WIDTH_M = 0.059
+CUBE_DEPTH_M = 0.059
+CUBE_BODY_HEIGHT_M = 0.057
+TOP_PROTRUSION_HEIGHT_M = 0.002
+CUBE_OVERALL_HEIGHT_M = CUBE_BODY_HEIGHT_M + TOP_PROTRUSION_HEIGHT_M
+
+CUBE_HALF_WIDTH_M = CUBE_WIDTH_M / 2.0
+CUBE_HALF_DEPTH_M = CUBE_DEPTH_M / 2.0
+TOP_MARKER_PLANE_Z_M = CUBE_OVERALL_HEIGHT_M / 2.0
+SIDE_MARKER_CENTER_Z_M = -TOP_PROTRUSION_HEIGHT_M / 2.0
+
+TOP_MARKER_NEG_Y_ID = 0   # +Z protrusion, center: (0, -14, +29.5) mm
+TOP_MARKER_POS_Y_ID = 1   # +Z protrusion, center: (0, +14, +29.5) mm
+SIDE_MARKER_POS_X_ID = 2  # +X body face, center: (+29.5, 0, -1) mm
+SIDE_MARKER_POS_Y_ID = 3  # +Y body face, center: (0, +29.5, -1) mm
+SIDE_MARKER_NEG_X_ID = 4  # -X body face, center: (-29.5, 0, -1) mm
+SIDE_MARKER_NEG_Y_ID = 5  # -Y body face, center: (0, -29.5, -1) mm
 
 TOP_MARKER_SIZE_M = 0.025
 SIDE_MARKER_SIZE_M = 0.051
@@ -32,16 +43,24 @@ SIDE_MARKER_SIZE_M = 0.051
 
 @dataclass
 class CubeConfig:
-    """Physical definition of the 59 x 59 x 59mm AprilTag cube.
+    """Physical marker-plane definition of the AprilTag cube.
 
     Object frame:
-      - origin: center of the full 59mm bounding cube
-      - +Z: upward; top surface z = +29.5mm
-      - side marker centers are at z = -1mm because the 57mm lower body spans
-        z = -29.5mm .. +27.5mm.
+      - body: 59 x 59 x 57mm
+      - +Z protrusion / top-marker plane: 2mm above the body
+      - overall envelope: 59 x 59 x 59mm
+      - origin: center of the overall 59mm-height envelope
+      - +Z: upward; top-marker plane z = +29.5mm
+      - side-marker centers: z = -1mm because the 57mm body spans
+        z = -29.5mm .. +27.5mm
+
+    ``cube_side_m`` is retained as the legacy 59mm footprint/overall-envelope
+    extent used by the marker-plane model. The body/protrusion dimensions above
+    are explicit module constants so the 57+2mm construction is not mistaken
+    for a solid 59mm-tall body.
     """
 
-    cube_side_m: float = 0.059
+    cube_side_m: float = CUBE_WIDTH_M
     marker_size_m: float = SIDE_MARKER_SIZE_M  # fallback only
     dictionary_name: str = "DICT_APRILTAG_36h11"
 
@@ -73,12 +92,12 @@ class CubeConfig:
     })
 
     marker_center_m: Dict[int, Tuple[float, float, float]] = field(default_factory=lambda: {
-        TOP_MARKER_NEG_Y_ID: (0.0, -0.014, 0.0295),
-        TOP_MARKER_POS_Y_ID: (0.0, 0.014, 0.0295),
-        SIDE_MARKER_POS_X_ID: (0.0295, 0.0, -0.001),
-        SIDE_MARKER_POS_Y_ID: (0.0, 0.0295, -0.001),
-        SIDE_MARKER_NEG_X_ID: (-0.0295, 0.0, -0.001),
-        SIDE_MARKER_NEG_Y_ID: (0.0, -0.0295, -0.001),
+        TOP_MARKER_NEG_Y_ID: (0.0, -0.014, TOP_MARKER_PLANE_Z_M),
+        TOP_MARKER_POS_Y_ID: (0.0, 0.014, TOP_MARKER_PLANE_Z_M),
+        SIDE_MARKER_POS_X_ID: (CUBE_HALF_WIDTH_M, 0.0, SIDE_MARKER_CENTER_Z_M),
+        SIDE_MARKER_POS_Y_ID: (0.0, CUBE_HALF_DEPTH_M, SIDE_MARKER_CENTER_Z_M),
+        SIDE_MARKER_NEG_X_ID: (-CUBE_HALF_WIDTH_M, 0.0, SIDE_MARKER_CENTER_Z_M),
+        SIDE_MARKER_NEG_Y_ID: (0.0, -CUBE_HALF_DEPTH_M, SIDE_MARKER_CENTER_Z_M),
     })
 
     # OpenCV returns decoded marker corners visually clockwise in the image.
@@ -139,3 +158,11 @@ class CharucoBoardConfig:
     marker_length_m: float = 0.018
     dictionary_name: str = "DICT_4X4_250"
     marker_id_start: int = 5  # 인쇄된 보드의 ArUco ID 시작값. 큐브(DICT_APRILTAG_36h11)와 다른 딕셔너리(DICT_4X4_250)라 ID 겹쳐도 무방
+
+
+def get_default_charuco_board_config() -> CharucoBoardConfig:
+    return CharucoBoardConfig()
+
+
+def get_default_charuco_board_config_source() -> str:
+    return "config_py:CharucoBoardConfig"

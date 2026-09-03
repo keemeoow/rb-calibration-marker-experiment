@@ -1,1 +1,1 @@
-"""Camera/robot capture support used by Step 1b and Step 2."""
+"""Intrinsic calibration and synchronized camera/robot capture support."""

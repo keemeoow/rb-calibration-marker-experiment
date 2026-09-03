@@ -1,0 +1,22 @@
+{
+  "artifact_schema": "base_cube_pose_predictions_v1",
+  "source": "REPLACE_WITH_INDEPENDENT_TRACKER_OR_CMM_SYSTEM",
+  "coordinate_convention": "T_base_cube maps cube-object coordinates into robot-base coordinates",
+  "units": {
+    "translation": "metre",
+    "rotation": "3x3 rotation matrix"
+  },
+  "poses": {
+    "pose_001": {
+      "status": "ok",
+      "T_base_cube": [
+        [1.0, 0.0, 0.0, 0.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 0.0],
+        [0.0, 0.0, 0.0, 1.0]
+      ],
+      "strata": ["workspace_center", "mid_distance", "frontal"]
+    }
+  },
+  "warning": "Replace every example value with independently measured data before GT unlock. Pose IDs must match blind capture meta.external_gt_pose_id."
+}

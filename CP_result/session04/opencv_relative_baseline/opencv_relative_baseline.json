@@ -1,10 +1,52 @@
 {
   "artifact_schema": "opencv_relative_reference_baseline_v1",
   "protocol": {
-    "role": "public_library_reference_for_data_vs_custom_code_diagnosis",
+    "role": "independent_FK_free_relative_pose_reference_baseline",
+    "reporting_tier": "independent_reference",
+    "relative_pose_reporting": {
+      "method_specific_heldout_consistency": {
+        "label": "A",
+        "implementation": "fixed_to_fixed_board_cube_and_legacy_e_cross",
+        "reporting_tier": "supplementary",
+        "uses_fitted_main_method_camera_poses": true,
+        "uses_robot_fk": false,
+        "uses_external_ground_truth": false,
+        "may_rank_methods_before_external_gt": false,
+        "interpretation": "heldout consistency of each fitted method; not an independent relative-pose reference and not absolute physical accuracy"
+      },
+      "independent_reference_baseline": {
+        "label": "B",
+        "runner": "calibration_pipeline.opencv_relative_baseline:main",
+        "implementation": "measurement_only_OpenCV_PnP_direct_relative_transforms_and_preregistered_robust_SE3_average",
+        "reporting_tier": "independent_reference",
+        "uses_fitted_main_method_camera_poses": false,
+        "uses_joint_optimizer": false,
+        "uses_robot_fk": false,
+        "uses_handeye": false,
+        "uses_shared_target_pose": false,
+        "uses_external_ground_truth": false,
+        "absolute_accuracy_metric": false,
+        "interpretation": "FK-free independent relative-pose reference baseline; not SOTA and not external ground truth"
+      }
+    },
+    "independent_reference_contract": {
+      "label": "B",
+      "runner": "calibration_pipeline.opencv_relative_baseline:main",
+      "implementation": "measurement_only_OpenCV_PnP_direct_relative_transforms_and_preregistered_robust_SE3_average",
+      "reporting_tier": "independent_reference",
+      "uses_fitted_main_method_camera_poses": false,
+      "uses_joint_optimizer": false,
+      "uses_robot_fk": false,
+      "uses_handeye": false,
+      "uses_shared_target_pose": false,
+      "uses_external_ground_truth": false,
+      "absolute_accuracy_metric": false,
+      "interpretation": "FK-free independent relative-pose reference baseline; not SOTA and not external ground truth"
+    },
     "not_a_sota_claim": true,
     "calibration": "OpenCV measurement-only PnP direct anchor-camera relative transforms plus preregistered MAD-trimmed SE3 average",
     "uses_joint_optimizer": false,
+    "uses_fitted_main_method_camera_poses": false,
     "uses_robot_fk": false,
     "uses_handeye": false,
     "uses_shared_target_pose": false,
@@ -284,7 +326,7 @@
     "source_data_provenance": {
       "meta_json": {
         "path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session04/calib_train/meta.json",
-        "sha256": "fa86c823bada4ae5222ffda45865b63f9a6cc05418a717156f44e37b246eea3a"
+        "sha256": "0740c75897408e7c913bcbcaf66dee63dd79abbf56470855e3d846037c74b1cd"
       },
       "intrinsics": {
         "0": {
@@ -305,29 +347,29 @@
         }
       },
       "implementation_sha256": {
-        "calibration_pipeline/apriltag_cube.py": "04665ed5b7e0461ae4632ad547b5bed5e621aff8b78ef23149a910e4a1bbd577",
+        "calibration_pipeline/apriltag_cube.py": "905913eff76c68f5a0651280ea04283d990a75c65a4701cbfc20ae318f0f8e88",
         "calibration_pipeline/charuco.py": "f5bc57cbfda59e4e4768789d1ad16e60de3c8fb3aa9b66a9d4d4679d13c6e1d4",
-        "calibration_pipeline/config.py": "4bc389aaa29089b19efd38d46a665365bdd430952f3b82553820df231332d689",
-        "calibration_pipeline/cross_target.py": "2d9b085ce0bb2cdcfea7dd04e6de5c1835cc71e661b80efcfa4d3fd50c5c68d0",
-        "calibration_pipeline/cube_detection.py": "ddc52c803d887c8e59e6a1001ba80cff72eb9a78eff0579973858552ff667aa4",
+        "calibration_pipeline/config.py": "460f39036d1702f080815997f51109163471a1cf55576b4fa129469d74c428a4",
+        "calibration_pipeline/cross_target.py": "14b136265d63a273af05783b4189a69c315eff2c04ef42bb2a3c3e644759c59f",
+        "calibration_pipeline/cube_detection.py": "0a55b06152b1aadca307b81c450aa45e590527eb650ff41319243b007cba02d0",
         "calibration_pipeline/evaluation.py": "16b991587ab6fd0dac0f16cd115646b14e44c558c28216ca2b1d04119409ff62",
-        "calibration_pipeline/fk_alignment.py": "4cedcc964be08f157a6a6e17607797296407855bf38ec3a58e32501f4908c65a",
-        "calibration_pipeline/fk_factor.py": "6c2caccacc48708f227324392b53c4f9bb8adf7686dd987a9ec0be6aeecbff62",
-        "calibration_pipeline/marker_system.py": "62df45db4db8d64cde11d38b5ae76da9ef2595dcc8f876fc8a4a7db75aac42fc",
-        "calibration_pipeline/observations.py": "5669f88d49efdfe95d0e9c56dacd52101cfe0f71512a7fc4015836818bb5ead3",
-        "calibration_pipeline/path_evaluation.py": "c940c9b877da3e4ef5fe8150a7e2010030539545a20b4d0bafcc43f719f1b871",
+        "calibration_pipeline/fk_alignment.py": "bbf2065fa445cd89daeefaed2e30ee917966f65c4bf87d3953e141db7e4101a1",
+        "calibration_pipeline/fk_factor.py": "bd114361cfdf9b1a6458c1e9c2e4bef4d640ec23eb256a3598ec8ddeb1ff294d",
+        "calibration_pipeline/marker_system.py": "a8d54ceee443c943551a2c7541f5c083c960e08c024d54c39097aeec2702ae89",
+        "calibration_pipeline/observations.py": "e361ac76f71d8f146616fd889cab8f131781720c833d50a719f09ee634789bcc",
+        "calibration_pipeline/path_evaluation.py": "f439e1df095582048622470f66619a7633868657afe968e2247056e87ecf4f02",
         "calibration_pipeline/pose_convention.py": "410c5e06ac52e9d06aaf8414051b5a508d196e19bd41047c0ee24b96d7cc08be",
-        "calibration_pipeline/reprojection.py": "d053cf4b1f04e26aa9206c845c8ec3d576edd18eaecfe69f26e7d89c0fd6960b",
-        "calibration_pipeline/runtime.py": "97f2d9e4b227f2d314ba3bf5261c8f08cbf9ce8db0b2cf9f12010f682a7a8956",
-        "calibration_pipeline/schema.py": "4f77c397195024af65f9850ca6a9a47d2b54ca3ae352fdfac0fdbe45e6e1f42f",
+        "calibration_pipeline/reprojection.py": "58ad7b82421d1979c8ab01af6472e52d71acc20df10921b486f02a5bd8ebbc82",
+        "calibration_pipeline/runtime.py": "ca63e0c9ce1f05d43e917d3544da97a7e2983a1ab52d52388b98fc226643adc3",
+        "calibration_pipeline/schema.py": "9dc61da27a0753b2595a5ff99756fbac286f8d7306a5e27f1fcb60bd9556ccb5",
         "calibration_pipeline/se3.py": "a760b3f8d66dcf193c7d5b7a56d12f7061088dacc3c549c38d3c7baaffdd93e9",
-        "calibration_pipeline/table1.py": "8d3c1aea63a2f9e7e44e89065ecd35fc36659db9c9a3e7cce5410b28b142dc92"
+        "calibration_pipeline/table1.py": "4152246db195a9c21dee1473ae0451c766eaacc767021285869f18d518c6ea5e"
       },
       "observation_populations": {
         "eligible": {
-          "sha256": "b9f43c5e3c108c323e05705202d826420a349e38ec5237275688e5d623db36d5",
+          "sha256": "caa22c8ee23790a6366ee4e7831a256bc8d34b750ab23fd006ebcc63be358748",
           "observations": 154,
-          "corners": 4645,
+          "corners": 4625,
           "events": [
             24,
             25,
@@ -386,9 +428,9 @@
           ]
         },
         "train": {
-          "sha256": "7b932a73f47664caee9eacfa727cc18874d49f30a8933c5134251b4c09e83eb1",
+          "sha256": "c116ad02c4e4625a756aeb75e9b1b327c47ee59c2c54fe97556cf08182e65990",
           "observations": 119,
-          "corners": 3702,
+          "corners": 3686,
           "events": [
             25,
             26,
@@ -438,9 +480,9 @@
           ]
         },
         "heldout": {
-          "sha256": "8aac84ed3179a0cdbd3c855d292f4ce268820555568dfa54631db45e34328296",
+          "sha256": "28a8cd6fe28618eb4af05e9fadf19448fd115d5e721842625f1432a2aaa8a942",
           "observations": 35,
-          "corners": 943,
+          "corners": 939,
           "events": [
             24,
             33,
@@ -456,7 +498,7 @@
       },
       "observation_manifest": {
         "path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session04/calib_out/capture_filter/Step2b_observation_manifest.json",
-        "sha256": "18c1dafd655c3eb89e254e8f5d4e7723f0b79d4bff867104f69a143938e95cd9",
+        "sha256": "bb864bc3149afadb2c7f4d9991c939493c6fe55662c595e02df621b745737ea7",
         "policy": "standard"
       }
     },
@@ -466,7 +508,7 @@
       "scale": 1.0,
       "heldout_observations_used": false
     },
-    "evaluation_mask_sha256": "5543693435a83f0256182658a8251c7c20a6f46501b77ebd414fc0e315dc47cd"
+    "evaluation_mask_sha256": "bcd1d6af56cef28980c27dd4252fba6d715e61f1969664b89c4d70097e2c8f87"
   },
   "results": {
     "opencv_board": {
@@ -576,7 +618,7 @@
       },
       "heldout_fixed_to_fixed": {
         "applicable": true,
-        "evaluation_mask_sha256": "5543693435a83f0256182658a8251c7c20a6f46501b77ebd414fc0e315dc47cd",
+        "evaluation_mask_sha256": "bcd1d6af56cef28980c27dd4252fba6d715e61f1969664b89c4d70097e2c8f87",
         "metric_contract": {
           "name": "fixed_to_fixed_board_cube_cross_target",
           "targets": [
@@ -591,7 +633,10 @@
           "uses_gripper_camera": false,
           "uses_external_ground_truth": false,
           "absolute_accuracy_metric": false,
-          "ranking_role_before_external_gt": "fixed_camera_subsystem_relative_metric"
+          "reporting_tier": "supplementary",
+          "may_rank_methods_before_external_gt": false,
+          "ranking_role_before_external_gt": "supplementary_method_specific_heldout_consistency",
+          "interpretation": "computed with each method's fitted fixed-camera poses; useful as a held-out self-consistency diagnostic, not an independent baseline"
         },
         "model_dependent_gating": false,
         "output_dependent_pose_gate": null,
@@ -768,9 +813,9 @@
             ]
           },
           "cube": {
-            "pose_consistency_translation_rmse_mm": 17.04155081584487,
-            "pose_consistency_rotation_rmse_deg": 1.7671561120023362,
-            "cross_view_pixel_transfer_rmse_px": 12.70088415890769,
+            "pose_consistency_translation_rmse_mm": 10.179958061132366,
+            "pose_consistency_rotation_rmse_deg": 0.6223815229673624,
+            "cross_view_pixel_transfer_rmse_px": 6.76982616289872,
             "n_pairs": 9,
             "n_directions": 18,
             "n_output_rejected": 0,
@@ -781,20 +826,20 @@
                 "set": 4,
                 "left_observation_id": "cube:event=24:set=4:cam=0",
                 "right_observation_id": "cube:event=24:set=4:cam=1",
-                "translation_mm": 15.441310289202413,
-                "rotation_deg": 0.9766350899634484,
+                "translation_mm": 8.647416906493325,
+                "rotation_deg": 0.6781141271829856,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=0",
                     "destination_observation_id": "cube:event=24:set=4:cam=1",
-                    "rmse_px": 7.812777731608607,
+                    "rmse_px": 2.8512611267165275,
                     "n_corners": 8
                   },
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=1",
                     "destination_observation_id": "cube:event=24:set=4:cam=0",
-                    "rmse_px": 15.068821771742172,
-                    "n_corners": 16
+                    "rmse_px": 9.294432668066323,
+                    "n_corners": 12
                   }
                 ]
               },
@@ -804,20 +849,20 @@
                 "set": 4,
                 "left_observation_id": "cube:event=24:set=4:cam=0",
                 "right_observation_id": "cube:event=24:set=4:cam=3",
-                "translation_mm": 13.317877193936146,
-                "rotation_deg": 2.2874234040060473,
+                "translation_mm": 7.439400476340417,
+                "rotation_deg": 0.38639728002946305,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=0",
                     "destination_observation_id": "cube:event=24:set=4:cam=3",
-                    "rmse_px": 10.233155929907973,
+                    "rmse_px": 3.038092512652249,
                     "n_corners": 12
                   },
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=3",
                     "destination_observation_id": "cube:event=24:set=4:cam=0",
-                    "rmse_px": 6.752310301131354,
-                    "n_corners": 16
+                    "rmse_px": 5.835894062989299,
+                    "n_corners": 12
                   }
                 ]
               },
@@ -827,19 +872,19 @@
                 "set": 4,
                 "left_observation_id": "cube:event=24:set=4:cam=1",
                 "right_observation_id": "cube:event=24:set=4:cam=3",
-                "translation_mm": 16.300970859674624,
-                "rotation_deg": 1.8106665981788546,
+                "translation_mm": 11.435430636303394,
+                "rotation_deg": 0.8105512660700487,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=1",
                     "destination_observation_id": "cube:event=24:set=4:cam=3",
-                    "rmse_px": 15.74938826358776,
+                    "rmse_px": 10.26578782899369,
                     "n_corners": 12
                   },
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=3",
                     "destination_observation_id": "cube:event=24:set=4:cam=1",
-                    "rmse_px": 6.506403503153058,
+                    "rmse_px": 4.562311000979311,
                     "n_corners": 8
                   }
                 ]
@@ -850,19 +895,19 @@
                 "set": 8,
                 "left_observation_id": "cube:event=48:set=8:cam=0",
                 "right_observation_id": "cube:event=48:set=8:cam=1",
-                "translation_mm": 15.124298350851376,
-                "rotation_deg": 1.3684832943059042,
+                "translation_mm": 10.511332895956066,
+                "rotation_deg": 0.6464722224453893,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=0",
                     "destination_observation_id": "cube:event=48:set=8:cam=1",
-                    "rmse_px": 8.188070871355766,
-                    "n_corners": 16
+                    "rmse_px": 4.344217442103538,
+                    "n_corners": 12
                   },
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=1",
                     "destination_observation_id": "cube:event=48:set=8:cam=0",
-                    "rmse_px": 11.488627733458513,
+                    "rmse_px": 8.290984407271083,
                     "n_corners": 12
                   }
                 ]
@@ -873,19 +918,19 @@
                 "set": 8,
                 "left_observation_id": "cube:event=48:set=8:cam=0",
                 "right_observation_id": "cube:event=48:set=8:cam=3",
-                "translation_mm": 14.276282041749917,
-                "rotation_deg": 0.9600039474012262,
+                "translation_mm": 7.44605778545296,
+                "rotation_deg": 0.3620102390114209,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=0",
                     "destination_observation_id": "cube:event=48:set=8:cam=3",
-                    "rmse_px": 8.199300502815646,
-                    "n_corners": 8
+                    "rmse_px": 3.9487019902723706,
+                    "n_corners": 16
                   },
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=3",
                     "destination_observation_id": "cube:event=48:set=8:cam=0",
-                    "rmse_px": 10.707950761863074,
+                    "rmse_px": 5.661595876449927,
                     "n_corners": 12
                   }
                 ]
@@ -896,20 +941,20 @@
                 "set": 8,
                 "left_observation_id": "cube:event=48:set=8:cam=1",
                 "right_observation_id": "cube:event=48:set=8:cam=3",
-                "translation_mm": 21.961093931117226,
-                "rotation_deg": 1.7308420736015675,
+                "translation_mm": 14.125413550908316,
+                "rotation_deg": 0.40837739161898384,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=1",
                     "destination_observation_id": "cube:event=48:set=8:cam=3",
-                    "rmse_px": 12.049350680458268,
-                    "n_corners": 8
+                    "rmse_px": 9.261949278149357,
+                    "n_corners": 16
                   },
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=3",
                     "destination_observation_id": "cube:event=48:set=8:cam=1",
-                    "rmse_px": 12.49223604161769,
-                    "n_corners": 16
+                    "rmse_px": 5.947322594152168,
+                    "n_corners": 12
                   }
                 ]
               },
@@ -919,19 +964,19 @@
                 "set": 10,
                 "left_observation_id": "cube:event=60:set=10:cam=0",
                 "right_observation_id": "cube:event=60:set=10:cam=1",
-                "translation_mm": 21.40685768183816,
-                "rotation_deg": 0.9290568078472222,
+                "translation_mm": 12.031138817538348,
+                "rotation_deg": 0.6028273081655225,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=0",
                     "destination_observation_id": "cube:event=60:set=10:cam=1",
-                    "rmse_px": 24.31117269705484,
+                    "rmse_px": 9.284843980583961,
                     "n_corners": 16
                   },
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=1",
                     "destination_observation_id": "cube:event=60:set=10:cam=0",
-                    "rmse_px": 9.107058994256626,
+                    "rmse_px": 7.496008983772924,
                     "n_corners": 8
                   }
                 ]
@@ -942,19 +987,19 @@
                 "set": 10,
                 "left_observation_id": "cube:event=60:set=10:cam=0",
                 "right_observation_id": "cube:event=60:set=10:cam=3",
-                "translation_mm": 16.907251223467963,
-                "rotation_deg": 2.1517507563946263,
+                "translation_mm": 6.291057713303639,
+                "rotation_deg": 0.5886827068687033,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=0",
                     "destination_observation_id": "cube:event=60:set=10:cam=3",
-                    "rmse_px": 16.16464395246216,
+                    "rmse_px": 5.655384108269389,
                     "n_corners": 12
                   },
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=3",
                     "destination_observation_id": "cube:event=60:set=10:cam=0",
-                    "rmse_px": 8.956997618336757,
+                    "rmse_px": 3.636632496672972,
                     "n_corners": 8
                   }
                 ]
@@ -965,19 +1010,19 @@
                 "set": 10,
                 "left_observation_id": "cube:event=60:set=10:cam=1",
                 "right_observation_id": "cube:event=60:set=10:cam=3",
-                "translation_mm": 16.530382469156912,
-                "rotation_deg": 2.712486829527481,
+                "translation_mm": 11.045697375939893,
+                "rotation_deg": 0.8912889118512731,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=1",
                     "destination_observation_id": "cube:event=60:set=10:cam=3",
-                    "rmse_px": 8.813988460724687,
+                    "rmse_px": 7.987626303000008,
                     "n_corners": 12
                   },
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=3",
                     "destination_observation_id": "cube:event=60:set=10:cam=1",
-                    "rmse_px": 12.15115544414294,
+                    "rmse_px": 4.187600664229699,
                     "n_corners": 16
                   }
                 ]
@@ -985,7 +1030,7 @@
             ]
           }
         },
-        "overall_pixel_transfer_rmse_px": 7.5771225665234,
+        "overall_pixel_transfer_rmse_px": 4.152729797791596,
         "overall_note": "pooled board+cube pixel transfer is descriptive only; use each target component for comparison",
         "n_output_rejected": 0
       }
@@ -1023,22 +1068,22 @@
         ],
         "1": [
           [
-            -0.49859433375324674,
-            -0.3287309554728312,
-            0.8020845649076384,
-            -0.4829625995146759
+            -0.502166900522383,
+            -0.3292936056628584,
+            0.7996212386432074,
+            -0.47893187622245037
           ],
           [
-            0.38462716029653093,
-            0.7453278057557655,
-            0.5445625855028263,
-            -0.3294817147199036
+            0.3881393421133647,
+            0.7404665079057845,
+            0.5486867975207872,
+            -0.3290388368757116
           ],
           [
-            -0.7768305078402775,
-            0.5800193280238304,
-            -0.2451773668334848,
-            0.8020135986870047
+            -0.7727718001606607,
+            0.585896809975414,
+            -0.24402596775156085,
+            0.7953405665705818
           ],
           [
             0.0,
@@ -1049,22 +1094,22 @@
         ],
         "3": [
           [
-            -0.6427997978259512,
-            0.28571733037462005,
-            -0.7107559546275479,
-            0.5993104326402233
+            -0.6460856559470362,
+            0.2888872262502645,
+            -0.7064824808082056,
+            0.5909134432745454
           ],
           [
-            -0.3872427914894263,
-            0.6793557027749363,
-            0.6233128023285331,
-            -0.3408286454884848
+            -0.38568752754857366,
+            0.6751715934058764,
+            0.6287992132240936,
+            -0.34043517358428066
           ],
           [
-            0.6609473809271004,
-            0.675900463256812,
-            -0.3260477318044618,
-            0.7528398000973187
+            0.6586489628572697,
+            0.6787396334141684,
+            -0.3247984817696112,
+            0.7479764089176522
           ],
           [
             0.0,
@@ -1084,20 +1129,20 @@
           "num_total": 6,
           "num_inliers": 6,
           "inlier_ratio": 1.0,
-          "translation_std_mm": 3.3524051964999617,
-          "rotation_std_deg": 0.16219226274844314
+          "translation_std_mm": 0.7447851303585097,
+          "rotation_std_deg": 0.17017834594185086
         },
         "3": {
           "num_total": 6,
-          "num_inliers": 4,
-          "inlier_ratio": 0.6666666666666666,
-          "translation_std_mm": 1.6341595442993142,
-          "rotation_std_deg": 0.23896705868267948
+          "num_inliers": 6,
+          "inlier_ratio": 1.0,
+          "translation_std_mm": 4.398698529193738,
+          "rotation_std_deg": 0.29100082547725004
         }
       },
       "heldout_fixed_to_fixed": {
         "applicable": true,
-        "evaluation_mask_sha256": "5543693435a83f0256182658a8251c7c20a6f46501b77ebd414fc0e315dc47cd",
+        "evaluation_mask_sha256": "bcd1d6af56cef28980c27dd4252fba6d715e61f1969664b89c4d70097e2c8f87",
         "metric_contract": {
           "name": "fixed_to_fixed_board_cube_cross_target",
           "targets": [
@@ -1112,15 +1157,18 @@
           "uses_gripper_camera": false,
           "uses_external_ground_truth": false,
           "absolute_accuracy_metric": false,
-          "ranking_role_before_external_gt": "fixed_camera_subsystem_relative_metric"
+          "reporting_tier": "supplementary",
+          "may_rank_methods_before_external_gt": false,
+          "ranking_role_before_external_gt": "supplementary_method_specific_heldout_consistency",
+          "interpretation": "computed with each method's fitted fixed-camera poses; useful as a held-out self-consistency diagnostic, not an independent baseline"
         },
         "model_dependent_gating": false,
         "output_dependent_pose_gate": null,
         "by_target": {
           "board": {
-            "pose_consistency_translation_rmse_mm": 16.659369757138403,
-            "pose_consistency_rotation_rmse_deg": 0.3332266486680869,
-            "cross_view_pixel_transfer_rmse_px": 11.308208574713014,
+            "pose_consistency_translation_rmse_mm": 9.199804474781947,
+            "pose_consistency_rotation_rmse_deg": 0.6475660583113767,
+            "cross_view_pixel_transfer_rmse_px": 6.492783667552773,
             "n_pairs": 7,
             "n_directions": 14,
             "n_output_rejected": 0,
@@ -1131,19 +1179,19 @@
                 "set": 4,
                 "left_observation_id": "board:event=24:set=4:cam=0",
                 "right_observation_id": "board:event=24:set=4:cam=1",
-                "translation_mm": 16.4924938704423,
-                "rotation_deg": 0.4107533381377065,
+                "translation_mm": 9.862171944814998,
+                "rotation_deg": 0.5057151725674833,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "board:event=24:set=4:cam=0",
                     "destination_observation_id": "board:event=24:set=4:cam=1",
-                    "rmse_px": 10.88295749228043,
+                    "rmse_px": 5.657953939770497,
                     "n_corners": 23
                   },
                   {
                     "source_observation_id": "board:event=24:set=4:cam=1",
                     "destination_observation_id": "board:event=24:set=4:cam=0",
-                    "rmse_px": 11.658963182400399,
+                    "rmse_px": 7.5937417103847995,
                     "n_corners": 42
                   }
                 ]
@@ -1154,19 +1202,19 @@
                 "set": 4,
                 "left_observation_id": "board:event=24:set=4:cam=0",
                 "right_observation_id": "board:event=24:set=4:cam=3",
-                "translation_mm": 13.367875138425227,
-                "rotation_deg": 0.2628821018348063,
+                "translation_mm": 4.911962082279037,
+                "rotation_deg": 0.37105238831402293,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "board:event=24:set=4:cam=0",
                     "destination_observation_id": "board:event=24:set=4:cam=3",
-                    "rmse_px": 9.394608411629447,
+                    "rmse_px": 5.674961801481021,
                     "n_corners": 16
                   },
                   {
                     "source_observation_id": "board:event=24:set=4:cam=3",
                     "destination_observation_id": "board:event=24:set=4:cam=0",
-                    "rmse_px": 9.183559230929777,
+                    "rmse_px": 2.5562821918271683,
                     "n_corners": 42
                   }
                 ]
@@ -1177,19 +1225,19 @@
                 "set": 4,
                 "left_observation_id": "board:event=24:set=4:cam=1",
                 "right_observation_id": "board:event=24:set=4:cam=3",
-                "translation_mm": 16.700544643107207,
-                "rotation_deg": 0.3347246070137677,
+                "translation_mm": 8.032883387798691,
+                "rotation_deg": 0.8736361476800908,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "board:event=24:set=4:cam=1",
                     "destination_observation_id": "board:event=24:set=4:cam=3",
-                    "rmse_px": 11.51340415305147,
+                    "rmse_px": 6.267657145465551,
                     "n_corners": 16
                   },
                   {
                     "source_observation_id": "board:event=24:set=4:cam=3",
                     "destination_observation_id": "board:event=24:set=4:cam=1",
-                    "rmse_px": 11.125682481989548,
+                    "rmse_px": 3.5666122911338376,
                     "n_corners": 23
                   }
                 ]
@@ -1200,19 +1248,19 @@
                 "set": 8,
                 "left_observation_id": "board:event=48:set=8:cam=0",
                 "right_observation_id": "board:event=48:set=8:cam=1",
-                "translation_mm": 17.780468357322796,
-                "rotation_deg": 0.35270692962272976,
+                "translation_mm": 11.25463224127007,
+                "rotation_deg": 0.5277486214955337,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "board:event=48:set=8:cam=0",
                     "destination_observation_id": "board:event=48:set=8:cam=1",
-                    "rmse_px": 10.902043060622066,
+                    "rmse_px": 5.694294730199435,
                     "n_corners": 17
                   },
                   {
                     "source_observation_id": "board:event=48:set=8:cam=1",
                     "destination_observation_id": "board:event=48:set=8:cam=0",
-                    "rmse_px": 12.826389229462098,
+                    "rmse_px": 8.84671200812099,
                     "n_corners": 48
                   }
                 ]
@@ -1223,19 +1271,19 @@
                 "set": 8,
                 "left_observation_id": "board:event=48:set=8:cam=0",
                 "right_observation_id": "board:event=48:set=8:cam=3",
-                "translation_mm": 14.308977741364865,
-                "rotation_deg": 0.055121346998462946,
+                "translation_mm": 5.621051055932572,
+                "rotation_deg": 0.43608377377939894,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "board:event=48:set=8:cam=0",
                     "destination_observation_id": "board:event=48:set=8:cam=3",
-                    "rmse_px": 9.565252253518064,
+                    "rmse_px": 5.738710778579141,
                     "n_corners": 27
                   },
                   {
                     "source_observation_id": "board:event=48:set=8:cam=3",
                     "destination_observation_id": "board:event=48:set=8:cam=0",
-                    "rmse_px": 9.911755671443736,
+                    "rmse_px": 3.254067630219958,
                     "n_corners": 48
                   }
                 ]
@@ -1246,19 +1294,19 @@
                 "set": 8,
                 "left_observation_id": "board:event=48:set=8:cam=1",
                 "right_observation_id": "board:event=48:set=8:cam=3",
-                "translation_mm": 18.77393736859199,
-                "rotation_deg": 0.37168574335176663,
+                "translation_mm": 10.111021395406402,
+                "rotation_deg": 0.8976610434863165,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "board:event=48:set=8:cam=1",
                     "destination_observation_id": "board:event=48:set=8:cam=3",
-                    "rmse_px": 12.952791372574927,
+                    "rmse_px": 7.85934270057493,
                     "n_corners": 27
                   },
                   {
                     "source_observation_id": "board:event=48:set=8:cam=3",
                     "destination_observation_id": "board:event=48:set=8:cam=1",
-                    "rmse_px": 11.565975381131688,
+                    "rmse_px": 4.322848575984694,
                     "n_corners": 17
                   }
                 ]
@@ -1269,19 +1317,19 @@
                 "set": 10,
                 "left_observation_id": "board:event=60:set=10:cam=0",
                 "right_observation_id": "board:event=60:set=10:cam=1",
-                "translation_mm": 18.433093892438006,
-                "rotation_deg": 0.4022726637136843,
+                "translation_mm": 12.084787073536209,
+                "rotation_deg": 0.7100998209615766,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "board:event=60:set=10:cam=0",
                     "destination_observation_id": "board:event=60:set=10:cam=1",
-                    "rmse_px": 9.661270544541761,
+                    "rmse_px": 4.860244994799038,
                     "n_corners": 14
                   },
                   {
                     "source_observation_id": "board:event=60:set=10:cam=1",
                     "destination_observation_id": "board:event=60:set=10:cam=0",
-                    "rmse_px": 13.515482242580688,
+                    "rmse_px": 9.640990492490541,
                     "n_corners": 45
                   }
                 ]
@@ -1289,9 +1337,9 @@
             ]
           },
           "cube": {
-            "pose_consistency_translation_rmse_mm": 4.479787181376066,
-            "pose_consistency_rotation_rmse_deg": 1.6914827731670339,
-            "cross_view_pixel_transfer_rmse_px": 4.246995731145374,
+            "pose_consistency_translation_rmse_mm": 3.5148197551980243,
+            "pose_consistency_rotation_rmse_deg": 0.5490529377894185,
+            "cross_view_pixel_transfer_rmse_px": 2.881954917412687,
             "n_pairs": 9,
             "n_directions": 18,
             "n_output_rejected": 0,
@@ -1302,20 +1350,20 @@
                 "set": 4,
                 "left_observation_id": "cube:event=24:set=4:cam=0",
                 "right_observation_id": "cube:event=24:set=4:cam=1",
-                "translation_mm": 3.7829253443789526,
-                "rotation_deg": 0.7267228605760161,
+                "translation_mm": 3.0320286534090197,
+                "rotation_deg": 0.5695218290194829,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=0",
                     "destination_observation_id": "cube:event=24:set=4:cam=1",
-                    "rmse_px": 1.0223216823397276,
+                    "rmse_px": 1.111521846710837,
                     "n_corners": 8
                   },
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=1",
                     "destination_observation_id": "cube:event=24:set=4:cam=0",
-                    "rmse_px": 4.311978870382002,
-                    "n_corners": 16
+                    "rmse_px": 3.6893541946176627,
+                    "n_corners": 12
                   }
                 ]
               },
@@ -1325,20 +1373,20 @@
                 "set": 4,
                 "left_observation_id": "cube:event=24:set=4:cam=0",
                 "right_observation_id": "cube:event=24:set=4:cam=3",
-                "translation_mm": 1.4480940294551494,
-                "rotation_deg": 2.346937462198487,
+                "translation_mm": 4.039751457472788,
+                "rotation_deg": 0.6262894007951327,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=0",
                     "destination_observation_id": "cube:event=24:set=4:cam=3",
-                    "rmse_px": 2.319339441445062,
+                    "rmse_px": 3.8350299678654545,
                     "n_corners": 12
                   },
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=3",
                     "destination_observation_id": "cube:event=24:set=4:cam=0",
-                    "rmse_px": 2.001655735864123,
-                    "n_corners": 16
+                    "rmse_px": 4.328154078448388,
+                    "n_corners": 12
                   }
                 ]
               },
@@ -1348,19 +1396,19 @@
                 "set": 4,
                 "left_observation_id": "cube:event=24:set=4:cam=1",
                 "right_observation_id": "cube:event=24:set=4:cam=3",
-                "translation_mm": 3.4435313467764272,
-                "rotation_deg": 2.0488911590832233,
+                "translation_mm": 1.783621311971003,
+                "rotation_deg": 1.1200428948193264,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=1",
                     "destination_observation_id": "cube:event=24:set=4:cam=3",
-                    "rmse_px": 3.7424888563236034,
+                    "rmse_px": 2.004513406304108,
                     "n_corners": 12
                   },
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=3",
                     "destination_observation_id": "cube:event=24:set=4:cam=1",
-                    "rmse_px": 1.1307433723000229,
+                    "rmse_px": 1.5247846145281383,
                     "n_corners": 8
                   }
                 ]
@@ -1371,19 +1419,19 @@
                 "set": 8,
                 "left_observation_id": "cube:event=48:set=8:cam=0",
                 "right_observation_id": "cube:event=48:set=8:cam=1",
-                "translation_mm": 5.697975889745225,
-                "rotation_deg": 1.2450255111905617,
+                "translation_mm": 2.464785825420564,
+                "rotation_deg": 0.15765571722576527,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=0",
                     "destination_observation_id": "cube:event=48:set=8:cam=1",
-                    "rmse_px": 6.758103102278583,
-                    "n_corners": 16
+                    "rmse_px": 3.010283839851909,
+                    "n_corners": 12
                   },
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=1",
                     "destination_observation_id": "cube:event=48:set=8:cam=0",
-                    "rmse_px": 1.0254303783889958,
+                    "rmse_px": 0.49962766663821934,
                     "n_corners": 12
                   }
                 ]
@@ -1394,19 +1442,19 @@
                 "set": 8,
                 "left_observation_id": "cube:event=48:set=8:cam=0",
                 "right_observation_id": "cube:event=48:set=8:cam=3",
-                "translation_mm": 4.37076251396596,
-                "rotation_deg": 0.9500743686653084,
+                "translation_mm": 5.619141645747178,
+                "rotation_deg": 0.578042226359935,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=0",
                     "destination_observation_id": "cube:event=48:set=8:cam=3",
-                    "rmse_px": 3.3797467146914184,
-                    "n_corners": 8
+                    "rmse_px": 2.2483167347356683,
+                    "n_corners": 16
                   },
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=3",
                     "destination_observation_id": "cube:event=48:set=8:cam=0",
-                    "rmse_px": 3.1558687072711615,
+                    "rmse_px": 4.624907475617051,
                     "n_corners": 12
                   }
                 ]
@@ -1417,20 +1465,20 @@
                 "set": 8,
                 "left_observation_id": "cube:event=48:set=8:cam=1",
                 "right_observation_id": "cube:event=48:set=8:cam=3",
-                "translation_mm": 5.129858276190138,
-                "rotation_deg": 1.5332369874921552,
+                "translation_mm": 5.8185102715685115,
+                "rotation_deg": 0.4792141535726097,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=1",
                     "destination_observation_id": "cube:event=48:set=8:cam=3",
-                    "rmse_px": 3.8961415572917826,
-                    "n_corners": 8
+                    "rmse_px": 1.1981118146804168,
+                    "n_corners": 16
                   },
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=3",
                     "destination_observation_id": "cube:event=48:set=8:cam=1",
-                    "rmse_px": 5.602793168249398,
-                    "n_corners": 16
+                    "rmse_px": 5.644413811168068,
+                    "n_corners": 12
                   }
                 ]
               },
@@ -1440,19 +1488,19 @@
                 "set": 10,
                 "left_observation_id": "cube:event=60:set=10:cam=0",
                 "right_observation_id": "cube:event=60:set=10:cam=1",
-                "translation_mm": 3.8879082411651193,
-                "rotation_deg": 0.8097343787040792,
+                "translation_mm": 0.5583022910481453,
+                "rotation_deg": 0.29633584444557615,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=0",
                     "destination_observation_id": "cube:event=60:set=10:cam=1",
-                    "rmse_px": 5.951364607689202,
+                    "rmse_px": 0.6532275906625554,
                     "n_corners": 16
                   },
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=1",
                     "destination_observation_id": "cube:event=60:set=10:cam=0",
-                    "rmse_px": 1.269101605163077,
+                    "rmse_px": 0.6281897160434354,
                     "n_corners": 8
                   }
                 ]
@@ -1463,19 +1511,19 @@
                 "set": 10,
                 "left_observation_id": "cube:event=60:set=10:cam=0",
                 "right_observation_id": "cube:event=60:set=10:cam=3",
-                "translation_mm": 6.854152630398241,
-                "rotation_deg": 1.978991985107453,
+                "translation_mm": 2.3840157198478855,
+                "rotation_deg": 0.2447252793230649,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=0",
                     "destination_observation_id": "cube:event=60:set=10:cam=3",
-                    "rmse_px": 6.782843035128529,
+                    "rmse_px": 1.5479110655557848,
                     "n_corners": 12
                   },
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=3",
                     "destination_observation_id": "cube:event=60:set=10:cam=0",
-                    "rmse_px": 1.367319507679345,
+                    "rmse_px": 1.9400677404804805,
                     "n_corners": 8
                   }
                 ]
@@ -1486,19 +1534,19 @@
                 "set": 10,
                 "left_observation_id": "cube:event=60:set=10:cam=1",
                 "right_observation_id": "cube:event=60:set=10:cam=3",
-                "translation_mm": 3.5170799249309908,
-                "rotation_deg": 2.4779436368619763,
+                "translation_mm": 2.2341240889495255,
+                "rotation_deg": 0.07551690067118871,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=1",
                     "destination_observation_id": "cube:event=60:set=10:cam=3",
-                    "rmse_px": 3.35029336799152,
+                    "rmse_px": 1.7494713122015773,
                     "n_corners": 12
                   },
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=3",
                     "destination_observation_id": "cube:event=60:set=10:cam=1",
-                    "rmse_px": 5.147144932595202,
+                    "rmse_px": 3.4690903977896705,
                     "n_corners": 16
                   }
                 ]
@@ -1506,7 +1554,7 @@
             ]
           }
         },
-        "overall_pixel_transfer_rmse_px": 9.469469246090714,
+        "overall_pixel_transfer_rmse_px": 5.51199841244611,
         "overall_note": "pooled board+cube pixel transfer is descriptive only; use each target component for comparison",
         "n_output_rejected": 0
       }
@@ -1571,22 +1619,22 @@
         ],
         "3": [
           [
-            -0.6415465394138046,
-            0.28796316147274614,
-            -0.7109818952693467,
-            0.5943223082890607
+            -0.6417939285450465,
+            0.28917481193204475,
+            -0.7102664862055527,
+            0.5923041374142713
           ],
           [
-            -0.3875691734093011,
-            0.6781752683642751,
-            0.6243944596181762,
-            -0.33868676641468803
+            -0.38793800846557586,
+            0.6765095591527398,
+            0.6259703810586632,
+            -0.33732457973498353
           ],
           [
-            0.6619729402241477,
-            0.6761327702557127,
-            -0.3234753520708076,
-            0.7441062895780088
+            0.6615169346815534,
+            0.6772833561509035,
+            -0.32199782702758983,
+            0.7427210276884016
           ],
           [
             0.0,
@@ -1611,15 +1659,15 @@
         },
         "3": {
           "num_total": 9,
-          "num_inliers": 5,
-          "inlier_ratio": 0.5555555555555556,
-          "translation_std_mm": 2.3240618902009977,
-          "rotation_std_deg": 0.24205568777952044
+          "num_inliers": 6,
+          "inlier_ratio": 0.6666666666666666,
+          "translation_std_mm": 1.4091214796253504,
+          "rotation_std_deg": 0.14967496050305767
         }
       },
       "heldout_fixed_to_fixed": {
         "applicable": true,
-        "evaluation_mask_sha256": "5543693435a83f0256182658a8251c7c20a6f46501b77ebd414fc0e315dc47cd",
+        "evaluation_mask_sha256": "bcd1d6af56cef28980c27dd4252fba6d715e61f1969664b89c4d70097e2c8f87",
         "metric_contract": {
           "name": "fixed_to_fixed_board_cube_cross_target",
           "targets": [
@@ -1634,15 +1682,18 @@
           "uses_gripper_camera": false,
           "uses_external_ground_truth": false,
           "absolute_accuracy_metric": false,
-          "ranking_role_before_external_gt": "fixed_camera_subsystem_relative_metric"
+          "reporting_tier": "supplementary",
+          "may_rank_methods_before_external_gt": false,
+          "ranking_role_before_external_gt": "supplementary_method_specific_heldout_consistency",
+          "interpretation": "computed with each method's fitted fixed-camera poses; useful as a held-out self-consistency diagnostic, not an independent baseline"
         },
         "model_dependent_gating": false,
         "output_dependent_pose_gate": null,
         "by_target": {
           "board": {
-            "pose_consistency_translation_rmse_mm": 4.440930822160069,
-            "pose_consistency_rotation_rmse_deg": 0.1580680428373842,
-            "cross_view_pixel_transfer_rmse_px": 3.421069780636656,
+            "pose_consistency_translation_rmse_mm": 2.847904144239345,
+            "pose_consistency_rotation_rmse_deg": 0.20909037762299298,
+            "cross_view_pixel_transfer_rmse_px": 2.208357680313072,
             "n_pairs": 7,
             "n_directions": 14,
             "n_output_rejected": 0,
@@ -1676,19 +1727,19 @@
                 "set": 4,
                 "left_observation_id": "board:event=24:set=4:cam=0",
                 "right_observation_id": "board:event=24:set=4:cam=3",
-                "translation_mm": 4.9835060105921025,
-                "rotation_deg": 0.12430345685249955,
+                "translation_mm": 2.730532107678069,
+                "rotation_deg": 0.06663849330072952,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "board:event=24:set=4:cam=0",
                     "destination_observation_id": "board:event=24:set=4:cam=3",
-                    "rmse_px": 2.5979062639981176,
+                    "rmse_px": 2.2572770673018163,
                     "n_corners": 16
                   },
                   {
                     "source_observation_id": "board:event=24:set=4:cam=3",
                     "destination_observation_id": "board:event=24:set=4:cam=0",
-                    "rmse_px": 4.1520709997074,
+                    "rmse_px": 1.6095744626712831,
                     "n_corners": 42
                   }
                 ]
@@ -1699,19 +1750,19 @@
                 "set": 4,
                 "left_observation_id": "board:event=24:set=4:cam=1",
                 "right_observation_id": "board:event=24:set=4:cam=3",
-                "translation_mm": 5.636886461814494,
-                "rotation_deg": 0.10955586547020428,
+                "translation_mm": 3.5872559624832747,
+                "rotation_deg": 0.19577235853412409,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "board:event=24:set=4:cam=1",
                     "destination_observation_id": "board:event=24:set=4:cam=3",
-                    "rmse_px": 4.84740771708804,
+                    "rmse_px": 4.025967609536726,
                     "n_corners": 16
                   },
                   {
                     "source_observation_id": "board:event=24:set=4:cam=3",
                     "destination_observation_id": "board:event=24:set=4:cam=1",
-                    "rmse_px": 5.560197832602901,
+                    "rmse_px": 2.9716228690156847,
                     "n_corners": 23
                   }
                 ]
@@ -1745,19 +1796,19 @@
                 "set": 8,
                 "left_observation_id": "board:event=48:set=8:cam=0",
                 "right_observation_id": "board:event=48:set=8:cam=3",
-                "translation_mm": 5.96651228686737,
-                "rotation_deg": 0.1359891424127101,
+                "translation_mm": 3.63616993757147,
+                "rotation_deg": 0.2563336938946117,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "board:event=48:set=8:cam=0",
                     "destination_observation_id": "board:event=48:set=8:cam=3",
-                    "rmse_px": 2.693227853555192,
+                    "rmse_px": 2.3488852091003913,
                     "n_corners": 27
                   },
                   {
                     "source_observation_id": "board:event=48:set=8:cam=3",
                     "destination_observation_id": "board:event=48:set=8:cam=0",
-                    "rmse_px": 4.904692037703281,
+                    "rmse_px": 2.4385212741129485,
                     "n_corners": 48
                   }
                 ]
@@ -1768,19 +1819,19 @@
                 "set": 8,
                 "left_observation_id": "board:event=48:set=8:cam=1",
                 "right_observation_id": "board:event=48:set=8:cam=3",
-                "translation_mm": 5.79684215114726,
-                "rotation_deg": 0.18666167036008924,
+                "translation_mm": 3.314719644596091,
+                "rotation_deg": 0.3216332604624418,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "board:event=48:set=8:cam=1",
                     "destination_observation_id": "board:event=48:set=8:cam=3",
-                    "rmse_px": 3.5062025302224527,
+                    "rmse_px": 2.780729723560393,
                     "n_corners": 27
                   },
                   {
                     "source_observation_id": "board:event=48:set=8:cam=3",
                     "destination_observation_id": "board:event=48:set=8:cam=1",
-                    "rmse_px": 6.3896183965165445,
+                    "rmse_px": 3.7161533342192814,
                     "n_corners": 17
                   }
                 ]
@@ -1811,9 +1862,9 @@
             ]
           },
           "cube": {
-            "pose_consistency_translation_rmse_mm": 15.258566287344559,
-            "pose_consistency_rotation_rmse_deg": 1.7586272562541265,
-            "cross_view_pixel_transfer_rmse_px": 11.673271916134608,
+            "pose_consistency_translation_rmse_mm": 9.455798668974804,
+            "pose_consistency_rotation_rmse_deg": 0.5998560565120697,
+            "cross_view_pixel_transfer_rmse_px": 6.583034095626658,
             "n_pairs": 9,
             "n_directions": 18,
             "n_output_rejected": 0,
@@ -1824,20 +1875,20 @@
                 "set": 4,
                 "left_observation_id": "cube:event=24:set=4:cam=0",
                 "right_observation_id": "cube:event=24:set=4:cam=1",
-                "translation_mm": 15.441310289202413,
-                "rotation_deg": 0.9766350899634484,
+                "translation_mm": 8.647416906493325,
+                "rotation_deg": 0.6781141271829856,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=0",
                     "destination_observation_id": "cube:event=24:set=4:cam=1",
-                    "rmse_px": 7.812777731608607,
+                    "rmse_px": 2.8512611267165275,
                     "n_corners": 8
                   },
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=1",
                     "destination_observation_id": "cube:event=24:set=4:cam=0",
-                    "rmse_px": 15.068821771742172,
-                    "n_corners": 16
+                    "rmse_px": 9.294432668066323,
+                    "n_corners": 12
                   }
                 ]
               },
@@ -1847,20 +1898,20 @@
                 "set": 4,
                 "left_observation_id": "cube:event=24:set=4:cam=0",
                 "right_observation_id": "cube:event=24:set=4:cam=3",
-                "translation_mm": 9.117835882667077,
-                "rotation_deg": 2.286281864027525,
+                "translation_mm": 5.2975817181984475,
+                "rotation_deg": 0.354582082321389,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=0",
                     "destination_observation_id": "cube:event=24:set=4:cam=3",
-                    "rmse_px": 8.513056576693547,
+                    "rmse_px": 1.2714927460884735,
                     "n_corners": 12
                   },
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=3",
                     "destination_observation_id": "cube:event=24:set=4:cam=0",
-                    "rmse_px": 3.0757520837620675,
-                    "n_corners": 16
+                    "rmse_px": 4.7959335510683125,
+                    "n_corners": 12
                   }
                 ]
               },
@@ -1870,19 +1921,19 @@
                 "set": 4,
                 "left_observation_id": "cube:event=24:set=4:cam=1",
                 "right_observation_id": "cube:event=24:set=4:cam=3",
-                "translation_mm": 14.309181299453837,
-                "rotation_deg": 1.818839335125412,
+                "translation_mm": 10.569310198107114,
+                "rotation_deg": 0.7875927506589694,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=1",
                     "destination_observation_id": "cube:event=24:set=4:cam=3",
-                    "rmse_px": 16.332454299395984,
+                    "rmse_px": 10.665386071677414,
                     "n_corners": 12
                   },
                   {
                     "source_observation_id": "cube:event=24:set=4:cam=3",
                     "destination_observation_id": "cube:event=24:set=4:cam=1",
-                    "rmse_px": 3.18348569514143,
+                    "rmse_px": 3.606095934342953,
                     "n_corners": 8
                   }
                 ]
@@ -1893,19 +1944,19 @@
                 "set": 8,
                 "left_observation_id": "cube:event=48:set=8:cam=0",
                 "right_observation_id": "cube:event=48:set=8:cam=1",
-                "translation_mm": 15.124298350851376,
-                "rotation_deg": 1.3684832943059042,
+                "translation_mm": 10.511332895956066,
+                "rotation_deg": 0.6464722224453893,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=0",
                     "destination_observation_id": "cube:event=48:set=8:cam=1",
-                    "rmse_px": 8.188070871355766,
-                    "n_corners": 16
+                    "rmse_px": 4.344217442103538,
+                    "n_corners": 12
                   },
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=1",
                     "destination_observation_id": "cube:event=48:set=8:cam=0",
-                    "rmse_px": 11.488627733458513,
+                    "rmse_px": 8.290984407271083,
                     "n_corners": 12
                   }
                 ]
@@ -1916,19 +1967,19 @@
                 "set": 8,
                 "left_observation_id": "cube:event=48:set=8:cam=0",
                 "right_observation_id": "cube:event=48:set=8:cam=3",
-                "translation_mm": 9.784260193190983,
-                "rotation_deg": 0.9890650871060117,
+                "translation_mm": 5.608268833591449,
+                "rotation_deg": 0.34130440684867247,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=0",
                     "destination_observation_id": "cube:event=48:set=8:cam=3",
-                    "rmse_px": 5.021092735664959,
-                    "n_corners": 8
+                    "rmse_px": 1.8119284187498905,
+                    "n_corners": 16
                   },
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=3",
                     "destination_observation_id": "cube:event=48:set=8:cam=0",
-                    "rmse_px": 7.559720418913283,
+                    "rmse_px": 4.63149925691373,
                     "n_corners": 12
                   }
                 ]
@@ -1939,20 +1990,20 @@
                 "set": 8,
                 "left_observation_id": "cube:event=48:set=8:cam=1",
                 "right_observation_id": "cube:event=48:set=8:cam=3",
-                "translation_mm": 19.540892896938654,
-                "rotation_deg": 1.7310813951877038,
+                "translation_mm": 13.256695917049546,
+                "rotation_deg": 0.352020884556534,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=1",
                     "destination_observation_id": "cube:event=48:set=8:cam=3",
-                    "rmse_px": 13.90641165969961,
-                    "n_corners": 8
+                    "rmse_px": 9.822704949540846,
+                    "n_corners": 16
                   },
                   {
                     "source_observation_id": "cube:event=48:set=8:cam=3",
                     "destination_observation_id": "cube:event=48:set=8:cam=1",
-                    "rmse_px": 8.429019649221193,
-                    "n_corners": 16
+                    "rmse_px": 5.303656945503324,
+                    "n_corners": 12
                   }
                 ]
               },
@@ -1962,19 +2013,19 @@
                 "set": 10,
                 "left_observation_id": "cube:event=60:set=10:cam=0",
                 "right_observation_id": "cube:event=60:set=10:cam=1",
-                "translation_mm": 21.40685768183816,
-                "rotation_deg": 0.9290568078472222,
+                "translation_mm": 12.031138817538348,
+                "rotation_deg": 0.6028273081655225,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=0",
                     "destination_observation_id": "cube:event=60:set=10:cam=1",
-                    "rmse_px": 24.31117269705484,
+                    "rmse_px": 9.284843980583961,
                     "n_corners": 16
                   },
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=1",
                     "destination_observation_id": "cube:event=60:set=10:cam=0",
-                    "rmse_px": 9.107058994256626,
+                    "rmse_px": 7.496008983772924,
                     "n_corners": 8
                   }
                 ]
@@ -1985,19 +2036,19 @@
                 "set": 10,
                 "left_observation_id": "cube:event=60:set=10:cam=0",
                 "right_observation_id": "cube:event=60:set=10:cam=3",
-                "translation_mm": 13.319201085431132,
-                "rotation_deg": 2.11683348020319,
+                "translation_mm": 4.072371151092596,
+                "rotation_deg": 0.5384494764987114,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=0",
                     "destination_observation_id": "cube:event=60:set=10:cam=3",
-                    "rmse_px": 13.392861756324587,
+                    "rmse_px": 3.82936168950617,
                     "n_corners": 12
                   },
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=3",
                     "destination_observation_id": "cube:event=60:set=10:cam=0",
-                    "rmse_px": 5.426417741349066,
+                    "rmse_px": 2.2371551331929576,
                     "n_corners": 8
                   }
                 ]
@@ -2008,19 +2059,19 @@
                 "set": 10,
                 "left_observation_id": "cube:event=60:set=10:cam=1",
                 "right_observation_id": "cube:event=60:set=10:cam=3",
-                "translation_mm": 15.070355852082399,
-                "rotation_deg": 2.6747114694902945,
+                "translation_mm": 10.542454823164972,
+                "rotation_deg": 0.8490663669144065,
                 "pixel_transfer_directions": [
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=1",
                     "destination_observation_id": "cube:event=60:set=10:cam=3",
-                    "rmse_px": 10.8335076182196,
+                    "rmse_px": 8.495950875986006,
                     "n_corners": 12
                   },
                   {
                     "source_observation_id": "cube:event=60:set=10:cam=3",
                     "destination_observation_id": "cube:event=60:set=10:cam=1",
-                    "rmse_px": 7.350299093534365,
+                    "rmse_px": 4.615765484157597,
                     "n_corners": 16
                   }
                 ]
@@ -2028,7 +2079,7 @@
             ]
           }
         },
-        "overall_pixel_transfer_rmse_px": 7.41818562864531,
+        "overall_pixel_transfer_rmse_px": 4.272476920824178,
         "overall_note": "pooled board+cube pixel transfer is descriptive only; use each target component for comparison",
         "n_output_rejected": 0
       }
@@ -2039,16 +2090,16 @@
     "uses_robot_fk": false,
     "per_camera": {
       "1": {
-        "translation_mm": 19.423174710891704,
-        "rotation_deg": 0.27234681938287675
+        "translation_mm": 12.952384190277622,
+        "rotation_deg": 0.5270391414046575
       },
       "3": {
-        "translation_mm": 14.874620788978222,
-        "rotation_deg": 0.2169586278329329
+        "translation_mm": 8.114649685508855,
+        "rotation_deg": 0.3824936486364274
       }
     },
-    "translation_rmse_mm": 17.299047075861232,
-    "rotation_rmse_deg": 0.24621518659408317
+    "translation_rmse_mm": 10.807677727686984,
+    "rotation_rmse_deg": 0.4604734779657593
   },
   "summary": [
     {
@@ -2057,38 +2108,38 @@
       "board_pose_consistency_translation_rmse_mm": 1.9468613153990815,
       "board_pose_consistency_rotation_rmse_deg": 0.17471901110230567,
       "n_board_pairs": 7,
-      "cube_cross_view_pixel_transfer_rmse_px": 12.70088415890769,
-      "cube_pose_consistency_translation_rmse_mm": 17.04155081584487,
-      "cube_pose_consistency_rotation_rmse_deg": 1.7671561120023362,
+      "cube_cross_view_pixel_transfer_rmse_px": 6.76982616289872,
+      "cube_pose_consistency_translation_rmse_mm": 10.179958061132366,
+      "cube_pose_consistency_rotation_rmse_deg": 0.6223815229673624,
       "n_cube_pairs": 9,
       "n_train_relative_candidates": 9,
       "n_train_relative_inliers": 8
     },
     {
       "baseline": "opencv_cube",
-      "board_cross_view_pixel_transfer_rmse_px": 11.308208574713014,
-      "board_pose_consistency_translation_rmse_mm": 16.659369757138403,
-      "board_pose_consistency_rotation_rmse_deg": 0.3332266486680869,
+      "board_cross_view_pixel_transfer_rmse_px": 6.492783667552773,
+      "board_pose_consistency_translation_rmse_mm": 9.199804474781947,
+      "board_pose_consistency_rotation_rmse_deg": 0.6475660583113767,
       "n_board_pairs": 7,
-      "cube_cross_view_pixel_transfer_rmse_px": 4.246995731145374,
-      "cube_pose_consistency_translation_rmse_mm": 4.479787181376066,
-      "cube_pose_consistency_rotation_rmse_deg": 1.6914827731670339,
+      "cube_cross_view_pixel_transfer_rmse_px": 2.881954917412687,
+      "cube_pose_consistency_translation_rmse_mm": 3.5148197551980243,
+      "cube_pose_consistency_rotation_rmse_deg": 0.5490529377894185,
       "n_cube_pairs": 9,
       "n_train_relative_candidates": 12,
-      "n_train_relative_inliers": 10
+      "n_train_relative_inliers": 12
     },
     {
       "baseline": "opencv_board_cube",
-      "board_cross_view_pixel_transfer_rmse_px": 3.421069780636656,
-      "board_pose_consistency_translation_rmse_mm": 4.440930822160069,
-      "board_pose_consistency_rotation_rmse_deg": 0.1580680428373842,
+      "board_cross_view_pixel_transfer_rmse_px": 2.208357680313072,
+      "board_pose_consistency_translation_rmse_mm": 2.847904144239345,
+      "board_pose_consistency_rotation_rmse_deg": 0.20909037762299298,
       "n_board_pairs": 7,
-      "cube_cross_view_pixel_transfer_rmse_px": 11.673271916134608,
-      "cube_pose_consistency_translation_rmse_mm": 15.258566287344559,
-      "cube_pose_consistency_rotation_rmse_deg": 1.7586272562541265,
+      "cube_cross_view_pixel_transfer_rmse_px": 6.583034095626658,
+      "cube_pose_consistency_translation_rmse_mm": 9.455798668974804,
+      "cube_pose_consistency_rotation_rmse_deg": 0.5998560565120697,
       "n_cube_pairs": 9,
       "n_train_relative_candidates": 21,
-      "n_train_relative_inliers": 10
+      "n_train_relative_inliers": 11
     }
   ]
 }

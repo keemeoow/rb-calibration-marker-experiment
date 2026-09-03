@@ -33,6 +33,27 @@ REPROJECTION_METRIC_CONTRACT = {
     "millimetre_reprojection_conversion_reported": False,
 }
 
+# Corner-pooled RMSE weights a set by however many corners it happened to
+# expose, so one densely detected placement can outvote the rest.  The same
+# event-then-set order the cross-target paths already use gives every placement
+# one vote instead.
+SET_EQUAL_WEIGHT_REPROJECTION_CONTRACT = {
+    "name": "set_equal_weight_heldout_reprojection",
+    "aggregation": (
+        "corner_components_to_event_RMSE_then_event_to_set_RMSE_then_"
+        "equal_weight_RMSE_across_sets"),
+    "role": "pooling_bias_control_reported_beside_corner_pooled_rmse_px",
+    "unit": "distorted_native_image_pixels",
+    "requires_set_index_on_every_observation": True,
+    "computed_on_the_same_frozen_population": True,
+    "may_rank_methods_before_external_gt": False,
+}
+
+# Only the slices named by ``EVALUATION_COMPARISON_CONTRACT`` carry the full
+# per-set breakdown; every other slice keeps the scalar so the artifact does
+# not grow a per-set table for all 32 camera/role combinations.
+SET_EQUAL_WEIGHT_DETAIL_KEYS = ("overall", "board", "cube")
+
 REFERENCE_DEPENDENT_REPROJECTION_CONTRACT = {
     "name": "shared_train_target_pose_reprojection_diagnostic",
     "uses_same_heldout_fixed_camera_corners": True,
@@ -136,6 +157,40 @@ def observations_sha256(observations: Sequence[PixelObs]) -> str:
     return digest.hexdigest()
 
 
+def set_equal_weight_rmse(
+    event_squared: Mapping[tuple[int, int], Sequence[float]],
+) -> dict:
+    """Collapse corners within an event, events within a set, then sets.
+
+    Each level takes the mean square and the final value is its square root, so
+    the result is the RMS of set RMSEs.  This is the ordering
+    ``_event_then_set_aggregate`` already applies to the cross-target paths;
+    reusing it keeps one placement worth one vote in both places.
+    """
+    event_mean_squares: Dict[int, list[float]] = defaultdict(list)
+    events: Dict[int, list[int]] = defaultdict(list)
+    corners: Dict[int, int] = defaultdict(int)
+    for (set_index, event), values in sorted(event_squared.items()):
+        event_mean_squares[set_index].append(float(np.mean(values)))
+        events[set_index].append(int(event))
+        # Two residual components (du, dv) per corner.
+        corners[set_index] += len(values) // 2
+    per_set = []
+    for set_index in sorted(event_mean_squares):
+        set_mean_square = float(np.mean(event_mean_squares[set_index]))
+        per_set.append({
+            "set": int(set_index),
+            "n_events": len(event_mean_squares[set_index]),
+            "events": sorted(events[set_index]),
+            "n_corners": int(corners[set_index]),
+            "rmse_px": float(np.sqrt(set_mean_square)),
+            "mean_square_px2": set_mean_square,
+        })
+    overall = float(np.sqrt(np.mean(
+        [row["mean_square_px2"] for row in per_set])))
+    return {"rmse_px": overall, "per_set": per_set}
+
+
 def pixel_reprojection_metrics(
     observations: Sequence[PixelObs],
     state: PoseState,
@@ -153,6 +208,10 @@ def pixel_reprojection_metrics(
     squared_residuals: Dict[str, list[float]] = defaultdict(list)
     counts: Dict[str, Dict[str, int]] = defaultdict(
         lambda: {"observations": 0, "corners": 0})
+    # key -> (set, event) -> residual components, for the equal-weight pooling.
+    by_set_event: Dict[str, Dict[tuple[int, int], list[float]]] = defaultdict(
+        lambda: defaultdict(list))
+    without_set_index: set[str] = set()
     gripper = int(gripper_cam_idx)
     for observation in observations:
         camera_id = int(observation.cam)
@@ -208,20 +267,43 @@ def pixel_reprojection_metrics(
                 "non-finite or shape-mismatched pixel projection in the fixed "
                 f"evaluation population: event={observation.event}, cam={camera_id}")
         residual_squared = np.square(prediction - measured).reshape(-1)
+        components = residual_squared.tolist()
+        set_index = observation.set_idx
         for key in keys:
-            squared_residuals[key].extend(residual_squared.tolist())
+            squared_residuals[key].extend(components)
             counts[key]["observations"] += 1
             counts[key]["corners"] += len(prediction)
+            if set_index is None:
+                without_set_index.add(key)
+            else:
+                by_set_event[key][
+                    (int(set_index), int(observation.event))].extend(components)
 
-    result = {
-        key: {
+    result = {}
+    for key, values in sorted(squared_residuals.items()):
+        entry = {
             "rmse_px": float(np.sqrt(np.mean(values))),
             "n_observations": int(counts[key]["observations"]),
             "n_corners": int(counts[key]["corners"]),
         }
-        for key, values in sorted(squared_residuals.items())
-    }
+        if key in without_set_index:
+            # Refuse to compute rather than pool a subset: dropping the
+            # set-less corners would silently reweight the population.
+            entry["set_equal_weight_rmse_px"] = None
+            entry["set_equal_weight_unsupported_reason"] = (
+                "observation_without_set_index_in_this_population")
+        else:
+            aggregate = set_equal_weight_rmse(by_set_event[key])
+            entry["set_equal_weight_rmse_px"] = aggregate["rmse_px"]
+            entry["n_sets"] = len(aggregate["per_set"])
+            entry["n_events"] = sum(
+                int(row["n_events"]) for row in aggregate["per_set"])
+            if key in SET_EQUAL_WEIGHT_DETAIL_KEYS:
+                entry["set_equal_weight_per_set"] = aggregate["per_set"]
+        result[key] = entry
     result["metric_contract"] = dict(REPROJECTION_METRIC_CONTRACT)
+    result["set_equal_weight_contract"] = dict(
+        SET_EQUAL_WEIGHT_REPROJECTION_CONTRACT)
     result["unsupported"] = []
     return result
 

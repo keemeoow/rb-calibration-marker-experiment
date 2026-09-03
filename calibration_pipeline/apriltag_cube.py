@@ -16,6 +16,9 @@ import numpy as np
 from calibration_pipeline.config import CubeConfig, get_default_cube_config
 
 
+CUBE_CORNER_REFINEMENT_MODES = ("apriltag", "line_intersection")
+
+
 def rodrigues_to_Rt(rvec, tvec) -> np.ndarray:
     """OpenCV rvec/tvec -> 4x4 T_camera_object."""
     R, _ = cv2.Rodrigues(np.asarray(rvec, dtype=np.float64).reshape(3, 1))
@@ -170,19 +173,127 @@ class AprilTagCubeModel:
 class AprilTagCubeTarget:
     """Detect configured tags and estimate T_camera_object using solvePnP."""
 
-    def __init__(self, cfg: CubeConfig):
+    def __init__(self, cfg: CubeConfig,
+                 corner_refinement_mode: str = "apriltag"):
+        if corner_refinement_mode not in CUBE_CORNER_REFINEMENT_MODES:
+            raise ValueError(
+                "corner_refinement_mode must be one of "
+                f"{CUBE_CORNER_REFINEMENT_MODES}")
         self.cfg = cfg
+        self.corner_refinement_mode = str(corner_refinement_mode)
         self.model = AprilTagCubeModel(cfg)
         dictionary_id = getattr(cv2.aruco, cfg.dictionary_name)
         self.dictionary = cv2.aruco.getPredefinedDictionary(dictionary_id)
         try:
             self.params = cv2.aruco.DetectorParameters()
+            self.params.cornerRefinementMethod = getattr(
+                cv2.aruco, "CORNER_REFINE_APRILTAG",
+                cv2.aruco.CORNER_REFINE_SUBPIX)
             self.detector = cv2.aruco.ArucoDetector(self.dictionary, self.params)
             self._new_api = True
         except AttributeError:
             self.params = cv2.aruco.DetectorParameters_create()
+            self.params.cornerRefinementMethod = getattr(
+                cv2.aruco, "CORNER_REFINE_APRILTAG",
+                cv2.aruco.CORNER_REFINE_SUBPIX)
             self.detector = None
             self._new_api = False
+
+    @staticmethod
+    def _fit_image_edge_line(gray: np.ndarray, start: np.ndarray,
+                             end: np.ndarray, quad_center: np.ndarray):
+        """Fit one physical black-border edge from subpixel image gradients."""
+        start = np.asarray(start, dtype=np.float64).reshape(2)
+        end = np.asarray(end, dtype=np.float64).reshape(2)
+        tangent = end - start
+        length = float(np.linalg.norm(tangent))
+        if length < 12.0:
+            return None
+        tangent /= length
+        normal = np.array([-tangent[1], tangent[0]], dtype=np.float64)
+        midpoint = 0.5 * (start + end)
+        if float(normal @ (np.asarray(quad_center) - midpoint)) < 0.0:
+            normal *= -1.0
+
+        count = max(12, int(round(0.7 * length)))
+        along = np.linspace(0.12, 0.88, count)
+        nominal = start[None, :] + along[:, None] * (end - start)[None, :]
+        offsets = np.linspace(-2.0, 2.0, 33)
+        samples = nominal[:, None, :] + offsets[None, :, None] * normal
+        map_x = samples[..., 0].astype(np.float32)
+        map_y = samples[..., 1].astype(np.float32)
+        intensities = cv2.remap(
+            gray, map_x, map_y, interpolation=cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_REFLECT101).astype(np.float64)
+        gradients = np.abs(np.diff(intensities, axis=1))
+        best = np.argmax(gradients, axis=1)
+        strengths = gradients[np.arange(count), best]
+        keep = strengths >= max(3.0, float(np.percentile(strengths, 35)))
+        if int(np.sum(keep)) < 8:
+            return None
+        edge_offsets = 0.5 * (offsets[best] + offsets[best + 1])
+        edge_points = nominal + edge_offsets[:, None] * normal
+        edge_points = edge_points[keep].astype(np.float32).reshape(-1, 1, 2)
+        line = cv2.fitLine(
+            edge_points, cv2.DIST_HUBER, 0.0, 0.01, 0.01).reshape(-1)
+        direction = np.asarray(line[:2], dtype=np.float64)
+        direction /= max(float(np.linalg.norm(direction)), 1e-12)
+        point = np.asarray(line[2:4], dtype=np.float64)
+        return point, direction
+
+    @staticmethod
+    def _line_intersection(first, second):
+        point_a, direction_a = first
+        point_b, direction_b = second
+        system = np.column_stack([direction_a, -direction_b])
+        determinant = float(np.linalg.det(system))
+        if abs(determinant) < 1e-3:
+            return None
+        amount = np.linalg.solve(system, point_b - point_a)[0]
+        return point_a + float(amount) * direction_a
+
+    @classmethod
+    def refine_quad_by_line_intersections(
+            cls, image: np.ndarray, corners: np.ndarray) -> np.ndarray:
+        """Refine an AprilTag quad without changing its metric geometry."""
+        gray = (cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+                if image.ndim == 3 else np.asarray(image))
+        gray = np.asarray(gray, dtype=np.uint8)
+        original = np.asarray(corners, dtype=np.float64).reshape(4, 2)
+        center = np.mean(original, axis=0)
+        lines = [
+            cls._fit_image_edge_line(
+                gray, original[index], original[(index + 1) % 4], center)
+            for index in range(4)
+        ]
+        if any(line is None for line in lines):
+            return original.astype(np.float32)
+        refined = []
+        for index in range(4):
+            corner = cls._line_intersection(lines[(index - 1) % 4], lines[index])
+            if corner is None:
+                return original.astype(np.float32)
+            refined.append(corner)
+        refined = np.asarray(refined, dtype=np.float64)
+        shifts = np.linalg.norm(refined - original, axis=1)
+        original_area = abs(float(cv2.contourArea(original.astype(np.float32))))
+        refined_area = abs(float(cv2.contourArea(refined.astype(np.float32))))
+        area_ratio = refined_area / max(original_area, 1e-12)
+        if (not np.all(np.isfinite(refined)) or float(np.max(shifts)) > 2.5
+                or float(np.mean(shifts)) > 2.0
+                or not 0.90 <= area_ratio <= 1.10
+                or not cv2.isContourConvex(refined.astype(np.float32))):
+            return original.astype(np.float32)
+        return refined.astype(np.float32)
+
+    def _refine_corner_sets(self, image: np.ndarray,
+                            corners: List[np.ndarray]):
+        if self.corner_refinement_mode != "line_intersection":
+            return corners
+        return [
+            self.refine_quad_by_line_intersections(image, corner).reshape(1, 4, 2)
+            for corner in corners
+        ]
 
     def _detector_parameters(self, *, relaxed: bool = False):
         try:
@@ -209,8 +320,9 @@ class AprilTagCubeTarget:
         else:
             corners, ids, _ = cv2.aruco.detectMarkers(
                 gray, self.dictionary, parameters=params)
-        return ([], None) if ids is None else (
-            corners, ids.flatten().astype(int))
+        if ids is None:
+            return [], None
+        return self._refine_corner_sets(image, corners), ids.flatten().astype(int)
 
     @staticmethod
     def _native_scale_corners(corners: List[np.ndarray], scale: float):
@@ -265,7 +377,9 @@ class AprilTagCubeTarget:
             corners, ids, _ = self.detector.detectMarkers(gray)
         else:
             corners, ids, _ = cv2.aruco.detectMarkers(gray, self.dictionary, parameters=self.params)
-        return ([], None) if ids is None else (corners, ids.flatten().astype(int))
+        if ids is None:
+            return [], None
+        return self._refine_corner_sets(bgr, corners), ids.flatten().astype(int)
 
     def collect_observations(
         self,

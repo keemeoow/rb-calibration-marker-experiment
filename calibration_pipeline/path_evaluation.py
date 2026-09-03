@@ -10,12 +10,13 @@ Two contracts intentionally coexist:
 * the legacy cube path also contains the FK-dependent eye-in-hand closure used
   by Table 1;
 * the fixed-camera cross-target path evaluates board and cube without a shared
-  target pose, robot FK, or gripper camera;
+  target pose, robot FK, or gripper camera, but remains method-specific and is
+  reported only as supplementary held-out consistency;
 * the gripper-to-fixed path uses the same visual targets but evaluates through
   robot FK and the calibrated hand-eye transform.
 
-They are complementary subsystem and full-chain internal metrics before
-independent external GT; neither is absolute physical accuracy.
+They are internal diagnostics before independent external GT; neither is
+absolute physical accuracy or an independent relative-pose reference.
 """
 
 from __future__ import annotations
@@ -55,7 +56,13 @@ FIXED_TO_FIXED_CROSS_TARGET_CONTRACT = {
     "uses_gripper_camera": False,
     "uses_external_ground_truth": False,
     "absolute_accuracy_metric": False,
-    "ranking_role_before_external_gt": "fixed_camera_subsystem_relative_metric",
+    "reporting_tier": "supplementary",
+    "may_rank_methods_before_external_gt": False,
+    "ranking_role_before_external_gt": (
+        "supplementary_method_specific_heldout_consistency"),
+    "interpretation": (
+        "computed with each method's fitted fixed-camera poses; useful as a "
+        "held-out self-consistency diagnostic, not an independent baseline"),
 }
 
 GRIPPER_TO_FIXED_CROSS_TARGET_CONTRACT = {
@@ -108,6 +115,9 @@ E_CROSS_CONTRACT = {
     "uses_gripper_camera": False,
     "uses_nominal_or_ground_truth_cube_pose": False,
     "absolute_accuracy_metric": False,
+    "reporting_tier": "supplementary",
+    "may_rank_methods_before_external_gt": False,
+    "role": "method_specific_heldout_consistency",
 }
 
 E_CROSS_PIXEL_TRANSFER_CONTRACT = {
@@ -123,6 +133,9 @@ E_CROSS_PIXEL_TRANSFER_CONTRACT = {
     "uses_shared_target_pose": False,
     "uses_external_ground_truth": False,
     "absolute_accuracy_metric": False,
+    "reporting_tier": "supplementary",
+    "may_rank_methods_before_external_gt": False,
+    "role": "method_specific_heldout_consistency",
 }
 
 

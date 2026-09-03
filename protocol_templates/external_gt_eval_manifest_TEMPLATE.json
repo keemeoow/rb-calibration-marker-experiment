@@ -1,9 +1,13 @@
 {
-  "artifact_schema": "external_gt_eval_manifest_v1",
-  "methods": ["A4", "A1", "A2", "A3", "B1", "C1", "C2", "C3", "C4"],
+  "artifact_schema": "external_gt_eval_manifest_v2",
+  "methods": ["A4", "A2", "A5", "A3"],
   "ours_method": "A4",
   "blind_gt_used_for_training": false,
-  "gt_independent_of_fk_factor": true,
+  "gt_independent_of_all_compared_methods": true,
+  "preregistered_before_gt_unlock": true,
+  "calibration_and_predictions_frozen_before_gt_unlock": true,
+  "primary_contrast": "A4_vs_A2",
+  "secondary_contrast": "A4_vs_A5",
   "add_mode": "ADD-S",
   "object_points_m": [
     [-0.0295, -0.0295, -0.0295],
@@ -37,27 +41,17 @@
       "external_gt": "session_01/blind_test/external_gt.json",
       "predictions": {
         "A4": "session_01/predictions/A4.json",
-        "A1": "session_01/predictions/A1.json",
         "A2": "session_01/predictions/A2.json",
-        "A3": "session_01/predictions/A3.json",
-        "B1": "session_01/predictions/B1.json",
-        "C1": "session_01/predictions/C1.json",
-        "C2": "session_01/predictions/C2.json",
-        "C3": "session_01/predictions/C3.json",
-        "C4": "session_01/predictions/C4.json"
+        "A5": "session_01/predictions/A5.json",
+        "A3": "session_01/predictions/A3.json"
       },
       "registered_cameras": {
         "A4": 4,
-        "A1": 4,
         "A2": 4,
-        "A3": 4,
-        "B1": 4,
-        "C1": 4,
-        "C2": 4,
-        "C3": 4,
-        "C4": 4
+        "A5": 4,
+        "A3": 4
       }
     }
   ],
-  "warning": "Replace all nulls, paths, camera counts and task geometry before preregistration. At least two sessions are required; five are recommended for the pilot."
+  "warning": "Replace every null, path, camera count and margin before preregistration. Duplicate the session block: two independent sessions are the code minimum; five sessions with at least 30 blind poses each are recommended."
 }

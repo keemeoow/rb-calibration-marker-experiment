@@ -10,6 +10,15 @@
     2,
     3
   ],
+  "charuco_board_config_source": "config_py:CharucoBoardConfig",
+  "charuco_board_config": {
+    "squares_x": 11,
+    "squares_y": 7,
+    "square_length_m": 0.025,
+    "marker_length_m": 0.018,
+    "dictionary_name": "DICT_4X4_250",
+    "marker_id_start": 5
+  },
   "cube_config_source": "config_py:CubeConfig",
   "cube_config": {
     "cube_side_m": 0.059,
@@ -122,6 +131,14 @@
   },
   "capture_config": {
     "schema_version": "capture_config_v1",
+    "charuco_board_config": {
+      "squares_x": 11,
+      "squares_y": 7,
+      "square_length_m": 0.025,
+      "marker_length_m": 0.018,
+      "dictionary_name": "DICT_4X4_250",
+      "marker_id_start": 5
+    },
     "intrinsics_dir": "/home/sprout/Desktop/**jiwoo/rb-calibration-marker-experiment/intrinsics",
     "width": 1280,
     "height": 720,

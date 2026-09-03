@@ -439,7 +439,7 @@ def estimate_board_free_fk_cube_artifact(
         }
     body = {
         "artifact_schema": "board_free_fk_cube_alignment_v1",
-        "canonical_for_rows": ["A3", "A4", "B1", "B2"],
+        "canonical_for_rows": ["A4", "A5", "B1", "B2"],
         "board_information_used": False,
         "board_observation_count": 0,
         "heldout_information_used": False,

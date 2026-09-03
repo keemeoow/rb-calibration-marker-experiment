@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-7개 실험 전체 실행 → Table 2a (절제, 시뮬 GT 지표) 산출 + JSON 저장.
+8개 실험 전체 실행 → Table 2a (절제, 시뮬 GT 지표) 산출 + JSON 저장.
 
   python run_all.py --seeds 20 --dump results/tables/table2a.json
 """
