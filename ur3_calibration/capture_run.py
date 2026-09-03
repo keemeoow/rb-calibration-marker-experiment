@@ -24,7 +24,9 @@
 갱신되며, 실제 저장되는 캡처와는 별개로 확인용이다.
 
 출력: data/session{N}_.../capture/<index:03d>/
-  cam_<라벨 또는 serial>.png (카메라별 컬러 프레임) + robot.json
+  cam_<라벨 또는 serial>.png       (컬러)
+  cam_<라벨 또는 serial>_depth.png (컬러에 정렬된 16bit depth, mm, z16)
+  robot.json                       (tcp_pose, joint_radians/degrees, timestamp)
 
 사용법:
   python capture_run.py --session 1                          # dry-run
@@ -110,7 +112,8 @@ def connect_cameras(no_reset=False):
     for serial, name in devices.items():
         print(f"  {serial}  {name}")
         cam = RealSenseCamera(serial, width=CAM_WIDTH, height=CAM_HEIGHT, fps=CAM_FPS,
-                               use_color=True, use_depth=False, lock_color_exposure=False)
+                               use_color=True, use_depth=True, align_depth_to_color=True,
+                               lock_color_exposure=False)
         cam.start()
         cams[serial] = cam
     return cams, devices
@@ -184,15 +187,20 @@ def read_robot_state(rtde_r, extra=None):
 
 
 def save_capture(cams, labels, out_dir: Path, robot_state: dict):
+    """컬러 + depth(정렬된 16bit mm, z16) + 로봇 상태를 저장한다."""
     out_dir.mkdir(parents=True, exist_ok=True)
     saved = []
     for serial, cam in cams.items():
-        color, _depth, _ts = cam.get_latest()
+        color, depth, _ts = cam.get_latest()
         if color is None:
             print(f"  [WARN] cam {serial}: 프레임 없음, 건너뜀")
             continue
         name = labels.get(serial, serial)
         cv2.imwrite(str(out_dir / f"cam_{name}.png"), color)
+        if depth is not None:
+            cv2.imwrite(str(out_dir / f"cam_{name}_depth.png"), depth)
+        else:
+            print(f"  [WARN] cam {serial} ({name}): depth 프레임 없음")
         saved.append(name)
     (out_dir / "robot.json").write_text(json.dumps(robot_state, indent=2, ensure_ascii=False) + "\n")
     return saved
