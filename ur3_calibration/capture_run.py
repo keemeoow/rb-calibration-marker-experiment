@@ -68,7 +68,11 @@ from session2_pick_and_place import (
 CAM_WIDTH, CAM_HEIGHT, CAM_FPS = 1280, 720, 15
 MOVE_SPEED = 0.10
 MOVE_ACCEL = 0.30
-SETTLE_S = 0.3
+SETTLE_S = 0.3                 # 로봇 정지 확인 후에도 카메라 버퍼가 새 프레임을 채울 여유 시간
+STOP_LIN_THRESHOLD = 0.002      # m/s
+STOP_ANG_THRESHOLD = 0.01       # rad/s
+STOP_POLL_INTERVAL = 0.03
+STOP_TIMEOUT_S = 2.0
 ROTATION_JUMP_THRESHOLD = 1.0
 
 
@@ -179,9 +183,23 @@ class LiveView:
         self._closed = True
         cv2.destroyWindow(self.window_name)
 
-    def stop(self):
-        self._stop.set()
-        self._thread.join(timeout=2.0)
+
+def wait_until_robot_stopped(rtde_r, timeout=STOP_TIMEOUT_S):
+    """TCP 속도가 거의 0이 될 때까지 기다린 뒤, 카메라 버퍼가 정지 후
+    프레임으로 채워질 시간을 조금 더 준다. moveL/moveJ가 '완료'를 보고하는
+    시점과 실제로 팔의 잔진동이 가라앉는 시점은 완전히 같지 않을 수 있고,
+    RealSense도 버퍼링 지연이 있어 촬영 직전 이걸로 한 번 더 확인한다."""
+    start = time.time()
+    while time.time() - start < timeout:
+        speed = rtde_r.getActualTCPSpeed()
+        lin = float(np.linalg.norm(speed[:3]))
+        ang = float(np.linalg.norm(speed[3:6]))
+        if lin < STOP_LIN_THRESHOLD and ang < STOP_ANG_THRESHOLD:
+            break
+        time.sleep(STOP_POLL_INTERVAL)
+    else:
+        print(f"  [WARN] {timeout}s 동안 로봇이 완전히 멈추지 않았습니다 (그래도 촬영 진행).")
+    time.sleep(SETTLE_S)
 
 
 def read_robot_state(rtde_r, extra=None):
@@ -256,7 +274,7 @@ def move_and_capture_poses(session_id, args, cams, labels, rtde_c, rtde_r, start
         else:
             rtde_c.moveL(target, MOVE_SPEED, MOVE_ACCEL)
         last_pose = target
-        time.sleep(SETTLE_S)
+        wait_until_robot_stopped(rtde_r)
 
         robot_state = read_robot_state(rtde_r, {"pose_index": idx})
         out_dir = out_root / f"{idx:03d}"
@@ -316,7 +334,7 @@ def make_session2_capture_callback(session_poses, cams, labels):
     capture_counter = {"n": 0}
 
     def on_capture(step, index, rtde_c, rtde_r):
-        time.sleep(SETTLE_S)
+        wait_until_robot_stopped(rtde_r)
         robot_state = read_robot_state(
             rtde_r, {"capture_index": capture_counter["n"], "step_index": index}
         )
@@ -349,13 +367,29 @@ def run_session2(args, cams, labels, view=None):
 GRASP_PHASE_LEN = 6
 
 
-def full_close_grasp_phase(grasp_phase, full_close_pos):
-    """세션1 시작 전 큐브를 잡을 때는 (session2 자체 pick-place 재그립과
-    달리) 그리퍼를 끝까지 닫아서 세션1 내내 확실히 물고 있게 한다."""
+SESSION1_EXTRA_DESCEND_MM = 1.0        # session1용 grasp는 1mm 더 내려가서(거의 닿게) 정렬을 쉽게 함
+SESSION1_PREOPEN_MARGIN_DEFAULT = 20   # "그리퍼 열기"를 완전개방이 아니라 close-pos에서 이만큼만 더 벌림
+
+
+def adjust_session1_grasp_phase(grasp_phase, close_pos, session1_close_pos, preopen_margin):
+    """세션1 시작 전 큐브를 잡는 grasp_phase를 사람이 맞추기 쉽게 조정한다
+    (session2 자체 pick-place 재그립에는 영향 없음, 이건 잘라낸 사본만 고침):
+
+    - "그리퍼 열기": 완전개방(0) 대신 close_pos에서 preopen_margin만큼만
+      더 벌린 값 -- 이미 큐브 폭 근처라 맞추기 쉽고 닫는 이동도 짧다.
+    - "pick 수직 하강": 기존보다 1mm 더 내려가서 사실상 닿을 때까지 감.
+    - "그리퍼 닫기": 완전히 닫아서(session1_close_pos) 세션1 내내 확실히 문다.
+    """
     phase = [dict(step) for step in grasp_phase]
     for step in phase:
-        if step["kind"] == "gripper" and "닫기" in step["desc"]:
-            step["pos"] = full_close_pos
+        if step["kind"] == "gripper" and "열기" in step["desc"]:
+            step["pos"] = max(close_pos - preopen_margin, 0)
+        elif step["kind"] == "gripper" and "닫기" in step["desc"]:
+            step["pos"] = session1_close_pos
+        elif step["kind"] == "moveL" and "pick 수직 하강" in step["desc"]:
+            pose = list(step["pose"])
+            pose[2] -= SESSION1_EXTRA_DESCEND_MM / 1000.0
+            step["pose"] = pose
     return phase
 
 
@@ -369,7 +403,9 @@ def run_full_pipeline(args, cams, labels, view=None):
     pick은 기존처럼 --close-pos(그립 폭 실측값)를 쓴다.
     """
     steps2, session_poses = build_session2_steps(args)
-    grasp_phase = full_close_grasp_phase(steps2[:GRASP_PHASE_LEN], args.session1_close_pos)
+    grasp_phase = adjust_session1_grasp_phase(
+        steps2[:GRASP_PHASE_LEN], args.close_pos, args.session1_close_pos, args.session1_preopen_margin
+    )
     on_capture = make_session2_capture_callback(session_poses, cams, labels)
     on_tick = view.show if view is not None else None
 
@@ -423,6 +459,8 @@ def main():
                     help="세션2 자체 pick-place 재그립 시 그리퍼 닫힘 값 (실측 그립 폭)")
     ap.add_argument("--session1-close-pos", type=int, default=255,
                     help="세션1 시작 전 최초로 큐브를 잡을 때는 완전히 닫아서(기본 255) 세션1 내내 확실히 문다")
+    ap.add_argument("--session1-preopen-margin", type=int, default=SESSION1_PREOPEN_MARGIN_DEFAULT,
+                    help="세션1 grasp 전 '그리퍼 열기'를 완전개방 대신 close-pos에서 이만큼만 더 벌림")
     ap.add_argument("--release-pos", type=int, default=None)
     ap.add_argument("--return-home", action="store_true")
     ap.add_argument("--skip-steps", type=int, default=0,
