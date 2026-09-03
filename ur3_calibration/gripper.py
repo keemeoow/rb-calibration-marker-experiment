@@ -44,14 +44,21 @@ class RobotiqGripper:
     def set_pos(self, pos: float) -> None:
         self._set("POS", int(round(np.clip(pos, 0, 255))))
 
-    def wait_until_stopped(self, timeout: float = 3.0, poll_interval: float = 0.05) -> int:
+    def wait_until_stopped(self, timeout: float = 3.0, poll_interval: float = 0.05,
+                            initial_delay: float = 0.2) -> int:
         """물리적으로 움직임이 멈출 때까지 대기하고 마지막 OBJ 상태를 반환.
 
         set_pos()는 명령만 보내고 바로 리턴하므로, 그 직후 바로 다음 이동
         명령을 내리면 그리퍼가 다 닫히기/열리기 전에 팔이 움직여버린다.
         OBJ 레지스터(0=이동 중, 1/2=물체에 걸려 정지, 3=접촉 없이 목표 도달)가
         0이 아니게 될 때까지 기다리면 실제로 멈춘 뒤에만 다음 동작으로 넘어간다.
+
+        set_pos() 직후 곧바로 OBJ를 읽으면 그리퍼가 아직 새 명령을 반영하기
+        전이라 "이전 명령이 끝났을 때"의 값(0이 아님)이 그대로 남아있어서
+        바로 통과해버리는 경우가 있다. 그래서 먼저 initial_delay만큼 기다려
+        모션이 실제로 시작될 시간을 준 뒤에 폴링을 시작한다.
         """
+        time.sleep(initial_delay)
         start = time.time()
         obj = self._get("OBJ")
         while obj == 0 and time.time() - start < timeout:
