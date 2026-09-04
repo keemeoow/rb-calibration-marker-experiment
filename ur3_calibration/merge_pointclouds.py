@@ -48,12 +48,27 @@ def load_fit(fit_path: Path) -> dict:
     return T_base_cam, T_gripper_cam
 
 
+def edge_mask(depth_u16: np.ndarray, grad_thresh_mm: float) -> np.ndarray:
+    """RealSense의 'flying pixel' 노이즈(물체 경계에서 앞/뒤 depth가 섞여
+    카메라 쪽으로 길게 뻗치는 점) 제거용. depth_u16의 raw 단위가 mm인
+    카메라(depth_scale_m_per_unit=0.001)를 가정하고 그대로 Sobel gradient를
+    잰다 -- 실측(session2 cam0)에서 유효 픽셀의 ~4%가 500mm 넘게 튀는 걸
+    확인했고, 그게 화면에 보인 뾰족한 선들의 정체다."""
+    depth_f = depth_u16.astype(np.float64)
+    gx = cv2.Sobel(depth_f, cv2.CV_64F, 1, 0, ksize=3)
+    gy = cv2.Sobel(depth_f, cv2.CV_64F, 0, 1, ksize=3)
+    grad = np.sqrt(gx ** 2 + gy ** 2)
+    return grad < grad_thresh_mm
+
+
 def backproject(depth_u16: np.ndarray, color_bgr: np.ndarray, K: np.ndarray,
-                 depth_scale: float, stride: int, max_depth_m: float):
+                 depth_scale: float, stride: int, max_depth_m: float,
+                 grad_thresh_mm: float = 30.0):
+    smooth = edge_mask(depth_u16, grad_thresh_mm)
     h, w = depth_u16.shape
     ys, xs = np.mgrid[0:h:stride, 0:w:stride]
     depth = depth_u16[ys, xs].astype(np.float64) * depth_scale
-    valid = (depth > 0) & (depth < max_depth_m)
+    valid = (depth > 0) & (depth < max_depth_m) & smooth[ys, xs]
     xs, ys, depth = xs[valid], ys[valid], depth[valid]
 
     fx, fy, cx, cy = K[0, 0], K[1, 1], K[0, 2], K[1, 2]
@@ -91,7 +106,16 @@ def main():
     ap.add_argument("--out", default=str(Path(__file__).resolve().parent / "merged_scene.ply"))
     ap.add_argument("--stride", type=int, default=2, help="픽셀 서브샘플링 간격 (클수록 점 적고 파일 작음)")
     ap.add_argument("--max-depth-m", type=float, default=1.5, help="이 거리 넘는 depth는 버림")
+    ap.add_argument("--edge-thresh-mm", type=float, default=30.0,
+                    help="이웃 픽셀과 depth 차이가 이보다 크면 flying pixel로 보고 제외")
+    ap.add_argument("--per-camera-color", action="store_true",
+                    help="실제 색 대신 카메라별로 다른 단색을 입혀서 정합 상태를 더 쉽게 확인")
     args = ap.parse_args()
+
+    CAMERA_FLAT_COLORS = {
+        "fixed1": (255, 60, 60), "fixed2": (60, 220, 60),
+        "fixed3": (60, 120, 255), "gripper": (255, 220, 40),
+    }
 
     capture_dir = Path(args.capture)
     T_base_cam, T_gripper_cam = load_fit(Path(args.fit))
@@ -120,7 +144,10 @@ def main():
         else:
             T_cam_now = T_base_cam[cam_idx]
 
-        points_cam, colors = backproject(depth, color, K, depth_scale, args.stride, args.max_depth_m)
+        points_cam, colors = backproject(depth, color, K, depth_scale, args.stride, args.max_depth_m,
+                                          args.edge_thresh_mm)
+        if args.per_camera_color:
+            colors = np.tile(np.array(CAMERA_FLAT_COLORS[label], dtype=np.uint8), (len(points_cam), 1))
         points_base = transform_points(points_cam, T_cam_now)
         print(f"  {label} (cam{cam_idx}): {len(points_base)}개 점")
         all_points.append(points_base)
