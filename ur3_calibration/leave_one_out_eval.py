@@ -67,6 +67,34 @@ For each held-out placement ``h`` in 1..12:
      (fixed cams 0/2/3, gripper cam 1) computed by concatenating every held-out
      corner residual for that camera across all 12 iterations.
 
+Extension 1 -- a5 (schema.py's post-hoc "vision-aligned FK fixed" diagnostic):
+  Alongside no_fk/fixed_fk/factor_fk, each iteration also fits a4th mode, a5:
+  T_base_cube[s] = T_base_fk_raw[s] @ Delta_train for the 11 training
+  placements, HARD-FIXED (0 DoF, like fixed_fk/A3) instead of softly pulled
+  toward it (like factor_fk/A4). Delta_train is the SAME per-iteration
+  train-only alignment (``aligned_fk_train`` from
+  ``estimate_board_free_fk_cube_artifact``) that the factor_fk block already
+  fits, so a5 costs one extra hard-fixed solve and no extra alignment fit.
+  Held-out evaluation is identical in convention to every other mode: it
+  reprojects the uncorrected/raw T_base_cube_FK[h] (independent of every fit)
+  through a5's fitted cameras -- a5 only changes what is fixed during
+  TRAINING, never the held-out reference.
+
+Extension 2 -- genuine mm/deg 3D pose error, not just px reprojection RMSE:
+  For every held-out iteration and mode, in addition to the pixel-space check
+  above, ``solve_vision_only_cube_pose`` performs a SEPARATE multi-camera
+  bundle solve: freeze every camera extrinsic at that mode's fitted values,
+  free ONLY the held-out set's cube pose, and fit it against h's real corner
+  detections (whatever cameras actually saw it) via the same
+  ``solve_corner_reprojection`` backend used everywhere else in this repo.
+  The result, ``T_base_cube_vision_estimate[h]``, is compared against the
+  same independent ``T_base_cube_FK[h]`` via
+  ``calibration_pipeline.reprojection.pose_delta`` (translation_mm = Euclidean
+  distance between translations; rotation_deg = angle-axis magnitude of the
+  relative rotation). This is a single fused estimate per held-out placement,
+  not a per-corner or per-camera quantity, so its "pooled" stats and its
+  per-iteration stats are the same 12 numbers.
+
 Usage:
   python ur3_calibration/leave_one_out_eval.py \\
       [--sets 1,2,3,...,12] [--out ur3_calibration/leave_one_out_eval.json]
@@ -95,7 +123,8 @@ from calibration_pipeline.fk_factor import (  # noqa: E402
 )
 from calibration_pipeline.observations import load_cube_board_pixel_observations  # noqa: E402
 from calibration_pipeline.reprojection import (  # noqa: E402
-    PoseState, SolverOptions, project_points, variable_keys,
+    PoseState, SolverOptions, pose_delta, project_points, solve_corner_reprojection,
+    variable_keys,
 )
 from calibration_pipeline.runtime import (  # noqa: E402
     get_capture_set_cube_center_transform_raw, load_intrinsics_with_depth_scale,
@@ -106,7 +135,14 @@ ROOT = str(REPO_ROOT / "data" / "ur3_session12" / "calib_train")
 INTRINSICS_DIR = str(REPO_ROOT / "ur3_calibration" / "intrinsics")
 PASS1_JSON = REPO_ROOT / "ur3_calibration" / "pass1_grasp_offset.json"
 MECHANICAL_MAP = np.asarray(RAW_FK_CUBE_CENTER_TO_OBJECT, dtype=np.float64)
-MODES = ("no_fk", "fixed_fk", "factor_fk")
+# a5 (schema.py's post-hoc "vision-aligned FK fixed" diagnostic, see
+# VISION_ALIGNED_FK_FIXED_CONTRACT/ALIGNED_FK_FIXED_ROWS): T_base_cube[s] =
+# T_base_fk_raw[s] @ Delta_train (the SAME Delta_train factor_fk fits from the
+# training placements' eye-in-hand cube corners only), but HARD-FIXED like
+# fixed_fk/A3 instead of a soft factor. It reuses factor_fk's per-iteration
+# aligned_fk_train exactly, so it costs one extra hard-fixed solve, no extra
+# alignment fit.
+MODES = ("no_fk", "fixed_fk", "factor_fk", "a5")
 
 
 def parse_sets(spec: str, available: list) -> list:
@@ -153,6 +189,36 @@ def evaluate_held_out(state, held_obs, gripper, robot_T, excluded_event,
         },
         "raw_errors_by_camera": {str(cam): values for cam, values in by_cam.items()},
     }
+
+
+def solve_vision_only_cube_pose(state, held_obs, held_set, init_guess,
+                                 robot_T, K_map, D_map, gripper, options):
+    """Multi-camera vision-only pose solve for the held-out placement.
+
+    Fixes every camera extrinsic (``T_base_Ci``, ``T_gripper_cam``,
+    ``T_base_board`` -- board unused here since ``held_obs`` are cube-only) at
+    this iteration/mode's FITTED values and solves ONLY the held-out set's
+    cube pose against the REAL corner detections actually observed at h,
+    across however many cameras saw it. This is a multi-camera PnP/bundle
+    solve of "where does the cube appear given the cameras we just
+    calibrated" -- it reuses ``CornerReprojectionProblem`` via
+    ``solve_corner_reprojection`` exactly as the training fits do, just with
+    the free/frozen roles of cameras and cube swapped and restricted to one
+    set's observations. ``init_guess`` seeds the optimizer only (does not
+    constrain the result); it never enters the training fit.
+    """
+    vision_state = PoseState(
+        cams={c: np.asarray(T, dtype=np.float64).copy() for c, T in state.cams.items()},
+        gtc=np.asarray(state.gtc, dtype=np.float64).copy(),
+        board=None,
+        cubes={int(held_set): np.asarray(init_guess, dtype=np.float64).copy()},
+    )
+    free_keys = variable_keys(["T_base_cube_by_set"], vision_state)
+    solved_state, diag = solve_corner_reprojection(
+        observations=held_obs, variable_keys_=free_keys,
+        reference_state=vision_state, robot_T=robot_T, K_map=K_map, D_map=D_map,
+        gripper_cam_idx=gripper, options=options)
+    return solved_state.cubes[int(held_set)], diag
 
 
 def main():
@@ -275,8 +341,26 @@ def main():
             fk_covariances={s: covariance for s in train_sets},
             fk_spec=FKFactorSpec(mode=FK_MODE_FACTOR))
 
-        states = {"no_fk": state_no_fk, "fixed_fk": state_fixed, "factor_fk": state_factor}
-        diags = {"no_fk": diag_no_fk, "fixed_fk": diag_fixed, "factor_fk": diag_factor}
+        # --- a5: vision-aligned FK, HARD-FIXED (schema.py's post-hoc A5) ---
+        # Reuses factor_fk's Delta_train (aligned_fk_train, fit from the SAME
+        # 11 training placements' eih cube corners, held-out excluded) but
+        # hard-fixes the cube pose to it instead of softly pulling toward it
+        # -- mechanically identical to the fixed_fk block above, just with
+        # T_base_cube_fk[s] swapped for aligned_fk_train[s].
+        state_a5_init = base_state.clone()
+        state_a5_init.cubes = {s: aligned_fk_train[s].copy() for s in train_sets}
+        a5_keys = variable_keys(
+            ["T_base_Ci", "T_gripper_cam", "T_base_board"], state_a5_init)
+        state_a5, diag_a5 = solve_factorized_fk(
+            observations=train_obs, variable_keys_=a5_keys,
+            reference_state=state_a5_init, robot_T=robot_T, K_map=K_map, D_map=D_map,
+            gripper_cam_idx=gripper, options=options,
+            fk_spec=FKFactorSpec(mode=FK_MODE_FIXED))
+
+        states = {"no_fk": state_no_fk, "fixed_fk": state_fixed,
+                  "factor_fk": state_factor, "a5": state_a5}
+        diags = {"no_fk": diag_no_fk, "fixed_fk": diag_fixed,
+                 "factor_fk": diag_factor, "a5": diag_a5}
 
         line = [f"h={h:2d} (event {excluded_event})"]
         for mode in MODES:
@@ -285,6 +369,16 @@ def main():
                 T_base_cube_fk[h], K_map, D_map)
             for cam, values in held.pop("raw_errors_by_camera").items():
                 per_mode_raw_by_cam[mode][cam].extend(values)
+
+            # Extension 2: genuine 3D pose comparison. Solve the held-out
+            # cube's pose from vision alone (real corners at h, cameras fixed
+            # at this mode's fitted extrinsics), then compare against the
+            # same independent FK reference used for the pixel-space check.
+            vision_pose, vision_diag = solve_vision_only_cube_pose(
+                states[mode], held_obs, h, vision_cubes_full[h],
+                robot_T, K_map, D_map, gripper, options)
+            translation_mm, rotation_deg = pose_delta(vision_pose, T_base_cube_fk[h])
+
             record = {
                 "held_out_set": h,
                 "held_out_event": excluded_event,
@@ -294,21 +388,29 @@ def main():
                 "held_out_n_corners": held["n_corners"],
                 "held_out_rmse_by_camera_px": {
                     cam: rec["rmse_px"] for cam, rec in held["by_camera"].items()},
+                "vision_pose_solve_success": bool(vision_diag["success"]),
+                "vision_pose_solve_rmse_px": vision_diag["train_reprojection_rmse_px"],
+                "held_out_translation_error_mm": translation_mm,
+                "held_out_rotation_error_deg": rotation_deg,
             }
-            if mode == "factor_fk":
+            if mode in ("factor_fk", "a5"):
+                # Same Delta_train for both -- carried on both records so a5's
+                # (frequently pathological, see module docstring) behavior can
+                # be diagnosed directly against the delta that drives it.
                 record["fk_delta_translation_mm"] = (
                     np.asarray(artifact["T_fk_cube_center_to_tag_object"])[:3, 3] * 1000).tolist()
             per_mode_iterations[mode].append(record)
             line.append(f"{mode}: train={record['train_reprojection_rmse_px']:.3f}px "
-                        f"held_out={record['held_out_reprojection_rmse_px']:.3f}px")
+                        f"held_out={record['held_out_reprojection_rmse_px']:.3f}px "
+                        f"pose=({translation_mm:.2f}mm,{rotation_deg:.2f}deg)")
         elapsed = time.perf_counter() - started
         print(" | ".join(line) + f" ({elapsed:.1f}s)")
 
-    def agg(values):
+    def agg(values, unit="px"):
         arr = np.asarray(values, dtype=np.float64)
         return {
-            "mean_px": float(np.mean(arr)), "median_px": float(np.median(arr)),
-            "max_px": float(np.max(arr)), "min_px": float(np.min(arr)),
+            f"mean_{unit}": float(np.mean(arr)), f"median_{unit}": float(np.median(arr)),
+            f"max_{unit}": float(np.max(arr)), f"min_{unit}": float(np.min(arr)),
             "n_iterations": int(len(arr)),
         }
 
@@ -332,6 +434,22 @@ def main():
             "train_reprojection_rmse_px_stats": agg(
                 [r["train_reprojection_rmse_px"] for r in records]),
             "n_successful_solves": int(sum(r["solve_success"] for r in records)),
+            # Extension 2: genuine 3D pose comparison. The vision-only cube
+            # pose solve fuses every camera that saw h into ONE pose estimate
+            # per held-out placement (a multi-camera bundle, not a per-corner
+            # or per-camera quantity), so there is no meaningful finer-grained
+            # "pooled by camera" breakdown here -- these stats over the 12
+            # held-out iterations ARE the pooled statistic.
+            "held_out_pose_error_granularity": (
+                "one_fused_multi_camera_vision_pose_estimate_per_held_out_placement"),
+            "held_out_translation_error_mm_stats": agg(
+                [r["held_out_translation_error_mm"] for r in records], "mm"),
+            "held_out_rotation_error_deg_stats": agg(
+                [r["held_out_rotation_error_deg"] for r in records], "deg"),
+            "vision_pose_solve_n_successful": int(
+                sum(r["vision_pose_solve_success"] for r in records)),
+            "vision_pose_solve_rmse_px_stats": agg(
+                [r["vision_pose_solve_rmse_px"] for r in records]),
         }
 
     print()
@@ -345,12 +463,27 @@ def main():
               f"{s['train_reprojection_rmse_px_stats']['mean_px']:>15.4f} "
               f"{s['held_out_rmse_per_iteration_px_stats']['n_iterations']:>7d}")
 
+    print()
+    print(f"{'mode':>10} {'trans_mean_mm':>14} {'trans_median_mm':>17} "
+          f"{'trans_max_mm':>13} {'rot_mean_deg':>13} {'rot_median_deg':>15} "
+          f"{'rot_max_deg':>12}")
+    for mode in MODES:
+        s = summary[mode]
+        t = s["held_out_translation_error_mm_stats"]
+        r = s["held_out_rotation_error_deg_stats"]
+        print(f"{mode:>10} {t['mean_mm']:>14.3f} {t['median_mm']:>17.3f} "
+              f"{t['max_mm']:>13.3f} {r['mean_deg']:>13.3f} {r['median_deg']:>15.3f} "
+              f"{r['max_deg']:>12.3f}")
+
     output = {
         "warning": (
-            "Leave-one-placement-out held-out evaluation of the same no_fk/"
+            "Leave-one-placement-out held-out evaluation of the no_fk/"
             "fixed_fk/factor_fk comparison fit_fk_ablation_diagnostic.py made "
-            "train-pooled-only. Camera 1 is the gripper (eye-in-hand); cameras "
-            "0/2/3 are the fixed (eye-to-hand) cameras."),
+            "train-pooled-only, extended with a5 (schema.py's post-hoc "
+            "vision-aligned-FK-fixed diagnostic) and a genuine mm/deg 3D pose "
+            "comparison alongside the pixel reprojection RMSE. Camera 1 is "
+            "the gripper (eye-in-hand); cameras 0/2/3 are the fixed "
+            "(eye-to-hand) cameras."),
         "gripper_cam_idx": gripper,
         "all_session2_sets": all_sets,
         "held_out_sets_run": held_out_sets,
@@ -358,6 +491,54 @@ def main():
             "T_gripper_cube held fixed at pass1_grasp_offset.json's fitted "
             "value in every iteration/mode (session1-only support, invariant "
             "under leaving out any session2 placement)."),
+        "a5_policy": (
+            "a5 hard-fixes T_base_cube[s] = T_base_fk_raw[s] @ Delta_train for "
+            "the 11 training placements, reusing the SAME Delta_train "
+            "(aligned_fk_train/artifact) that factor_fk fits from those "
+            "placements' eye-in-hand cube corners for this iteration -- see "
+            "calibration_pipeline/schema.py's VISION_ALIGNED_FK_FIXED_CONTRACT "
+            "and ALIGNED_FK_FIXED_ROWS. Held-out evaluation is identical to "
+            "every other mode: reprojects the uncorrected/raw "
+            "T_base_cube_FK[h] (never touched by any fit) through a5's fitted "
+            "cameras."),
+        "a5_ill_conditioning_finding": (
+            "a5's numbers are dominated by a PRE-EXISTING ill-conditioning of "
+            "Delta_train itself, not a bug in this script. Every session2 "
+            "placement's eye-in-hand cube-viewing image is taken from "
+            "virtually the SAME robot pose (translation varies <0.1mm across "
+            "all 12 events -- see set_to_event/robot_T), so the board-free "
+            "joint (T_gripper_cam, Delta) fit in "
+            "estimate_board_free_fk_cube_artifact has no motion diversity to "
+            "resolve depth/translation along the camera axis and lands on "
+            "wildly nonphysical deltas (per-fold fk_delta_translation_mm ranges "
+            "from a few mm to >300mm here, and the ALREADY-COMMITTED full-data "
+            "fit in fk_ablation_diagnostic.json shows the same symptom: "
+            "delta_train_translation_mm=[-1.78, 3.58, -346.14]mm, i.e. a "
+            "~35cm 'mechanical correction' that cannot be physically real for "
+            "a 59mm cube). factor_fk's soft 2mm/0.3deg-sigma Huber factor "
+            "discounts a target that far away almost entirely, which hid this "
+            "defect (factor_fk tracks no_fk closely in every fold). a5's hard "
+            "fix has zero degrees of freedom to discount it, so it inherits "
+            "the pathology directly: only 6/12 folds even report "
+            "scipy success=True, train_reprojection_rmse_px ranges from "
+            "~3.7px to ~1e24px, and held-out translation/rotation error "
+            "ranges from a plausible few mm up to 310mm/105deg. This is a "
+            "dataset/estimator limitation (session2's cube-viewing waypoint "
+            "needs pose diversity across placements to identify Delta_train "
+            "reliably), not something fixable by more code in this script; "
+            "report a5 with this caveat rather than as a clean number."),
+        "pose_comparison_policy": (
+            "For each iteration/mode, T_base_cube_vision_estimate[h] is a "
+            "multi-camera bundle solve of ONLY the held-out cube pose against "
+            "h's real corner detections, with every camera extrinsic "
+            "(T_base_Ci, T_gripper_cam) frozen at that mode's fitted values "
+            "from the training fit (solve_vision_only_cube_pose, reusing "
+            "solve_corner_reprojection). Compared against the same "
+            "independent T_base_cube_FK[h] via "
+            "calibration_pipeline.reprojection.pose_delta: translation_mm is "
+            "the Euclidean distance between the two poses' translations, "
+            "rotation_deg is the angle-axis magnitude of the relative "
+            "rotation inv(R_vision) @ R_fk."),
         "summary": summary,
         "iterations": per_mode_iterations,
     }
