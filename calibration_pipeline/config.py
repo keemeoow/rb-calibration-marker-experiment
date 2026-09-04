@@ -10,27 +10,42 @@ from typing import Dict, Tuple
 
 
 # =============================================================================
-# USER-EDITABLE MARKER IDS / SIZES - AprilTag 59mm calibration cube
+# USER-EDITABLE MARKER IDS / SIZES - AprilTag marker cube (59mm body footprint)
 # -----------------------------------------------------------------------------
 # Edit only this block when reprinting tags with different IDs.
 # Sizes are the outer black-border side lengths used by solvePnP. Measure that
 # border on the printed tags (not the white paper/pocket) before changing them.
-# Top face has two 25mm tags on +Z, centered at y=-14mm and y=+14mm.
-# Four side faces have one 51mm tag each.
+# Top face has two 25mm tags on the +Z protrusion, centered at y=-14mm and
+# y=+14mm. Four side faces have one 51mm tag each.
+#
+# CAD revision (2026-09): the +Z protrusion grew from 2mm to 35mm. The 59x59x57mm
+# body and its four side tags are unchanged, and the object-frame origin is kept
+# at the point it has always been, so only the top-marker plane moved
+# (+29.5mm -> +62.5mm). Data captured before this revision carries its own frozen
+# cube_config in meta.json / the observation manifest and is unaffected.
 # =============================================================================
 CUBE_WIDTH_M = 0.059
 CUBE_DEPTH_M = 0.059
 CUBE_BODY_HEIGHT_M = 0.057
-TOP_PROTRUSION_HEIGHT_M = 0.002
+TOP_PROTRUSION_HEIGHT_M = 0.035
 CUBE_OVERALL_HEIGHT_M = CUBE_BODY_HEIGHT_M + TOP_PROTRUSION_HEIGHT_M
 
 CUBE_HALF_WIDTH_M = CUBE_WIDTH_M / 2.0
 CUBE_HALF_DEPTH_M = CUBE_DEPTH_M / 2.0
-TOP_MARKER_PLANE_Z_M = CUBE_OVERALL_HEIGHT_M / 2.0
-SIDE_MARKER_CENTER_Z_M = -TOP_PROTRUSION_HEIGHT_M / 2.0
 
-TOP_MARKER_NEG_Y_ID = 0   # +Z protrusion, center: (0, -14, +29.5) mm
-TOP_MARKER_POS_Y_ID = 1   # +Z protrusion, center: (0, +14, +29.5) mm
+# Object-frame origin, deliberately unchanged across the CAD revision: the
+# center of the original 59mm envelope, which sits 1mm above the body center.
+# Pinning it to the body (not to the protrusion-dependent envelope) keeps every
+# body/side-marker coordinate identical to the pre-revision cube, so previously
+# estimated cube poses and priors stay comparable.
+CUBE_ORIGIN_ABOVE_BODY_CENTER_M = 0.001
+CUBE_BODY_TOP_Z_M = CUBE_BODY_HEIGHT_M / 2.0 - CUBE_ORIGIN_ABOVE_BODY_CENTER_M
+CUBE_BODY_BOTTOM_Z_M = -(CUBE_BODY_HEIGHT_M / 2.0 + CUBE_ORIGIN_ABOVE_BODY_CENTER_M)
+TOP_MARKER_PLANE_Z_M = CUBE_BODY_TOP_Z_M + TOP_PROTRUSION_HEIGHT_M
+SIDE_MARKER_CENTER_Z_M = -CUBE_ORIGIN_ABOVE_BODY_CENTER_M
+
+TOP_MARKER_NEG_Y_ID = 0   # +Z protrusion top, center: (0, -14, +62.5) mm
+TOP_MARKER_POS_Y_ID = 1   # +Z protrusion top, center: (0, +14, +62.5) mm
 SIDE_MARKER_POS_X_ID = 2  # +X body face, center: (+29.5, 0, -1) mm
 SIDE_MARKER_POS_Y_ID = 3  # +Y body face, center: (0, +29.5, -1) mm
 SIDE_MARKER_NEG_X_ID = 4  # -X body face, center: (-29.5, 0, -1) mm
@@ -46,21 +61,22 @@ class CubeConfig:
     """Physical marker-plane definition of the AprilTag cube.
 
     Object frame:
-      - body: 59 x 59 x 57mm
-      - +Z protrusion / top-marker plane: 2mm above the body
-      - overall envelope: 59 x 59 x 59mm
-      - origin: center of the overall 59mm-height envelope
-      - +Z: upward; top-marker plane z = +29.5mm
-      - side-marker centers: z = -1mm because the 57mm body spans
-        z = -29.5mm .. +27.5mm
+      - body: 59 x 59 x 57mm, spanning z = -29.5mm .. +27.5mm
+      - +Z protrusion: 35mm above the body top, same 59 x 59mm footprint
+      - overall envelope: 59 x 59 x 92mm, spanning z = -29.5mm .. +62.5mm
+      - origin: center of the pre-revision 59mm envelope, i.e. 1mm above the
+        body center; kept fixed so the body and side markers never move when
+        the protrusion changes
+      - +Z: upward; top-marker plane z = +62.5mm (body top +27.5 plus 35mm)
+      - side-marker centers: z = -1mm, the mid-height of the 57mm body
 
-    ``cube_side_m`` is retained as the legacy 59mm footprint/overall-envelope
-    extent used by the marker-plane model. The body/protrusion dimensions above
-    are explicit module constants so the 57+2mm construction is not mistaken
-    for a solid 59mm-tall body.
+    ``cube_side_m`` is the 59mm square footprint (x/y extent) used by the
+    marker-plane model; it is no longer the z extent. The body/protrusion
+    heights are explicit module constants so the 57+35mm construction is not
+    mistaken for a solid 59mm cube.
     """
 
-    cube_side_m: float = CUBE_WIDTH_M
+    cube_side_m: float = CUBE_WIDTH_M  # square footprint (x/y), not the height
     marker_size_m: float = SIDE_MARKER_SIZE_M  # fallback only
     dictionary_name: str = "DICT_APRILTAG_36h11"
 

@@ -23,6 +23,8 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from calibration_pipeline import table1  # noqa: E402
 from calibration_pipeline.apriltag_cube import inv_T  # noqa: E402
+from calibration_pipeline.config import CUBE_BODY_HEIGHT_M  # noqa: E402
+from calibration_pipeline.cube_config import cube_config_from_dict  # noqa: E402
 from calibration_pipeline.board_config import (  # noqa: E402
     charuco_config_from_dict,
     charuco_topology,
@@ -813,6 +815,39 @@ def _intrinsic_metadata(intrinsics_dir: Path):
     return output
 
 
+def _physical_cube_measurement(cube_cfg) -> dict:
+    """Cube envelope as defined by the session's own frozen cube config.
+
+    The numbers are read from the config rather than hard-coded so a session
+    captured with a different cube CAD revision (the +Z protrusion grew from
+    2mm to 35mm in 2026-09) is reported with the geometry it actually used.
+    The 57mm body height is a module constant because no revision changed it.
+    """
+    top_ids = [int(m) for m in cube_cfg.marker_ids
+               if cube_cfg.id_to_face.get(int(m)) == "+Z"]
+    side_ids = [int(m) for m in cube_cfg.marker_ids
+                if cube_cfg.id_to_face.get(int(m)) in ("+X", "-X", "+Y", "-Y")]
+    top_plane_mm = 1000.0 * float(cube_cfg.marker_center_m[top_ids[0]][2])
+    side_center_mm = 1000.0 * float(cube_cfg.marker_center_m[side_ids[0]][2])
+    body_height_mm = 1000.0 * CUBE_BODY_HEIGHT_M
+    protrusion_mm = top_plane_mm - (side_center_mm + body_height_mm / 2.0)
+    return {
+        "body_width_mm": 1000.0 * float(cube_cfg.cube_side_m),
+        "body_depth_mm": 1000.0 * float(cube_cfg.cube_side_m),
+        "body_height_mm": body_height_mm,
+        "top_protrusion_height_mm": protrusion_mm,
+        "overall_height_mm": body_height_mm + protrusion_mm,
+        "top_marker_plane_z_mm": top_plane_mm,
+        "side_marker_center_z_mm": side_center_mm,
+        "side_marker_outer_black_border_mm": 1000.0 * float(
+            cube_cfg.marker_size_by_id[side_ids[0]]),
+        "top_marker_outer_black_border_mm": 1000.0 * float(
+            cube_cfg.marker_size_by_id[top_ids[0]]),
+        "matches_config": True,
+        "source": "frozen cube_config in the observation manifest",
+    }
+
+
 def _write_report(path: Path, payload: dict):
     scale = payload["train_only_board_metric_scale"]
     current = payload["intrinsic_variants"]["charuco_calibrated_KD"]
@@ -831,6 +866,7 @@ def _write_report(path: Path, payload: dict):
     cube_scan = payload["cube_geometry_scale_scan"]
     software_fix = payload["cube_corner_refinement_fix"]
     board_contract = payload["physical_board_measurement"]
+    cube_contract = payload["physical_cube_measurement"]
     conflict_contract = payload["systematic_conflict_contract"]
     best_pnp = payload["pnp_solver_scan"][0]
     stereo = payload["stereo_calibration_conflict"]
@@ -853,9 +889,15 @@ def _write_report(path: Path, payload: dict):
         f"전체 폭 275 mm는 square length `{nominal_square_mm:.1f} mm`와 "
         "일치합니다. 여기서 10은 checker square 수가 아니라 내부 corner column "
         "수입니다.",
-        "Cube도 본체 59×59×57 mm, +Z 돌출부 2 mm, side marker 51 mm, "
-        "top marker 25 mm 정의와 실물이 일치합니다. 기존 3D corner 좌표는 이미 "
-        "top marker plane z=+29.5 mm와 side marker center z=-1 mm로 이 구조를 "
+        f"Cube도 본체 "
+        f"{cube_contract['body_width_mm']:.0f}×{cube_contract['body_depth_mm']:.0f}"
+        f"×{cube_contract['body_height_mm']:.0f} mm, +Z 돌출부 "
+        f"{cube_contract['top_protrusion_height_mm']:.0f} mm, side marker "
+        f"{cube_contract['side_marker_outer_black_border_mm']:.0f} mm, top marker "
+        f"{cube_contract['top_marker_outer_black_border_mm']:.0f} mm 정의와 실물이 "
+        "일치합니다. 기존 3D corner 좌표는 이미 top marker plane "
+        f"z={cube_contract['top_marker_plane_z_mm']:+.1f} mm와 side marker center "
+        f"z={cube_contract['side_marker_center_z_mm']:+.1f} mm로 이 구조를 "
         "표현하므로 Cube geometry scale 불일치 가설도 기각합니다.",
         "",
         "확인된 소프트웨어 문제는 Cube 기본 검출기의 corner refinement가 꺼져 있어 "
@@ -1090,6 +1132,12 @@ def main(argv=None):
     parser.add_argument("--split-seed", type=int, default=20260731)
     parser.add_argument("--test-fraction", type=float, default=0.2)
     parser.add_argument("--min-train-eih-cube-events", type=int, default=3)
+    parser.add_argument(
+        "--allow-relocated-session-root", "--allow_relocated_session_root",
+        dest="allow_relocated_session_root", action="store_true",
+        help=(
+            "Replay a frozen manifest captured in another checkout while "
+            "still validating source file SHA-256 hashes."))
     args = parser.parse_args(argv)
 
     root = Path(args.session_root).resolve()
@@ -1100,7 +1148,8 @@ def main(argv=None):
         manifest_payload = json.load(stream)
     observations, manifest_diagnostics = load_pixel_observations_from_manifest(
         args.manifest, policy=args.observation_filter_policy, root=str(root),
-        intrinsics_dir=str(intrinsics_dir), validate_sources=True)
+        intrinsics_dir=str(intrinsics_dir), validate_sources=True,
+        allow_relocated_root=bool(args.allow_relocated_session_root))
     split, train, test = _split_observations(
         observations, gripper=2, fraction=args.test_fraction,
         seed=args.split_seed, minimum=args.min_train_eih_cube_events)
@@ -1139,6 +1188,8 @@ def main(argv=None):
     board_cfg = charuco_config_from_dict(
         manifest_diagnostics["charuco_board_config"])
     board_topology = charuco_topology(board_cfg)
+    cube_measurement = _physical_cube_measurement(
+        cube_config_from_dict(manifest_diagnostics["cube_config"]))
     same_event_conflict = _same_event_conflicts(
         [observation for observation in observations
          if observation.set_idx in set(split["eligible_sets"])],
@@ -1165,18 +1216,7 @@ def main(argv=None):
                 "11 checker-square columns produce 10 internal ChArUco "
                 "corner columns and 60=(11-1)*(7-1) total corners"),
         },
-        "physical_cube_measurement": {
-            "body_width_mm": 59.0,
-            "body_depth_mm": 59.0,
-            "body_height_mm": 57.0,
-            "top_protrusion_height_mm": 2.0,
-            "overall_height_mm": 59.0,
-            "top_marker_plane_z_mm": 29.5,
-            "side_marker_center_z_mm": -1.0,
-            "side_marker_outer_black_border_mm": 51.0,
-            "top_marker_outer_black_border_mm": 25.0,
-            "matches_config": True,
-        },
+        "physical_cube_measurement": cube_measurement,
         "cube_corner_refinement_fix": {
             "before": {
                 "corner_refinement": "CORNER_REFINE_NONE",

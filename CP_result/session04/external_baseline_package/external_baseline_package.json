@@ -1,0 +1,345 @@
+{
+  "artifact_schema": "external_baseline_frozen_observation_package_v1",
+  "feedback_id": 7,
+  "role": "neutral_input_for_public_or_external_baseline_adapters",
+  "status": "input_package_ready_adapter_execution_pending",
+  "policy": "standard",
+  "source_manifest": {
+    "path": "data/session04/calib_out/capture_filter/Step2b_observation_manifest.json",
+    "sha256": "bb864bc3149afadb2c7f4d9991c939493c6fe55662c595e02df621b745737ea7",
+    "schema": "post_capture_observation_manifest_v2"
+  },
+  "source_table1": {
+    "path": "CP_result/session04/late_table1/table1_methods.json",
+    "sha256": "f048caac50d5a3ae3e5b7f735cfddd073bdc0cf21be14b6b5fc51249257bb5d9"
+  },
+  "split": {
+    "strategy": "event_grouped_and_set_stratified",
+    "seed": 20260731,
+    "test_fraction_requested": 0.2,
+    "min_train_eih_cube_events": 3,
+    "eligible_sets": [
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "train_events": [
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      34,
+      35,
+      36,
+      37,
+      38,
+      39,
+      40,
+      42,
+      43,
+      44,
+      46,
+      47,
+      49,
+      50,
+      51,
+      52,
+      53,
+      54,
+      55,
+      57,
+      58,
+      59,
+      61,
+      62,
+      63,
+      64,
+      65,
+      66,
+      67,
+      68,
+      69,
+      71,
+      72,
+      73,
+      74,
+      75,
+      77
+    ],
+    "test_events": [
+      24,
+      33,
+      41,
+      45,
+      48,
+      56,
+      60,
+      70,
+      76
+    ],
+    "per_set": {
+      "4": {
+        "train_events": [
+          25,
+          26,
+          27,
+          28,
+          29
+        ],
+        "test_events": [
+          24
+        ],
+        "train_eih_cube_events": [
+          25,
+          26,
+          27,
+          29
+        ]
+      },
+      "5": {
+        "train_events": [
+          30,
+          31,
+          32,
+          34,
+          35
+        ],
+        "test_events": [
+          33
+        ],
+        "train_eih_cube_events": [
+          30,
+          31,
+          32,
+          35
+        ]
+      },
+      "6": {
+        "train_events": [
+          36,
+          37,
+          38,
+          39,
+          40
+        ],
+        "test_events": [
+          41
+        ],
+        "train_eih_cube_events": [
+          36,
+          37,
+          38,
+          39
+        ]
+      },
+      "7": {
+        "train_events": [
+          42,
+          43,
+          44,
+          46,
+          47
+        ],
+        "test_events": [
+          45
+        ],
+        "train_eih_cube_events": [
+          42,
+          43,
+          44,
+          46,
+          47
+        ]
+      },
+      "8": {
+        "train_events": [
+          49,
+          50,
+          51,
+          52,
+          53
+        ],
+        "test_events": [
+          48
+        ],
+        "train_eih_cube_events": [
+          49,
+          50,
+          51,
+          52,
+          53
+        ]
+      },
+      "9": {
+        "train_events": [
+          54,
+          55,
+          57,
+          58,
+          59
+        ],
+        "test_events": [
+          56
+        ],
+        "train_eih_cube_events": [
+          54,
+          55,
+          57,
+          58,
+          59
+        ]
+      },
+      "10": {
+        "train_events": [
+          61,
+          62,
+          63,
+          64,
+          65
+        ],
+        "test_events": [
+          60
+        ],
+        "train_eih_cube_events": [
+          61,
+          62,
+          63,
+          64,
+          65
+        ]
+      },
+      "11": {
+        "train_events": [
+          66,
+          67,
+          68,
+          69,
+          71
+        ],
+        "test_events": [
+          70
+        ],
+        "train_eih_cube_events": [
+          66,
+          67,
+          68,
+          71
+        ]
+      },
+      "12": {
+        "train_events": [
+          72,
+          73,
+          74,
+          75,
+          77
+        ],
+        "test_events": [
+          76
+        ],
+        "train_eih_cube_events": [
+          72,
+          73,
+          74,
+          75,
+          77
+        ]
+      }
+    },
+    "dropped_sets": {
+      "0": {
+        "reason": "insufficient_eih_cube_events_for_train_and_test",
+        "n_events": 6,
+        "n_eih_cube_events": 2
+      },
+      "1": {
+        "reason": "insufficient_eih_cube_events_for_train_and_test",
+        "n_events": 6,
+        "n_eih_cube_events": 3
+      },
+      "2": {
+        "reason": "insufficient_eih_cube_events_for_train_and_test",
+        "n_events": 6,
+        "n_eih_cube_events": 3
+      },
+      "3": {
+        "reason": "insufficient_eih_cube_events_for_train_and_test",
+        "n_events": 6,
+        "n_eih_cube_events": 2
+      }
+    }
+  },
+  "counts": {
+    "observations": 154,
+    "corners": 4625,
+    "by_split": {
+      "test": 35,
+      "train": 119
+    },
+    "by_target": {
+      "board": 77,
+      "cube": 77
+    },
+    "by_split_target": {
+      "test:board": 17,
+      "test:cube": 18,
+      "train:board": 60,
+      "train:cube": 59
+    },
+    "by_camera_role": {
+      "fixed": 50,
+      "gripper": 104
+    },
+    "by_camera": {
+      "0": 18,
+      "1": 18,
+      "2": 104,
+      "3": 14
+    }
+  },
+  "files": {
+    "observations_csv": "CP_result/session04/external_baseline_package/external_baseline_observations.csv",
+    "intrinsics_json": "CP_result/session04/external_baseline_package/external_baseline_intrinsics.json",
+    "readme": "CP_result/session04/external_baseline_package/EXTERNAL_BASELINE_PACKAGE.md"
+  },
+  "source_validation": {
+    "images_checked": 81,
+    "intrinsics_checked": 4,
+    "sha256_enforced": true
+  },
+  "adapter_contract": {
+    "allowed_inputs": [
+      "frozen_RGB_image_paths_and_SHA256",
+      "frozen_2d_image_points",
+      "frozen_3d_object_points",
+      "fixed_camera_intrinsics",
+      "train_test_split"
+    ],
+    "forbidden_inputs": [
+      "main_method_camera_poses",
+      "joint_optimizer_state",
+      "robot_FK",
+      "hand_eye_transform",
+      "fitted_shared_target_pose",
+      "heldout_refit_or_model_dependent_gating"
+    ],
+    "adapter_targets": [
+      "OpenCV_PnP_relative_pose",
+      "MATLAB_or_other_public_multiview_baseline",
+      "COLMAP_style_featureless_marker_adapter_if_supported"
+    ],
+    "not_external_gt": true,
+    "not_sota_claim_by_itself": true
+  },
+  "observation_digest": "d8cbd09254c56a844fa1bff275fad03b9ccaaed95538f5ef1a353b3add933b58"
+}

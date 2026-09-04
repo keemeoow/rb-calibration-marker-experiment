@@ -89,6 +89,22 @@ $$
 - calibration에 쓰는 RGB 카메라, controller FK, A4 covariance, A5의 $\Delta_{train}$으로 GT를 만들면 안 된다.
 - tracker가 없으면 base에 고정한 kinematic nest의 6-DoF pose를 CMM으로 먼저 측정하고 cube를 여러 nest에 반복 장착할 수 있다. 눈금자만으로 translation만 재면 rotation GT가 없으므로 최종 실험으로 부족하다.
 
+### 4.1b 눈금 큐브 translation sanity check
+
+8/3 피드백의 "눈금 큐브 재파지로 x/y/z 오차를 실측"은 **gross translation/frame error를
+잡는 pilot check**로는 유효하지만, 그 자체로 최종 6-DoF external GT가 되지는 않는다.
+따라서 다음 계약으로만 사용한다.
+
+1. A2/A3/A4/A5의 prediction 파일을 먼저 생성하고 SHA-256을 동결한다.
+2. 로봇 base에 고정한 눈금 fixture 또는 kinematic nest를 사용해 cube center의 signed
+   `x/y/z` translation error(mm)를 기록한다.
+3. 각 pose는 최소 3회 이상 재장착하고, 접근 방향을 바꾼 반복을 포함한다. 한 방향 접근만
+   반복하면 backlash/contact bias를 과소평가할 수 있다.
+4. rotation은 `measured=false`로 기록한다. rotation을 별도 측정하지 않았다면 TRE/ADD/6-DoF
+   ranking에 사용하지 않는다.
+5. 이 sanity check의 목적은 축 방향, scale, frame sign, 큰 systematic offset을 찾는 것이다.
+   A2/A4 최종 우열은 4.1의 독립 6-DoF GT 또는 4.3의 paired robot task에서만 확정한다.
+
 ### 4.2 권장 표본 수와 배치
 
 - 코드 최소값은 독립 camera-installation session 2개지만, 최종 실험은 **5 sessions × 30 blind poses = 150 poses**를 권장한다.

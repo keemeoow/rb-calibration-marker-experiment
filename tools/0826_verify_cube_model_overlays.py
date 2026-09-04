@@ -24,6 +24,11 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from calibration_pipeline.apriltag_cube import AprilTagCubeTarget
+from calibration_pipeline.config import (
+    CUBE_BODY_BOTTOM_Z_M,
+    CUBE_BODY_HEIGHT_M,
+    CUBE_BODY_TOP_Z_M,
+)
 from calibration_pipeline.cube_config import load_cube_config_from_meta
 from calibration_pipeline.runtime import load_intrinsics_with_depth_scale
 
@@ -104,10 +109,25 @@ def _solve_camera_pose(target, camera_info, K, D):
     return CameraPose(rvec=rvec, tvec=tvec, rmse_px=rmse, used_ids=used)
 
 
-def _cube_box_points(side_m):
-    d = float(side_m) / 2.0
+def _cube_box_points(target):
+    """Envelope box of the drawn cube: 59mm square footprint, asymmetric z.
+
+    The z extent is read from the target's own marker planes so a session that
+    was captured with an earlier cube CAD is drawn with the box it actually had:
+    the top of the +Z protrusion is the top-marker plane, and the body bottom is
+    half the (revision-invariant) 57mm body below the side-marker plane.
+    """
+    cfg = target.cfg
+    d = float(cfg.cube_side_m) / 2.0
+    top_z = [target.model.marker_pose_in_rig(mid)[2, 3]
+             for mid in cfg.marker_ids if cfg.id_to_face.get(int(mid)) == "+Z"]
+    side_z = [target.model.marker_pose_in_rig(mid)[2, 3]
+              for mid in cfg.marker_ids
+              if cfg.id_to_face.get(int(mid)) in ("+X", "-X", "+Y", "-Y")]
+    z_top = max(top_z) if top_z else CUBE_BODY_TOP_Z_M
+    z_bottom = (min(side_z) - CUBE_BODY_HEIGHT_M / 2.0) if side_z else CUBE_BODY_BOTTOM_Z_M
     return np.array(
-        [[x, y, z] for x in (-d, d) for y in (-d, d) for z in (-d, d)],
+        [[x, y, z] for x in (-d, d) for y in (-d, d) for z in (z_bottom, z_top)],
         dtype=np.float64,
     )
 
@@ -121,7 +141,7 @@ BOX_EDGES = (
 def _draw_model_overlay(image, camera_idx, event_id, camera_info, target, pose, K, D):
     canvas = image.copy()
 
-    box_2d = _project(_cube_box_points(target.cfg.cube_side_m), pose, K, D)
+    box_2d = _project(_cube_box_points(target), pose, K, D)
     for a, b in BOX_EDGES:
         cv2.line(
             canvas,
@@ -337,7 +357,7 @@ def _set_axes_equal(ax, half_extent=0.048):
 def _render_geometry_reference(target, destination):
     fig = plt.figure(figsize=(18, 9), dpi=140, facecolor="#11151b")
     views = ((24, -54, "+X / +Y / +Z view"), (24, 126, "-X / -Y / +Z view"))
-    box = _cube_box_points(target.cfg.cube_side_m) * 1000.0
+    box = _cube_box_points(target) * 1000.0
 
     for subplot, (elevation, azimuth, title) in enumerate(views, start=1):
         ax = fig.add_subplot(1, 2, subplot, projection="3d", facecolor="#11151b")

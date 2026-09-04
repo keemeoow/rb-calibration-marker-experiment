@@ -9,11 +9,12 @@ scope it, and what do the current data say?"
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 import sys
 from typing import Iterable
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -58,6 +59,48 @@ from tools.make_calibration_result_presentation import (  # noqa: E402
 
 OUT_PDF = ROOT / "캘리브레이션_8-3_피드백_해결_시각화_발표자료.pdf"
 OUT_PNG_DIR = ROOT / "CP_result/session04/feedback_resolution_slides"
+STEP2B_OVERLAY = ROOT / "data/session04/calib_out/capture_filter/Step2b_review_overlay.jpg"
+REDETECTION_OVERLAY = (
+    ROOT / "data/session04/calib_out/verify/cube_observation_quality/"
+    "redetection_recovered_core_overlay.png"
+)
+CUBE_MODEL_OVERLAY = (
+    ROOT / "data/session04/calib_out/verify/0826_cube_model_validation/"
+    "cube_model_overlay_event00000.png"
+)
+BOARD_CUBE_OVERLAY = (
+    ROOT / "data/session04/calib_out/verify/board_cube_relative_pose/"
+    "camera1_camera3_board_cube_overlay.png"
+)
+ROBOT_BASE_POINTCLOUD = (
+    ROOT / "CP_result/session04/robot_base_pointcloud/"
+    "robot_base_pointcloud_A2_event0054.png"
+)
+ROBOT_BASE_POINTCLOUD_JSON = (
+    ROOT / "CP_result/session04/robot_base_pointcloud/"
+    "robot_base_pointcloud_diagnostic.json"
+)
+
+
+def load_pointcloud_payload() -> dict:
+    if not ROBOT_BASE_POINTCLOUD_JSON.exists():
+        return {}
+    return json.loads(ROBOT_BASE_POINTCLOUD_JSON.read_text(encoding="utf-8"))
+
+
+def pointcloud_method_rows() -> list[dict]:
+    return load_pointcloud_payload().get("method_summary", [])
+
+
+def pointcloud_method_row(method: str) -> dict:
+    for row in pointcloud_method_rows():
+        if row.get("method") == method:
+            return row
+    return {}
+
+
+def fmt_mm(value) -> str:
+    return "N/A" if value is None else f"{float(value):.3f} mm"
 
 
 def delta(ctx: dict, first: str, second: str, key: str) -> float:
@@ -66,6 +109,35 @@ def delta(ctx: dict, first: str, second: str, key: str) -> float:
 
 def signed(value: float) -> str:
     return f"{value:+.4f}"
+
+
+def image_panel(
+    canvas: Image.Image,
+    draw: ImageDraw.ImageDraw,
+    path: Path,
+    box: tuple[int, int, int, int],
+    *,
+    fit_mode: str = "cover",
+    bg: str = "#0F172A",
+) -> None:
+    x0, y0, x1, y1 = box
+    rounded(draw, box, fill=bg, outline=LINE, radius=15)
+    pad = 10
+    image_box = (x0 + pad, y0 + pad, x1 - pad, y1 - pad)
+    iw, ih = image_box[2] - image_box[0], image_box[3] - image_box[1]
+    if not path.exists():
+        draw_wrapped(draw, (x0 + 28, y0 + 28), f"Missing image: {path}", font(22), PAPER, x1 - x0 - 56)
+        return
+    source = Image.open(path).convert("RGB")
+    if fit_mode == "contain":
+        source.thumbnail((iw, ih), Image.Resampling.LANCZOS)
+        px = image_box[0] + (iw - source.width) // 2
+        py = image_box[1] + (ih - source.height) // 2
+        canvas.paste(source, (px, py))
+    else:
+        source = ImageOps.fit(source, (iw, ih), method=Image.Resampling.LANCZOS)
+        canvas.paste(source, (image_box[0], image_box[1]))
+    draw.rectangle(image_box, outline="#CBD5E1", width=2)
 
 
 def delta_bars(
@@ -128,7 +200,7 @@ def slide_cover(ctx: dict, i: int, n: int) -> Image.Image:
     draw_wrapped(
         draw,
         (100, 334),
-        "Session04 캘리브레이션 결과를 8/3 피드백 항목별로 재구성한 발표자료",
+        "Session04 캘리브레이션 결과를 8/3 피드백 항목별로 재구성하고 실제 overlay 증거를 첨부한 발표자료",
         font(31),
         "#CBD5E1",
         1120,
@@ -153,28 +225,25 @@ def slide_status(ctx: dict, i: int, n: int) -> Image.Image:
         i,
         n,
         "AT A GLANCE",
-        "8/3 피드백 반영 상태",
-        "19개 피드백을 코드·문서·산출물 기준으로 재확인했다.",
+        "8/3 피드백을 7개 유형으로 재정리",
+        "19개 피드백을 번호 순서가 아니라 문제 유형별로 묶어 발표한다.",
     )
     small_stat(draw, (68, y, 384, y + 138), "11", "반영 완료", GREEN)
-    small_stat(draw, (420, y, 736, y + 138), "7", "부분 반영 / 일정 의존", AMBER)
-    small_stat(draw, (772, y, 1088, y + 138), "1", "point-cloud 전용 평가 미구현", RED)
+    small_stat(draw, (420, y, 736, y + 138), "8", "부분 반영 / 일정 의존", AMBER)
+    small_stat(draw, (772, y, 1088, y + 138), "0", "완전 미반영 없음", GREEN)
     small_stat(draw, (1124, y, 1564, y + 138), "다음주", "Independent External GT", BLUE)
     card(
         draw,
         (68, y + 178, 760, y + 428),
-        "현재 완료로 말할 수 있는 것",
-        "frame-prune/refit/rollback, 목적함수 항 분리, event-grouped split, "
-        "matched contrast table, set-equal/paired bootstrap, OpenCV reference, "
-        "camera-scope 진단까지 반영했다.",
+        "완료 중심 유형",
+        "C1 관측 품질, C2 목적함수/FK 설명, C3 평가 공정성은 현재 코드·데이터·overlay로 설명 가능하다.",
         GREEN,
     )
     card(
         draw,
         (804, y + 178, 1564, y + 428),
-        "다음주로 남긴 것",
-        "Independent External GT, 눈금 큐브 재파지, robot task success/failure, "
-        "translation/rotation/P95/failure rate는 현재 데이터로 계산하지 않는다.",
+        "제한/후속 유형",
+        "C4는 기여도 표현을 제한하고, C5/C6는 진단·외부 대조로 둔다. C7 point cloud는 구현했고 물리 GT와 robot task는 다음주 예정이다.",
         ORANGE,
     )
     return img
@@ -186,25 +255,26 @@ def slide_feedback_clusters(ctx: dict, i: int, n: int) -> Image.Image:
         i,
         n,
         "FEEDBACK MAP",
-        "피드백을 6개 문제로 묶으면",
-        "각 문제는 해결 방식과 현재 산출물 위치가 다르다.",
+        "피드백을 7개 분류로 묶으면",
+        "각 피드백은 하나의 primary 분류에 배정하고, 해결 방식과 남은 일을 분리한다.",
     )
     rows = [
-        ["#1 #2 #18", "이상치·검출 QA", "image-level frame-prune, refit/rollback, overlay QA", "완료"],
-        ["#3 #4 #9 #19", "목적함수/FK 설명", "visual 1항 또는 visual+FK 2항으로 재정의", "완료/부분"],
-        ["#5 #8 #10 #11 #12", "평가지표 공정성", "matched contrast, event split, mm/deg 보조 지표", "완료"],
-        ["#6", "수치가 큰 원인", "Board-Cube conflict 17.299→10.808 mm까지 낮춤", "부분"],
-        ["#7", "공개 구현 대조", "OpenCV direct relative-pose reference 구현", "부분"],
-        ["#14 #15 #16 #17", "robot task/GT", "Track C schema와 evaluator 준비, 실측은 다음주", "부분/미구현"],
+        ["C1", "#1 #2 #18", "관측 품질 / 이상치", "frame-prune, refit/rollback, overlay QA"],
+        ["C2", "#3 #4 #9 #19", "목적함수 / FK 사용", "visual/FK block 분리, A2/A4/A5 역할 확정"],
+        ["C3", "#5 #8 #10 #11 #12", "평가 공정성 / 지표", "matched contrast, event split, camera scope"],
+        ["C4", "#13", "기여도 / ablation", "A1/B1은 제안이 아니라 효과 분리 baseline"],
+        ["C5", "#6", "큰 오차 원인 진단", "Board-Cube conflict 17.299→10.808 mm 추적"],
+        ["C6", "#7", "외부 구현 대조", "OpenCV reference + frozen external package"],
+        ["C7", "#14 #15 #16 #17", "물리 GT / 로봇 작업", "Track C + point-cloud diagnostic, 실측 GT는 다음주"],
     ]
     table(
         draw,
         72,
         y,
-        [170, 300, 760, 170],
-        ["피드백", "문제", "해결 방식", "상태"],
+        [88, 210, 340, 710],
+        ["분류", "피드백", "문제 축", "현재 처리"],
         rows,
-        row_font_size=19,
+        row_font_size=18,
         header_font_size=17,
         max_bottom=810,
     )
@@ -216,28 +286,194 @@ def slide_solution_contract(ctx: dict, i: int, n: int) -> Image.Image:
     img, draw, y = content_base(
         i,
         n,
-        "FIX CONTRACT",
-        "피드백 → 해결 방식 → 확인 자료",
-        "발표에서 질문이 들어오면 이 표의 세 번째 칸으로 바로 답하면 된다.",
+        "TYPE CONTRACT",
+        "유형별 해결 계약",
+        "발표에서는 먼저 C분류를 말하고, 그 다음 해당 증거 슬라이드로 넘긴다.",
     )
     rows = [
-        ["프레임 이상치 제거", "MAD 기반 image-level frame-prune 후 refit, 악화 시 rollback", "15개 stage가 시도 후 rollback"],
-        ["목적함수 혼동", "camera-to-camera residual 없음. shared target pose로 결합", "Visual 1항 / FK rows 2항"],
-        ["FK 항이 묻힘", "visual/FK cost block을 분리 보고", "A4 FK cost fraction 0.122%"],
-        ["지표 편향", "Own-heldout + set-equal + paired bootstrap + camera-scope", "Board 703 / Cube 236 corners"],
-        ["공개 구현 비교", "main method와 독립인 OpenCV relative-pose baseline", "별도 JSON/CSV/MD 산출물"],
-        ["robot task 정확도", "Independent External GT와 paired task-trial schema 유지", "다음주 측정 예정"],
+        ["C1", "#1 #2 #18", "관측 품질 / 이상치", "frame-prune, refit/rollback, 실제 overlay QA"],
+        ["C2", "#3 #4 #9 #19", "목적함수 / FK 사용", "visual-only 1항, soft-FK 2항, A2/A4/A5 역할 분리"],
+        ["C3", "#5 #8 #10 #11 #12", "평가 공정성 / 지표", "matched contrast, event split, camera-scope, mm/deg 보조 지표"],
+        ["C4", "#13", "기여도 / ablation", "A1/B1은 제안 방법이 아니라 효과 분리 baseline"],
+        ["C5", "#6", "큰 오차 원인 진단", "Board-Cube conflict 10.8077 mm를 제한으로 명시"],
+        ["C6", "#7", "외부 구현 대조", "OpenCV reference와 frozen external package"],
+        ["C7", "#14 #15 #16 #17", "물리 GT / 로봇 작업", "Track C + point-cloud diagnostic, GT는 다음주"],
     ]
     table(
         draw,
         72,
         y,
-        [320, 690, 340],
-        ["피드백", "해결 방식", "현재 확인"],
+        [84, 216, 330, 720],
+        ["분류", "피드백", "문제 축", "확인 자료 / 발표 답변"],
         rows,
-        row_font_size=20,
+        row_font_size=18,
         header_font_size=17,
         max_bottom=810,
+    )
+    return img
+
+
+def slide_evidence_observation_overlay(ctx: dict, i: int, n: int) -> Image.Image:
+    del ctx
+    img, draw, y = content_base(
+        i,
+        n,
+        "C1 | REAL OVERLAY",
+        "관측 품질: selected / recovered / rejected",
+        "Step 04의 frozen observation manifest가 실제 RGB 위에서 어떻게 판정됐는지 보여준다.",
+    )
+    image_panel(img, draw, STEP2B_OVERLAY, (68, y, 982, y + 522), fit_mode="cover")
+    card(
+        draw,
+        (1024, y, 1564, y + 150),
+        "증거 역할",
+        "초록은 recovered/selected, 노랑은 quarantine, 빨강은 rejected다. 검출 QA를 실제 사진 위에서 확인한다.",
+        GREEN,
+        title_size=25,
+        body_size=21,
+    )
+    card(
+        draw,
+        (1024, y + 184, 1564, y + 338),
+        "연결 유형",
+        "#1 image-level frame prune, #2 refit/rollback, #18 overlay QA에 대한 시각 증거다.",
+        BLUE,
+        title_size=25,
+        body_size=21,
+    )
+    card(
+        draw,
+        (1024, y + 372, 1564, y + 522),
+        "현재 숫자",
+        "Cube detection: 117 images read, 108 accepted PnP observations, 99 core multiface selected, 2 RMSE rejections.",
+        ORANGE,
+        title_size=25,
+        body_size=20,
+    )
+    return img
+
+
+def slide_evidence_cube_overlays(ctx: dict, i: int, n: int) -> Image.Image:
+    del ctx
+    img, draw, y = content_base(
+        i,
+        n,
+        "C1+C5 | REAL OVERLAY",
+        "Cube 검출과 모델 일치 확인",
+        "실제 RGB 위의 cube corner, face ID, model reprojection을 확인한다.",
+    )
+    image_panel(img, draw, REDETECTION_OVERLAY, (68, y, 1564, y + 230), fit_mode="cover")
+    image_panel(img, draw, CUBE_MODEL_OVERLAY, (68, y + 264, 960, y + 522), fit_mode="cover")
+    card(
+        draw,
+        (1000, y + 264, 1564, y + 392),
+        "Redetection evidence",
+        "baseline 검출에서 부족했던 관측을 relaxed/subpixel 후보로 회복했고, RMSE와 face set을 함께 표시했다.",
+        GREEN,
+        title_size=24,
+        body_size=20,
+    )
+    card(
+        draw,
+        (1000, y + 420, 1564, y + 522),
+        "Model evidence",
+        "green=detected, magenta=model reprojection, orange=normal/axis로 cube geometry가 실제 이미지와 맞는지 본다.",
+        BLUE,
+        title_size=24,
+        body_size=19,
+    )
+    return img
+
+
+def slide_evidence_board_cube_conflict(ctx: dict, i: int, n: int) -> Image.Image:
+    del ctx
+    img, draw, y = content_base(
+        i,
+        n,
+        "C5 | REAL OVERLAY",
+        "큰 오차 원인: Board-Cube conflict",
+        "같은 event의 board PnP와 cube PnP를 같은 fixed camera pair에서 직접 비교한 overlay다.",
+    )
+    image_panel(img, draw, BOARD_CUBE_OVERLAY, (68, y, 1564, y + 340), fit_mode="cover")
+    small_stat(draw, (68, y + 378, 384, y + 512), "10.8077 mm", "direct PnP translation RMSE", ORANGE)
+    small_stat(draw, (420, y + 378, 736, y + 512), "0.5270°", "max rotation disagreement", ORANGE)
+    card(
+        draw,
+        (772, y + 378, 1564, y + 512),
+        "즉시 triage",
+        "event 54 제거 후에도 9.599 mm가 남는다. 단일 프레임보다 cube sparse observation + localization/intrinsic bias로 설명한다.",
+        RED,
+        title_size=23,
+        body_size=20,
+    )
+    return img
+
+
+def slide_robot_base_pointcloud(ctx: dict, i: int, n: int) -> Image.Image:
+    del ctx
+    a2 = pointcloud_method_row("A2")
+    obs = a2.get("observations", 24)
+    img, draw, y = content_base(
+        i,
+        n,
+        "C7 | POINT CLOUD",
+        "로봇 base frame에서 본 point cloud 정합",
+        "aligned depth를 calibration 목적함수에 넣지 않고, A2 transform으로 robot-base 좌표계에 올려 진단한다.",
+    )
+    image_panel(img, draw, ROBOT_BASE_POINTCLOUD, (68, y, 1098, y + 522), fit_mode="contain", bg=PAPER)
+    small_stat(draw, (1134, y, 1564, y + 124), f"{obs} obs", "event 24/54/72 board+cube", BLUE)
+    small_stat(draw, (1134, y + 150, 1564, y + 274), fmt_mm(a2.get("board_rmse_mm")), "board depth-to-plane RMSE", TEAL)
+    small_stat(draw, (1134, y + 300, 1564, y + 424), fmt_mm(a2.get("cube_rmse_mm")), "cube depth-to-plane RMSE", ORANGE)
+    card(
+        draw,
+        (1134, y + 450, 1564, y + 608),
+        "해석 제한",
+        "depth 기반 진단이다. external GT와 robot-contact 정확도는 다음주 실측에서 확정한다.",
+        RED,
+        title_size=21,
+        body_size=19,
+    )
+    return img
+
+
+def slide_robot_base_pointcloud_rows(ctx: dict, i: int, n: int) -> Image.Image:
+    del ctx
+    img, draw, y = content_base(
+        i,
+        n,
+        "C7 | ROW SUMMARY",
+        "point cloud도 비교실험 row별로 보면",
+        "각 row의 marker 구성만 사용해 robot-base depth-to-plane residual을 산출했다.",
+    )
+    rows = []
+    for row in pointcloud_method_rows():
+        rows.append([
+            row["method"],
+            row["targets"],
+            fmt_mm(row.get("board_rmse_mm")),
+            fmt_mm(row.get("cube_rmse_mm")),
+            fmt_mm(row.get("combined_rmse_mm")),
+            row["role"],
+        ])
+    table(
+        draw,
+        72,
+        y,
+        [84, 170, 170, 170, 190, 690],
+        ["Row", "Target", "Board", "Cube", "Combined", "역할"],
+        rows,
+        row_font_size=17,
+        header_font_size=16,
+        max_bottom=748,
+    )
+    card(
+        draw,
+        (72, 700, 1564, 836),
+        "해석",
+        "A5/B2가 낮아 보여도 post-hoc/preflight 성격이라 물리 승자가 아니다. #17의 로봇 좌표계 진단 증거로만 사용한다.",
+        ORANGE,
+        title_size=21,
+        body_size=20,
     )
     return img
 
@@ -247,8 +483,8 @@ def slide_algorithm(ctx: dict, i: int, n: int) -> Image.Image:
     img, draw, y = content_base(
         i,
         n,
-        "ALGORITHM",
-        "알고리즘 설명 최종본",
+        "C2 | ALGORITHM",
+        "목적함수 / FK 사용 설명",
         "카메라 간 pose를 직접 평균하는 방법이 아니라, 공유 target pose를 통해 joint optimization하는 방법이다.",
     )
     card(
@@ -291,8 +527,8 @@ def slide_experiment_table(ctx: dict, i: int, n: int) -> Image.Image:
     img, draw, y = content_base(
         i,
         n,
-        "EXPERIMENT DESIGN",
-        "비교실험 구성 표",
+        "C4 | EXPERIMENT DESIGN",
+        "기여도는 ablation 표로 제한",
         "전체 순위가 아니라, 한 번에 하나만 바뀌는 matched contrast로 해석한다.",
     )
     rows = [
@@ -325,8 +561,8 @@ def slide_metrics(ctx: dict, i: int, n: int) -> Image.Image:
     img, draw, y = content_base(
         i,
         n,
-        "METRICS",
-        "평가지표 최종 계층",
+        "C3 | METRICS",
+        "평가지표 공정성 계층",
         "지표의 역할을 분리해야 FK에 유리한 숫자만 고른다는 오해를 피할 수 있다.",
     )
     rows = [
@@ -370,8 +606,8 @@ def slide_main_result(ctx: dict, i: int, n: int) -> Image.Image:
     img, draw, y = content_base(
         i,
         n,
-        "DATA RESULT 1",
-        "A1 → A2: 현재 가장 강한 내부 결과",
+        "C2+C4 | DATA RESULT",
+        "A1 → A2: unified 효과",
         "동일 board+cube 관측에서 sequential frozen-stage를 unified joint optimization으로 바꾼 비교다.",
     )
     bar_chart(
@@ -419,8 +655,8 @@ def slide_cube_result(ctx: dict, i: int, n: int) -> Image.Image:
     img, draw, y = content_base(
         i,
         n,
-        "DATA RESULT 2",
-        "Cube claim은 조건부로 바꾼다",
+        "C4+C5 | DATA RESULT",
+        "Cube claim은 조건부로 제한",
         "cube를 단순히 추가하면 항상 좋아진다는 claim은 현재 데이터와 맞지 않는다.",
     )
     delta_bars(
@@ -451,8 +687,8 @@ def slide_fk_result(ctx: dict, i: int, n: int) -> Image.Image:
     img, draw, y = content_base(
         i,
         n,
-        "DATA RESULT 3",
-        "FK는 hard GT가 아니라 uncertainty-aware prior",
+        "C2 | DATA RESULT",
+        "FK는 hard GT가 아니라 prior",
         "A2, A3, A4, A5는 FK를 어떻게 넣을지에 대한 원인 분리다.",
     )
     entries = [
@@ -500,8 +736,8 @@ def slide_data_quality(ctx: dict, i: int, n: int) -> Image.Image:
     img, draw, y = content_base(
         i,
         n,
-        "DATA QA",
-        "데이터 문제는 없는가?",
+        "C1+C5+C6 | DATA QA",
+        "데이터 문제와 남은 리스크",
         "계산/동기화 오류는 보이지 않지만, 남은 데이터 리스크는 숨기지 않는다.",
     )
     small_stat(draw, (68, y, 384, y + 138), "27/27", "모든 row·seed 수렴", GREEN)
@@ -533,15 +769,17 @@ def slide_script_next(ctx: dict, i: int, n: int) -> Image.Image:
     img, draw, y = content_base(
         i,
         n,
-        "CLOSING",
-        "마지막 발표 멘트",
+        "C1-C7 | CLOSING",
+        "유형별 최종 발표 멘트",
         "이 문단이 현재 결론의 가장 안전한 버전이다.",
     )
     script = (
-        f"“8/3 피드백 이후 표를 전체 순위표가 아니라 matched ablation 표로 재구성했습니다. "
+        f"“8/3 피드백은 C1 관측 품질, C2 목적함수/FK, C3 평가 공정성, C4 ablation 포지셔닝, "
+        f"C5 큰 오차 원인, C6 외부 구현 대조, C7 물리 GT/로봇 작업으로 나눠 정리했습니다. "
         f"현재 주 지표는 같은 marker population의 held-out reprojection이고, A1→A2에서 own overall이 "
         f"{fmt(a1)} px에서 {fmt(a2)} px로 낮아져 unified feedback 효과가 가장 분명합니다. "
-        f"반면 cube 효과는 조건부이고, hard FK는 악화되며, soft-FK는 아직 preflight입니다. "
+        f"다만 cube 효과는 조건부이고, hard FK는 악화되며, soft-FK는 preflight입니다. "
+        f"#17은 A0–A5/B1–B3 전체 비교 row에 대해 robot-base point-cloud diagnostic까지 구현했습니다. "
         f"따라서 현 단계 결론은 A2가 internal main이고, robot-base 물리 정확도는 다음주 Independent External GT로 "
         f"Translation/Rotation/P95/Failure Rate를 산출해 확정하겠습니다.”"
     )
@@ -564,6 +802,11 @@ SLIDES = [
     slide_status,
     slide_feedback_clusters,
     slide_solution_contract,
+    slide_evidence_observation_overlay,
+    slide_evidence_cube_overlays,
+    slide_evidence_board_cube_conflict,
+    slide_robot_base_pointcloud,
+    slide_robot_base_pointcloud_rows,
     slide_algorithm,
     slide_experiment_table,
     slide_metrics,
