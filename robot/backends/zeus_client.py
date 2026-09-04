@@ -159,8 +159,13 @@ class ZeusClient:
             kwargs["pose_speed"] = float(pose_speed)
         self._send("movel", **kwargs)
 
-    def movej(self, joints: Sequence[float], jnt_speed: float = 10.0) -> None:
-        self._send("movej", joints=[float(v) for v in joints], jnt_speed=float(jnt_speed))
+    def movej(self, joints: Sequence[float], jnt_speed: float = 10.0,
+              overlap: float = 0.0, acc: Optional[float] = None) -> None:
+        kwargs = {"joints": [float(v) for v in joints], "jnt_speed": float(jnt_speed),
+                  "overlap": float(overlap)}
+        if acc is not None:
+            kwargs["acc"] = float(acc)
+        self._send("movej", **kwargs)
 
     def grip(self, state: str, timeout_s: float = 3.0) -> bool:
         """state: 'open' | 'close'. Returns the server's `reached` flag verbatim.
@@ -179,6 +184,18 @@ class ZeusClient:
         """Close the gripper and return True iff something is now held (stalled close)."""
         reached = self.grip("close", timeout_s=timeout_s)
         return not reached
+
+    def stream_start(self) -> None:
+        """Turn on the i611 SDK's prefetch/queue mode (asyncm(1)) so subsequent
+        movel/movej calls return once queued rather than once the robot
+        physically stops. Pair with overlap>0. Always follow with
+        stream_stop() before disconnecting."""
+        self._send("stream_start")
+
+    def stream_stop(self) -> None:
+        """Flush the queued motion (join()) and turn prefetch back off
+        (asyncm(2)), restoring the default synchronous movel/movej behaviour."""
+        self._send("stream_stop")
 
     def stop(self) -> None:
         self._send("stop")
