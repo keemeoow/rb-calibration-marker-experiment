@@ -31,6 +31,7 @@
   ],
   "grasp_offset_policy": "T_gripper_cube held fixed at pass1_grasp_offset.json's fitted value in every iteration/mode (session1-only support, invariant under leaving out any session2 placement).",
   "a5_policy": "a5 hard-fixes T_base_cube[s] = T_base_fk_raw[s] @ Delta_train for the 11 training placements, reusing the SAME Delta_train (aligned_fk_train/artifact) that factor_fk fits from those placements' eye-in-hand cube corners for this iteration -- see calibration_pipeline/schema.py's VISION_ALIGNED_FK_FIXED_CONTRACT and ALIGNED_FK_FIXED_ROWS. Held-out evaluation is identical to every other mode: reprojects the uncorrected/raw T_base_cube_FK[h] (never touched by any fit) through a5's fitted cameras.",
+  "a5_ill_conditioning_finding": "a5's numbers are dominated by a PRE-EXISTING ill-conditioning of Delta_train itself, not a bug in this script. Every session2 placement's eye-in-hand cube-viewing image is taken from virtually the SAME robot pose (translation varies <0.1mm across all 12 events -- see set_to_event/robot_T), so the board-free joint (T_gripper_cam, Delta) fit in estimate_board_free_fk_cube_artifact has no motion diversity to resolve depth/translation along the camera axis and lands on wildly nonphysical deltas (per-fold fk_delta_translation_mm ranges from a few mm to >300mm here, and the ALREADY-COMMITTED full-data fit in fk_ablation_diagnostic.json shows the same symptom: delta_train_translation_mm=[-1.78, 3.58, -346.14]mm, i.e. a ~35cm 'mechanical correction' that cannot be physically real for a 59mm cube). factor_fk's soft 2mm/0.3deg-sigma Huber factor discounts a target that far away almost entirely, which hid this defect (factor_fk tracks no_fk closely in every fold). a5's hard fix has zero degrees of freedom to discount it, so it inherits the pathology directly: only 6/12 folds even report scipy success=True, train_reprojection_rmse_px ranges from ~3.7px to ~1e24px, and held-out translation/rotation error ranges from a plausible few mm up to 310mm/105deg. This is a dataset/estimator limitation (session2's cube-viewing waypoint needs pose diversity across placements to identify Delta_train reliably), not something fixable by more code in this script; report a5 with this caveat rather than as a clean number.",
   "pose_comparison_policy": "For each iteration/mode, T_base_cube_vision_estimate[h] is a multi-camera bundle solve of ONLY the held-out cube pose against h's real corner detections, with every camera extrinsic (T_base_Ci, T_gripper_cam) frozen at that mode's fitted values from the training fit (solve_vision_only_cube_pose, reusing solve_corner_reprojection). Compared against the same independent T_base_cube_FK[h] via calibration_pipeline.reprojection.pose_delta: translation_mm is the Euclidean distance between the two poses' translations, rotation_deg is the angle-axis magnitude of the relative rotation inv(R_vision) @ R_fk.",
   "summary": {
     "no_fk": {
@@ -999,7 +1000,12 @@
         "vision_pose_solve_success": true,
         "vision_pose_solve_rmse_px": 0.619652872939085,
         "held_out_translation_error_mm": 4.733317324085088,
-        "held_out_rotation_error_deg": 0.48372219269604483
+        "held_out_rotation_error_deg": 0.48372219269604483,
+        "fk_delta_translation_mm": [
+          -2.9073745266562208,
+          3.9553311972623084,
+          -999.4342025533642
+        ]
       },
       {
         "held_out_set": 2,
@@ -1017,7 +1023,12 @@
         "vision_pose_solve_success": true,
         "vision_pose_solve_rmse_px": 36.06159966620583,
         "held_out_translation_error_mm": 114.57496813588433,
-        "held_out_rotation_error_deg": 30.61752566180234
+        "held_out_rotation_error_deg": 30.61752566180234,
+        "fk_delta_translation_mm": [
+          -1.0069995573274362,
+          0.9550379159328733,
+          641.9963999116683
+        ]
       },
       {
         "held_out_set": 3,
@@ -1035,7 +1046,12 @@
         "vision_pose_solve_success": true,
         "vision_pose_solve_rmse_px": 1.4820680791793115,
         "held_out_translation_error_mm": 11.870470229512277,
-        "held_out_rotation_error_deg": 0.9514053997408047
+        "held_out_rotation_error_deg": 0.9514053997408047,
+        "fk_delta_translation_mm": [
+          -1.253721507741561,
+          2.89810963938693,
+          -18.69707655880299
+        ]
       },
       {
         "held_out_set": 4,
@@ -1053,7 +1069,12 @@
         "vision_pose_solve_success": true,
         "vision_pose_solve_rmse_px": 0.6514984876371901,
         "held_out_translation_error_mm": 2.5684409051074577,
-        "held_out_rotation_error_deg": 0.7197430599851125
+        "held_out_rotation_error_deg": 0.7197430599851125,
+        "fk_delta_translation_mm": [
+          -2.036803951547394,
+          5.293438921688577,
+          -1076.0454407195055
+        ]
       },
       {
         "held_out_set": 5,
@@ -1071,7 +1092,12 @@
         "vision_pose_solve_success": true,
         "vision_pose_solve_rmse_px": 0.6376305656429404,
         "held_out_translation_error_mm": 2.226277865084447,
-        "held_out_rotation_error_deg": 0.7907077344582967
+        "held_out_rotation_error_deg": 0.7907077344582967,
+        "fk_delta_translation_mm": [
+          -2.4264158125597395,
+          6.718970371670512,
+          -1791.1733162507821
+        ]
       },
       {
         "held_out_set": 6,
@@ -1089,7 +1115,12 @@
         "vision_pose_solve_success": true,
         "vision_pose_solve_rmse_px": 55.828109712463046,
         "held_out_translation_error_mm": 65.89366568467608,
-        "held_out_rotation_error_deg": 34.36741099414703
+        "held_out_rotation_error_deg": 34.36741099414703,
+        "fk_delta_translation_mm": [
+          -0.7913902418786011,
+          1.43037023827032,
+          706.7552640691343
+        ]
       },
       {
         "held_out_set": 7,
@@ -1107,7 +1138,12 @@
         "vision_pose_solve_success": true,
         "vision_pose_solve_rmse_px": 45.44101645816175,
         "held_out_translation_error_mm": 310.14749267551196,
-        "held_out_rotation_error_deg": 105.56917031854798
+        "held_out_rotation_error_deg": 105.56917031854798,
+        "fk_delta_translation_mm": [
+          -2.10084541933068,
+          4.344486287995843,
+          -700.7460650718991
+        ]
       },
       {
         "held_out_set": 8,
@@ -1124,7 +1160,12 @@
         "vision_pose_solve_success": true,
         "vision_pose_solve_rmse_px": 0.6149612419093695,
         "held_out_translation_error_mm": 3.8520919063162156,
-        "held_out_rotation_error_deg": 1.1519834995629823
+        "held_out_rotation_error_deg": 1.1519834995629823,
+        "fk_delta_translation_mm": [
+          -3.42062468149549,
+          8.160769328061878,
+          -1957.9946622978111
+        ]
       },
       {
         "held_out_set": 9,
@@ -1142,7 +1183,12 @@
         "vision_pose_solve_success": true,
         "vision_pose_solve_rmse_px": 2.883090570625244,
         "held_out_translation_error_mm": 14.65681854702678,
-        "held_out_rotation_error_deg": 1.9895633590338788
+        "held_out_rotation_error_deg": 1.9895633590338788,
+        "fk_delta_translation_mm": [
+          -1.6367976788187775,
+          2.4679499649340593,
+          156.6400166107933
+        ]
       },
       {
         "held_out_set": 10,
@@ -1160,7 +1206,12 @@
         "vision_pose_solve_success": true,
         "vision_pose_solve_rmse_px": 40.975333087455915,
         "held_out_translation_error_mm": 83.85637434234651,
-        "held_out_rotation_error_deg": 30.61698770282614
+        "held_out_rotation_error_deg": 30.61698770282614,
+        "fk_delta_translation_mm": [
+          -0.8897978180743547,
+          0.9781486126402136,
+          689.5121222968457
+        ]
       },
       {
         "held_out_set": 11,
@@ -1178,7 +1229,12 @@
         "vision_pose_solve_success": true,
         "vision_pose_solve_rmse_px": 2.179725725975289,
         "held_out_translation_error_mm": 17.39414997452388,
-        "held_out_rotation_error_deg": 2.8865980982415858
+        "held_out_rotation_error_deg": 2.8865980982415858,
+        "fk_delta_translation_mm": [
+          -1.944270120457581,
+          2.4771076523466053,
+          60.43337840585875
+        ]
       },
       {
         "held_out_set": 12,
@@ -1196,7 +1252,12 @@
         "vision_pose_solve_success": true,
         "vision_pose_solve_rmse_px": 11.143524982055766,
         "held_out_translation_error_mm": 307.1475276158312,
-        "held_out_rotation_error_deg": 12.92255651849372
+        "held_out_rotation_error_deg": 12.92255651849372,
+        "fk_delta_translation_mm": [
+          -1.8281794667318154,
+          3.777244582642398,
+          -341.7525394918039
+        ]
       }
     ]
   }
