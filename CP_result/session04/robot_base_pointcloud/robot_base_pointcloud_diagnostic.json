@@ -25712,7 +25712,7 @@
     },
     {
       "method": "A5",
-      "role": "vision-aligned FK hard post-hoc",
+      "role": "vision-aligned FK hard fixed",
       "targets": "board+cube",
       "observations": 24,
       "accepted_samples": 11837,

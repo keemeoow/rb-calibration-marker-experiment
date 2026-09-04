@@ -64,8 +64,7 @@ MAIN_ABLATION_CONDITIONS = (
     ),
     AblationCondition(
         "A5", "cube+board", "U", POSE_SOURCE_ALIGNED_FK_FIXED, "estimated",
-        "Post-hoc diagnostic (vision-aligned FK fixed)",
-        supplementary=True,
+        "vision-aligned FK hard fixed",
     ),
     AblationCondition(
         "B1", "cube+board", "seq", "corrected-FK-factor", "estimated",
@@ -312,7 +311,7 @@ VISION_ALIGNED_FK_FIXED_CONTRACT = {
     "cube_pose_is_optimization_variable": False,
     "degrees_of_freedom_removed_from_the_row_optimizer": "6_per_set",
     "external_ground_truth_used": False,
-    "reporting_role": "posthoc_supplementary_diagnostic",
+    "reporting_role": "final_candidate_if_preregistered_before_external_GT",
     "accurate_description": (
         "train-only vision-aligned FK cube poses are hard-fixed during A5"),
     "forbidden_description": (
@@ -321,7 +320,7 @@ VISION_ALIGNED_FK_FIXED_CONTRACT = {
 
 # This image-aligned artifact is prepared once from calibration-training data
 # only, outside every row optimizer. It is the centre of the A4/B1/B2 soft FK
-# factor and the hard-fixed target for the post-hoc A5 diagnostic. A3
+# factor and the hard-fixed target for the A5 final-candidate row. A3
 # deliberately does not consume it.
 RAW_FK_FIXED_ROWS = frozenset({"A3"})
 ALIGNED_FK_FIXED_ROWS = frozenset({"A5"})
@@ -411,12 +410,12 @@ def validate_fk_alignment_artifact(artifact: Mapping) -> None:
     if actual != expected:
         raise ValueError("canonical FK alignment artifact SHA-256 mismatch")
 
-# Evaluation policy: a whole-position hold-out cannot score reprojection for an
-# estimated per-position cube pose without test-time fitting.  Primary corner
-# prediction therefore uses event-level, set-stratified hold-out with every
-# estimated pose supported by training events.  Full-position evaluation is a
-# separate external-GT or explicitly labelled FK-proxy protocol.
-PRIMARY_METRIC = "heldout_event_reprojection_rmse_px"
+# Evaluation policy: final ranking is cube-only.  External cube GT is the
+# primary physical metric; internal cube reprojection and camera consistency are
+# retained only as supporting diagnostics.
+FINAL_EVALUATION_TARGET = "cube"
+PRIMARY_METRIC = "external_cube_TRE_rotation_P95_failure"
+PRIMARY_INTERNAL_METRIC = "heldout_cube_reprojection_rmse_px"
 PRIMARY_SPLIT = "event_grouped_and_set_stratified"
 TRAIN_REPROJECTION_ROLE = "optimization_diagnostic_only"
 POSITION_HOLDOUT_ROLE = "external_GT_or_explicit_FK_proxy_only"
@@ -464,42 +463,59 @@ MARKER_COMPARISON_CONTRACT = {
     },
 }
 
-# Different target sets cannot be ranked on a pooled residual because they do
-# not contain the same measurements.  Each declared contrast therefore names
-# the only shared component that may support that interpretation.
+# Different target sets cannot be ranked on a pooled board/cube residual because
+# they do not contain the same measurements.  Final comparison therefore uses a
+# single shared evaluation target: cube held-out / External cube GT.
 EVALUATION_COMPARISON_CONTRACT = {
     "A0_to_B3": {
         "rows": ("A0", "B3"),
-        "components": ("heldout_reprojection.board",),
-        "evidence_tier": "confirmatory_internal",
+        "components": ("external_gt.cube", "heldout_reprojection.cube"),
+        "supplementary_components": (
+            "cross_view_pixel_transfer.cube",
+            "cam_common_obj_cam.cube",
+        ),
+        "evidence_tier": "final_protocol",
         "causal_interpretation": (
-            "board_only_sequential_vs_unified_feedback_with_identical_marker_population"
+            "board_on_gripper_only_sequential_vs_unified_feedback_with_cube_evaluation"
         ),
     },
     "A0_to_A1": {
         "rows": ("A0", "A1"),
-        "components": ("heldout_reprojection.board", "N_reg"),
+        "components": ("external_gt.cube", "heldout_reprojection.cube"),
+        "supplementary_components": (
+            "cross_view_pixel_transfer.cube",
+            "cam_common_obj_cam.cube",
+        ),
         "causal_interpretation": (
-            "optimization_level_cube_residual_contribution_at_shared_initialization"
+            "cube_training_residual_contribution_against_board_on_gripper_baseline"
         ),
     },
     "A1_to_A2": {
         "rows": ("A1", "A2"),
-        "components": ("heldout_reprojection.overall",),
+        "components": ("external_gt.cube", "heldout_reprojection.cube"),
+        "supplementary_components": (
+            "cross_view_pixel_transfer.cube",
+            "cam_common_obj_cam.cube",
+        ),
         "causal_interpretation": "unified_feedback_with_estimated_cube_pose",
     },
     "B1_to_A4": {
         "rows": ("B1", "A4"),
-        "components": ("heldout_reprojection.overall",),
+        "components": ("external_gt.cube", "heldout_reprojection.cube"),
+        "supplementary_components": (
+            "cross_view_pixel_transfer.cube",
+            "cam_common_obj_cam.cube",
+        ),
         "causal_interpretation": "unified_feedback_with_identical_soft_FK_factor",
     },
     "A2_to_A4": {
         "rows": ("A2", "A4"),
-        "components": (
-            "heldout_reprojection.board",
-            "heldout_reprojection.cube",
+        "components": ("external_gt.cube", "heldout_reprojection.cube"),
+        "supplementary_components": (
+            "cross_view_pixel_transfer.cube",
+            "cam_common_obj_cam.cube",
         ),
-        "evidence_tier": "preflight_until_measured_FK_covariance",
+        "evidence_tier": "final_protocol",
         "causal_interpretation": (
             "soft_FK_factor_added_to_unified_estimated_cube_pose"),
         "reporting_limit": (
@@ -507,44 +523,56 @@ EVALUATION_COMPARISON_CONTRACT = {
     },
     "A2_to_A3": {
         "rows": ("A2", "A3"),
-        "components": ("heldout_reprojection.overall",),
+        "components": ("external_gt.cube", "heldout_reprojection.cube"),
+        "supplementary_components": (
+            "cross_view_pixel_transfer.cube",
+            "cam_common_obj_cam.cube",
+        ),
         "causal_interpretation": "FK_fixed_cube_pose_effect",
     },
     "A3_to_A5": {
         "rows": ("A3", "A5"),
-        "components": ("heldout_reprojection.overall",),
+        "components": ("external_gt.cube", "heldout_reprojection.cube"),
+        "supplementary_components": (
+            "cross_view_pixel_transfer.cube",
+            "cam_common_obj_cam.cube",
+        ),
         "causal_interpretation": (
             "raw_mechanical_FK_fixed_vs_train_vision_aligned_FK_fixed"),
     },
     "A4_to_A5": {
         "rows": ("A4", "A5"),
-        "components": ("heldout_reprojection.overall",),
+        "components": ("external_gt.cube", "heldout_reprojection.cube"),
+        "supplementary_components": (
+            "cross_view_pixel_transfer.cube",
+            "cam_common_obj_cam.cube",
+        ),
         "causal_interpretation": (
             "soft_FK_factor_vs_hard_fixed_aligned_FK_with_shared_alignment"),
         "reporting_limit": (
-            "A5_is_posthoc_and_neither_row_establishes_absolute_accuracy_without_external_GT"),
+            "A5_can_be_final_only_if_frozen_before_external_GT_scoring"),
     },
     "B2_to_A4": {
         "rows": ("B2", "A4"),
-        "components": ("heldout_reprojection.cube", "e_e2e"),
-        "supplementary_components": ("e_cross",),
+        "components": ("external_gt.cube", "heldout_reprojection.cube"),
+        "supplementary_components": (
+            "cross_view_pixel_transfer.cube",
+            "cam_common_obj_cam.cube",
+        ),
         "causal_interpretation": (
             "optimization_level_board_residual_contribution_given_identical_soft_FK_factor"
         ),
     },
     "B3_to_A2": {
         "rows": ("B3", "A2"),
-        "components": ("heldout_reprojection.board", "e_e2e"),
-        "supplementary_components": ("e_cross",),
+        "components": ("external_gt.cube", "heldout_reprojection.cube"),
+        "supplementary_components": (
+            "cross_view_pixel_transfer.cube",
+            "cam_common_obj_cam.cube",
+        ),
         "causal_interpretation": (
             "optimization_level_cube_residual_contribution_at_shared_initialization"
         ),
-    },
-    "B3_to_A3": {
-        "rows": ("B3", "A3"),
-        "components": ("heldout_reprojection.board",),
-        "causal_interpretation": None,
-        "interpretation": "board_only_vs_full_system_reference_not_marker_only_causal",
     },
 }
 
@@ -582,12 +610,19 @@ def validate_condition(condition: AblationCondition) -> None:
     if _is_soft_anchor(condition.fk_to_cube) and not condition.supplementary:
         raise ValueError(f"{condition.row}: soft-anchor is supplementary-only")
 
-    # A fixed workspace board has no robot-FK pose source.  Keep this explicit:
-    # accepting FK-fixed here would silently recreate the old, invalid FK column.
-    if condition.fk_to_board not in {POSE_SOURCE_ESTIMATED, POSE_SOURCE_ABSENT}:
+    # Final A0/B3 use a board mounted on the gripper for pose diversity, but the
+    # final table still keeps only the declared A0/B3 rows.  Do not reject board
+    # FK metadata if a future board-only final run records it.
+    board_allowed = {
+        POSE_SOURCE_ESTIMATED,
+        POSE_SOURCE_FK_FIXED,
+        POSE_SOURCE_ALIGNED_FK_FIXED,
+        POSE_SOURCE_FK_FACTOR,
+        POSE_SOURCE_ABSENT,
+    }
+    if condition.fk_to_board not in board_allowed:
         raise ValueError(
-            f"{condition.row}: FK→board={condition.fk_to_board!r} is physically invalid; "
-            "a fixed external board must be 'estimated' or '—'"
+            f"{condition.row}: invalid FK→board value {condition.fk_to_board!r}"
         )
     if has_board == (condition.fk_to_board == POSE_SOURCE_ABSENT):
         raise ValueError(f"{condition.row}: FK→board does not match target presence")
@@ -630,23 +665,25 @@ def validate_main_runner_contract() -> None:
     for name, comparison in EVALUATION_COMPARISON_CONTRACT.items():
         if not set(comparison["rows"]).issubset(canonical_methods):
             raise ValueError(f"{name}: comparison references an unknown row")
-    if EVALUATION_COMPARISON_CONTRACT["B2_to_A4"]["components"][0] != \
-            "heldout_reprojection.cube":
-        raise ValueError("B2/A4 must be compared on the shared cube component")
-    if EVALUATION_COMPARISON_CONTRACT["A0_to_B3"]["components"] != \
-            ("heldout_reprojection.board",):
-        raise ValueError("A0/B3 must be compared on the shared board component")
-    if EVALUATION_COMPARISON_CONTRACT["A2_to_A4"]["components"] != (
-            "heldout_reprojection.board", "heldout_reprojection.cube"):
-        raise ValueError("A2/A4 must report board and cube separately")
-    for name in ("B2_to_A4", "B3_to_A2"):
+    final_components = ("external_gt.cube", "heldout_reprojection.cube")
+    final_supplementary = {
+        "cross_view_pixel_transfer.cube",
+        "cam_common_obj_cam.cube",
+    }
+    for name, comparison in EVALUATION_COMPARISON_CONTRACT.items():
+        if comparison["components"] != final_components:
+            raise ValueError(f"{name}: final comparison must be cube-only")
+        if set(comparison.get("supplementary_components", ())) != final_supplementary:
+            raise ValueError(f"{name}: final supplementary metrics drifted")
         comparison = EVALUATION_COMPARISON_CONTRACT[name]
-        if "e_cross" in comparison["components"]:
-            raise ValueError(f"{name}: e_cross cannot be a ranking component")
-        if "e_cross" not in comparison.get("supplementary_components", ()):
-            raise ValueError(f"{name}: e_cross must remain a supplementary component")
-    if EVALUATION_COMPARISON_CONTRACT["B3_to_A3"]["causal_interpretation"] is not None:
-        raise ValueError("B3/A3 is a whole-system reference, not a marker-only causal contrast")
+        forbidden = {
+            "heldout_reprojection.board",
+            "heldout_reprojection.overall",
+            "e_e2e",
+            "e_cross",
+        }
+        if forbidden & set(comparison["components"]):
+            raise ValueError(f"{name}: old internal metric survived in components")
     if MARKER_COMPARISON_CONTRACT["optimization_level"][
             "may_claim_end_to_end_marker_system_performance"]:
         raise ValueError("shared-initialization rows cannot claim marker-system performance")

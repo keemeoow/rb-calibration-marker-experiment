@@ -26,10 +26,10 @@
         }
       },
       "implementation_sha256": {
-        "calibration_pipeline/apriltag_cube.py": "905913eff76c68f5a0651280ea04283d990a75c65a4701cbfc20ae318f0f8e88",
+        "calibration_pipeline/apriltag_cube.py": "2016c0acf6c0ac6923fd54ce74c0cd6076d8c0eff64a33a6e22941407e94efcc",
         "calibration_pipeline/charuco.py": "f5bc57cbfda59e4e4768789d1ad16e60de3c8fb3aa9b66a9d4d4679d13c6e1d4",
-        "calibration_pipeline/config.py": "460f39036d1702f080815997f51109163471a1cf55576b4fa129469d74c428a4",
-        "calibration_pipeline/cross_target.py": "b6b95dd7aefeec713cd696fe7b6bb71a5e6287304ba29ce352beed1ebebf3e99",
+        "calibration_pipeline/config.py": "f735145e5a03b49999fb9be7a7c85ac3f690b535e94eb717237dd8a84a31bc4c",
+        "calibration_pipeline/cross_target.py": "9136248717473a3a2e587ff903b300608b9ee777f055d5b0dd197b772fb5699d",
         "calibration_pipeline/cube_detection.py": "0a55b06152b1aadca307b81c450aa45e590527eb650ff41319243b007cba02d0",
         "calibration_pipeline/evaluation.py": "672ae34cb0f786411be161553a9faae50aa9eae2c08b1825e3061cb275aacb6c",
         "calibration_pipeline/fk_alignment.py": "bbf2065fa445cd89daeefaed2e30ee917966f65c4bf87d3953e141db7e4101a1",
@@ -40,7 +40,7 @@
         "calibration_pipeline/pose_convention.py": "410c5e06ac52e9d06aaf8414051b5a508d196e19bd41047c0ee24b96d7cc08be",
         "calibration_pipeline/reprojection.py": "58ad7b82421d1979c8ab01af6472e52d71acc20df10921b486f02a5bd8ebbc82",
         "calibration_pipeline/runtime.py": "9feb4432591c1de3b3450066f73b7cbd7ae8991c1709d9a8d07f34b093e6ffae",
-        "calibration_pipeline/schema.py": "927956b5df3db4b81568b37a795f4c51c0ed744c104547fdb3f5ab429a145dbe",
+        "calibration_pipeline/schema.py": "1da67fed18592116e58a972f898e9805f469896287646c3bbfce88485b3ec2bf",
         "calibration_pipeline/se3.py": "a760b3f8d66dcf193c7d5b7a56d12f7061088dacc3c549c38d3c7baaffdd93e9",
         "calibration_pipeline/table1.py": "a58ee1b59cbf4da89c00eae159c5e180403fc7ca0d10b8305c79c7dba242a5e8"
       },
@@ -1067,7 +1067,7 @@
     },
     {
       "method": "A5",
-      "status": "posthoc_diagnostic",
+      "status": "freeze_before_external_gt",
       "n_runs": 3,
       "reference_dependent_overall_reprojection_rmse_px_mean": 6.281841351258483,
       "reference_dependent_overall_reprojection_rmse_px_std": 7.310258729534103e-05,

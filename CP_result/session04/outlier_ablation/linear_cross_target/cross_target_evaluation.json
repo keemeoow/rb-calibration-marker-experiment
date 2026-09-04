@@ -1067,7 +1067,7 @@
     },
     {
       "method": "A5",
-      "status": "posthoc_diagnostic",
+      "status": "freeze_before_external_gt",
       "n_runs": 3,
       "reference_dependent_overall_reprojection_rmse_px_mean": 6.246040830464952,
       "reference_dependent_overall_reprojection_rmse_px_std": 2.0569036840499668e-05,

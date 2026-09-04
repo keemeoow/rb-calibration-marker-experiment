@@ -5143,7 +5143,7 @@
         "optimization_label": "unified_joint_optimization",
         "fk_to_cube": "vision-aligned-FK-fixed",
         "fk_to_board": "estimated",
-        "label": "Post-hoc diagnostic (vision-aligned FK fixed)"
+        "label": "vision-aligned FK hard fixed"
       },
       "initialization_dispersion": {
         "T_gripper_cam": {

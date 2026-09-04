@@ -1,6 +1,6 @@
 # Hard rejection threshold 민감도 (Session04, OFAT)
 
-설계와 판정 규칙은 실행 전에 [PREREGISTRATION_HARD_THRESHOLD.md](PREREGISTRATION_HARD_THRESHOLD.md)에 고정했다. 아래 표는 그 규칙을 그대로 적용한 결과다.
+설계와 판정 규칙은 실행 전에 [PREREGISTRATION_HARD_THRESHOLD.md](../PREREGISTRATION_HARD_THRESHOLD.md)에 고정했다. 아래 표는 그 규칙을 그대로 적용한 결과다.
 
 ## 읽는 법
 

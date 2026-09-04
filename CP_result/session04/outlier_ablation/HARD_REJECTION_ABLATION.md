@@ -43,7 +43,7 @@ strict 정책은 Table 1 학습에서 cube 관측 2개(32 corners)를 추가 제
 - A1→A2 held-out 개선: standard 4.74% → strict 4.27%로 방향이 유지됐다.
 - A2와 A4 차이: standard +0.0001 px, strict +0.0002 px로 둘 다 사실상 동률이다. 따라서 이 실험도 A4 우월성 주장의 근거가 아니다.
 - A3 raw-FK-fixed는 두 정책 모두 A2/A4보다 높은 오차를 유지했다. 즉 A3의 차이는 해당 두 경계 관측만으로 설명되지 않는다.
-- A5도 두 정책에서 낮은 내부 px를 유지하지만 post-hoc diagnostic이다. 따라서 strict 민감도 통과가 외부 물리 정확도 우월성을 뜻하지 않는다.
+- A5도 두 정책에서 낮은 내부 px를 유지한다. External GT 공개 전에 방법과 alignment artifact가 frozen이면 최종 후보지만, strict 민감도 통과 자체가 외부 물리 정확도 우월성을 뜻하지 않는다.
 
 ## 재현 명령
 

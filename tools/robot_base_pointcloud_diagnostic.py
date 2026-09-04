@@ -76,7 +76,7 @@ METHOD_ROLES = {
     "A2": "board+cube unified internal main",
     "A3": "raw-FK hard fixed diagnostic",
     "A4": "soft-FK preflight",
-    "A5": "vision-aligned FK hard post-hoc",
+    "A5": "vision-aligned FK hard fixed",
     "B1": "-Unified soft-FK baseline",
     "B2": "-board cube-only soft-FK",
     "B3": "-cube board-only unified",

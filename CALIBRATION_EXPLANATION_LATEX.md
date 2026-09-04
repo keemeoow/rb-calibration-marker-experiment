@@ -707,7 +707,7 @@ $\mathbf{O}_s$는 최적화 변수에서 제거되지 않는다. 또한 어떤 �
 
 6차원 표본 공분산의 rank는 반복 수 $N$에 대해 최대 $N-1$이므로, full-rank $6\times6$ 공분산에는 최소 $N=7$개의 독립 반복이 필요하다. 코드도 7회 미만, 비대칭, 비양정치 covariance를 거부한다. 실제로는 안정적인 추정을 위해 7회보다 충분히 많은 반복을 사용하는 편이 바람직하다.
 
-### 11.7 A5: vision-aligned-FK-fixed post-hoc 진단
+### 11.7 A5: vision-aligned-FK-fixed 최종 후보와 사후 진단의 경계
 
 A5는 11.2절에서 만든 동일한 train-only 정렬 FK를 사용하지만, A4와 달리 cube pose를 자유변수로 두지 않는다.
 
@@ -728,7 +728,7 @@ $$
 
 A3와 A5는 모두 set당 cube 6자유도를 제거하며 목적함수에는 visual residual 한 항만 남는다. 차이는 A3가 영상과 무관한 mechanical $R_y(180^\circ)$를 쓰고, A5가 train EIH cube 영상으로 적합한 $\boldsymbol{\Delta}_{\mathrm{train}}$을 쓴다는 점이다. A4와 A5는 동일 aligned-FK artifact를 공유하므로 soft factor와 hard constraint의 차이를 진단할 수 있다.
 
-그러나 A5는 결과를 확인한 뒤 원인을 분리하기 위해 추가되었고 aligned pose도 train 영상에서 왔다. 따라서 `posthoc_diagnostic`으로만 보고하며, 독립 실측 correction, 외부 GT 또는 최종 우월 방법으로 부르지 않는다. 독립 실측 6-DoF correction을 사용하는 미래 행은 A6로 예약한다.
+A5의 올바른 판정은 External GT 공개 시점으로 결정한다. GT 공개 전에 방법, parameter, train-only aligned-FK artifact, split, 평가 코드를 모두 frozen하면 A5는 최종 후보로 비교할 수 있다. 반대로 GT 결과를 본 뒤 A5를 정의하거나 alignment artifact를 바꾸면 그때는 사후 진단으로만 보고한다. A5의 aligned pose는 train 영상에서 온 correction이므로 그 자체가 독립 외부 정답은 아니며, 최종 물리 순위는 다음주 Independent External GT에서 cube pose로 판정한다.
 
 ---
 
@@ -741,7 +741,7 @@ A3와 A5는 모두 set당 cube 6자유도를 제거하며 목적함수에는 vis
 | `no-FK(vision)` | 없음 | $\mathbf{O}_s$ 자유변수 | cube FK prior 없이 raw-corner vision으로 추정 |
 | `raw-FK-fixed` | $\mathbf{O}_s=\widetilde{\mathbf{F}}^{raw}_s$ | cube 변수 제거 | raw FK와 mechanical frame map을 hard constraint로 사용 |
 | `corrected-FK factor` | $\mathbf{w}_s=\mathbf{L}_s^{-1}\mathbf{e}^{\mathrm{FK}}_s$ | $\mathbf{O}_s$ 자유변수 | vision 목적함수에 covariance-whitened robust FK factor 추가 |
-| `vision-aligned-FK-fixed` | $\mathbf{O}_s=\mathbf{F}^{raw}_s\boldsymbol{\Delta}_{train}$ | cube 변수 제거 | train-vision-aligned FK를 hard constraint로 사용하는 post-hoc 진단 |
+| `vision-aligned-FK-fixed` | $\mathbf{O}_s=\mathbf{F}^{raw}_s\boldsymbol{\Delta}_{train}$ | cube 변수 제거 | External GT 공개 전 frozen이면 최종 후보, 이후 변경이면 사후 진단 |
 
 한 문장으로 요약하면 다음과 같다.
 
@@ -931,7 +931,7 @@ $$
 24-6=18
 $$
 
-이는 물리적으로 정의 가능한 개념 조합의 수다. 현재 real-data Table은 이 18개를 전부 실행하는 full factorial이 아니라, A0–A4/B1–B3의 8개 사전 정의 비교행과 결과 원인을 분리하기 위해 추가한 post-hoc A5 한 행을 실행한다. A6는 독립 실측 correction label을 위한 미실행 예약이다.
+이는 물리적으로 정의 가능한 개념 조합의 수다. 현재 real-data Table은 이 18개를 전부 실행하는 full factorial이 아니라, 최종 비교행 A0–A5/B1–B3의 9개 행만 사용한다. A6와 추가 board-only FK 변형은 최종 표에 넣지 않는다.
 
 ---
 
@@ -1105,44 +1105,46 @@ $$
 
 ### 18.4 현재 Session04에서 허용되는 비교 결론
 
-Primary pixel 비교는 같은 marker population을 공유하는 행끼리만 수행한다. 동일한 cube+board 관측을 사용하는 A1과 A2에서 own held-out overall RMSE는 각각 $4.0837\,\mathrm{px}$와 $3.8901\,\mathrm{px}$다. 따라서 이 비교가 지원하는 결론은 ``동일 관측·초기값·solver에서 Unified Joint Optimization이 Sequential Frozen-Stage Optimization보다 held-out reprojection을 낮췄다''이다. 새로운 작업 위치의 절대 자세 정확도가 더 높다는 결론은 아니다.
+최종 내부 평가는 어떤 marker로 학습했는지와 무관하게 **heldout cube**만 본다. 따라서 Board heldout과 board/cube pooled overall은 최종 순위 지표에서 제거한다. 현재 artifact에서 A1의 heldout cube RMSE는 $4.1402\,\mathrm{px}$이고 A2는 $3.5958\,\mathrm{px}$다. 이 비교는 동일 관측·초기값·solver 조건에서 Unified Joint Optimization이 cube 재투영을 낮췄다는 내부 근거다.
 
-A2와 A4의 own held-out overall은 각각 $3.8901\,\mathrm{px}$와 $3.8899\,\mathrm{px}$이고, cube held-out은 $3.5958\,\mathrm{px}$와 $3.5805\,\mathrm{px}$다. 현재 A4는 실측 covariance가 아니라 Simulation prior를 사용하므로 이 작은 차이로 corrected-FK factor의 우월성을 주장하지 않는다. 허용되는 표현은 ``A4는 Simulation covariance 기반 preflight에서 A2와 유사한 동일-population held-out reprojection을 보였다''이다.
+Raw FK를 hard fixed한 A3는 heldout cube $6.3959\,\mathrm{px}$로 A2보다 나쁘다. 즉 현재 raw tool4/mechanical pose를 외부 정답처럼 고정하면 cube 영상 정합이 악화된다. Corrected-FK soft factor인 A4는 $3.5805\,\mathrm{px}$로 A2와 거의 같고, vision-aligned FK hard fixed인 A5는 $3.2274\,\mathrm{px}$로 현재 내부 cube 지표가 가장 낮다. 단, A4/B1/B2의 실측 FK covariance와 A5의 frozen artifact는 External GT 공개 전에 고정되어야 최종 후보로 인정된다.
 
-A5의 own held-out overall은 $3.7270\,\mathrm{px}$, board/cube held-out은 각각 $3.8804/3.2274\,\mathrm{px}$로 현재 내부 수치상 A4보다 낮다. Fixed-to-Fixed cube transfer도 A5 $3.4706\,\mathrm{px}$가 A4 $4.0375\,\mathrm{px}$보다 낮지만, Fixed-to-Fixed board transfer는 A5 $4.8563\,\mathrm{px}$가 A4 $3.1156\,\mathrm{px}$보다 높다. 즉 내부 지표에서도 A5는 모든 표적·범위의 일관된 승자가 아니다. 또한 A5는 train EIH cube 영상으로 적합한 aligned FK를 hard-fixed하고 결과 확인 후 추가한 post-hoc 진단이다. 따라서 이 결과는 ``이전 A3의 낮은 오차가 vision-aligned hard constraint에서 왔다''는 원인 설명에는 사용할 수 있지만, A5가 A4보다 실제 공간에서 정확하다는 주장에는 사용할 수 없다. 현재 확증 대표 행은 A2, 불확실성을 다루는 방법론적 확장 후보는 A4, 원인 진단은 A5이며 A4/A5 물리 순위는 다음주 Independent External GT 이후 결정한다.
+최종 물리 주장은 다음주 Independent External GT의 cube TRE/rotation/P95/failure로만 결정한다. 현재 표현은 ``Session04 내부 cube-only 지표에서는 A5가 가장 낮고, A2/A4가 그 다음으로 안정적이며, raw-FK hard fixed A3는 악화된다''까지가 안전하다.
 
 ### 18.5 논문 실험 결과 본문용 서술
 
-모든 비교행에 동일한 frozen corner 관측, event-grouped/set-stratified train–held-out split, camera intrinsic, target geometry, solver 설정 및 train-only shared initialization을 적용하였다. 동일한 board+cube marker population을 사용하는 vision 조건에서 Sequential Frozen-Stage Optimization인 A1의 held-out reprojection RMSE는 $4.0837\,\mathrm{px}$였고, Unified Joint Optimization인 A2는 $3.8901\,\mathrm{px}$로 $4.74\%$ 감소하였다. 표적별로는 board가 $4.0645\rightarrow3.9840\,\mathrm{px}$, cube가 $4.1402\rightarrow3.5958\,\mathrm{px}$로 감소했다. 두 행은 최적화 구조 외의 입력과 목적함수를 공유하므로, 이 결과는 Eye-in-Hand(EIH)와 Eye-to-Hand(E2H) 관측 사이의 양방향 Unified feedback이 동일 marker population의 held-out reprojection을 개선했음을 지원한다. 반면 raw FK cube pose를 set별 hard constraint로 고정한 A3는 held-out overall $4.7835\,\mathrm{px}$와 cube $6.3959\,\mathrm{px}$를 보여, raw tool4/mechanical pose를 외부 정답으로 간주할 수 없음을 확인했다. Corrected-FK factor를 추가한 A4의 held-out overall은 $3.8899\,\mathrm{px}$로 A2와 사실상 동일했으며, 현재 A4/B1/B2는 실측 FK covariance가 아닌 Simulation prior를 사용한 preflight다. Train-vision-aligned FK를 hard-fixed한 post-hoc A5는 held-out overall $3.7270\,\mathrm{px}$를 보였지만, 이는 이전 A3 성능의 원인을 설명하는 진단이지 독립 물리 정확도 증거가 아니다. 따라서 현재 확증 대표 행은 A2이고 A4는 방법론적 확장 preflight, A5는 원인 진단이다. 본 실험은 Unified feedback과 raw-FK hard-fix의 효과를 동일-population 내부 held-out reprojection에서 입증하지만, A4/A5 중 실제 공간에서 더 정확한 방법이나 새로운 작업 위치의 절대 물리 정확도는 다음주 Independent External GT 전에는 결정하지 않는다.
+모든 비교행에는 동일한 frozen corner 관측, event-grouped/set-stratified split, camera intrinsic, target geometry, solver 설정 및 train-only shared initialization을 적용하였다. 최종 내부 평가는 항상 cube target으로 통일했다. Vision-only 조건에서 Sequential Frozen-Stage Optimization인 A1의 heldout cube RMSE는 $4.1402\,\mathrm{px}$였고, Unified Joint Optimization인 A2는 $3.5958\,\mathrm{px}$로 낮아졌다. 이는 Eye-in-Hand와 Eye-to-Hand 관측 사이의 양방향 feedback이 cube 재투영 일관성을 개선한다는 근거다.
+
+Raw FK cube pose를 hard fixed한 A3는 $6.3959\,\mathrm{px}$로 악화되어 raw FK를 그대로 정답으로 쓰면 안 됨을 보였다. Corrected-FK soft factor를 추가한 A4는 $3.5805\,\mathrm{px}$로 A2와 유사했고, vision-aligned FK hard fixed인 A5는 $3.2274\,\mathrm{px}$로 현재 내부 cube 지표가 가장 낮았다. 따라서 External GT 공개 전에 A5 방법과 artifact를 frozen하면 A5를 최종 후보로 채택할 수 있다. 실제 3D 공간 정합 우월성은 다음주 Independent External GT에서 cube TRE, rotation error, P95, failure rate로 확정한다.
 
 ### 18.6 Paper-ready English Results paragraph
 
-All methods were evaluated using the same frozen corner observations, event-grouped and set-stratified train–held-out split, camera intrinsics, target geometry, solver settings, and train-only shared initialization. Under the vision-only condition with an identical board-and-cube marker population, A1 (Sequential Frozen-Stage Optimization) achieved a held-out reprojection RMSE of $4.0837\,\mathrm{px}$, whereas A2 (Unified Joint Optimization) achieved $3.8901\,\mathrm{px}$, corresponding to a $4.74\%$ reduction. By target, the board RMSE decreased from $4.0645$ to $3.9840\,\mathrm{px}$, and the cube RMSE decreased from $4.1402$ to $3.5958\,\mathrm{px}$. Because A1 and A2 share the same observations, initialization, and objective terms and differ only in optimization structure, these results support the conclusion that bidirectional feedback between Eye-in-Hand (EIH) and Eye-to-Hand (E2H) observations improves held-out reprojection within the same marker population. In contrast, A3, which hard-fixed each set-specific cube pose to raw FK transformed only by the prescribed mechanical mapping, yielded an overall held-out RMSE of $4.7835\,\mathrm{px}$ and a cube RMSE of $6.3959\,\mathrm{px}$, showing that raw tool4/mechanical poses cannot be treated as external ground truth. A4, which added a corrected-FK factor, achieved $3.8899\,\mathrm{px}$ overall and remains a preflight because its covariance prior is simulation-derived. Post-hoc A5 hard-fixed the same train-vision-aligned FK targets and achieved $3.7270\,\mathrm{px}$ overall; this diagnoses the source of the former A3 result but is neither an independent correction nor evidence of superior physical accuracy. A2 is therefore the current confirmatory representative, A4 is the uncertainty-aware extension candidate, and A5 is a causal diagnostic. Blind external ground truth is required to determine the physical ranking of A4 and A5.
+All variants were evaluated using the same frozen corner observations, event-grouped and set-stratified split, camera intrinsics, target geometry, solver settings, and train-only shared initialization. The final internal endpoint is cube-only held-out reprojection. Under the vision-only condition, A1 (Sequential Frozen-Stage Optimization) achieved a held-out cube RMSE of $4.1402\,\mathrm{px}$, whereas A2 (Unified Joint Optimization) achieved $3.5958\,\mathrm{px}$. Hard-fixing the cube pose to raw FK in A3 degraded the cube endpoint to $6.3959\,\mathrm{px}$, indicating that raw FK should not be treated as ground truth. A4 (corrected-FK soft factor) achieved $3.5805\,\mathrm{px}$, and A5 (vision-aligned FK hard fixed) achieved the lowest current internal cube RMSE, $3.2274\,\mathrm{px}$. If A5 and its train-only alignment artifact are frozen before external-GT scoring, A5 is a valid final candidate. The physical ranking will be decided only by the forthcoming independent external cube-GT metrics.
 
 ### 18.7 Paper-ready English Table 1 caption
 
-**Table 1. Quantitative comparison of the calibration variants on Session04.** All reprojection values are root-mean-square errors (RMSEs) in native distorted-pixel coordinates; lower is better. The variants use the same frozen detection pool, event-grouped and set-stratified train–held-out split, camera intrinsics, target geometry, solver settings, and train-only shared initialization, while the marker population, optimization structure, and cube-pose treatment vary as specified. ``Own Held-out Overall'' is evaluated on each row's own marker population and is therefore compared only between rows with identical populations; ``Board/Cube Held-out'' reports target-specific RMSE. A3 applies the prescribed mechanical frame mapping to raw FK without vision alignment. A4, B1, and B2 use a simulation-derived covariance prior and are preflight evaluations. A5 hard-fixes the train-vision-aligned FK targets and is a post-hoc diagnostic. Boldface denotes the lowest target-specific held-out RMSE among Complete confirmatory rows only. ``Convergence $3/3$'' indicates successful solver termination for all three initialization seeds, not global optimality or absolute physical accuracy. External ground truth is not used in this table.
+**Table 1. Quantitative comparison of the predefined calibration variants on Session04.** The final internal endpoint is held-out cube reprojection RMSE in native distorted-pixel coordinates; lower is better. The variants share the same frozen detection pool, event-grouped and set-stratified split, camera intrinsics, target geometry, solver settings, and train-only shared initialization, while the training target population, optimization structure, and FK/target-pose treatment vary as specified. Board held-out and board/cube pooled overall rankings are excluded from the final table. A0 and B3 are board-on-gripper-only calibration rows and therefore have no current Session04 cube-heldout value until the final board-on-gripper capture is added. A3 hard-fixes the cube pose to raw FK after the prescribed mechanical frame mapping. A4, B1, and B2 use corrected-FK soft factors; A5 hard-fixes the train-only vision-aligned FK pose. ``Convergence $3/3$'' reports solver termination across three initialization seeds and does not imply global optimality or physical accuracy. External cube GT is pending.
 
 ### 18.8 Paper-ready English column labels and table notes
 
-논문 표에서는 결합된 ``Board/Cube Held-out'' 열을 두 열로 분리해 각 숫자의 의미를 직접 드러낸다. 권장 최종 열 순서는 다음과 같다.
+최종 논문 표 열은 하나만 사용한다.
 
 | Current report label | Paper-ready label |
 |---|---|
 | Method | Method |
-| Marker Set | Marker Population |
-| Optimization | Optimization Structure |
-| Cube Pose | Cube-Pose Treatment |
-| Train Overall | Train RMSE (px) |
-| Own Held-out Overall | Own Held-Out RMSE (px) |
-| Board Held-out | Board Held-Out RMSE (px) |
-| Cube Held-out | Cube Held-Out RMSE (px) |
+| Calibration train target | Training Targets |
+| Optimization | Optimization |
+| FK / target-pose 처리 | FK / Target-Pose Treatment |
+| Train RMSE px | Train RMSE (px) |
+| ALL Cube RMSE px | All-Cube RMSE (px) |
+| Heldout Cube RMSE px | Held-Out Cube RMSE (px) |
+| Cross-view Cube px | Cross-View Cube Transfer (px) |
+| Cam-common Cube mm/deg | Cam-Common Cube Consistency (mm/deg) |
+| External cube GT | External Cube GT |
 | Convergence | Conv. |
-| Status | Status |
+| Data status | Status |
 
-긴 셀 문자열은 `sequential_frozen_stage`를 ``Sequential Frozen-Stage'', `unified_joint_optimization`을 ``Unified Joint'', `estimated`를 ``Vision-estimated'', `raw-FK-fixed`를 ``Raw-FK fixed$^{\ddagger}$'', `corrected-FK-factor`를 ``Corrected-FK factor$^{\dagger}$'', `vision-aligned-FK-fixed`를 ``Aligned-FK fixed$^{\S}$''로 줄여 쓴다. A4, B1, B2에는 $\dagger$, A5에는 $\S$를 표시한다.
-
-**Paper-ready table note.** Values are RMSEs in native distorted-pixel coordinates; lower is better. Own held-out RMSE is computed on each method's declared marker population, so only rows with identical populations are directly comparable. Boldface indicates the lowest target-specific held-out RMSE among Complete confirmatory rows, and N/A indicates that the corresponding target was excluded. $^{\dagger}$ denotes a preflight result using a simulation-derived covariance prior rather than a physically measured FK covariance. $^{\ddagger}$ denotes cube poses hard-fixed to controller raw FK after applying only the prescribed $R_y(180^\circ)$ mechanical frame mapping. $^{\S}$ denotes the post-hoc A5 diagnostic that hard-fixes train-vision-aligned FK targets. Neither hard-fixed pose source is external ground truth. Conv. reports successful solver termination across three initialization seeds and does not imply global optimality or absolute physical accuracy.
+**Paper-ready table note.** Values are computed on frozen observations. Held-out evaluation is cube-only for all methods. All-cube RMSE is a fit sanity check because it pools train and held-out cube observations. Cross-view transfer and cam-common consistency jointly aggregate fixed-camera pairs and fixed-gripper pairs as supplementary internal camera-consistency checks, not external physical accuracy. $^{\ddagger}$ denotes raw-FK hard fixing, $^{\dagger}$ denotes corrected-FK soft factors, and $^{\S}$ denotes vision-aligned FK hard fixing. A5 is a valid final candidate only if the method and alignment artifact are frozen before external-GT scoring. External cube GT is pending.
 
 ### 18.9 Copy-ready LaTeX Table 1
 
@@ -1151,7 +1153,7 @@ All methods were evaluated using the same frozen corner observations, event-grou
 ```latex
 \begin{table*}[t]
 \centering
-\caption{Quantitative comparison of the predefined calibration variants on Session04. All reprojection values are RMSEs in native distorted-pixel coordinates; lower is better.}
+\caption{Final cube-only evaluation protocol for the predefined Session04 calibration variants.}
 \label{tab:session04_calibration}
 \setlength{\tabcolsep}{3pt}
 \renewcommand{\arraystretch}{1.12}
@@ -1159,31 +1161,32 @@ All methods were evaluated using the same frozen corner observations, event-grou
 \begin{tabular}{@{}llllrrrrcl@{}}
 \toprule
 Method &
-\shortstack{Marker\\Population} &
-\shortstack{Optimization\\Structure} &
-\shortstack{Cube-Pose\\Treatment} &
+\shortstack{Training\\Targets} &
+Optimization &
+\shortstack{FK / Target-Pose\\Treatment} &
 \shortstack{Train\\RMSE (px)} &
-\shortstack{Own Held-Out\\RMSE (px)} &
-\shortstack{Board Held-Out\\RMSE (px)} &
-\shortstack{Cube Held-Out\\RMSE (px)} &
+\shortstack{All-Cube\\RMSE (px)} &
+\shortstack{Held-Out Cube\\RMSE (px)} &
+\shortstack{Cross-View Cube\\Transfer (px)} &
+\shortstack{Cam-Common\\Cube mm/deg} &
 Conv. & Status \\
 \midrule
-A0 (Baseline)             & Board        & Sequential Frozen-Stage & N/A                 & 3.8202 & 4.0530 & 4.0530          & N/A             & 3/3 & Complete  \\
-A1 (+Cube)                & Board + Cube & Sequential Frozen-Stage & Vision-estimated    & 3.7923 & 4.0837 & 4.0645          & 4.1402          & 3/3 & Complete  \\
-A2 (+Unified)             & Board + Cube & Unified Joint            & Vision-estimated    & 3.7421 & 3.8901 & \textbf{3.9840} & \textbf{3.5958} & 3/3 & Complete  \\
-A3$^{\ddagger}$ (Raw-FK fixed) & Board + Cube & Unified Joint       & Raw-FK fixed        & 5.1587 & 4.7835 & 4.1026          & 6.3959          & 3/3 & Complete  \\
-A4$^{\dagger}$ (+FK factor)    & Board + Cube & Unified Joint       & Corrected-FK factor & 3.7441 & 3.8899 & 3.9884          & 3.5805          & 3/3 & Preflight \\
-A5$^{\S}$ (Aligned-FK fixed)   & Board + Cube & Unified Joint       & Aligned-FK fixed    & 3.9648 & 3.7270 & 3.8804          & 3.2274          & 3/3 & Post-hoc \\
-B1$^{\dagger}$ ($-$Unified)    & Board + Cube & Sequential Frozen-Stage & Corrected-FK factor & 3.7887 & 4.0783 & 4.0648 & 4.1182 & 3/3 & Preflight \\
-B2$^{\dagger}$ ($-$Board)      & Cube         & Unified Joint        & Corrected-FK factor & 3.0269 & 4.4827 & N/A             & 4.4827          & 3/3 & Preflight \\
-B3 ($-$Cube)               & Board        & Unified Joint            & N/A                 & 3.8202 & 4.0531 & 4.0531          & N/A             & 3/3 & Complete  \\
+A0 (Baseline)             & Board-on-gripper & Sequential & Board pose estimated; cube eval only & 3.8202 & N/A    & N/A             & 7.2577 & 8.677/0.904 & 3/3 & Pending cube eval \\
+A1 (+Cube)                & Board + Cube     & Sequential & Cube pose estimated                  & 3.7923 & 3.8075 & 4.1402          & 7.3085 & 8.829/1.050 & 3/3 & Current data \\
+A2 (+Unified)             & Board + Cube     & Unified    & Cube pose estimated                  & 3.7421 & 3.4139 & 3.5958          & 6.3003 & 7.287/1.028 & 3/3 & Current data \\
+A3$^{\ddagger}$ (Raw-FK)  & Board + Cube     & Unified    & Raw-FK hard fixed                    & 5.1587 & 7.8551 & 6.3959          & 6.8626 & 8.338/2.089 & 3/3 & Current data \\
+A4$^{\dagger}$ (+FK)      & Board + Cube     & Unified    & Corrected-FK soft factor             & 3.7441 & 3.4149 & 3.5805          & 6.3126 & 7.308/1.015 & 3/3 & FK cov. pending \\
+A5$^{\S}$ (Aligned-FK)    & Board + Cube     & Unified    & Vision-aligned FK hard fixed         & 3.9648 & 3.8102 & \textbf{3.2274} & 5.7166 & 6.674/0.886 & 3/3 & Freeze before GT \\
+B1$^{\dagger}$ ($-$Unified) & Board + Cube   & Sequential & Corrected-FK soft factor             & 3.7887 & 3.7832 & 4.1182          & 7.2867 & 8.806/1.054 & 3/3 & FK cov. pending \\
+B2$^{\dagger}$ ($-$Board) & Cube only        & Unified    & Corrected-FK soft factor             & 3.0269 & 3.4423 & 4.4827          & 6.5284 & 7.429/1.049 & 3/3 & FK cov. pending \\
+B3 ($-$Cube)              & Board-on-gripper & Unified    & Board pose estimated; cube eval only & 3.8202 & N/A    & N/A             & 7.2550 & 8.674/0.904 & 3/3 & Pending cube eval \\
 \bottomrule
 \end{tabular}%
 }
 \vspace{2pt}
 
 \parbox{\textwidth}{\footnotesize
-Own held-out RMSE is computed on each method's declared marker population; only rows with identical populations are directly comparable. Boldface indicates the lowest target-specific held-out RMSE among Complete confirmatory rows. $^{\dagger}$ denotes a simulation-covariance preflight, $^{\ddagger}$ denotes raw-FK mechanical hard fixing, and $^{\S}$ denotes the post-hoc train-vision-aligned hard-fixed diagnostic. Neither fixed pose is external ground truth. Conv. reports successful solver termination across three initialization seeds and does not imply global optimality or absolute physical accuracy.}
+Held-out evaluation is cube-only. All-cube RMSE pools train and held-out cube observations and is used only as a fit sanity check. Cross-view transfer and cam-common consistency aggregate fixed-camera pairs and fixed-gripper pairs as supplementary internal camera-consistency metrics. $^{\ddagger}$ raw-FK hard fixing; $^{\dagger}$ corrected-FK soft factor; $^{\S}$ vision-aligned FK hard fixing. External cube GT is pending and will decide the final physical ranking.}
 \end{table*}
 ```
 

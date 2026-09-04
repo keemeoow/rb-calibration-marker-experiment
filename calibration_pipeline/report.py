@@ -18,6 +18,7 @@ METHOD_ORDER = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
 CANONICAL_LABEL_OVERRIDES = {
     "A3": "raw-FK hard fixed",
     "A4": "corrected-FK soft factor",
+    "A5": "vision-aligned FK hard fixed",
 }
 
 MATRIX_SEMANTICS = {
@@ -62,25 +63,11 @@ def _frame_prune_records(value: Any) -> list[dict]:
     return records
 
 
-def _fmt(value: Any, digits: int = 4) -> str:
-    if value is None:
-        return "—"
-    return f"{float(value):.{digits}f}"
-
-
 def _display_condition(method: str, row: Mapping[str, Any]) -> dict:
     condition = dict(row["condition"])
     if method in CANONICAL_LABEL_OVERRIDES:
         condition["label"] = CANONICAL_LABEL_OVERRIDES[method]
     return condition
-
-
-def _matrix_text(matrix: list[list[float]]) -> str:
-    rows = [
-        "  [" + ", ".join(f"{float(value): .9f}" for value in row) + "]"
-        for row in matrix
-    ]
-    return "[\n" + ",\n".join(rows) + "\n]"
 
 
 def _validate(payload: dict, representative_seed: int) -> None:
@@ -192,150 +179,6 @@ def _matrix_artifact(payload: dict, source: Path,
     }
 
 
-def _markdown(payload: dict, summaries: list[dict], matrix_artifact: dict,
-              representative_seed: int) -> str:
-    protocol = payload["protocol"]
-    split = protocol["split"]
-    provenance = protocol["source_data_provenance"]
-    train = provenance["observation_populations"]["train"]
-    heldout = provenance["observation_populations"]["heldout"]
-    solver = protocol["solver_options"]
-    prune_totals = {
-        key: sum(int(row[key]) for row in summaries)
-        for key in ("solver_stages", "prune_refit_attempts",
-                    "prune_refit_accepted", "prune_refit_rollbacks",
-                    "pruned_frames_considered")
-    }
-    lines = [
-        "# Calibration Results",
-        "",
-        "이 문서는 `05_calibrate.py`의 결과만 사용한다. Cross-target, marker-system, "
-        "OpenCV baseline 또는 외부 GT가 없어도 생성된다.",
-        "",
-        "## 실행 및 데이터 계약",
-        "",
-        f"- Dataset: `{protocol.get('dataset')}`",
-        f"- Eligible sets: `{split.get('eligible_sets')}`",
-        f"- Train: {train['observations']} observations / {train['corners']} corners / "
-        f"{len(train['events'])} events",
-        f"- Held-out: {heldout['observations']} observations / {heldout['corners']} corners / "
-        f"{len(heldout['events'])} events",
-        f"- Solver: `{solver['method']}`, loss `{solver['loss']}`, "
-        f"f_scale `{solver['f_scale_px']} px`, residual weighting "
-        f"`{solver['residual_weighting']}`",
-        f"- Representative matrices: seed `{representative_seed}`; seed 0 is "
-        "the unperturbed initialization and is not selected using held-out error.",
-        "",
-        "## 행렬이 생성되는 시점",
-        "",
-        "| 단계 | 행렬/파라미터 | 상태와 저장 위치 |",
-        "| --- | --- | --- |",
-        "| 01 | Factory `color_K`, `color_D`, `depth_K`, depth-to-color extrinsic, depth scale | `intrinsics/cam*.npz`; 센서에서 읽은 초기 intrinsic |",
-        "| 02 | Refined `color_K`, `color_D` | 같은 `cam*.npz`를 갱신하고 factory 값은 `factory_backup/`에 보존 |",
-        "| 03 | Event별 `T_base_gripper`와 raw cube-center pose | `calib_train/meta.json`; robot FK 입력이며 calibration 결과가 아님 |",
-        "| 04 | Cube/board PnP pose | 검출 품질·positive-depth 판정에만 임시 사용; 최종 행렬로 저장하거나 전달하지 않음 |",
-        "| 05 초기화 | `shared_reference_state`와 행별 초기 행렬 | `shared_train_only_baseline.json`; held-out을 쓰지 않은 optimizer 시작점 |",
-        "| 05 FK 정렬 | `T_gripper_cam`, `T_fk_cube_center_to_tag_object`, raw/aligned set pose | `shared_board_free_fk_cube.json`; A4/A5/B1/B2용 train-only artifact |",
-        "| 05 최종 | 각 행·seed의 `T_base_Ci`, `T_gripper_cam`, board/cube pose | `table1_methods.json → rows.<행>.runs[*].transforms`; fit/refit/rollback 뒤 확정 |",
-        "| 06 | 새 행렬 없음 | 05 결과를 CSV/JSON/Markdown으로 정리 |",
-        "",
-        "## 최종 행렬의 의미",
-        "",
-        "- `T_base_Ci = T^B_Ci`: 고정카메라 좌표를 robot-base 좌표로 변환하는 최종 extrinsic.",
-        "- `T_gripper_cam = T^G_C`: wrist-camera 좌표를 gripper 좌표로 변환하는 최종 hand-eye.",
-        "- `T_base_board`, `T_base_cube_by_set`: 공동 최적화를 연결하는 target pose이며 배포용 camera calibration 행렬이 아니다.",
-        "- 모든 4×4 행렬의 translation 단위는 meter다. 회전은 좌상단 3×3 rotation matrix다.",
-        "",
-        "## Table 1 calibration 요약",
-        "",
-        "| Row | Condition | Target | FK | Converged | Train px | Held-out px | "
-        "Prune attempts / accepted / rollback | Seed max Δ mm / deg |",
-        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |",
-    ]
-    for row in summaries:
-        lines.append(
-            f"| {row['method']} | {row['label']} | {row['targets']} | "
-            f"{row['fk_to_cube']} | {row['converged_runs']}/{row['total_runs']} | "
-            f"{_fmt(row['train_rmse_px_mean'])} ± {_fmt(row['train_rmse_px_std'])} | "
-            f"{_fmt(row['heldout_rmse_px_mean'])} ± {_fmt(row['heldout_rmse_px_std'])} | "
-            f"{row['prune_refit_attempts']} / {row['prune_refit_accepted']} / "
-            f"{row['prune_refit_rollbacks']} | "
-            f"{_fmt(row['seed_dispersion_translation_max_mm'], 5)} / "
-            f"{_fmt(row['seed_dispersion_rotation_max_deg'], 6)} |")
-    lines.extend([
-        "",
-        "### 행별 실제 residual 모집단 — representative seed",
-        "",
-        "| Row | Train observations / corners | Held-out observations / corners | "
-        "Fixed cameras | Board pose | Cube set poses |",
-        "| --- | ---: | ---: | --- | --- | ---: |",
-    ])
-    for row in summaries:
-        lines.append(
-            f"| {row['method']} | {row['train_observations']} / "
-            f"{row['train_corners']} | {row['heldout_observations']} / "
-            f"{row['heldout_corners']} | {row['fixed_camera_ids']} | "
-            f"{row['has_board_pose']} | {row['cube_pose_count']} |")
-    lines.extend([
-        "",
-        "## Frame-prune 전체 결과",
-        "",
-        f"- Solver stages: {prune_totals['solver_stages']}",
-        f"- Prune/refit attempts: {prune_totals['prune_refit_attempts']}",
-        f"- Candidate frames considered for pruning: "
-        f"{prune_totals['pruned_frames_considered']}",
-        f"- Accepted refits: {prune_totals['prune_refit_accepted']}",
-        f"- Rollbacks: {prune_totals['prune_refit_rollbacks']}",
-        "- Rollback은 오류가 아니다. 제거 전 전체 train robust objective가 개선되지 "
-        "않으면 첫 fit을 유지하는 정상 동작이다.",
-        "",
-        f"## 대표 최종 행렬 — seed {representative_seed}",
-        "",
-        "아래에는 실제 배포 대상인 fixed-camera extrinsic과 hand-eye만 표시한다. "
-        "모든 seed와 target pose의 정확한 값은 `calibration_matrices.json`에 있다.",
-        "",
-    ])
-    for method in METHOD_ORDER:
-        method_payload = matrix_artifact["rows"][method]
-        run = next(item for item in method_payload["runs"]
-                   if int(item["seed"]) == representative_seed)
-        transforms = run["transforms"]
-        lines.extend([
-            f"### {method} — {method_payload['condition']['label']}",
-            "",
-            f"Converged: `{run['converged']}` · train "
-            f"`{_fmt(run['train_reprojection_rmse_px'])} px` · held-out "
-            f"`{_fmt(run['heldout_reprojection_rmse_px'])} px`",
-            "",
-            "`T_gripper_cam`:",
-            "",
-            "```text",
-            _matrix_text(transforms["T_gripper_cam"]),
-            "```",
-            "",
-        ])
-        for camera, matrix in sorted(
-                transforms["T_base_Ci"].items(), key=lambda item: int(item[0])):
-            lines.extend([
-                f"`T_base_C{camera}`:",
-                "",
-                "```text",
-                _matrix_text(matrix),
-                "```",
-                "",
-            ])
-    lines.extend([
-        "## 해석 제한",
-        "",
-        "- Held-out reprojection은 행마다 사용 marker가 다를 수 있어 모든 행의 절대 "
-        "순위를 정하는 외부 정확도 지표가 아니다.",
-        "- A4/B1/B2의 FK covariance가 simulation prior이면 confirmatory 물리 결과가 아니다.",
-        "- 외부 GT와 robot task가 없으므로 실제 robot-base 절대 정확도는 아직 확정할 수 없다.",
-        "",
-    ])
-    return "\n".join(lines)
-
-
 def write_report(table1_path: Path, out_dir: Path,
                  representative_seed: int = 0) -> dict:
     payload = json.loads(table1_path.read_text(encoding="utf-8"))
@@ -349,7 +192,6 @@ def write_report(table1_path: Path, out_dir: Path,
     out_dir.mkdir(parents=True, exist_ok=True)
     csv_path = out_dir / "calibration_summary.csv"
     matrix_path = out_dir / "calibration_matrices.json"
-    markdown_path = out_dir / "CALIBRATION_RESULTS.md"
     with csv_path.open("w", encoding="utf-8-sig", newline="") as stream:
         writer = csv.DictWriter(
             stream, fieldnames=list(summaries[0]), lineterminator="\n")
@@ -358,14 +200,10 @@ def write_report(table1_path: Path, out_dir: Path,
     matrix_path.write_text(
         json.dumps(matrix_artifact, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8")
-    markdown_path.write_text(
-        _markdown(payload, summaries, matrix_artifact, representative_seed),
-        encoding="utf-8")
     return {
         "source": str(table1_path),
         "csv": str(csv_path),
         "matrices": str(matrix_path),
-        "markdown": str(markdown_path),
         "rows": len(summaries),
         "representative_seed": representative_seed,
     }

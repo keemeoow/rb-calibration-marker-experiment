@@ -36,9 +36,6 @@ def test_report_contains_every_final_calibration_matrix(tmp_path):
     assert sum(int(row["prune_refit_attempts"]) for row in summary) == 15
     assert sum(int(row["prune_refit_rollbacks"]) for row in summary) == 15
 
-    markdown = (tmp_path / "CALIBRATION_RESULTS.md").read_text(
-        encoding="utf-8")
-    assert "## 행렬이 생성되는 시점" in markdown
-    assert "## 대표 최종 행렬 — seed 0" in markdown
-    assert "`T_base_C3`" in markdown
+    assert not (tmp_path / "CALIBRATION_RESULTS.md").exists()
     assert result["rows"] == 9
+    assert "markdown" not in result

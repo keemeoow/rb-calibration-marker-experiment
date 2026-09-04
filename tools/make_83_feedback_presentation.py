@@ -209,11 +209,11 @@ def slide_cover(ctx: dict, i: int, n: int) -> Image.Image:
     rounded(draw, (100, 468, 1080, 532), fill=NAVY_2, radius=10)
     draw.text(
         (124, 482),
-        "A2 = internal main | A4 = preflight | A5 = post-hoc diagnostic",
+        "Final rows: A0-A5/B1-B3 | heldout=cube | External cube GT pending",
         font=font(25, "mono"),
         fill="#DCE7F7",
     )
-    draw.text((100, 740), "현재 범위: Pre-GT internal evaluation", font=font(24), fill="#AAB7CA")
+    draw.text((100, 740), "현재 범위: Final protocol before External GT", font=font(24), fill="#AAB7CA")
     draw.text((100, 782), "External GT / robot task: 다음주 예정 태스크", font=font(24, "bold"), fill="#F8D879")
     footer(draw, i, n, dark=True, label="8/3 feedback resolution")
     return img
@@ -470,7 +470,7 @@ def slide_robot_base_pointcloud_rows(ctx: dict, i: int, n: int) -> Image.Image:
         draw,
         (72, 700, 1564, 836),
         "해석",
-        "A5/B2가 낮아 보여도 post-hoc/preflight 성격이라 물리 승자가 아니다. #17의 로봇 좌표계 진단 증거로만 사용한다.",
+        "A5/B2 수치는 External GT 공개 전에 방법을 frozen한 뒤 같은 cube GT list로 최종 판정한다.",
         ORANGE,
         title_size=21,
         body_size=20,
@@ -534,10 +534,10 @@ def slide_experiment_table(ctx: dict, i: int, n: int) -> Image.Image:
     rows = [
         ["A0", "board", "seq", "-", "board-only baseline"],
         ["A1", "board+cube", "seq", "estimated", "cube 추가 reference"],
-        ["A2", "board+cube", "unified", "estimated", "현재 internal main"],
+        ["A2", "board+cube", "unified", "estimated", "vision-only unified 후보"],
         ["A3", "board+cube", "unified", "raw-FK hard", "FK 위험성 진단"],
-        ["A4", "board+cube", "unified", "soft-FK", "preflight 후보"],
-        ["A5", "board+cube", "unified", "aligned-FK hard", "post-hoc 진단"],
+        ["A4", "board+cube", "unified", "soft-FK", "FK cov 대기 후보"],
+        ["A5", "board+cube", "unified", "aligned-FK hard", "GT 전 frozen 최종 후보"],
         ["B1", "board+cube", "seq", "soft-FK", "A4 대비 -Unified"],
         ["B2", "cube", "unified", "soft-FK", "A4 대비 -board"],
         ["B3", "board", "unified", "-", "A2 대비 -cube"],
@@ -566,12 +566,12 @@ def slide_metrics(ctx: dict, i: int, n: int) -> Image.Image:
         "지표의 역할을 분리해야 FK에 유리한 숫자만 고른다는 오해를 피할 수 있다.",
     )
     rows = [
-        ["Primary", "Own-marker held-out px", "matched contrast의 주 내부 지표"],
-        ["Bias check", "Set-equal-weight px", "Board/Cube corner support 차이 점검"],
-        ["Sensitivity", "Paired set bootstrap CI", "n=9 sets, 방향성 민감도"],
-        ["Subsystem", "Fixed-to-Fixed", "FK-free 고정카메라 상대 일관성"],
-        ["Closure", "Gripper-to-Fixed", "FK/Hand-Eye 포함 full-chain 내부 진단"],
-        ["Next week", "TRE/Rotation/P95/Failure", "Independent External GT 후 최종 물리 정확도"],
+        ["Final", "External cube TRE/rot/P95/fail", "Independent External GT 후 최종 물리 순위"],
+        ["Support", "Heldout Cube RMSE px", "미사용 cube event 재투영"],
+        ["Support", "ALL Cube RMSE px", "train+heldout cube fit sanity check"],
+        ["Diagnostic", "Train RMSE px", "solver 수렴/학습 적합도"],
+        ["Diagnostic", "Cross-view pixel transfer", "fixed/gripper camera cube px 일관성"],
+        ["Diagnostic", "Cam-common Obj-Cam mm/deg", "카메라가 본 cube pose 차이"],
     ]
     table(
         draw,
@@ -588,7 +588,7 @@ def slide_metrics(ctx: dict, i: int, n: int) -> Image.Image:
         draw,
         (100, 760, 1500, 832),
         "핵심",
-        "현재 결론은 internal reprojection consistency이고, absolute robot-base accuracy는 다음주 GT 이후다.",
+        "최종 heldout은 항상 cube만 보고, absolute robot-base accuracy는 External cube GT로 정한다.",
         ORANGE,
         title_size=22,
         body_size=21,
@@ -597,12 +597,8 @@ def slide_metrics(ctx: dict, i: int, n: int) -> Image.Image:
 
 
 def slide_main_result(ctx: dict, i: int, n: int) -> Image.Image:
-    a1b = metric(ctx, "A1", "heldout_board_reprojection_rmse_px")
-    a2b = metric(ctx, "A2", "heldout_board_reprojection_rmse_px")
     a1c = metric(ctx, "A1", "heldout_cube_reprojection_rmse_px")
     a2c = metric(ctx, "A2", "heldout_cube_reprojection_rmse_px")
-    a1o = metric(ctx, "A1", "heldout_overall_reprojection_rmse_px")
-    a2o = metric(ctx, "A2", "heldout_overall_reprojection_rmse_px")
     img, draw, y = content_base(
         i,
         n,
@@ -613,17 +609,17 @@ def slide_main_result(ctx: dict, i: int, n: int) -> Image.Image:
     bar_chart(
         draw,
         (68, y, 1008, y + 448),
-        "Held-out reprojection RMSE px",
-        [("A1 board", a1b, GRAY_BAR), ("A2 board", a2b, BLUE), ("A1 cube", a1c, GRAY_BAR), ("A2 cube", a2c, TEAL)],
+        "Heldout cube reprojection RMSE px",
+        [("A1 cube", a1c, GRAY_BAR), ("A2 cube", a2c, TEAL)],
         max_value=4.6,
-        note="낮을수록 좋다. A2는 board와 cube에서 모두 개선된다.",
+        note="낮을수록 좋다. 최종 heldout 평가는 cube만 사용한다.",
     )
-    card(draw, (1048, y, 1564, y + 190), "숫자 요약", f"Own overall {fmt(a1o)} → {fmt(a2o)} px\n{pct_drop(a1o, a2o)} 감소", GREEN)
+    card(draw, (1048, y, 1564, y + 190), "숫자 요약", f"Heldout cube {fmt(a1c)} → {fmt(a2c)} px\n{pct_drop(a1c, a2c)} 감소", GREEN)
     card(
         draw,
         (1048, y + 230, 1564, y + 448),
         "발표 문장",
-        "“같은 데이터 조건에서 unified feedback을 넣으면 두 target의 held-out residual이 함께 낮아졌습니다.”",
+        "“같은 데이터 조건에서 unified feedback을 넣으면 cube heldout residual이 낮아졌습니다.”",
         BLUE,
     )
     return img
@@ -632,52 +628,57 @@ def slide_main_result(ctx: dict, i: int, n: int) -> Image.Image:
 def slide_cube_result(ctx: dict, i: int, n: int) -> Image.Image:
     entries = [
         (
-            "A0 → A1 board",
-            delta(ctx, "A0", "A1", "heldout_board_reprojection_rmse_px"),
-            "순차 구조에서 cube만 추가",
-        ),
-        (
-            "B3 → A2 board",
-            delta(ctx, "B3", "A2", "heldout_board_reprojection_rmse_px"),
-            "unified 구조에서 cube coupling",
-        ),
-        (
             "A1 → A2 cube",
             delta(ctx, "A1", "A2", "heldout_cube_reprojection_rmse_px"),
             "same marker, unified feedback",
         ),
         (
+            "A2 → A3 cube",
+            delta(ctx, "A2", "A3", "heldout_cube_reprojection_rmse_px"),
+            "raw-FK hard fixed effect",
+        ),
+        (
+            "A2 → A4 cube",
+            delta(ctx, "A2", "A4", "heldout_cube_reprojection_rmse_px"),
+            "soft-FK factor effect",
+        ),
+        (
             "B2 → A4 cube",
             delta(ctx, "B2", "A4", "heldout_cube_reprojection_rmse_px"),
-            "soft-FK preflight에서 board 도움",
+            "soft-FK 조건에서 board residual 도움",
+        ),
+        (
+            "A4 → A5 cube",
+            delta(ctx, "A4", "A5", "heldout_cube_reprojection_rmse_px"),
+            "aligned-FK hard fixed 후보",
         ),
     ]
     img, draw, y = content_base(
         i,
         n,
         "C4+C5 | DATA RESULT",
-        "Cube claim은 조건부로 제한",
-        "cube를 단순히 추가하면 항상 좋아진다는 claim은 현재 데이터와 맞지 않는다.",
+        "Cube-only contrast snapshot",
+        "최종 heldout 평가는 cube만 사용하고, External GT에서 물리 순위를 확정한다.",
     )
     delta_bars(
         draw,
         (68, y, 1088, y + 462),
         "Second - first Δ RMSE px",
         entries,
-        note="음수는 두 번째 방법이 더 좋다는 뜻이다. cube 효과는 unified/soft-FK context에서 더 설득력 있게 보인다.",
+        note="음수는 두 번째 방법이 더 좋다는 뜻이다. A0/B3는 현재 cube heldout이 없어 최종 capture 후 채운다.",
     )
     card(
         draw,
         (1126, y, 1564, y + 202),
         "수정된 claim",
-        "Cube는 universal improvement가 아니라, board/cube 관측을 하나의 solver에서 연결하는 3D common target이다.",
+        "내부 cube px가 좋아도 최종 물리 승자는 External cube GT로만 결정한다.",
         ORANGE,
     )
     card(
         draw,
         (1126, y + 246, 1564, y + 462),
         "왜 중요한가",
-        "이렇게 말해야 A0→A1의 미세 악화를 숨기지 않으면서도 cube 설계 의도를 유지할 수 있다.",
+        "A0/B3의 board-on-gripper 최종 capture가 들어오면 같은 cube GT list에서 공정하게 비교한다.",
         BLUE,
     )
     return img
@@ -692,26 +693,24 @@ def slide_fk_result(ctx: dict, i: int, n: int) -> Image.Image:
         "A2, A3, A4, A5는 FK를 어떻게 넣을지에 대한 원인 분리다.",
     )
     entries = [
-        ("A2 board", metric(ctx, "A2", "heldout_board_reprojection_rmse_px"), BLUE),
-        ("A3 board", metric(ctx, "A3", "heldout_board_reprojection_rmse_px"), RED),
-        ("A4 board", metric(ctx, "A4", "heldout_board_reprojection_rmse_px"), TEAL),
         ("A2 cube", metric(ctx, "A2", "heldout_cube_reprojection_rmse_px"), BLUE),
         ("A3 cube", metric(ctx, "A3", "heldout_cube_reprojection_rmse_px"), RED),
         ("A4 cube", metric(ctx, "A4", "heldout_cube_reprojection_rmse_px"), TEAL),
+        ("A5 cube", metric(ctx, "A5", "heldout_cube_reprojection_rmse_px"), PURPLE),
     ]
     bar_chart(
         draw,
         (68, y, 1040, y + 462),
-        "Held-out reprojection RMSE px",
+        "Heldout cube reprojection RMSE px",
         entries,
         max_value=7.0,
-        note="A3 hard-FK fixed는 특히 cube에서 크게 악화된다. A4는 A2와 거의 tie다.",
+        note="A3 hard-FK fixed는 cube에서 크게 악화된다. A5는 GT 전 frozen 후보로 둔다.",
     )
     card(
         draw,
         (1080, y, 1564, y + 146),
         "A2",
-        "현재 internal main. no-FK cube pose estimated.",
+        "vision-only unified 후보. cube pose estimated.",
         BLUE,
     )
     card(
@@ -725,7 +724,7 @@ def slide_fk_result(ctx: dict, i: int, n: int) -> Image.Image:
         draw,
         (1080, y + 346, 1564, y + 462),
         "A4",
-        "soft-FK preflight. 우월성은 다음주 GT 필요.",
+        "soft-FK 후보. 우월성은 External cube GT로 판정.",
         TEAL,
     )
     return img
@@ -776,11 +775,11 @@ def slide_script_next(ctx: dict, i: int, n: int) -> Image.Image:
     script = (
         f"“8/3 피드백은 C1 관측 품질, C2 목적함수/FK, C3 평가 공정성, C4 ablation 포지셔닝, "
         f"C5 큰 오차 원인, C6 외부 구현 대조, C7 물리 GT/로봇 작업으로 나눠 정리했습니다. "
-        f"현재 주 지표는 같은 marker population의 held-out reprojection이고, A1→A2에서 own overall이 "
-        f"{fmt(a1)} px에서 {fmt(a2)} px로 낮아져 unified feedback 효과가 가장 분명합니다. "
-        f"다만 cube 효과는 조건부이고, hard FK는 악화되며, soft-FK는 preflight입니다. "
+        f"최종 프로토콜은 A0–A5/B1–B3 한 벌만 남기고 heldout은 항상 cube만 봅니다. "
+        f"현재 Session04 내부 수치에서는 A1→A2 own overall이 {fmt(a1)} px에서 {fmt(a2)} px로 낮아져 unified feedback 효과가 보입니다. "
+        f"다만 최종 순위는 내부 px가 아니라 External cube GT로 정하고, A5도 GT 공개 전 frozen 후보로 비교합니다. "
         f"#17은 A0–A5/B1–B3 전체 비교 row에 대해 robot-base point-cloud diagnostic까지 구현했습니다. "
-        f"따라서 현 단계 결론은 A2가 internal main이고, robot-base 물리 정확도는 다음주 Independent External GT로 "
+        f"따라서 robot-base 물리 정확도는 다음주 Independent External GT로 "
         f"Translation/Rotation/P95/Failure Rate를 산출해 확정하겠습니다.”"
     )
     rounded(draw, (92, y + 10, 1510, y + 330), fill="#EEF5FF", outline="#BED8FF", radius=18)

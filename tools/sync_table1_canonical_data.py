@@ -12,7 +12,6 @@ import csv
 from html import escape
 import json
 from pathlib import Path
-import random
 from statistics import fmean
 
 METHOD_ORDER = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
@@ -20,8 +19,10 @@ METHOD_ORDER = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
 CANONICAL_LABEL_OVERRIDES = {
     "A3": "raw-FK hard fixed",
     "A4": "corrected-FK soft factor",
+    "A5": "vision-aligned FK hard fixed",
 }
 SYSTEM_ORDER = ("board_only", "cube_only", "board_cube")
+FINAL_TARGET = "cube"
 TARGETS = ("board", "cube")
 SCOPE_FIELDS = (
     "cross_view_pixel_transfer_rmse_px",
@@ -29,9 +30,6 @@ SCOPE_FIELDS = (
     "pose_consistency_rotation_rmse_deg",
 )
 ROOT = Path(__file__).resolve().parents[1]
-BOOTSTRAP_REPETITIONS = 10000
-BOOTSTRAP_SEED = 20260903
-CSV_EXCLUDED_FIELD_SUFFIXES = ("_set_mean_square_px2",)
 
 
 def _load(path: Path) -> dict:
@@ -56,6 +54,22 @@ def _minimum(rows, key: str):
     return None if not numeric else min(numeric)
 
 
+def _weighted_rmse(*entries: tuple[float | None, int | None]) -> float | None:
+    total_weight = 0
+    total_square = 0.0
+    for value, weight in entries:
+        if value in (None, "") or weight in (None, ""):
+            continue
+        weight_int = int(weight)
+        if weight_int <= 0:
+            continue
+        total_weight += weight_int
+        total_square += float(value) ** 2 * weight_int
+    if total_weight == 0:
+        return None
+    return (total_square / total_weight) ** 0.5
+
+
 def _fmt_best(value, best, digits: int = 4, html: bool = False) -> str:
     """Bold a displayed minimum, including values tied after rounding."""
     formatted = _fmt(value, digits)
@@ -67,10 +81,13 @@ def _fmt_best(value, best, digits: int = 4, html: bool = False) -> str:
 
 def _status_label(value: str) -> str:
     return {
-        "complete": "Complete (완료)",
+        "complete": "Current data available (현재 데이터 있음)",
         "preflight_simulation_prior": (
-            "Preflight — Simulation Prior (예비실험 — 시뮬레이션 사전값)"),
-        "posthoc_diagnostic": "Post-hoc Diagnostic (사후 원인 진단)",
+            "Current data available; measured FK covariance pending "
+            "(현재 데이터 있음; FK covariance 측정 대기)"),
+        "freeze_before_external_gt": (
+            "Current data available; freeze before External GT scoring "
+            "(현재 데이터 있음; External GT 채점 전 고정 필요)"),
     }.get(value, value)
 
 
@@ -81,19 +98,9 @@ def _display_label(method: str, source_label: str) -> str:
 def _result_sections(rows: list[dict]) -> list[tuple[str, str, list[dict]]]:
     return [
         (
-            "Confirmatory Internal (확증 내부)",
-            "코드 내부 ablation과 calibration 안정성 검증에 쓰는 Complete 행이다.",
-            [row for row in rows if row["status"] == "complete"],
-        ),
-        (
-            "Preflight (예비실험)",
-            "Simulation prior FK covariance를 쓰므로 물리 우월성 주장에는 쓰지 않는다.",
-            [row for row in rows if row["status"] == "preflight_simulation_prior"],
-        ),
-        (
-            "Post-hoc Diagnostics (사후 원인 진단)",
-            "결과 해석 뒤 원인을 분리하기 위한 진단 행이며 메인 순위에서 제외한다.",
-            [row for row in rows if row["status"] == "posthoc_diagnostic"],
+            "Final A0-A5/B1-B3 (최종 단일 비교 구성)",
+            "모든 행은 같은 cube heldout / External cube GT 평가 대상에서만 비교한다.",
+            rows,
         ),
     ]
 
@@ -125,6 +132,26 @@ def _corner_count(runs: list[dict], split: str, target: str) -> int | None:
         if entry is not None:
             return int(entry["n_corners"])
     return None
+
+
+def _combined_reprojection_mean(
+        runs: list[dict], target: str,
+        splits: tuple[str, ...] = ("train", "heldout")) -> float | None:
+    """Average split-combined RMSE across seeds using corner support weights."""
+    per_run = []
+    for run in runs:
+        total_weight = 0
+        total_square = 0.0
+        for split in splits:
+            entry = run[f"{split}_reprojection"].get(target)
+            if entry is None or entry.get("rmse_px") is None:
+                continue
+            weight = int(entry.get("n_corners", 0))
+            total_weight += weight
+            total_square += float(entry["rmse_px"]) ** 2 * weight
+        if total_weight > 0:
+            per_run.append((total_square / total_weight) ** 0.5)
+    return _mean(per_run)
 
 
 def _per_set_mean_squares(runs: list[dict], split: str,
@@ -281,6 +308,7 @@ def _method_rows(table1: dict, cross: dict) -> list[dict]:
                  if source["condition"]["unified"] == "seq"
                  else "unified_joint_optimization")),
             "cube_pose_handling": source["condition"]["fk_to_cube"],
+            "board_pose_handling": source["condition"]["fk_to_board"],
             "status": cross_row["status"],
             "converged_runs": sum(bool(run["converged"]) for run in runs),
             "total_runs": len(runs),
@@ -324,6 +352,10 @@ def _method_rows(table1: dict, cross: dict) -> list[dict]:
             for target in ("overall", "board", "cube"):
                 row[f"{split}_{target}_reprojection_rmse_px"] = (
                     _reprojection_mean(runs, split, target))
+                row[f"{split}_{target}_n_corners"] = _corner_count(
+                    runs, split, target)
+        row["all_cube_reprojection_rmse_px"] = _combined_reprojection_mean(
+            runs, FINAL_TARGET)
         for target in ("overall", "board", "cube"):
             row[f"heldout_{target}_set_equal_weight_rmse_px"] = (
                 _reprojection_field_mean(
@@ -337,6 +369,41 @@ def _method_rows(table1: dict, cross: dict) -> list[dict]:
                 for field in SCOPE_FIELDS:
                     row[f"{scope}_{target}_{field}"] = cross_row[
                         f"{scope}_{target}_{field}_mean"]
+        row["cross_view_cube_pixel_transfer_rmse_px"] = _weighted_rmse(
+            (
+                row["fixed_to_fixed_cube_cross_view_pixel_transfer_rmse_px"],
+                cross_row.get("n_fixed_to_fixed_cube_directions"),
+            ),
+            (
+                row["gripper_to_fixed_cube_cross_view_pixel_transfer_rmse_px"],
+                cross_row.get("n_gripper_to_fixed_cube_directions"),
+            ),
+        )
+        row["cam_common_cube_translation_rmse_mm"] = _weighted_rmse(
+            (
+                row["fixed_to_fixed_cube_pose_consistency_translation_rmse_mm"],
+                cross_row.get("n_fixed_to_fixed_cube_pairs"),
+            ),
+            (
+                row["gripper_to_fixed_cube_pose_consistency_translation_rmse_mm"],
+                cross_row.get("n_gripper_to_fixed_cube_pairs"),
+            ),
+        )
+        row["cam_common_cube_rotation_rmse_deg"] = _weighted_rmse(
+            (
+                row["fixed_to_fixed_cube_pose_consistency_rotation_rmse_deg"],
+                cross_row.get("n_fixed_to_fixed_cube_pairs"),
+            ),
+            (
+                row["gripper_to_fixed_cube_pose_consistency_rotation_rmse_deg"],
+                cross_row.get("n_gripper_to_fixed_cube_pairs"),
+            ),
+        )
+        row["cross_view_cube_support"] = (
+            f"{cross_row.get('n_fixed_to_fixed_cube_pairs', 0)} "
+            f"fixed-camera pairs + "
+            f"{cross_row.get('n_gripper_to_fixed_cube_pairs', 0)} "
+            "fixed-gripper pairs")
         for target in ("overall", "board", "cube"):
             row[f"reference_dependent_{target}_reprojection_rmse_px"] = (
                 cross_row[
@@ -345,30 +412,43 @@ def _method_rows(table1: dict, cross: dict) -> list[dict]:
     return rows
 
 
-def _optimization_result_table(
-        rows: list[dict], board_best, cube_best,
-        highlight_complete_best: bool) -> str:
+def _final_train_target(row: dict) -> str:
+    if row["method"] in {"A0", "B3"}:
+        return "board-on-gripper only"
+    if row["method"] == "B2":
+        return "cube only"
+    return "board+cube"
+
+
+def _final_pose_handling(row: dict) -> str:
+    if row["method"] in {"A0", "B3"}:
+        return f"board pose={row['board_pose_handling']}; cube heldout only"
+    return f"cube pose={row['cube_pose_handling']}"
+
+
+def _optimization_result_table(rows: list[dict], cube_best) -> str:
     lines = [
-        "| Method (방법) | 기여도2 - Marker Set (마커 구성) | 기여도1 - "
-        "Optimization (최적화) | 기여도3 - Cube Pose (큐브 자세 처리) | Train Overall "
-        "(학습 전체 px) | Own Held-out Overall (자체 홀드아웃 전체 px) | "
-        "Board/Cube Held-out (보드/큐브 홀드아웃 px) | Convergence (수렴) | "
-        "Status (상태) |",
-        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | --- |",
+        "| Method (방법) | Calibration train target | Optimization | "
+        "FK / target-pose 처리 | Train RMSE px | ALL Cube RMSE px | "
+        "Heldout Cube RMSE px | Cross-view Cube px | Cam-common Cube "
+        "mm/deg | External cube GT | Convergence | Data status |",
+        "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | --- |",
     ]
     for row in rows:
-        board = row["heldout_board_reprojection_rmse_px"]
         cube = row["heldout_cube_reprojection_rmse_px"]
-        board_text = (_fmt_best(board, board_best)
-                      if highlight_complete_best else _fmt(board))
-        cube_text = (_fmt_best(cube, cube_best)
-                     if highlight_complete_best else _fmt(cube))
+        cube_text = _fmt_best(cube, cube_best)
+        cam_common_mm_deg = (
+            f"{_fmt(row['cam_common_cube_translation_rmse_mm'])} / "
+            f"{_fmt(row['cam_common_cube_rotation_rmse_deg'])}"
+        )
         lines.append(
-            f"| {row['method']} ({row['label']}) | {row['target_set']} | "
-            f"{row['optimization']} | {row['cube_pose_handling']} | "
+            f"| {row['method']} ({row['label']}) | {_final_train_target(row)} | "
+            f"{row['optimization']} | {_final_pose_handling(row)} | "
             f"{_fmt(row['train_overall_reprojection_rmse_px'])} | "
-            f"{_fmt(row['heldout_overall_reprojection_rmse_px'])} | "
-            f"{board_text} / {cube_text} | "
+            f"{_fmt(row['all_cube_reprojection_rmse_px'])} | "
+            f"{cube_text} | "
+            f"{_fmt(row['cross_view_cube_pixel_transfer_rmse_px'])} | "
+            f"{cam_common_mm_deg} | Pending | "
             f"{row['converged_runs']}/{row['total_runs']} | "
             f"{_status_label(row['status'])} |")
     return "\n".join(lines)
@@ -422,77 +502,67 @@ def _write_csv(path: Path, rows: list[dict]) -> None:
 def _csv_rows(rows: list[dict]) -> list[dict]:
     return [
         {
-            key: value
-            for key, value in row.items()
-            if not key.endswith(CSV_EXCLUDED_FIELD_SUFFIXES)
+            "method": row["method"],
+            "label": row["label"],
+            "calibration_train_target": _final_train_target(row),
+            "optimization": row["optimization"],
+            "fk_target_pose_handling": _final_pose_handling(row),
+            "train_reprojection_rmse_px": row["train_overall_reprojection_rmse_px"],
+            "all_cube_reprojection_rmse_px": row["all_cube_reprojection_rmse_px"],
+            "heldout_cube_reprojection_rmse_px": row[
+                "heldout_cube_reprojection_rmse_px"],
+            "heldout_cube_n_corners": row["heldout_cube_n_corners"],
+            "cross_view_cube_pixel_transfer_rmse_px": row[
+                "cross_view_cube_pixel_transfer_rmse_px"],
+            "cam_common_cube_translation_rmse_mm": row[
+                "cam_common_cube_translation_rmse_mm"],
+            "cam_common_cube_rotation_rmse_deg": row[
+                "cam_common_cube_rotation_rmse_deg"],
+            "cross_view_cube_support": row["cross_view_cube_support"],
+            "external_cube_gt_status": "pending",
+            "converged_runs": row["converged_runs"],
+            "total_runs": row["total_runs"],
+            "data_status": _status_label(row["status"]),
+            "n_visual_residual_components": row["n_visual_residual_components"],
+            "n_fk_factor_blocks": row["n_fk_factor_blocks"],
+            "n_fk_residual_components": row["n_fk_residual_components"],
+            "final_visual_robust_cost_mean": row["final_visual_robust_cost_mean"],
+            "final_fk_robust_cost_mean": row["final_fk_robust_cost_mean"],
+            "final_fk_robust_cost_fraction_mean": row[
+                "final_fk_robust_cost_fraction_mean"],
         }
         for row in rows
     ]
 
 
-def _scope_table(rows: list[dict], scope: str) -> str:
-    scope_label = (
-        "A — Fixed-to-Fixed 보조 Held-out 일관성" if scope == "fixed_to_fixed"
-        else "Gripper-to-Fixed (그리퍼카메라–고정카메라 간)")
+def _scope_table(rows: list[dict], scope: str = "cube_cross_view") -> str:
+    _ = scope
+    fields = (
+        ("cross_view_cube_pixel_transfer_rmse_px", "Cross-view Cube px"),
+        ("cam_common_cube_translation_rmse_mm", "Cam-common Cube mm"),
+        ("cam_common_cube_rotation_rmse_deg", "Cam-common Cube deg"),
+    )
     lines = [
-        f"### {scope_label}",
+        "## Cross-view Camera Consistency (cube-only)",
         "",
-        "| Method (방법) | Board Pixel (보드 px) | Board Translation "
-        "(보드 이동 mm) | Board Rotation (보드 회전 deg) | Cube Pixel "
-        "(큐브 px) | Cube Translation (큐브 이동 mm) | Cube Rotation "
-        "(큐브 회전 deg) |",
-        "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        "고정카메라 pair와 고정카메라↔그리퍼카메라 pair를 같은 cross-view "
+        "cube consistency 지표 안에서 함께 집계한다. 별도 pair-type 순위 "
+        "지표는 만들지 않는다.",
+        "",
+        "| Method (방법) | Cross-view Cube px | Cam-common Cube mm | "
+        "Cam-common Cube deg | Support |",
+        "| --- | ---: | ---: | ---: | --- |",
     ]
     best = {
-        (target, field): _minimum(rows, f"{scope}_{target}_{field}")
-        for target in TARGETS for field in SCOPE_FIELDS
+        key: _minimum(rows, key)
+        for key, _label in fields
     }
     for row in rows:
         values = []
-        for target in TARGETS:
-            for field in SCOPE_FIELDS:
-                key = f"{scope}_{target}_{field}"
-                values.append(_fmt_best(
-                    row[key], best[(target, field)]))
+        for key, _label in fields:
+            values.append(_fmt_best(row[key], best[key]))
         lines.append("| " + " | ".join(
-            [row["method"], *values]) + " |")
-    return "\n".join(lines)
-
-
-def _marker_table(marker: dict) -> str:
-    by_system = {row["system"]: row for row in marker["summary"]}
-    marker_rows = list(by_system.values())
-    best = {
-        key: _minimum(marker_rows, key)
-        for key in (
-            "fixed_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean",
-            "fixed_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean",
-            "gripper_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean",
-            "gripper_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean",
-        )
-    }
-    lines = [
-        "### Marker-system End-to-End (마커 시스템 전체 경로)",
-        "",
-        "| System (시스템) | Own Held-out (자체 홀드아웃 px) | "
-        "Fixed-to-Fixed Board/Cube (고정카메라 간 보드/큐브 px) | "
-        "Gripper-to-Fixed Board/Cube (그리퍼카메라–고정카메라 간 "
-        "보드/큐브 px) | Convergence (수렴) |",
-        "| --- | ---: | ---: | ---: | ---: |",
-    ]
-    for system in SYSTEM_ORDER:
-        row = by_system[system]
-        fixed_board = "fixed_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean"
-        fixed_cube = "fixed_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean"
-        gripper_board = "gripper_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean"
-        gripper_cube = "gripper_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean"
-        lines.append(
-            f"| {row['label']} | {_fmt(row['own_heldout_overall_rmse_px_mean'])} | "
-            f"{_fmt_best(row[fixed_board], best[fixed_board])} / "
-            f"{_fmt_best(row[fixed_cube], best[fixed_cube])} | "
-            f"{_fmt_best(row[gripper_board], best[gripper_board])} / "
-            f"{_fmt_best(row[gripper_cube], best[gripper_cube])} | "
-            f"{row['converged_runs']}/{row['total_runs']} |")
+            [row["method"], *values, row["cross_view_cube_support"]]) + " |")
     return "\n".join(lines)
 
 
@@ -555,34 +625,10 @@ def _implementation_audit() -> str:
         "고정한다. A4와 동일한 aligned-FK artifact를 사용하지만 A4처럼 "
         "covariance factor로 완화하지 않는다.",
         "",
-        "> **판정:** A5는 이전 A3 결과의 원인을 분리하는 post-hoc "
-        "diagnostic이다. 독립 실측 correction이나 external GT가 아니다.",
+        "> **판정:** A5는 train-only vision-aligned FK를 쓰는 최종 후보 "
+        "방법으로 둘 수 있다. 단, External GT 공개 전에 alignment artifact와 "
+        "평가 코드를 frozen해야 한다.",
     ])
-
-
-def _set_equal_weight_table(rows: list[dict]) -> str:
-    """Report the pooling-bias control beside the corner-pooled number.
-
-    Corner-pooled RMSE lets whichever placement exposed the most corners speak
-    loudest.  Showing both, with the corner counts that drive the difference,
-    keeps the reader from reading a support artefact as an accuracy change.
-    """
-    lines = [
-        "| Method (방법) | Board pooled / set-equal (보드 px) | "
-        "Cube pooled / set-equal (큐브 px) | "
-        "Overall pooled / set-equal (전체 px) | Status (상태) |",
-        "| --- | ---: | ---: | ---: | --- |",
-    ]
-    for row in rows:
-        cells = []
-        for target in ("board", "cube", "overall"):
-            pooled = row[f"heldout_{target}_reprojection_rmse_px"]
-            equal = row[f"heldout_{target}_set_equal_weight_rmse_px"]
-            cells.append(f"{_fmt(pooled)} / {_fmt(equal)}")
-        lines.append(
-            f"| {row['method']} ({row['label']}) | " + " | ".join(cells)
-            + f" | {_status_label(row['status'])} |")
-    return "\n".join(lines)
 
 
 def _delta_text(first, second) -> str:
@@ -604,94 +650,94 @@ def _heldout_pair(by_method: dict[str, dict], first: str, second: str,
 def _contrast_definitions() -> list[tuple[str, str, str, str, str, tuple[str, ...], str]]:
     return [
         (
-            "Confirmatory internal",
+            "Final protocol",
             "A0",
             "B3",
-            "A0 <-> B3",
-            "Board-only에서 sequential freeze와 unified feedback 차이가 있는가",
-            ("board",),
-            "동률. Board-only에서는 통합 자체가 추가 이득을 만들지 않는다.",
+            "A0 -> B3",
+            "board-on-gripper only에서 sequential과 unified의 차이는 무엇인가",
+            ("cube",),
+            "External cube GT에서 최종 판정한다. 현재 데이터에 cube heldout이 없으면 N/A로 둔다.",
         ),
         (
-            "Confirmatory internal",
+            "Final protocol",
             "A0",
             "A1",
             "A0 -> A1",
-            "순차법에 cube residual을 추가하면 board 성능이 좋아지는가",
-            ("board",),
-            "Board는 미세 악화. 순차 구조에서는 cube 추가 이득이 보이지 않는다.",
+            "board-on-gripper baseline에 cube train 관측을 추가하면 cube 평가가 개선되는가",
+            ("cube",),
+            "External cube GT와 heldout cube RMSE로 판정한다.",
         ),
         (
-            "Confirmatory internal",
+            "Final protocol",
             "A1",
             "A2",
             "A1 -> A2",
             "Vision-only 조건에서 unified feedback이 도움이 되는가",
-            ("board", "cube"),
-            "두 target 모두 개선. 현재 내부 확증에서 가장 강한 긍정 contrast다.",
+            ("cube",),
+            "External cube GT와 heldout cube RMSE로 판정한다.",
         ),
         (
-            "Confirmatory internal",
+            "Final protocol",
             "B3",
             "A2",
             "B3 -> A2",
-            "Unified 조건에서 cube residual이 board calibration에도 도움이 되는가",
-            ("board",),
-            "Board shared component가 개선. 단 marker-system 전체 성능 주장은 아니다.",
+            "unified 구조에서 cube residual이 최종 cube 평가에 필요한가",
+            ("cube",),
+            "External cube GT와 heldout cube RMSE로 판정한다.",
         ),
         (
-            "Confirmatory internal",
+            "Final protocol",
             "A2",
             "A3",
             "A2 -> A3",
             "Vision-estimated cube pose를 raw-FK hard fixed로 바꾸면 어떤가",
-            ("board", "cube"),
-            "특히 cube가 크게 악화. raw FK를 GT로 해석하면 안 된다.",
+            ("cube",),
+            "raw FK hard fixed가 실제 cube 정합을 높이는지 External GT로 확인한다.",
         ),
         (
-            "Preflight",
+            "Final protocol",
             "B1",
             "A4",
             "B1 -> A4",
             "같은 soft FK factor에서 sequential과 unified 중 무엇이 나은가",
-            ("board", "cube"),
-            "통합 개선 경향. measured covariance 없이 내부 preflight로만 해석한다.",
+            ("cube",),
+            "External cube GT와 heldout cube RMSE로 판정한다.",
         ),
         (
-            "Preflight",
+            "Final protocol",
             "A2",
             "A4",
             "A2 -> A4",
             "Unified vision-only에 soft FK factor를 추가하면 이득이 있는가",
-            ("board", "cube"),
-            "사실상 동률. A4는 방법 확장 후보지만 현재 우월성 주장은 금지.",
+            ("cube",),
+            "soft FK factor의 최종 이득은 External cube GT로 판정한다.",
         ),
         (
-            "Preflight",
+            "Final protocol",
             "B2",
             "A4",
             "B2 -> A4",
             "Soft FK 조건에서 board residual이 cube 보정에 도움 되는가",
             ("cube",),
-            "Cube가 개선. board residual은 soft-FK cube 추정에 도움이 된다.",
+            "External cube GT와 heldout cube RMSE로 판정한다.",
         ),
         (
-            "Post-hoc",
+            "Final protocol",
             "A3",
             "A5",
             "A3 -> A5",
             "Raw FK hard fixed와 vision-aligned FK hard fixed의 차이는 무엇인가",
-            ("board", "cube"),
-            "A5는 원인 진단 전용. 독립 correction 또는 물리 순위가 아니다.",
+            ("cube",),
+            "A5가 GT 공개 전에 frozen method이면 최종 후보로 판정 가능하다.",
         ),
         (
-            "Post-hoc",
+            "Final protocol",
             "A4",
             "A5",
             "A4 -> A5",
             "같은 aligned FK를 soft factor와 hard fixed로 쓰면 무엇이 달라지는가",
-            ("board", "cube"),
-            "A5는 원인 진단 전용. 내부 px 하나로 물리 우열을 정하지 않는다.",
+            ("cube",),
+            "A5가 GT 공개 전에 frozen method이면 최종 후보로 판정 가능하다.",
         ),
     ]
 
@@ -700,17 +746,8 @@ def _matched_contrast_records(rows: list[dict]) -> list[tuple[str, str, str, str
     by_method = {row["method"]: row for row in rows}
     records = []
     for tier, first, second, label, question, targets, decision in _contrast_definitions():
-        metric = (
-            "held-out board px, N_reg" if label == "A0 -> A1"
-            else "internal metrics only" if tier == "Post-hoc"
-            else "held-out board/cube px" if targets == ("board", "cube")
-            else "held-out cube px" if targets == ("cube",)
-            else "held-out board px")
+        metric = "External cube GT + heldout cube RMSE"
         result = _heldout_pair(by_method, first, second, targets)
-        if label == "A0 -> A1":
-            result += (
-                f"; N_reg {by_method[first]['n_registered_fixed_cameras']} -> "
-                f"{by_method[second]['n_registered_fixed_cameras']}")
         records.append((tier, label, question, metric, result, decision))
     return records
 
@@ -720,8 +757,9 @@ def _matched_contrast_table(rows: list[dict]) -> str:
     lines = [
         "## Matched Contrast Decision Table (비교실험 구성 확정표)",
         "",
-        "모든 행을 하나의 전체 순위로 세우지 않고, 한 번에 한 요소만 달라지는 "
-        "contrast만 해석한다.",
+        "최종 비교는 아래 contrast만 사용한다. 모든 heldout 평가는 cube만 "
+        "보며, External GT가 들어오면 같은 cube pose list에서 paired "
+        "comparison으로 판정한다.",
         "",
         "| Tier (구분) | Direct Contrast (직접 비교) | Question (검증 질문) | "
         "Primary Metric (주 지표) | Session04 Result | Decision (판정) |",
@@ -733,8 +771,9 @@ def _matched_contrast_table(rows: list[dict]) -> str:
             f"{decision} |")
     lines.extend([
         "",
-        "> 현재 메인 결론은 A2다. A4는 measured FK covariance가 들어오기 전까지 "
-        "방법 확장 후보이고, A5는 post-hoc 원인 진단이다.",
+        "> A5는 External GT 공개 전에 방법·파라미터·alignment artifact가 "
+        "frozen이면 최종 후보로 비교할 수 있다. GT를 본 뒤 A5를 정의하면 "
+        "사후 진단으로만 남긴다.",
     ])
     return "\n".join(lines)
 
@@ -749,16 +788,27 @@ def _first_support(rows: list[dict], target: str) -> int | None:
 
 def _metric_decision_records(rows: list[dict],
                              data_warnings: dict) -> list[tuple[str, str, str, str, str]]:
-    # A0/B3 are board-only and A2 is cube-only, so no single row carries both
-    # counts.  The split is frozen, so the first row that evaluated a target
-    # reports the same support every other row of that target sees.
-    board_corners = _first_support(rows, "board")
     cube_corners = _first_support(rows, "cube")
     support = data_warnings.get("support", {})
-    overall = support.get("overall", {})
+    cube = support.get("cube", {})
     cameras = ", ".join(str(value) for value in data_warnings.get(
         "evaluation_fixed_camera_intersection", [])) or "N/A"
     return [
+        (
+            "External cube TRE / rotation / P95 / failure",
+            "Final primary metric",
+            "독립 External GT cube pose와 blind prediction을 비교해 최종 순위를 정함",
+            "GT 측정계 uncertainty floor보다 작은 차이는 주장하지 않는다.",
+            "pending; External GT 추가 후 산출",
+        ),
+        (
+            "ALL Cube RMSE px",
+            "Fit sanity check",
+            "train+heldout 전체 cube evaluation data에 frozen calibration을 적용",
+            "train과 heldout을 섞으므로 일반화 지표가 아니다.",
+            f"cube {cube.get('n_observations', 'N/A')} obs / "
+            f"{cube.get('n_corners', cube_corners or 'N/A')} corners",
+        ),
         (
             "Train reprojection RMSE",
             "Solver diagnostic",
@@ -767,61 +817,26 @@ def _metric_decision_records(rows: list[dict],
             "row별 train residual",
         ),
         (
-            "Own-marker held-out RMSE",
-            "Primary internal pixel metric",
-            "matched contrast의 board/cube별 주 지표",
+            "Heldout Cube RMSE px",
+            "Internal support metric",
+            "미사용 cube event corner에 frozen transform을 적용해 재투영",
             "같은 set의 다른 event라 새 위치 일반화나 물리 GT가 아니다.",
-            f"Board {board_corners} corners, Cube {cube_corners} corners",
+            f"heldout cube {cube_corners or 'N/A'} corners",
         ),
         (
-            "Pooled overall RMSE",
-            "Secondary summary",
-            "같은 marker population 내부에서만 참고",
-            "Board corner 지지도가 커서 전체값이 board에 치우친다.",
-            "전체 순위 금지",
-        ),
-        (
-            "Set-equal-weight RMSE",
-            "Exploratory support-bias check",
-            "corner-pooled 값 옆에 병기",
-            "n=9 sets라 CI/유의성 주장은 아직 약하다.",
-            "corner -> event -> set -> set 동일가중",
-        ),
-        (
-            "Fixed-to-Fixed Board/Cube",
-            "Supplementary FK-free subsystem metric",
-            "고정카메라 상대 일관성 진단",
+            "Cross-view pixel transfer RMSE",
+            "Supplementary camera consistency",
+            "한 카메라 PnP pose를 다른 카메라로 전달해 cube corner px 오차 계산",
             "모든 고정카메라에 함께 존재하는 systematic error와 절대 "
             "물리 오차를 검출하지 못한다.",
-            f"fixed cameras {cameras}; {overall.get('n_observations', 'N/A')} obs",
+            f"fixed cameras {cameras}; gripper camera pair 포함",
         ),
         (
-            "Gripper-to-Fixed Board/Cube",
-            "Supplementary FK-dependent closure metric",
-            "전체 chain 내부 진단",
-            "FK와 Hand-Eye가 섞이며 fixed anchor 일부는 train 관측이다.",
-            "mixed train-anchor/held-out internal closure",
-        ),
-        (
-            "Reference-dependent reprojection",
-            "Secondary diagnostic",
-            "공유 target pose 기준의 보조 확인",
-            "reference가 fitted target이므로 ranking 지표가 아니다.",
-            "cross-target v8 artifact",
-        ),
-        (
-            "Seed mean +/- std",
-            "Stability diagnostic",
-            "3개 초기화 perturbation 안정성 확인",
-            "독립 실험 표본이 아니라 통계적 반복으로 해석하지 않는다.",
-            "27/27 converged",
-        ),
-        (
-            "External TRE/rotation/P95/failure",
-            "Scheduled next-week external validation",
-            "다음주 예정 태스크",
-            "현재 보고서 생성 시점에는 미계산. 다음주 Independent External GT로 Translation Error, Rotation Error, P95, Failure Rate를 산출한다.",
-            "planned external validation boundary",
+            "Cam-common Obj-Cam consistency mm/deg",
+            "Supplementary camera consistency",
+            "두 카메라가 계산한 cube object pose 차이를 mm/deg로 집계",
+            "공통 계통오차는 검출하지 못하며 외부 GT 순위용이 아니다.",
+            "fixed-camera pair와 fixed-gripper pair를 cube-only로 함께 집계",
         ),
     ]
 
@@ -841,212 +856,52 @@ def _metric_decision_table(rows: list[dict], data_warnings: dict) -> str:
     return "\n".join(lines)
 
 
-def _rmse_from_mean_squares(values: list[float]) -> float | None:
-    if not values:
-        return None
-    return float(fmean(values) ** 0.5)
-
-
-def _percentile(sorted_values: list[float], quantile: float) -> float:
-    if not sorted_values:
-        return float("nan")
-    index = quantile * (len(sorted_values) - 1)
-    lo = int(index)
-    hi = min(lo + 1, len(sorted_values) - 1)
-    weight = index - lo
-    return float(sorted_values[lo] * (1.0 - weight) + sorted_values[hi] * weight)
-
-
-def _paired_set_bootstrap(
-        rows: list[dict]) -> list[tuple[str, str, str, str, str, str, str]]:
-    by_method = {row["method"]: row for row in rows}
-    out = []
-    for tier, first, second, label, _, targets, decision in _contrast_definitions():
-        if label == "A0 <-> B3":
-            direction_label = "B3 - A0"
-        else:
-            direction_label = f"{second} - {first}"
-        for target in targets:
-            first_ms = by_method[first].get(
-                f"heldout_{target}_set_mean_square_px2", {})
-            second_ms = by_method[second].get(
-                f"heldout_{target}_set_mean_square_px2", {})
-            set_ids = sorted(set(first_ms) & set(second_ms))
-            if not set_ids:
-                continue
-            pooled_delta = (
-                by_method[second][f"heldout_{target}_reprojection_rmse_px"]
-                - by_method[first][f"heldout_{target}_reprojection_rmse_px"])
-            observed = (
-                _rmse_from_mean_squares([second_ms[set_id] for set_id in set_ids])
-                - _rmse_from_mean_squares([first_ms[set_id] for set_id in set_ids]))
-            rng_seed = BOOTSTRAP_SEED + sum(
-                ord(char) for char in f"{label}:{target}")
-            rng = random.Random(rng_seed)
-            samples = []
-            for _ in range(BOOTSTRAP_REPETITIONS):
-                sample = [rng.choice(set_ids) for _ in set_ids]
-                samples.append(
-                    _rmse_from_mean_squares([second_ms[set_id] for set_id in sample])
-                    - _rmse_from_mean_squares([first_ms[set_id] for set_id in sample]))
-            samples.sort()
-            lo = _percentile(samples, 0.025)
-            hi = _percentile(samples, 0.975)
-            if hi < 0.0:
-                stability = "negative interval; internal improvement direction is stable"
-            elif lo > 0.0:
-                stability = "positive interval; internal degradation direction is stable"
-            else:
-                stability = "interval crosses 0; direction is exploratory"
-            out.append((
-                tier,
-                label,
-                target,
-                direction_label,
-                f"{_fmt(pooled_delta)} / {_fmt(observed)}",
-                f"[{_fmt(lo)}, {_fmt(hi)}]",
-                f"n={len(set_ids)}; {stability}; {decision}",
-            ))
-    return out
-
-
-def _bootstrap_contrast_table(rows: list[dict]) -> str:
-    lines = [
-        "## Exploratory Paired Set Bootstrap CI (탐색적 paired set bootstrap CI)",
-        "",
-        f"각 contrast는 같은 held-out set을 paired unit으로 묶고, set을 "
-        f"{BOOTSTRAP_REPETITIONS:,}회 replacement resampling했다. 값은 "
-        "`second - first` RMSE 차이이며 음수는 두 번째 방법의 내부 px가 더 낮다는 "
-        "뜻이다. `n=9 sets`라 유의성 검정이 아니라 방향성 민감도 점검이다.",
-        "",
-        "| Tier | Contrast | Target | Direction | Δ pooled / set-equal px | "
-        "Set-bootstrap 95% CI px | Interpretation |",
-        "| --- | --- | --- | --- | ---: | ---: | --- |",
-    ]
-    for tier, label, target, direction, delta, interval, interpretation in (
-            _paired_set_bootstrap(rows)):
-        lines.append(
-            f"| {tier} | {label} | {target} | {direction} | {delta} | "
-            f"{interval} | {interpretation} |")
-    lines.extend([
-        "",
-        "> 이 표에서 0을 지나지 않는 contrast도 external physical accuracy를 "
-        "증명하지 않는다. 내부 held-out set에서 방향이 덜 흔들린다는 뜻까지만 허용한다.",
-    ])
-    return "\n".join(lines)
-
-
 def _internal_only_claim_envelope() -> str:
     return "\n".join([
-        "## Internal-Only Claim Envelope (현재 가능한 최대 결론)",
+        "## Final Protocol Lock (최종 단일 기준)",
         "",
-        "| Claim Type | Allowed Now (지금 가능) | Not Allowed Now (지금 금지) |",
+        "| 항목 | 최종 기준 | 제외한 것 |",
         "| --- | --- | --- |",
-        "| Main result | A2 is the strongest confirmatory internal row under matched held-out pixel contrasts. | A2 is physically most accurate in robot base. |",
-        "| Method extension | A4 is a preflight extension candidate; A2->A4 is practically tied on internal held-out px. | Corrected-FK soft factor is superior before measured FK covariance. |",
-        "| FK diagnosis | A3 shows raw-FK hard fixing hurts cube reprojection; A5 separates raw/aligned and soft/hard causes. | Raw FK or vision-aligned FK is external GT. |",
-        "| Metric scope | Report board/cube held-out px, set-equal-weight px, paired set bootstrap CI, Fixed-to-Fixed, Gripper-to-Fixed. | Merge all metrics into one final physical ranking. |",
-        "| Data risk | Surface dropped sets, support imbalance, detection failures, and 10.8077 mm Board-Cube disagreement. | Say the joint solve removed the systematic disagreement. |",
+        "| 비교 행 | A0~A5, B1~B3만 사용 | A6, 별도 board-only FK 변형, marker-system 별도 순위 |",
+        "| Heldout target | 항상 cube만 평가 | Board heldout, board와 cube를 섞은 pooled overall ranking |",
+        "| 최종 주 지표 | External cube TRE / rotation / P95 / failure | 내부 px만으로 물리 순위 확정 |",
+        "| 보조 내부 지표 | ALL Cube, Train, Heldout Cube, Cross-view camera consistency | pair type별 값을 별도 순위 지표로 분리 |",
+        "| A5 해석 | External GT 공개 전에 frozen이면 최종 후보 | GT를 본 뒤 정의한 사후 선택 |",
         "",
-        "Independent External GT is scheduled as a next-week task. Until then, this report stops at the strongest internally defensible evidence.",
+        "현재 Session04 artifact는 이전 촬영 구성에서 생성된 값이므로, 최종 "
+        "board-on-gripper A0/B3 cube 평가가 없으면 해당 칸은 N/A로 둔다.",
     ])
 
 
 def _markdown(rows: list[dict], marker: dict, detailed: bool,
               data_warnings: dict | None = None,
               session_label: str = "Session") -> str:
+    _ = marker
     data_warnings = data_warnings or {}
     title = (
         f"# {session_label} Calibration Evaluation (캘리브레이션 평가)"
         if detailed else f"# {session_label} Table 1 Results (표 1 결과)")
+    cube_best = _minimum(rows, "heldout_cube_reprojection_rmse_px")
     lines = [
         title,
         "",
-        "> Status: Pre-GT Internal Evaluation (외부 GT 전 내부 평가). "
-        "이 문서는 External GT (외부 정답)를 사용한 절대 정확도 순위를 "
-        "제시하지 않는다.",
+        "> Status: Final protocol before External GT. 비교 행은 A0~A5, "
+        "B1~B3 한 벌만 사용하고, heldout 평가는 항상 cube만 본다.",
         "",
         _markdown_data_warnings(data_warnings),
         "",
-        "## Evaluation Decision (평가 구성 결정)",
-        "",
-        "- A — Fixed-to-Fixed/e_cross는 각 방법이 추정한 카메라 자세로 "
-        "계산하는 방법별 Supplementary Held-out Consistency (보조 홀드아웃 "
-        "일관성)다. Robot FK는 쓰지 않지만 독립 기준선이나 순위 지표는 아니다.",
-        "- B — OpenCV Relative-pose Baseline은 Main-method Transform, Robot "
-        "FK, Hand–Eye, Shared Target Pose를 쓰지 않는 Independent Reference "
-        "(독립 기준선)이며 별도 결과 파일로 보고한다.",
-        "- Gripper-to-Fixed (그리퍼카메라–고정카메라 간)는 실제 Board/Cube "
-        "Image Corners (보드/큐브 영상 코너)를 사용하지만, 예측 경로에는 "
-        "Robot FK와 Hand–Eye (핸드–아이 변환)가 포함된다.",
-        "- 각 set의 최초 고정카메라 관측은 최적화에서 한 번만 사용한다. "
-        "Gripper-to-Fixed 평가는 이 fixed anchor를 같은 set의 모든 held-out "
-        "gripper Event와 연결하고, Event→set→set 동일가중 순서로 집계한다.",
-        "- 공식 결과는 물리 config의 nominal metric scale `1.0`만 사용한다. "
-        "데이터에서 추정한 scale은 별도 diagnostic 결과로만 허용한다.",
-        "- Board (보드)와 Cube (큐브)는 모두 촬영 원본에서 평가한다. "
-        "캘리브레이션에 사용한 마커 종류와 평가 표적 종류를 동일시하지 않는다.",
-        "- Reference-dependent Reprojection (기준 의존 재투영)은 Secondary "
-        "Diagnostic (보조 진단)이며 방법 순위에 사용하지 않는다.",
-        "- 현재 결론의 대표 행은 A2다. A4는 measured FK covariance 전 "
-        "preflight이고, A5는 이전 A3의 성능 원인을 설명하는 post-hoc "
-        "diagnostic이다. Independent External GT는 다음주 예정 태스크이므로 "
-        "실제 물리 순위는 현재 산출하지 않는다.",
-        "",
         _internal_only_claim_envelope(),
+        "",
+        "## Final Comparison Table (최종 비교실험표)",
+        "",
+        "> 굵은 값은 현재 artifact에서 관측된 Heldout Cube RMSE 최솟값이다. "
+        "External GT가 들어오기 전에는 최종 물리 순위로 해석하지 않는다.",
+        "",
+        _optimization_result_table(rows, cube_best),
         "",
         _matched_contrast_table(rows),
         "",
         _metric_decision_table(rows, data_warnings),
-        "",
-        _bootstrap_contrast_table(rows),
-        "",
-        _implementation_audit(),
-        "",
-        "## Table 1 Optimization Results (표 1 최적화 결과)",
-        "",
-        "> **굵은 값**은 `Complete` 행 중 Board/Cube별 held-out RMSE "
-        "최솟값이다. Preflight와 post-hoc 행은 수치가 더 낮아도 "
-        "확증 결과로 강조하지 않는다. Train/Own "
-        "Overall은 marker population이 달라 전체 최솟값을 강조하지 않는다.",
-    ]
-    complete_rows = [row for row in rows if row["status"] == "complete"]
-    board_best = _minimum(complete_rows, "heldout_board_reprojection_rmse_px")
-    cube_best = _minimum(complete_rows, "heldout_cube_reprojection_rmse_px")
-    for title, note, section_rows in _result_sections(rows):
-        if not section_rows:
-            continue
-        lines.extend([
-            "",
-            f"### {title}",
-            "",
-            note,
-            "",
-            _optimization_result_table(
-                section_rows, board_best, cube_best,
-                highlight_complete_best=section_rows[0]["status"] == "complete"),
-        ])
-    board_corners = _first_support(rows, "board")
-    cube_corners = _first_support(rows, "cube")
-    board_share = (
-        "N/A" if not board_corners or not cube_corners
-        else f"{100.0 * board_corners / (board_corners + cube_corners):.1f}%")
-    lines.extend([
-        "",
-        "### Set-equal-weight Held-out RMSE (set 동일가중 홀드아웃)",
-        "",
-        f"Held-out corner 지지도는 Board `{board_corners}` / Cube "
-        f"`{cube_corners}`이므로 corner-pooled Overall은 Board가 약 "
-        f"`{board_share}`를 차지한다. 아래 표는 같은 관측을 corner-pooled와 "
-        "`corner → event → set → set 동일가중` 두 방식으로 집계한 값이다. "
-        "두 값의 차이는 정확도 변화가 아니라 set별 corner 지지도 불균형의 "
-        "크기이며, 방법 간 방향이 달라지는 행은 corner 지지도에 의존하는 "
-        "결론이므로 단독으로 해석하지 않는다.",
-        "",
-        _set_equal_weight_table(rows),
-        "",
-        "> Set 동일가중 값은 corner-pooled 값을 대체하지 않는 보조 지표이며, "
-        "`n=9 sets`이므로 이 차이만으로 유의성을 주장하지 않는다.",
         "",
         "> `Convergence 3/3`은 서로 다른 초기화 seed 3회 모두에서 "
         "SciPy solver가 `success=True`로 종료됐다는 뜻이다. Sequential "
@@ -1054,23 +909,13 @@ def _markdown(rows: list[dict], marker: dict, detailed: bool,
         "stage 2가 성공해야 1회 수렴으로 센다. 이는 solver 종료 조건 충족을 "
         "뜻할 뿐, 절대 정확도나 전역 최적해를 보장하지 않는다.",
         "",
+        _scope_table(rows),
+        "",
         _objective_block_table(rows),
-        "",
-        "## Camera-scope Diagnostics (카메라 범위 진단)",
-        "",
-        "> **굵은 값**은 각 target·단위 열의 최솟값이다. A의 "
-        "Fixed-to-Fixed는 보조 일관성 지표이므로 굵은 값이 절대 정확도 "
-        "순위를 뜻하지 않는다.",
-        "",
-        _scope_table(rows, "fixed_to_fixed"),
-        "",
-        _scope_table(rows, "gripper_to_fixed"),
-        "",
-        _marker_table(marker),
         "",
         "## Calculation (계산 방식)",
         "",
-        "For Target $O\\in\\{board,cube\\}$ (표적 $O$):",
+        "최종 평가는 Target $O=cube$만 사용한다.",
         "",
         "$$T^{B,(i)}_O=T^B_{C_i}T^{C_i}_{O,\\mathrm{PnP}}$$",
         "",
@@ -1079,28 +924,24 @@ def _markdown(rows: list[dict], marker: dict, detailed: bool,
         "$$T^{B,(g)}_O(e)=T^B_G(e)T^G_{C_g}"
         "T^{C_g}_{O,\\mathrm{PnP}}$$",
         "",
-        "Pixel Transfer RMSE (픽셀 전달 평균제곱근오차)는 한 카메라의 "
-        "측정 PnP 자세를 다른 카메라로 옮겨 실제 검출 코너와 비교한다. "
-        "Translation/Rotation Consistency (이동/회전 일관성)는 두 경로로 "
-        "얻은 $T^B_O$의 차이를 mm/deg로 계산한다. Gripper-to-Fixed의 "
-        "최종값은 pair 성분을 Event RMSE로, Event를 set RMSE로 집계한 뒤 "
-        "set별 동일 가중치로 계산한다.",
+        "Cross-view pixel transfer는 한 카메라의 측정 PnP pose를 다른 "
+        "카메라로 전달해 cube corner pixel error를 계산한다. 고정카메라 "
+        "pair와 고정카메라↔그리퍼카메라 pair를 같은 보조 지표로 함께 "
+        "집계하고, 별도 pair-type 순위 지표는 만들지 않는다.",
         "",
-        "Held-out reprojection의 기본값은 corner-pooled RMSE "
-        "$\\sqrt{\\frac{1}{2N}\\sum(du^2+dv^2)}$이다. 같은 관측을 "
-        "`corner → Event RMSE → set RMSE → set별 동일 가중치` 순서로 다시 "
-        "집계한 값을 Set-equal-weight로 병기한다. 두 값은 corner 지지도가 "
-        "set마다 같을 때만 일치하므로, 차이는 정확도가 아니라 지지도 "
-        "불균형의 크기를 뜻한다.",
+        "Heldout Cube RMSE는 미사용 cube event corner에 frozen transform을 "
+        "적용해 계산한다.",
+        "",
+        "$$RMSE_{px}=\\sqrt{\\frac{1}{2N}\\sum_k((u_k-\\hat u_k)^2+(v_k-\\hat v_k)^2)}$$",
+        "",
+        "ALL Cube RMSE는 train cube와 heldout cube를 같은 방식으로 계산한 뒤 "
+        "corner 수로 가중해 합친 fit sanity check다.",
         "",
         "## Interpretation Limit (해석 한계)",
         "",
-        "A의 Fixed-to-Fixed는 방법별 추정값에 의존하고 모든 고정카메라에 "
-        "함께 존재하는 Systematic Error (계통 오차)를 검출할 수 없으므로 "
-        "보조 일관성 진단으로만 해석한다. Gripper-to-Fixed는 Hand–Eye Error "
-        "(핸드–아이 오차)와 FK Error (순기구학 오차)를 분리할 수 없다. "
-        "따라서 두 범위는 함께 보고하되 External Absolute Accuracy "
-        "(외부 절대 정확도)로 부르지 않는다.",
+        "Cross-view pixel transfer와 Cam-common Obj-Cam consistency는 "
+        "방법별 추정값에 의존하므로 공통 systematic error를 검출하지 못한다. "
+        "따라서 최종 주장은 External cube GT로만 결정한다.",
         "",
         "## Terminology (용어 설명)",
         "",
@@ -1114,50 +955,19 @@ def _markdown(rows: list[dict], marker: dict, detailed: bool,
         "2D 영상점으로 카메라–표적 자세를 계산한다.",
         "- **RMSE, Root Mean Squared Error (평균제곱근오차)**: 잔차 "
         "제곱 평균의 제곱근. px, mm, deg는 서로 합치지 않는다.",
-        "- **Reference-dependent Reprojection (기준 의존 재투영)**: "
-        "학습 표적 자세에 의존하는 보조 진단으로 External GT가 아니다.",
-    ])
+        "- **External cube GT**: GT 공개 전 저장한 blind prediction과 "
+        "독립 cube GT pose를 비교하는 최종 주 지표.",
+    ]
     if detailed:
         lines.extend([
             "",
-            "## Scheduled External GT Task (다음주 예정 태스크)",
+            "## External GT Task (다음주 예정 태스크)",
             "",
-            "Independent External GT (독립 외부 정답)는 다음주 예정 태스크로 "
-            "진행한다. 따라서 현재 문서는 내부 지표로 가능한 최대 보고서이며, "
-            "다음주 외부 GT 수집/평가 후 Translation Error, Rotation Error, "
-            "P95, Failure Rate 같은 최종 물리 정확도 지표를 별도 산출한다.",
+            "Independent External GT가 들어오면 모든 row의 cube pose prediction을 "
+            "같은 GT cube pose list와 비교한다. 최종 결과는 Translation Error, "
+            "Rotation Error, P95, Failure Rate로 산출한다.",
         ])
     return "\n".join(lines) + "\n"
-
-
-def _html_scope_table(rows: list[dict], scope: str) -> str:
-    title = (
-        "A — Fixed-to-Fixed Supplementary Consistency"
-        if scope == "fixed_to_fixed"
-        else "Gripper-to-Fixed (그리퍼카메라–고정카메라 간)")
-    body = []
-    best = {
-        (target, field): _minimum(rows, f"{scope}_{target}_{field}")
-        for target in TARGETS for field in SCOPE_FIELDS
-    }
-    for row in rows:
-        cells = [escape(row["method"])]
-        for target in TARGETS:
-            for field in SCOPE_FIELDS:
-                key = f"{scope}_{target}_{field}"
-                cells.append(_fmt_best(
-                    row[key], best[(target, field)], html=True))
-        body.append("<tr>" + "".join(
-            f"<td>{value}</td>" for value in cells) + "</tr>")
-    return f"""
-    <section class="panel scope" data-scope="{scope}">
-      <h2>{title}</h2>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Method (방법)</th><th>Board px</th><th>Board mm</th>
-        <th>Board deg</th><th>Cube px</th><th>Cube mm</th><th>Cube deg</th></tr></thead>
-        <tbody>{''.join(body)}</tbody>
-      </table></div>
-    </section>"""
 
 
 def _html_data_warnings(data_warnings: dict) -> str:
@@ -1205,77 +1015,6 @@ def _html_data_warnings(data_warnings: dict) -> str:
     )
 
 
-def _html_method_section(
-        title: str, note: str, section_rows: list[dict],
-        board_best, cube_best) -> str:
-    status = section_rows[0]["status"] if section_rows else ""
-    highlight = status == "complete"
-    body = []
-    for row in section_rows:
-        board = row["heldout_board_reprojection_rmse_px"]
-        cube = row["heldout_cube_reprojection_rmse_px"]
-        board_text = (_fmt_best(board, board_best, html=True)
-                      if highlight else _fmt(board))
-        cube_text = (_fmt_best(cube, cube_best, html=True)
-                     if highlight else _fmt(cube))
-        body.append(
-            "<tr>"
-            f"<td>{escape(row['method'])}</td><td>{escape(row['label'])}</td>"
-            f"<td>{escape(row['target_set'])}</td>"
-            f"<td>{escape(row['optimization'])}</td>"
-            f"<td>{escape(row['cube_pose_handling'])}</td>"
-            f"<td>{_fmt(row['heldout_overall_reprojection_rmse_px'])}</td>"
-            f"<td>{board_text}</td>"
-            f"<td>{cube_text}</td>"
-            f"<td>{row['converged_runs']}/{row['total_runs']}</td>"
-            f"<td>{escape(_status_label(row['status']))}</td></tr>")
-    return f"""
-    <section class="method-section">
-      <h3>{escape(title)}</h3>
-      <p>{escape(note)}</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Method (방법)</th><th>Label (설명)</th>
-        <th>Marker Set</th><th>Optimization</th><th>Cube Pose</th>
-        <th>Own Held-out Overall px</th><th>Board px</th><th>Cube px</th>
-        <th>Convergence (수렴)</th><th>Status (상태)</th></tr></thead>
-        <tbody>{''.join(body)}</tbody>
-      </table></div>
-    </section>"""
-
-
-def _html_set_equal_weight(rows: list[dict]) -> str:
-    board_corners = _first_support(rows, "board")
-    cube_corners = _first_support(rows, "cube")
-    share = (
-        "N/A" if not board_corners or not cube_corners
-        else f"{100.0 * board_corners / (board_corners + cube_corners):.1f}%")
-    body = []
-    for row in rows:
-        cells = []
-        for target in ("board", "cube", "overall"):
-            pooled = row[f"heldout_{target}_reprojection_rmse_px"]
-            equal = row[f"heldout_{target}_set_equal_weight_rmse_px"]
-            cells.append(f"<td>{_fmt(pooled)} / {_fmt(equal)}</td>")
-        body.append(
-            "<tr>"
-            f"<td>{escape(row['method'])}</td>"
-            f"<td>{escape(row['label'])}</td>"
-            + "".join(cells)
-            + f"<td>{escape(_status_label(row['status']))}</td></tr>")
-    return f"""
-<section class="panel"><h2>Set-equal-weight Held-out RMSE (set 동일가중 홀드아웃)</h2>
-<p>Held-out corner 지지도는 Board <code>{board_corners}</code> / Cube
-<code>{cube_corners}</code>이므로 corner-pooled Overall은 Board가 약
-<code>{share}</code>를 차지합니다. 각 칸은 <code>corner-pooled / set 동일가중</code>이며,
-두 값의 차이는 정확도 변화가 아니라 set별 corner 지지도 불균형의 크기입니다.
-<code>n=9 sets</code>이므로 이 차이만으로 유의성을 주장하지 않습니다.</p>
-<div class="table-wrap"><table>
-<thead><tr><th>Method (방법)</th><th>Label (설명)</th>
-<th>Board pooled / set-equal px</th><th>Cube pooled / set-equal px</th>
-<th>Overall pooled / set-equal px</th><th>Status (상태)</th></tr></thead>
-<tbody>{''.join(body)}</tbody></table></div></section>"""
-
-
 def _html_matched_contrast(rows: list[dict]) -> str:
     body = []
     for tier, contrast, question, metric, result, decision in _matched_contrast_records(rows):
@@ -1316,113 +1055,55 @@ def _html_metric_decision(rows: list[dict], data_warnings: dict) -> str:
 <tbody>{''.join(body)}</tbody></table></div></section>"""
 
 
-def _html_bootstrap_contrast(rows: list[dict]) -> str:
-    body = []
-    for tier, label, target, direction, delta, interval, interpretation in (
-            _paired_set_bootstrap(rows)):
-        body.append(
-            "<tr>"
-            f"<td>{escape(tier)}</td>"
-            f"<td>{escape(label)}</td>"
-            f"<td>{escape(target)}</td>"
-            f"<td>{escape(direction)}</td>"
-            f"<td>{escape(delta)}</td>"
-            f"<td>{escape(interval)}</td>"
-            f"<td>{escape(interpretation)}</td></tr>")
-    return f"""
-<section class="panel"><h2>Exploratory Paired Set Bootstrap CI (탐색적 paired set bootstrap CI)</h2>
-<p>각 contrast는 같은 held-out set을 paired unit으로 묶고, set을 {BOOTSTRAP_REPETITIONS:,}회 replacement resampling했습니다.
-값은 <code>second - first</code> RMSE 차이이며 음수는 두 번째 방법의 내부 px가 더 낮다는 뜻입니다.
-<code>n=9 sets</code>라 유의성 검정이 아니라 방향성 민감도 점검입니다.</p>
-<div class="table-wrap"><table>
-<thead><tr><th>Tier</th><th>Contrast</th><th>Target</th><th>Direction</th>
-<th>Δ pooled / set-equal px</th><th>Set-bootstrap 95% CI px</th>
-<th>Interpretation</th></tr></thead>
-<tbody>{''.join(body)}</tbody></table></div></section>"""
-
-
-def _html_internal_only_claim_envelope() -> str:
-    rows = [
-        (
-            "Main result",
-            "A2 is the strongest confirmatory internal row under matched held-out pixel contrasts.",
-            "A2 is physically most accurate in robot base.",
-        ),
-        (
-            "Method extension",
-            "A4 is a preflight extension candidate; A2->A4 is practically tied on internal held-out px.",
-            "Corrected-FK soft factor is superior before measured FK covariance.",
-        ),
-        (
-            "FK diagnosis",
-            "A3 shows raw-FK hard fixing hurts cube reprojection; A5 separates raw/aligned and soft/hard causes.",
-            "Raw FK or vision-aligned FK is external GT.",
-        ),
-        (
-            "Metric scope",
-            "Report board/cube held-out px, set-equal-weight px, paired set bootstrap CI, Fixed-to-Fixed, Gripper-to-Fixed.",
-            "Merge all metrics into one final physical ranking.",
-        ),
-        (
-            "Data risk",
-            "Surface dropped sets, support imbalance, detection failures, and 10.8077 mm Board-Cube disagreement.",
-            "Say the joint solve removed the systematic disagreement.",
-        ),
-    ]
-    body = "".join(
-        "<tr>"
-        f"<td>{escape(kind)}</td><td>{escape(allowed)}</td><td>{escape(blocked)}</td>"
-        "</tr>"
-        for kind, allowed, blocked in rows)
-    return f"""
-<section class="panel note"><h2>Internal-Only Claim Envelope (현재 가능한 최대 결론)</h2>
-<div class="table-wrap"><table>
-<thead><tr><th>Claim Type</th><th>Allowed Now (지금 가능)</th>
-<th>Not Allowed Now (지금 금지)</th></tr></thead>
-<tbody>{body}</tbody></table></div>
-<p>Independent External GT is scheduled as a next-week task. Until then, this report stops at the strongest internally defensible evidence.</p>
-</section>"""
-
-
 def _html(rows: list[dict], marker: dict,
           data_warnings: dict | None = None,
           session_label: str = "Session") -> str:
+    _ = marker
     data_warnings = data_warnings or {}
-    complete_rows = [row for row in rows if row["status"] == "complete"]
-    board_best = _minimum(complete_rows, "heldout_board_reprojection_rmse_px")
-    cube_best = _minimum(complete_rows, "heldout_cube_reprojection_rmse_px")
-    method_sections = [
-        _html_method_section(title, note, section_rows, board_best, cube_best)
-        for title, note, section_rows in _result_sections(rows)
-        if section_rows
-    ]
-    marker_rows = []
-    by_system = {row["system"]: row for row in marker["summary"]}
-    marker_values = list(by_system.values())
-    marker_best = {
-        key: _minimum(marker_values, key)
-        for key in (
-            "fixed_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean",
-            "fixed_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean",
-            "gripper_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean",
-            "gripper_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean",
+    cube_best = _minimum(rows, "heldout_cube_reprojection_rmse_px")
+
+    method_rows = []
+    for row in rows:
+        cam_common_mm_deg = (
+            f"{_fmt(row['cam_common_cube_translation_rmse_mm'])} / "
+            f"{_fmt(row['cam_common_cube_rotation_rmse_deg'])}"
         )
-    }
-    for system in SYSTEM_ORDER:
-        row = by_system[system]
-        fixed_board = "fixed_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean"
-        fixed_cube = "fixed_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean"
-        gripper_board = "gripper_to_fixed_board_cross_view_pixel_transfer_rmse_px_mean"
-        gripper_cube = "gripper_to_fixed_cube_cross_view_pixel_transfer_rmse_px_mean"
-        marker_rows.append(
+        method_rows.append(
             "<tr>"
+            f"<td>{escape(row['method'])}</td>"
             f"<td>{escape(row['label'])}</td>"
-            f"<td>{_fmt(row['own_heldout_overall_rmse_px_mean'])}</td>"
-            f"<td>{_fmt_best(row[fixed_board], marker_best[fixed_board], html=True)} / "
-            f"{_fmt_best(row[fixed_cube], marker_best[fixed_cube], html=True)}</td>"
-            f"<td>{_fmt_best(row[gripper_board], marker_best[gripper_board], html=True)} / "
-            f"{_fmt_best(row[gripper_cube], marker_best[gripper_cube], html=True)}</td>"
-            f"<td>{row['converged_runs']}/{row['total_runs']}</td></tr>")
+            f"<td>{escape(_final_train_target(row))}</td>"
+            f"<td>{escape(row['optimization'])}</td>"
+            f"<td>{escape(_final_pose_handling(row))}</td>"
+            f"<td>{_fmt(row['train_overall_reprojection_rmse_px'])}</td>"
+            f"<td>{_fmt(row['all_cube_reprojection_rmse_px'])}</td>"
+            f"<td>{_fmt_best(row['heldout_cube_reprojection_rmse_px'], cube_best, html=True)}</td>"
+            f"<td>{_fmt(row['cross_view_cube_pixel_transfer_rmse_px'])}</td>"
+            f"<td>{escape(cam_common_mm_deg)}</td>"
+            "<td>Pending</td>"
+            f"<td>{row['converged_runs']}/{row['total_runs']}</td>"
+            f"<td>{escape(_status_label(row['status']))}</td></tr>")
+
+    consistency_rows = []
+    consistency_fields = (
+        "cross_view_cube_pixel_transfer_rmse_px",
+        "cam_common_cube_translation_rmse_mm",
+        "cam_common_cube_rotation_rmse_deg",
+    )
+    best = {
+        key: _minimum(rows, key)
+        for key in consistency_fields
+    }
+    for row in rows:
+        values = []
+        for key in consistency_fields:
+            values.append(_fmt_best(row[key], best[key], html=True))
+        consistency_rows.append(
+            "<tr>"
+            f"<td>{escape(row['method'])}</td>"
+            + "".join(f"<td>{value}</td>" for value in values)
+            + f"<td>{escape(row['cross_view_cube_support'])}</td>"
+            + "</tr>")
     return f"""<!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{escape(session_label)} Calibration Evaluation (캘리브레이션 평가)</title>
@@ -1431,37 +1112,36 @@ def _html(rows: list[dict], marker: dict,
 *{{box-sizing:border-box}} body{{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 system-ui,-apple-system,sans-serif}}
 main{{max-width:1180px;margin:auto;padding:32px 20px 72px}} h1{{font-size:30px;margin:0 0 8px}} h2{{font-size:20px;margin:0 0 16px}} h3{{font-size:16px;margin:20px 0 6px}}
 .subtitle{{color:var(--muted);margin-bottom:22px}} .badge{{display:inline-block;background:#fff3cd;color:#755600;border:1px solid #efd582;border-radius:999px;padding:5px 11px;font-weight:700}}
-.grid{{display:grid;grid-template-columns:1fr 1fr;gap:18px}} .panel{{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin-top:18px;box-shadow:0 4px 14px #25364d0d}}
-.controls{{display:flex;gap:8px;margin-top:18px}} button{{border:1px solid var(--line);background:white;border-radius:9px;padding:9px 13px;cursor:pointer;font-weight:650}} button.active{{background:var(--blue);color:white;border-color:var(--blue)}}
+.panel{{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px;margin-top:18px;box-shadow:0 4px 14px #25364d0d}}
 .table-wrap{{overflow:auto}} table{{border-collapse:collapse;width:100%;min-width:680px}} th,td{{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}} th:first-child,td:first-child{{text-align:left}} th{{color:var(--muted);font-size:12px}}
 .method-section p{{color:var(--muted);margin:0 0 8px}} .warning{{border-left:4px solid #c05621}} .warning li{{margin:6px 0}} .note{{border-left:4px solid var(--teal);padding-left:14px}} code{{background:#edf2f7;padding:2px 5px;border-radius:5px}}
 @media(max-width:760px){{.grid{{grid-template-columns:1fr}} main{{padding:22px 12px 50px}}}}
 </style></head><body><main>
-<span class="badge">Pre-GT Internal Evaluation (외부 GT 전 내부 평가)</span>
+<span class="badge">Final protocol before External GT</span>
 <h1>{escape(session_label)} Calibration Evaluation (캘리브레이션 평가)</h1>
-<p class="subtitle">A2는 현재 검증된 대표 행, A4는 measured-covariance 전 preflight, A5는 post-hoc diagnostic입니다. Independent External GT는 다음주 예정 태스크이므로 실제 물리 순위는 현재 산출하지 않습니다.</p>
+<p class="subtitle">비교 행은 A0~A5, B1~B3 한 벌만 사용합니다. Heldout 평가는 항상 cube만 보며, 최종 순위는 External cube GT로 정합니다.</p>
 {_html_data_warnings(data_warnings or {})}
-{_html_internal_only_claim_envelope()}
-<section class="panel"><h2>Table 1 Optimization Results (표 1 최적화 결과)</h2>{''.join(method_sections)}</section>
+<section class="panel note"><h2>Final Protocol Lock (최종 단일 기준)</h2>
+<p>A0/B3의 board-only 방법은 cube 포즈 다양성만큼 board를 gripper에 붙여 촬영하는 최종 capture를 전제로 합니다. 현재 Session04 artifact에 해당 cube 평가가 없으면 N/A로 유지합니다.</p></section>
+<section class="panel"><h2>Final Comparison Table (최종 비교실험표)</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Method</th><th>Label</th><th>Calibration train target</th><th>Optimization</th><th>FK / target-pose 처리</th><th>Train RMSE px</th><th>ALL Cube RMSE px</th><th>Heldout Cube RMSE px</th><th>Cross-view Cube px</th><th>Cam-common Cube mm/deg</th><th>External cube GT</th><th>Convergence</th><th>Data status</th></tr></thead>
+<tbody>{''.join(method_rows)}</tbody></table></div></section>
 {_html_matched_contrast(rows)}
 {_html_metric_decision(rows, data_warnings)}
-{_html_bootstrap_contrast(rows)}
-{_html_set_equal_weight(rows)}
-<div class="controls"><button class="active" data-show="all">Both Scopes (두 범위)</button><button data-show="fixed_to_fixed">Fixed-to-Fixed</button><button data-show="gripper_to_fixed">Gripper-to-Fixed</button></div>
-<div class="grid">{_html_scope_table(rows, 'fixed_to_fixed')}{_html_scope_table(rows, 'gripper_to_fixed')}</div>
-<section class="panel"><h2>Marker-system End-to-End (마커 시스템 전체 경로)</h2><div class="table-wrap"><table>
-<thead><tr><th>System (시스템)</th><th>Own Held-out px</th><th>Fixed-to-Fixed Board/Cube px</th><th>Gripper-to-Fixed Board/Cube px</th><th>Convergence (수렴)</th></tr></thead>
-<tbody>{''.join(marker_rows)}</tbody></table></div></section>
-<section class="panel note"><h2>Interpretation (해석)</h2><p>Fixed-to-Fixed는 Robot FK 없이 고정카메라 부분을 평가합니다. Gripper-to-Fixed는 set 최초 fixed anchor를 같은 set의 모든 held-out gripper Event와 연결하고 Event→set→set 동일가중 순서로 집계합니다. 실제 영상 코너를 사용하지만 <code>T^B_G(e)T^G_C</code> 경로 때문에 Robot FK와 Hand–Eye에 의존합니다. 공식 표는 nominal metric scale 1.0만 사용하며, 두 지표 모두 External Absolute Accuracy (외부 절대 정확도)가 아닙니다.</p></section>
-<section class="panel note"><h2>Scheduled External GT Task (다음주 예정 태스크)</h2><p>Independent External GT (독립 외부 정답)는 다음주 예정 태스크로 진행합니다. 따라서 현재 문서는 내부 지표로 가능한 최대 보고서이며, 다음주 외부 GT 수집/평가 후 Translation Error, Rotation Error, P95, Failure Rate 같은 최종 물리 정확도 지표를 별도 산출합니다.</p></section>
+<section class="panel"><h2>Cross-view Camera Consistency (cube-only)</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>Method</th><th>Cross-view Cube px</th><th>Cam-common Cube mm</th><th>Cam-common Cube deg</th><th>Support</th></tr></thead>
+<tbody>{''.join(consistency_rows)}</tbody></table></div></section>
+<section class="panel note"><h2>Interpretation (해석)</h2><p>Cross-view pixel transfer와 Cam-common Obj-Cam consistency는 카메라 간 cube 일관성 보조 지표입니다. 공통 systematic error는 잡지 못하므로 최종 주장은 External cube GT로만 결정합니다.</p></section>
+<section class="panel note"><h2>External GT Task (다음주 예정 태스크)</h2><p>Independent External GT가 들어오면 모든 row의 cube pose prediction을 같은 GT cube pose list와 비교해 Translation Error, Rotation Error, P95, Failure Rate를 산출합니다.</p></section>
 <section class="panel"><h2>Terminology (용어 설명)</h2><ul>
 <li><b>PnP, Perspective-n-Point (3D–2D 자세 추정)</b>: 영상 코너로 카메라–표적 자세를 계산합니다.</li>
 <li><b>FK, Forward Kinematics (순기구학)</b>: 이벤트별 Base-to-Gripper Transform (베이스–그리퍼 변환)을 계산합니다.</li>
 <li><b>Hand–Eye Transform (핸드–아이 변환)</b>: Gripper-to-Camera Transform (그리퍼–카메라 변환)입니다.</li>
 <li><b>RMSE, Root Mean Squared Error (평균제곱근오차)</b>: px, mm, deg 단위를 분리해 해석합니다.</li>
-<li><b>Reference-dependent Reprojection (기준 의존 재투영)</b>: 학습 표적 자세를 쓰는 보조 진단이며 순위 지표가 아닙니다.</li>
+<li><b>External cube GT</b>: GT 공개 전 저장한 blind prediction과 독립 cube GT pose를 비교하는 최종 주 지표입니다.</li>
 </ul></section>
-<script>document.querySelectorAll('button[data-show]').forEach(b=>b.onclick=()=>{{document.querySelectorAll('button').forEach(x=>x.classList.remove('active'));b.classList.add('active');const s=b.dataset.show;document.querySelectorAll('.scope').forEach(p=>p.style.display=s==='all'||p.dataset.scope===s?'block':'none')}});</script>
 </main></body></html>"""
 
 
