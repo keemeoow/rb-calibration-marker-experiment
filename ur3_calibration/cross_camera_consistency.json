@@ -1,0 +1,707 @@
+{
+  "warning": "Cross-camera cube-pose consistency for the fixed_fk calibration fit ONCE over ALL 12 session2 placements + session1 (no held-out placement) -- see full_fixed_fk_fit.json. This is a same-event, same-fit self-consistency diagnostic (path_evaluation.py's E_CROSS_CONTRACT methodology, reused directly via solve_observed_pose/fixed_camera_cube_pose_in_base/fixed_camera_target_pair_disagreement), NOT a held-out generalization test -- that is leave_one_out_eval.py's job. Every per-camera pose here is an independent measurement-only PnP solve through that camera's own detected corners composed with its fitted extrinsic; it never reads the joint fit's per-set cube variable (hard-fixed to FK by construction, so identical across cameras and uninformative for this check).",
+  "e_cross_contract_reused": {
+    "name": "fixed_camera_cube_pose_consistency",
+    "translation_metric": "pairwise_cube_center_distance_RMSE_mm",
+    "rotation_metric": "pairwise_SO3_geodesic_RMSE_deg",
+    "per_camera_pose": "T_base_cube_from_camera = T_base_camera @ T_camera_cube_PnP",
+    "pair_population": "predeclared_heldout_fixed_camera_pairs",
+    "uses_robot_fk": false,
+    "uses_gripper_camera": false,
+    "uses_nominal_or_ground_truth_cube_pose": false,
+    "absolute_accuracy_metric": false,
+    "reporting_tier": "supplementary",
+    "may_rank_methods_before_external_gt": false,
+    "role": "method_specific_heldout_consistency"
+  },
+  "fit_source": "/home/sstone/rb-calibration-marker-experiment/ur3_calibration/full_fixed_fk_fit.json",
+  "gripper_cam_idx": 1,
+  "camera_labels": {
+    "0": "cam0 [fixed (eye-to-hand), serial 039422061216]",
+    "1": "cam1 [gripper (eye-in-hand), serial 136622073980]",
+    "2": "cam2 [fixed (eye-to-hand), serial 243622070663]",
+    "3": "cam3 [fixed (eye-to-hand), serial 314522062542]"
+  },
+  "per_camera_pose_chain": {
+    "fixed_camera": "T_base_cube_via_cam = T_base_camera[fitted] @ T_camera_cube_pnp",
+    "gripper_camera": "T_base_cube_via_cam = robot_T[event] @ T_gripper_cam[fitted] @ T_camera_cube_pnp"
+  },
+  "n_events_with_cube_observations": 27,
+  "n_events_with_2plus_camera_solves": 26,
+  "n_pnp_failures": 0,
+  "pnp_failures": [],
+  "pairwise": {
+    "0-1": {
+      "camera_a": "cam0 [fixed (eye-to-hand), serial 039422061216]",
+      "camera_b": "cam1 [gripper (eye-in-hand), serial 136622073980]",
+      "n_simultaneous_observations": 12,
+      "n_session1": 0,
+      "n_session2": 12,
+      "translation_mm": {
+        "mean": 4.184110452003783,
+        "median": 3.3192196102093803,
+        "max": 12.450449981568385,
+        "min": 1.3822558353390937,
+        "rmse": 5.208798438281481
+      },
+      "rotation_deg": {
+        "mean": 1.4557322552116316,
+        "median": 1.0736278463254156,
+        "max": 3.2657862012435874,
+        "min": 0.2417787890193727,
+        "rmse": 1.7819010448611943
+      },
+      "per_event": [
+        {
+          "event": 15,
+          "session": "session2_set1",
+          "translation_mm": 6.130063283909103,
+          "rotation_deg": 0.8368097806010731
+        },
+        {
+          "event": 16,
+          "session": "session2_set2",
+          "translation_mm": 6.940790963682571,
+          "rotation_deg": 0.2417787890193727
+        },
+        {
+          "event": 17,
+          "session": "session2_set3",
+          "translation_mm": 4.021695831838439,
+          "rotation_deg": 0.5114767434992252
+        },
+        {
+          "event": 18,
+          "session": "session2_set4",
+          "translation_mm": 1.3822558353390937,
+          "rotation_deg": 0.8907852173526193
+        },
+        {
+          "event": 19,
+          "session": "session2_set5",
+          "translation_mm": 2.6167433885803213,
+          "rotation_deg": 0.5991752852916248
+        },
+        {
+          "event": 20,
+          "session": "session2_set6",
+          "translation_mm": 4.098853320428523,
+          "rotation_deg": 1.256470475298212
+        },
+        {
+          "event": 21,
+          "session": "session2_set7",
+          "translation_mm": 1.4708008666029024,
+          "rotation_deg": 1.3106935174330718
+        },
+        {
+          "event": 22,
+          "session": "session2_set8",
+          "translation_mm": 12.450449981568385,
+          "rotation_deg": 3.2657862012435874
+        },
+        {
+          "event": 23,
+          "session": "session2_set9",
+          "translation_mm": 5.475144242803705,
+          "rotation_deg": 2.4475311816354792
+        },
+        {
+          "event": 24,
+          "session": "session2_set10",
+          "translation_mm": 2.3912046787325663,
+          "rotation_deg": 2.941903501524087
+        },
+        {
+          "event": 25,
+          "session": "session2_set11",
+          "translation_mm": 1.5896093801996183,
+          "rotation_deg": 0.5086974196993345
+        },
+        {
+          "event": 26,
+          "session": "session2_set12",
+          "translation_mm": 1.6417136503601661,
+          "rotation_deg": 2.657678949941894
+        }
+      ]
+    },
+    "0-2": {
+      "camera_a": "cam0 [fixed (eye-to-hand), serial 039422061216]",
+      "camera_b": "cam2 [fixed (eye-to-hand), serial 243622070663]",
+      "n_simultaneous_observations": 22,
+      "n_session1": 10,
+      "n_session2": 12,
+      "translation_mm": {
+        "mean": 5.40940785257683,
+        "median": 5.790628172559618,
+        "max": 10.408962786012609,
+        "min": 1.0686216267477149,
+        "rmse": 6.022016955155642
+      },
+      "rotation_deg": {
+        "mean": 0.8928190166423945,
+        "median": 0.8295107690221171,
+        "max": 1.892975114231333,
+        "min": 0.39059253955201007,
+        "rmse": 0.9717718223656464
+      },
+      "per_event": [
+        {
+          "event": 0,
+          "session": "session1_gripped",
+          "translation_mm": 6.807828086752456,
+          "rotation_deg": 0.6382255495763266
+        },
+        {
+          "event": 1,
+          "session": "session1_gripped",
+          "translation_mm": 9.616811403889907,
+          "rotation_deg": 0.69623437935481
+        },
+        {
+          "event": 2,
+          "session": "session1_gripped",
+          "translation_mm": 10.104798922258261,
+          "rotation_deg": 0.9835233491053909
+        },
+        {
+          "event": 3,
+          "session": "session1_gripped",
+          "translation_mm": 6.003901531289201,
+          "rotation_deg": 0.8297626478474296
+        },
+        {
+          "event": 4,
+          "session": "session1_gripped",
+          "translation_mm": 7.698940818059663,
+          "rotation_deg": 0.8292588901968047
+        },
+        {
+          "event": 5,
+          "session": "session1_gripped",
+          "translation_mm": 5.285114598763,
+          "rotation_deg": 1.0854669803330086
+        },
+        {
+          "event": 7,
+          "session": "session1_gripped",
+          "translation_mm": 1.0686216267477149,
+          "rotation_deg": 0.8971079594808594
+        },
+        {
+          "event": 10,
+          "session": "session1_gripped",
+          "translation_mm": 2.234514562906652,
+          "rotation_deg": 1.001562899081864
+        },
+        {
+          "event": 12,
+          "session": "session1_gripped",
+          "translation_mm": 2.4754533738048994,
+          "rotation_deg": 1.892975114231333
+        },
+        {
+          "event": 14,
+          "session": "session1_gripped",
+          "translation_mm": 6.518671501352976,
+          "rotation_deg": 1.145003022263698
+        },
+        {
+          "event": 15,
+          "session": "session2_set1",
+          "translation_mm": 6.307981146129161,
+          "rotation_deg": 0.7179905374292682
+        },
+        {
+          "event": 16,
+          "session": "session2_set2",
+          "translation_mm": 7.291942323246765,
+          "rotation_deg": 0.5927190058732226
+        },
+        {
+          "event": 17,
+          "session": "session2_set3",
+          "translation_mm": 3.182098429648675,
+          "rotation_deg": 0.4001282767924605
+        },
+        {
+          "event": 18,
+          "session": "session2_set4",
+          "translation_mm": 1.649701314460528,
+          "rotation_deg": 0.45867749828528986
+        },
+        {
+          "event": 19,
+          "session": "session2_set5",
+          "translation_mm": 2.740774500145514,
+          "rotation_deg": 0.524343902676956
+        },
+        {
+          "event": 20,
+          "session": "session2_set6",
+          "translation_mm": 5.98142905445926,
+          "rotation_deg": 0.6693309686000514
+        },
+        {
+          "event": 21,
+          "session": "session2_set7",
+          "translation_mm": 3.995709040181352,
+          "rotation_deg": 0.88961808100082
+        },
+        {
+          "event": 22,
+          "session": "session2_set8",
+          "translation_mm": 10.408962786012609,
+          "rotation_deg": 1.1177726540651063
+        },
+        {
+          "event": 23,
+          "session": "session2_set9",
+          "translation_mm": 6.60332769158317,
+          "rotation_deg": 1.2442746324134355
+        },
+        {
+          "event": 24,
+          "session": "session2_set10",
+          "translation_mm": 5.599827290659976,
+          "rotation_deg": 1.808328327947468
+        },
+        {
+          "event": 25,
+          "session": "session2_set11",
+          "translation_mm": 2.511704035365277,
+          "rotation_deg": 0.8291211500250677
+        },
+        {
+          "event": 26,
+          "session": "session2_set12",
+          "translation_mm": 4.918858718973244,
+          "rotation_deg": 0.39059253955201007
+        }
+      ]
+    },
+    "0-3": {
+      "camera_a": "cam0 [fixed (eye-to-hand), serial 039422061216]",
+      "camera_b": "cam3 [fixed (eye-to-hand), serial 314522062542]",
+      "n_simultaneous_observations": 15,
+      "n_session1": 4,
+      "n_session2": 11,
+      "translation_mm": {
+        "mean": 4.65199005468854,
+        "median": 4.892360677066022,
+        "max": 8.290493120737978,
+        "min": 0.7848681814830943,
+        "rmse": 5.052104938200192
+      },
+      "rotation_deg": {
+        "mean": 0.5305014738811228,
+        "median": 0.44970809798798506,
+        "max": 1.1232155951568104,
+        "min": 0.24141113931268876,
+        "rmse": 0.5792786426323567
+      },
+      "per_event": [
+        {
+          "event": 2,
+          "session": "session1_gripped",
+          "translation_mm": 8.290493120737978,
+          "rotation_deg": 0.242145188633284
+        },
+        {
+          "event": 7,
+          "session": "session1_gripped",
+          "translation_mm": 0.7848681814830943,
+          "rotation_deg": 1.1232155951568104
+        },
+        {
+          "event": 10,
+          "session": "session1_gripped",
+          "translation_mm": 3.542483566634268,
+          "rotation_deg": 0.8854478828718493
+        },
+        {
+          "event": 13,
+          "session": "session1_gripped",
+          "translation_mm": 0.7883879563996363,
+          "rotation_deg": 0.24141113931268876
+        },
+        {
+          "event": 15,
+          "session": "session2_set1",
+          "translation_mm": 6.154375695094121,
+          "rotation_deg": 0.5889898660299485
+        },
+        {
+          "event": 16,
+          "session": "session2_set2",
+          "translation_mm": 6.346324357158769,
+          "rotation_deg": 0.4049801362398081
+        },
+        {
+          "event": 17,
+          "session": "session2_set3",
+          "translation_mm": 4.892360677066022,
+          "rotation_deg": 0.5700165692305484
+        },
+        {
+          "event": 18,
+          "session": "session2_set4",
+          "translation_mm": 5.559516405949423,
+          "rotation_deg": 0.436257631777241
+        },
+        {
+          "event": 19,
+          "session": "session2_set5",
+          "translation_mm": 6.901239472264504,
+          "rotation_deg": 0.3588121152927375
+        },
+        {
+          "event": 20,
+          "session": "session2_set6",
+          "translation_mm": 5.219105149075273,
+          "rotation_deg": 0.44970809798798506
+        },
+        {
+          "event": 21,
+          "session": "session2_set7",
+          "translation_mm": 5.3734828943110395,
+          "rotation_deg": 0.38156525342155173
+        },
+        {
+          "event": 23,
+          "session": "session2_set9",
+          "translation_mm": 3.8000513960953493,
+          "rotation_deg": 0.5964911603455137
+        },
+        {
+          "event": 24,
+          "session": "session2_set10",
+          "translation_mm": 3.773262309467858,
+          "rotation_deg": 0.7705293613478111
+        },
+        {
+          "event": 25,
+          "session": "session2_set11",
+          "translation_mm": 4.298675691092263,
+          "rotation_deg": 0.39708810455130583
+        },
+        {
+          "event": 26,
+          "session": "session2_set12",
+          "translation_mm": 4.055223947498499,
+          "rotation_deg": 0.5108640060177587
+        }
+      ]
+    },
+    "1-2": {
+      "camera_a": "cam1 [gripper (eye-in-hand), serial 136622073980]",
+      "camera_b": "cam2 [fixed (eye-to-hand), serial 243622070663]",
+      "n_simultaneous_observations": 12,
+      "n_session1": 0,
+      "n_session2": 12,
+      "translation_mm": {
+        "mean": 3.4845371003814685,
+        "median": 2.95805907602993,
+        "max": 10.443092840088491,
+        "min": 1.079307419540251,
+        "rmse": 4.214068230575525
+      },
+      "rotation_deg": {
+        "mean": 1.5205190414116245,
+        "median": 1.131973193317275,
+        "max": 3.2781031876387092,
+        "min": 0.6765180810836504,
+        "rmse": 1.748575236971866
+      },
+      "per_event": [
+        {
+          "event": 15,
+          "session": "session2_set1",
+          "translation_mm": 1.1728058891975124,
+          "rotation_deg": 1.2914690982516317
+        },
+        {
+          "event": 16,
+          "session": "session2_set2",
+          "translation_mm": 2.328930122001958,
+          "rotation_deg": 0.6765180810836504
+        },
+        {
+          "event": 17,
+          "session": "session2_set3",
+          "translation_mm": 3.0311672459536605,
+          "rotation_deg": 0.7722695468312682
+        },
+        {
+          "event": 18,
+          "session": "session2_set4",
+          "translation_mm": 1.079307419540251,
+          "rotation_deg": 0.9723485646366593
+        },
+        {
+          "event": 19,
+          "session": "session2_set5",
+          "translation_mm": 2.8849509061061993,
+          "rotation_deg": 0.679429973025444
+        },
+        {
+          "event": 20,
+          "session": "session2_set6",
+          "translation_mm": 3.288909564424671,
+          "rotation_deg": 0.972477288382918
+        },
+        {
+          "event": 21,
+          "session": "session2_set7",
+          "translation_mm": 2.6863986008606666,
+          "rotation_deg": 1.4755552189755776
+        },
+        {
+          "event": 22,
+          "session": "session2_set8",
+          "translation_mm": 10.443092840088491,
+          "rotation_deg": 3.2781031876387092
+        },
+        {
+          "event": 23,
+          "session": "session2_set9",
+          "translation_mm": 5.289278677183579,
+          "rotation_deg": 2.279967361963953
+        },
+        {
+          "event": 24,
+          "session": "session2_set10",
+          "translation_mm": 3.3425897666598243,
+          "rotation_deg": 2.54147902240693
+        },
+        {
+          "event": 25,
+          "session": "session2_set11",
+          "translation_mm": 2.1990869125945056,
+          "rotation_deg": 0.76787154470798
+        },
+        {
+          "event": 26,
+          "session": "session2_set12",
+          "translation_mm": 4.0679272599663,
+          "rotation_deg": 2.5387396090347716
+        }
+      ]
+    },
+    "1-3": {
+      "camera_a": "cam1 [gripper (eye-in-hand), serial 136622073980]",
+      "camera_b": "cam3 [fixed (eye-to-hand), serial 314522062542]",
+      "n_simultaneous_observations": 11,
+      "n_session1": 0,
+      "n_session2": 11,
+      "translation_mm": {
+        "mean": 5.263851376152588,
+        "median": 5.604885854240129,
+        "max": 6.6848727710432465,
+        "min": 1.9019626126362623,
+        "rmse": 5.420412348445691
+      },
+      "rotation_deg": {
+        "mean": 1.2643547034439981,
+        "median": 1.0864436538363493,
+        "max": 2.4702998580500677,
+        "min": 0.30536836946379203,
+        "rmse": 1.4896087440102375
+      },
+      "per_event": [
+        {
+          "event": 15,
+          "session": "session2_set1",
+          "translation_mm": 5.789686343825898,
+          "rotation_deg": 1.3568723198124077
+        },
+        {
+          "event": 16,
+          "session": "session2_set2",
+          "translation_mm": 1.9019626126362623,
+          "rotation_deg": 0.3910565649300256
+        },
+        {
+          "event": 17,
+          "session": "session2_set3",
+          "translation_mm": 4.224613517879539,
+          "rotation_deg": 0.3163637729583371
+        },
+        {
+          "event": 18,
+          "session": "session2_set4",
+          "translation_mm": 5.549935417092231,
+          "rotation_deg": 0.7816132282522085
+        },
+        {
+          "event": 19,
+          "session": "session2_set5",
+          "translation_mm": 6.3273154823746065,
+          "rotation_deg": 0.9507881322848709
+        },
+        {
+          "event": 20,
+          "session": "session2_set6",
+          "translation_mm": 4.885919016577182,
+          "rotation_deg": 1.0864436538363493
+        },
+        {
+          "event": 21,
+          "session": "session2_set7",
+          "translation_mm": 6.6848727710432465,
+          "rotation_deg": 1.5643309094811688
+        },
+        {
+          "event": 23,
+          "session": "session2_set9",
+          "translation_mm": 6.518235126312647,
+          "rotation_deg": 2.306245369951899
+        },
+        {
+          "event": 24,
+          "session": "session2_set10",
+          "translation_mm": 5.786363482887815,
+          "rotation_deg": 2.3785195588628514
+        },
+        {
+          "event": 25,
+          "session": "session2_set11",
+          "translation_mm": 4.628575512808906,
+          "rotation_deg": 0.30536836946379203
+        },
+        {
+          "event": 26,
+          "session": "session2_set12",
+          "translation_mm": 5.604885854240129,
+          "rotation_deg": 2.4702998580500677
+        }
+      ]
+    },
+    "2-3": {
+      "camera_a": "cam2 [fixed (eye-to-hand), serial 243622070663]",
+      "camera_b": "cam3 [fixed (eye-to-hand), serial 314522062542]",
+      "n_simultaneous_observations": 17,
+      "n_session1": 6,
+      "n_session2": 11,
+      "translation_mm": {
+        "mean": 5.702852455573204,
+        "median": 6.096106523385753,
+        "max": 9.767205932460092,
+        "min": 1.363361476519244,
+        "rmse": 6.3473503487747065
+      },
+      "rotation_deg": {
+        "mean": 0.7019024673164652,
+        "median": 0.7293196710233798,
+        "max": 1.138297676789784,
+        "min": 0.23214765247980051,
+        "rmse": 0.7417226375132192
+      },
+      "per_event": [
+        {
+          "event": 2,
+          "session": "session1_gripped",
+          "translation_mm": 5.596952189680204,
+          "rotation_deg": 1.0153962984969935
+        },
+        {
+          "event": 7,
+          "session": "session1_gripped",
+          "translation_mm": 1.363361476519244,
+          "rotation_deg": 0.6966181421974964
+        },
+        {
+          "event": 8,
+          "session": "session1_gripped",
+          "translation_mm": 1.4605867278222497,
+          "rotation_deg": 0.6377568975165242
+        },
+        {
+          "event": 9,
+          "session": "session1_gripped",
+          "translation_mm": 2.8318957116490875,
+          "rotation_deg": 0.8992850056775079
+        },
+        {
+          "event": 10,
+          "session": "session1_gripped",
+          "translation_mm": 2.390602135092266,
+          "rotation_deg": 0.35812100024920335
+        },
+        {
+          "event": 11,
+          "session": "session1_gripped",
+          "translation_mm": 6.096106523385753,
+          "rotation_deg": 0.23214765247980051
+        },
+        {
+          "event": 15,
+          "session": "session2_set1",
+          "translation_mm": 6.517783074242048,
+          "rotation_deg": 0.5335157407294022
+        },
+        {
+          "event": 16,
+          "session": "session2_set2",
+          "translation_mm": 1.7235415090202548,
+          "rotation_deg": 0.3330517285304072
+        },
+        {
+          "event": 17,
+          "session": "session2_set3",
+          "translation_mm": 5.426637046957973,
+          "rotation_deg": 0.7539066007333866
+        },
+        {
+          "event": 18,
+          "session": "session2_set4",
+          "translation_mm": 6.266001242060659,
+          "rotation_deg": 0.8005370046405151
+        },
+        {
+          "event": 19,
+          "session": "session2_set5",
+          "translation_mm": 8.80341344417003,
+          "rotation_deg": 0.7293196710233798
+        },
+        {
+          "event": 20,
+          "session": "session2_set6",
+          "translation_mm": 8.088907401448475,
+          "rotation_deg": 0.9076979501032207
+        },
+        {
+          "event": 21,
+          "session": "session2_set7",
+          "translation_mm": 8.654395586129084,
+          "rotation_deg": 0.7347585710658521
+        },
+        {
+          "event": 23,
+          "session": "session2_set9",
+          "translation_mm": 9.767205932460092,
+          "rotation_deg": 0.6500649140975628
+        },
+        {
+          "event": 24,
+          "session": "session2_set10",
+          "translation_mm": 8.647834093416147,
+          "rotation_deg": 1.138297676789784
+        },
+        {
+          "event": 25,
+          "session": "session2_set11",
+          "translation_mm": 4.669390738294247,
+          "rotation_deg": 0.9521831991304631
+        },
+        {
+          "event": 26,
+          "session": "session2_set12",
+          "translation_mm": 8.643876912396662,
+          "rotation_deg": 0.559683890918409
+        }
+      ]
+    }
+  }
+}
