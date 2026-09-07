@@ -134,9 +134,14 @@ class LiveView:
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
         self.show()
 
-    def show(self):
+    def show(self, wait_ms: int = 30, status: str = ""):
+        """한 프레임 갱신하고 눌린 키를 돌려준다 (없으면 -1).
+
+        wait_ms만큼 cv2.waitKey로 대기하면서 그 사이 계속 이 함수를 반복
+        호출해야 실시간으로 보인다 -- input()으로 터미널에서 블로킹하며
+        기다리면 그동안 화면이 멈춘 것처럼 보인다(예전 버그)."""
         if self._closed:
-            return
+            return -1
         tiles = []
         for serial in self.order:
             color, _depth, _ts = self.cams[serial].get_latest()
@@ -150,10 +155,15 @@ class LiveView:
         while len(tiles) < 4:
             tiles.append(np.zeros((self.TILE_H, self.TILE_W, 3), dtype=np.uint8))
         grid = np.vstack([np.hstack(tiles[0:2]), np.hstack(tiles[2:4])])
+        if status:
+            cv2.putText(grid, status, (10, grid.shape[0] - 15),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
         cv2.imshow(self.window_name, grid)
-        key = cv2.waitKey(1) & 0xFF
+        key = cv2.waitKey(wait_ms) & 0xFF
         if key in (ord("q"), 27):
             self.stop()
+            return key
+        return key if key != 255 else -1
 
     def stop(self):
         if self._closed:
@@ -232,16 +242,29 @@ def main():
     rb = ZeusClient(args.robot_ip, args.robot_port)
     rb.connect()
     print("로봇 서버 연결됨 (읽기 전용, get_state만 사용).")
-    print("GELLO로 원하는 자세로 옮긴 뒤: Enter=촬영 / q=조기 종료\n")
+    if view is not None:
+        print("GELLO로 원하는 자세로 옮긴 뒤, 미리보기 창에서: SPACE=촬영 / q 또는 ESC=조기 종료\n")
+    else:
+        print("GELLO로 원하는 자세로 옮긴 뒤: Enter=촬영 / q=조기 종료 (미리보기 꺼짐)\n")
 
     count = start_index
     try:
         while count < start_index + args.num_poses:
+            status = f"[{count - start_index}/{args.num_poses}] SPACE=촬영  q/ESC=종료"
             if view is not None:
-                view.show()
-            cmd = input(f"[{count - start_index}/{args.num_poses}] > ").strip().lower()
-            if cmd == "q":
-                break
+                # wait_ms만큼씩 계속 새로 그려야 실시간으로 보인다 (한 번만 그리고
+                # 터미널 input()으로 블로킹하면 그 사이 화면이 멈춘 것처럼 보임).
+                key = view.show(wait_ms=30, status=status)
+                if view._closed:
+                    print("미리보기 창에서 종료했습니다.")
+                    break
+                if key != 32:  # SPACE 아니면 계속 루프 돌며 화면만 갱신
+                    continue
+            else:
+                cmd = input(f"[{count - start_index}/{args.num_poses}] > ").strip().lower()
+                if cmd == "q":
+                    break
+
             robot_state = read_robot_state(rb, {"capture_index": count})
             out_dir = capture_root / f"{count:03d}"
             saved = save_capture(cams, used_labels, out_dir, robot_state)
