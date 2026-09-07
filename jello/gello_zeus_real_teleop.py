@@ -264,6 +264,9 @@ def parse_args() -> argparse.Namespace:
                              "0.3 정도로 줄이면 로그에서 축별 타이밍 구분이 쉬워짐")
     parser.add_argument("--dry-run", action="store_true",
                         help="실제 movej/grip 명령을 보내지 않고 로그만 출력 (첫 테스트 필수)")
+    parser.add_argument("--disable-gripper", action="store_true",
+                        help="GELLO 그리퍼 트리거를 완전히 무시하고 grip 명령을 전혀 보내지 않음 "
+                             "(캘리브레이션 촬영 등 팔만 움직이고 싶을 때, 트리거 오조작 방지용)")
     return parser.parse_args()
 
 
@@ -405,6 +408,8 @@ def control_worker(state: SharedState, args: argparse.Namespace) -> None:
         print(f"[zeus] connected to {args.robot_ip}:{args.robot_port}")
     else:
         print("[zeus] dry-run: 실제 연결 생략")
+    if args.disable_gripper:
+        print("[bridge] --disable-gripper: GELLO 그리퍼 트리거 무시, grip 명령 안 보냄")
 
     zeus_ref_joints: np.ndarray | None = None
     zeus_ref_pose6: np.ndarray | None = None
@@ -487,20 +492,22 @@ def control_worker(state: SharedState, args: argparse.Namespace) -> None:
                 continue
 
             dq_arm = np.clip(dq_arm, -max_delta, max_delta)
-            want_state = "open" if grip_pct < args.grip_close_threshold_pct else "close"
 
-            if want_state != gripper_state:
-                if args.dry_run:
-                    print(f"[dry-run gripper] {want_state} (grip={grip_pct:.0f}%)")
-                else:
-                    try:
-                        zeus.grip(want_state, timeout_s=args.grip_timeout)
-                    except ZeusError as exc:
-                        print(f"[zeus] grip failed: {exc}")
-                gripper_state = want_state
-                # 그리퍼 명령도 blocking이라 이번 사이클은 여기서 끝내고 다음
-                # 루프에서 최신 GELLO 목표로 관절 이동을 재개한다.
-                continue
+            if not args.disable_gripper:
+                want_state = "open" if grip_pct < args.grip_close_threshold_pct else "close"
+
+                if want_state != gripper_state:
+                    if args.dry_run:
+                        print(f"[dry-run gripper] {want_state} (grip={grip_pct:.0f}%)")
+                    else:
+                        try:
+                            zeus.grip(want_state, timeout_s=args.grip_timeout)
+                        except ZeusError as exc:
+                            print(f"[zeus] grip failed: {exc}")
+                    gripper_state = want_state
+                    # 그리퍼 명령도 blocking이라 이번 사이클은 여기서 끝내고 다음
+                    # 루프에서 최신 GELLO 목표로 관절 이동을 재개한다.
+                    continue
 
             if args.control_mode == "position":
                 p_gello_mm = gello_position_delta_mm(dq_arm)  # 1~3번만 반영, 4~6번 무시
