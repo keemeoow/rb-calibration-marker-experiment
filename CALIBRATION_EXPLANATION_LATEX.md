@@ -1105,25 +1105,25 @@ $$
 
 ### 18.4 현재 Session04에서 허용되는 비교 결론
 
-최종 내부 평가는 어떤 marker로 학습했는지와 무관하게 **heldout cube**만 본다. 따라서 Board heldout과 board/cube pooled overall은 최종 순위 지표에서 제거한다. 현재 artifact에서 A1의 heldout cube RMSE는 $4.1402\,\mathrm{px}$이고 A2는 $3.5958\,\mathrm{px}$다. 이 비교는 동일 관측·초기값·solver 조건에서 Unified Joint Optimization이 cube 재투영을 낮췄다는 내부 근거다.
+최종 내부 평가는 어떤 marker로 학습했는지와 무관하게 **heldout cube**만 본다. 따라서 Board heldout과 board/cube pooled overall은 최종 순위 지표에서 제거한다. 현재 artifact에서 A1의 heldout cube RMSE는 $3.6938\,\mathrm{px}$이고 A2는 $3.5960\,\mathrm{px}$다. 이 비교는 동일 관측·초기값·solver 조건에서 Unified Joint Optimization이 cube 재투영을 낮췄다는 내부 근거다. A0/B3는 calibration 단계에서는 board-only로 유지하되, train cube로 set별 evaluation cube pose만 맞춘 뒤 frozen camera/Hand--Eye transform으로 cube RMSE를 산출한다.
 
-Raw FK를 hard fixed한 A3는 heldout cube $6.3959\,\mathrm{px}$로 A2보다 나쁘다. 즉 현재 raw tool4/mechanical pose를 외부 정답처럼 고정하면 cube 영상 정합이 악화된다. Corrected-FK soft factor인 A4는 $3.5805\,\mathrm{px}$로 A2와 거의 같고, vision-aligned FK hard fixed인 A5는 $3.2274\,\mathrm{px}$로 현재 내부 cube 지표가 가장 낮다. 단, A4/B1/B2의 실측 FK covariance와 A5의 frozen artifact는 External GT 공개 전에 고정되어야 최종 후보로 인정된다.
+Raw FK를 hard fixed한 A3는 heldout cube $6.7199\,\mathrm{px}$로 A2보다 나쁘다. 즉 현재 raw tool4/mechanical pose를 외부 정답처럼 고정하면 cube 영상 정합이 악화된다. Corrected-FK soft factor인 A4는 $3.5786\,\mathrm{px}$로 A2와 거의 같고, vision-aligned FK hard fixed인 A5는 $3.4180\,\mathrm{px}$로 현재 내부 cube 지표가 가장 낮다. 단, A4/B1/B2의 실측 FK covariance와 A5의 frozen artifact는 External GT 공개 전에 고정되어야 최종 후보로 인정된다.
 
 최종 물리 주장은 다음주 Independent External GT의 cube TRE/rotation/P95/failure로만 결정한다. 현재 표현은 ``Session04 내부 cube-only 지표에서는 A5가 가장 낮고, A2/A4가 그 다음으로 안정적이며, raw-FK hard fixed A3는 악화된다''까지가 안전하다.
 
 ### 18.5 논문 실험 결과 본문용 서술
 
-모든 비교행에는 동일한 frozen corner 관측, event-grouped/set-stratified split, camera intrinsic, target geometry, solver 설정 및 train-only shared initialization을 적용하였다. 최종 내부 평가는 항상 cube target으로 통일했다. Vision-only 조건에서 Sequential Frozen-Stage Optimization인 A1의 heldout cube RMSE는 $4.1402\,\mathrm{px}$였고, Unified Joint Optimization인 A2는 $3.5958\,\mathrm{px}$로 낮아졌다. 이는 Eye-in-Hand와 Eye-to-Hand 관측 사이의 양방향 feedback이 cube 재투영 일관성을 개선한다는 근거다.
+모든 비교행에는 동일한 frozen corner 관측, event-grouped/set-stratified split, camera intrinsic, target geometry, solver 설정 및 train-only shared initialization을 적용하였다. 최종 내부 평가는 항상 cube target으로 통일했다. Vision-only 조건에서 Sequential Frozen-Stage Optimization인 A1의 heldout cube RMSE는 $3.6938\,\mathrm{px}$였고, Unified Joint Optimization인 A2는 $3.5960\,\mathrm{px}$로 낮아졌다. 이는 Eye-in-Hand와 Eye-to-Hand 관측 사이의 양방향 feedback이 cube 재투영 일관성을 개선한다는 근거다.
 
-Raw FK cube pose를 hard fixed한 A3는 $6.3959\,\mathrm{px}$로 악화되어 raw FK를 그대로 정답으로 쓰면 안 됨을 보였다. Corrected-FK soft factor를 추가한 A4는 $3.5805\,\mathrm{px}$로 A2와 유사했고, vision-aligned FK hard fixed인 A5는 $3.2274\,\mathrm{px}$로 현재 내부 cube 지표가 가장 낮았다. 따라서 External GT 공개 전에 A5 방법과 artifact를 frozen하면 A5를 최종 후보로 채택할 수 있다. 실제 3D 공간 정합 우월성은 다음주 Independent External GT에서 cube TRE, rotation error, P95, failure rate로 확정한다.
+Raw FK cube pose를 hard fixed한 A3는 $6.7199\,\mathrm{px}$로 악화되어 raw FK를 그대로 정답으로 쓰면 안 됨을 보였다. Corrected-FK soft factor를 추가한 A4는 $3.5786\,\mathrm{px}$로 A2와 유사했고, vision-aligned FK hard fixed인 A5는 $3.4180\,\mathrm{px}$로 현재 내부 cube 지표가 가장 낮았다. 따라서 External GT 공개 전에 A5 방법과 artifact를 frozen하면 A5를 최종 후보로 채택할 수 있다. 실제 3D 공간 정합 우월성은 다음주 Independent External GT에서 cube TRE, rotation error, P95, failure rate로 확정한다.
 
 ### 18.6 Paper-ready English Results paragraph
 
-All variants were evaluated using the same frozen corner observations, event-grouped and set-stratified split, camera intrinsics, target geometry, solver settings, and train-only shared initialization. The final internal endpoint is cube-only held-out reprojection. Under the vision-only condition, A1 (Sequential Frozen-Stage Optimization) achieved a held-out cube RMSE of $4.1402\,\mathrm{px}$, whereas A2 (Unified Joint Optimization) achieved $3.5958\,\mathrm{px}$. Hard-fixing the cube pose to raw FK in A3 degraded the cube endpoint to $6.3959\,\mathrm{px}$, indicating that raw FK should not be treated as ground truth. A4 (corrected-FK soft factor) achieved $3.5805\,\mathrm{px}$, and A5 (vision-aligned FK hard fixed) achieved the lowest current internal cube RMSE, $3.2274\,\mathrm{px}$. If A5 and its train-only alignment artifact are frozen before external-GT scoring, A5 is a valid final candidate. The physical ranking will be decided only by the forthcoming independent external cube-GT metrics.
+All variants were evaluated using the same frozen corner observations, event-grouped and set-stratified split, camera intrinsics, target geometry, solver settings, and train-only shared initialization. The final internal endpoint is cube-only held-out reprojection. Board-only rows A0/B3 keep cube observations out of calibration and use train cube observations only to fit nuisance evaluation poses with camera and hand-eye transforms frozen. Under the vision-only condition, A1 (Sequential Frozen-Stage Optimization) achieved a held-out cube RMSE of $3.6938\,\mathrm{px}$, whereas A2 (Unified Joint Optimization) achieved $3.5960\,\mathrm{px}$. Hard-fixing the cube pose to raw FK in A3 degraded the cube endpoint to $6.7199\,\mathrm{px}$, indicating that raw FK should not be treated as ground truth. A4 (corrected-FK soft factor) achieved $3.5786\,\mathrm{px}$, and A5 (vision-aligned FK hard fixed) achieved the lowest current internal cube RMSE, $3.4180\,\mathrm{px}$. If A5 and its train-only alignment artifact are frozen before external-GT scoring, A5 is a valid final candidate. The physical ranking will be decided only by the forthcoming independent external cube-GT metrics.
 
 ### 18.7 Paper-ready English Table 1 caption
 
-**Table 1. Quantitative comparison of the predefined calibration variants on Session04.** The final internal endpoint is held-out cube reprojection RMSE in native distorted-pixel coordinates; lower is better. The variants share the same frozen detection pool, event-grouped and set-stratified split, camera intrinsics, target geometry, solver settings, and train-only shared initialization, while the training target population, optimization structure, and FK/target-pose treatment vary as specified. Board held-out and board/cube pooled overall rankings are excluded from the final table. A0 and B3 are board-on-gripper-only calibration rows and therefore have no current Session04 cube-heldout value until the final board-on-gripper capture is added. A3 hard-fixes the cube pose to raw FK after the prescribed mechanical frame mapping. A4, B1, and B2 use corrected-FK soft factors; A5 hard-fixes the train-only vision-aligned FK pose. ``Convergence $3/3$'' reports solver termination across three initialization seeds and does not imply global optimality or physical accuracy. External cube GT is pending.
+**Table 1. Quantitative comparison of the predefined calibration variants on Session04.** The final internal endpoint is held-out cube reprojection RMSE in native distorted-pixel coordinates; lower is better. The variants share the same frozen detection pool, event-grouped and set-stratified split, camera intrinsics, target geometry, solver settings, and train-only shared initialization, while the training target population, optimization structure, and FK/target-pose treatment vary as specified. Board held-out and board/cube pooled overall rankings are excluded from the final table. A0 and B3 are board-on-gripper-only calibration rows; their cube RMSE is computed by fitting only set-wise evaluation cube poses from train cube observations after camera and hand-eye transforms are frozen. A3 hard-fixes the cube pose to raw FK after the prescribed mechanical frame mapping. A4, B1, and B2 use corrected-FK soft factors; A5 hard-fixes the train-only vision-aligned FK pose. ``Convergence $3/3$'' reports solver termination across three initialization seeds and does not imply global optimality or physical accuracy. External cube GT is pending.
 
 ### 18.8 Paper-ready English column labels and table notes
 
@@ -1135,16 +1135,16 @@ All variants were evaluated using the same frozen corner observations, event-gro
 | Calibration train target | Training Targets |
 | Optimization | Optimization |
 | FK / target-pose 처리 | FK / Target-Pose Treatment |
-| Train RMSE px | Train RMSE (px) |
+| Train Cube RMSE px | Train-Cube RMSE (px) |
 | ALL Cube RMSE px | All-Cube RMSE (px) |
 | Heldout Cube RMSE px | Held-Out Cube RMSE (px) |
 | Cross-view Cube px | Cross-View Cube Transfer (px) |
 | Cam-common Cube mm/deg | Cam-Common Cube Consistency (mm/deg) |
-| External cube GT | External Cube GT |
+| External GT TRE/Rot/P95/Fail | External Cube GT TRE/Rot/P95/Fail |
 | Convergence | Conv. |
 | Data status | Status |
 
-**Paper-ready table note.** Values are computed on frozen observations. Held-out evaluation is cube-only for all methods. All-cube RMSE is a fit sanity check because it pools train and held-out cube observations. Cross-view transfer and cam-common consistency jointly aggregate fixed-camera pairs and fixed-gripper pairs as supplementary internal camera-consistency checks, not external physical accuracy. $^{\ddagger}$ denotes raw-FK hard fixing, $^{\dagger}$ denotes corrected-FK soft factors, and $^{\S}$ denotes vision-aligned FK hard fixing. A5 is a valid final candidate only if the method and alignment artifact are frozen before external-GT scoring. External cube GT is pending.
+**Paper-ready table note.** Values are computed on frozen observations. Train-cube and held-out evaluation use the same cube populations for every method; set-wise evaluation cube poses are fitted from train cube observations only after camera and hand-eye transforms are frozen. Train-cube RMSE is an in-sample fit diagnostic, and all-cube RMSE is a fit sanity check dominated by its 724/960 train corners. Cross-view transfer directly pools 36 frozen pairs (9 fixed-fixed and 27 fixed-gripper) over 904 destination-corner evaluations; 18 fixed-gripper pairs use train fixed anchors. Cam-common consistency uses the same pair discrepancies in mm/deg, so the two are correlated supplementary checks rather than independent evidence. $^{\ddagger}$ denotes raw-FK hard fixing, $^{\dagger}$ corrected-FK soft factors, and $^{\S}$ vision-aligned FK hard fixing. A5 is a valid final candidate only if the method and alignment artifact are frozen before external-GT scoring. External cube GT is pending.
 
 ### 18.9 Copy-ready LaTeX Table 1
 
@@ -1158,35 +1158,36 @@ All variants were evaluated using the same frozen corner observations, event-gro
 \setlength{\tabcolsep}{3pt}
 \renewcommand{\arraystretch}{1.12}
 \resizebox{\textwidth}{!}{%
-\begin{tabular}{@{}llllrrrrcl@{}}
+\begin{tabular}{@{}llllrrrrrrcl@{}}
 \toprule
 Method &
 \shortstack{Training\\Targets} &
 Optimization &
 \shortstack{FK / Target-Pose\\Treatment} &
-\shortstack{Train\\RMSE (px)} &
+\shortstack{Train-Cube\\RMSE (px)} &
 \shortstack{All-Cube\\RMSE (px)} &
 \shortstack{Held-Out Cube\\RMSE (px)} &
 \shortstack{Cross-View Cube\\Transfer (px)} &
 \shortstack{Cam-Common\\Cube mm/deg} &
+\shortstack{External GT\\TRE/Rot/P95/Fail} &
 Conv. & Status \\
 \midrule
-A0 (Baseline)             & Board-on-gripper & Sequential & Board pose estimated; cube eval only & 3.8202 & N/A    & N/A             & 7.2577 & 8.677/0.904 & 3/3 & Pending cube eval \\
-A1 (+Cube)                & Board + Cube     & Sequential & Cube pose estimated                  & 3.7923 & 3.8075 & 4.1402          & 7.3085 & 8.829/1.050 & 3/3 & Current data \\
-A2 (+Unified)             & Board + Cube     & Unified    & Cube pose estimated                  & 3.7421 & 3.4139 & 3.5958          & 6.3003 & 7.287/1.028 & 3/3 & Current data \\
-A3$^{\ddagger}$ (Raw-FK)  & Board + Cube     & Unified    & Raw-FK hard fixed                    & 5.1587 & 7.8551 & 6.3959          & 6.8626 & 8.338/2.089 & 3/3 & Current data \\
-A4$^{\dagger}$ (+FK)      & Board + Cube     & Unified    & Corrected-FK soft factor             & 3.7441 & 3.4149 & 3.5805          & 6.3126 & 7.308/1.015 & 3/3 & FK cov. pending \\
-A5$^{\S}$ (Aligned-FK)    & Board + Cube     & Unified    & Vision-aligned FK hard fixed         & 3.9648 & 3.8102 & \textbf{3.2274} & 5.7166 & 6.674/0.886 & 3/3 & Freeze before GT \\
-B1$^{\dagger}$ ($-$Unified) & Board + Cube   & Sequential & Corrected-FK soft factor             & 3.7887 & 3.7832 & 4.1182          & 7.2867 & 8.806/1.054 & 3/3 & FK cov. pending \\
-B2$^{\dagger}$ ($-$Board) & Cube only        & Unified    & Corrected-FK soft factor             & 3.0269 & 3.4423 & 4.4827          & 6.5284 & 7.429/1.049 & 3/3 & FK cov. pending \\
-B3 ($-$Cube)              & Board-on-gripper & Unified    & Board pose estimated; cube eval only & 3.8202 & N/A    & N/A             & 7.2550 & 8.674/0.904 & 3/3 & Pending cube eval \\
+A0 (Baseline)             & Board-on-gripper & Sequential & Board pose estimated; cube eval only & 3.4489 & 3.5063 & 3.6768          & 7.1528 & 8.677/0.904 & Pending & 3/3 & Current data \\
+A1 (+Cube)                & Board + Cube     & Sequential & Cube pose estimated                  & 3.3414 & 3.4314 & 3.6938          & 7.1995 & 8.829/1.050 & Pending & 3/3 & Current data \\
+A2 (+Unified)             & Board + Cube     & Unified    & Cube pose estimated                  & 3.3525 & 3.4140 & 3.5960          & 6.1948 & 7.287/1.028 & Pending & 3/3 & Current data \\
+A3$^{\ddagger}$ (Raw-FK)  & Board + Cube     & Unified    & Raw-FK hard fixed                    & 4.2878 & 4.9967 & 6.7199          & 6.8268 & 8.338/2.089 & Pending & 3/3 & Current data \\
+A4$^{\dagger}$ (+FK)      & Board + Cube     & Unified    & Corrected-FK soft factor             & 3.3547 & 3.4111 & 3.5786          & 6.2061 & 7.308/1.015 & Pending & 3/3 & FK cov. pending \\
+A5$^{\S}$ (Aligned-FK)    & Board + Cube     & Unified    & Vision-aligned FK hard fixed         & 3.5312 & 3.5037 & \textbf{3.4180} & 5.6072 & 6.674/0.886 & Pending & 3/3 & Freeze before GT \\
+B1$^{\dagger}$ ($-$Unified) & Board + Cube   & Sequential & Corrected-FK soft factor             & 3.3450 & 3.4322 & 3.6870          & 7.1779 & 8.806/1.054 & Pending & 3/3 & FK cov. pending \\
+B2$^{\dagger}$ ($-$Board) & Cube only        & Unified    & Corrected-FK soft factor             & 3.0201 & 3.4308 & 4.4608          & 6.4557 & 7.429/1.049 & Pending & 3/3 & FK cov. pending \\
+B3 ($-$Cube)              & Board-on-gripper & Unified    & Board pose estimated; cube eval only & 3.4489 & 3.5061 & 3.6763          & 7.1502 & 8.674/0.904 & Pending & 3/3 & Current data \\
 \bottomrule
 \end{tabular}%
 }
 \vspace{2pt}
 
 \parbox{\textwidth}{\footnotesize
-Held-out evaluation is cube-only. All-cube RMSE pools train and held-out cube observations and is used only as a fit sanity check. Cross-view transfer and cam-common consistency aggregate fixed-camera pairs and fixed-gripper pairs as supplementary internal camera-consistency metrics. $^{\ddagger}$ raw-FK hard fixing; $^{\dagger}$ corrected-FK soft factor; $^{\S}$ vision-aligned FK hard fixing. External cube GT is pending and will decide the final physical ranking.}
+Train-cube and held-out evaluation are cube-only and use identical populations across methods. Train-cube RMSE is in-sample; all-cube RMSE pools 724 train and 236 held-out corners. Cross-view directly pools 36 pairs over 904 destination-corner evaluations; 18 fixed-gripper pairs use train fixed anchors. Cam-common uses the same pair discrepancies in mm/deg, so neither is independent physical accuracy. $^{\ddagger}$ raw-FK hard fixing; $^{\dagger}$ corrected-FK soft factor; $^{\S}$ vision-aligned FK hard fixing. External cube GT is pending and will decide the final physical ranking.}
 \end{table*}
 ```
 

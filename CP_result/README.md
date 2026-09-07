@@ -69,7 +69,7 @@ CP_result/session04/
 
 - 최종 비교 행은 A0~A5, B1~B3 한 벌만 사용한다.
 - heldout 평가는 항상 cube만 사용한다. Board heldout과 board/cube pooled overall ranking은 최종 표에서 제거했다.
-- A0/B3의 board-only 방법은 최종 capture에서 board를 gripper에 붙여 cube pose diversity와 같은 수준으로 촬영하는 프로토콜을 따른다.
+- A0/B3의 board-only 방법은 최종 capture에서 board를 gripper에 붙여 cube pose diversity와 같은 수준으로 촬영하는 프로토콜을 따른다. Cube RMSE는 calibration을 다시 풀지 않고 train cube로 evaluation pose만 맞춘 뒤 산출한다.
 - A3/A4/A5/B1/B2는 FK 처리 방식이 다른 최종 후보 행이다. A5도 External GT 공개 전에 방법과 artifact가 frozen이면 최종 후보로 비교할 수 있다.
 - 최종 물리 순위는 다음주 Independent External cube GT의 TRE, rotation, P95, failure rate로 결정한다.
 

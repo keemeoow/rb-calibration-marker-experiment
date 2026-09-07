@@ -416,6 +416,8 @@ def validate_fk_alignment_artifact(artifact: Mapping) -> None:
 FINAL_EVALUATION_TARGET = "cube"
 PRIMARY_METRIC = "external_cube_TRE_rotation_P95_failure"
 PRIMARY_INTERNAL_METRIC = "heldout_cube_reprojection_rmse_px"
+INTERNAL_CUBE_EVALUATION_POSE_POLICY = (
+    "fit_T_base_cube_by_set_from_train_cube_only_after_camera_calibration_is_frozen")
 PRIMARY_SPLIT = "event_grouped_and_set_stratified"
 TRAIN_REPROJECTION_ROLE = "optimization_diagnostic_only"
 POSITION_HOLDOUT_ROLE = "external_GT_or_explicit_FK_proxy_only"
@@ -476,7 +478,7 @@ EVALUATION_COMPARISON_CONTRACT = {
         ),
         "evidence_tier": "final_protocol",
         "causal_interpretation": (
-            "board_on_gripper_only_sequential_vs_unified_feedback_with_cube_evaluation"
+            "single_target_sequential_vs_unified_equivalence_negative_control"
         ),
     },
     "A0_to_A1": {

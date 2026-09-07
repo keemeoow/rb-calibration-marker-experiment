@@ -38,8 +38,17 @@ multi-camera calibration framework를 제안한다. 최종 비교는 `A0~A5`, `B
 | B2 | cube-only corrected-FK soft factor | A4 대비 board residual 제거 |
 | B3 | board-on-gripper only unified baseline | board-only unified 기준선 |
 
-A0/B3의 board-only 방법은 cube 촬영 포즈 다양성만큼 board를 gripper에 붙여 촬영한다.
-현재 Session04 artifact는 이전 촬영 구성이므로 A0/B3 cube heldout 값은 N/A로 남을 수 있다.
+A0/B3를 위해 별도 board 영상을 더 촬영하지 않는다. Planar board와 multi-face cube를
+하나의 강체 composite target으로 제작하고, 모든 방법이 P1 moving rig 15 events,
+P2 10 placements x 2 views 20 events, P3 stationary rig 10 events로 구성된 동일한
+45개 raw capture event를 사용한다. A0/B3는 cube observation을 calibration 전체에서
+masking하고 B2는 board observation을 masking한다. A1~A5/B1만 같은 영상의 두 target
+residual을 모두 사용하므로 cube 추가 효과에 촬영 수 증가가 섞이지 않는다.
+
+현재 Session04 artifact는 정적 workspace board를 사용한 legacy 촬영이다. A0/B3
+calibration은 board-only로 유지하고, cube RMSE는 train cube로 set별 evaluation pose만
+맞춘 뒤 frozen calibration으로 계산한다. 새 composite-target 결과와 섞어 동일한 최종
+실험으로 해석하지 않는다.
 
 ## 3. 최종 평가지표
 
@@ -47,10 +56,10 @@ A0/B3의 board-only 방법은 cube 촬영 포즈 다양성만큼 board를 grippe
 | --- | --- | --- |
 | External cube TRE / rotation / P95 / failure | 최종 주 지표 | Independent External GT와 blind prediction 비교 |
 | ALL Cube RMSE px | fit sanity check | train+heldout cube 전체 재투영 |
-| Train RMSE px | 수렴 진단 | 학습 적합도이며 순위 지표가 아님 |
+| Train Cube RMSE px | train-split fit 진단 | 모든 row의 동일 train cube에서 계산하지만 in-sample pose fit이므로 순위 지표가 아님 |
 | Heldout Cube RMSE px | 내부 보조 지표 | 미사용 cube event 재투영 |
-| Cross-view pixel transfer RMSE px | 카메라 간 pixel 일관성 | fixed-camera pair와 fixed-gripper pair를 cube-only로 함께 집계 |
-| Cam-common Obj-Cam consistency mm/deg | 카메라 간 3D 일관성 | 두 카메라가 본 cube pose 차이 |
+| Cross-view pixel transfer RMSE px | 카메라 간 pixel 일관성 | 같은 36 frozen pair의 904 destination-corner를 직접 pooling; 일부 train fixed-anchor 포함 |
+| Cam-common Obj-Cam consistency mm/deg | 카메라 간 3D 일관성 | Cross-view와 같은 pair discrepancy의 mm/deg 표현이며 독립 증거는 아님 |
 
 제거한 지표:
 
@@ -65,12 +74,12 @@ A0/B3의 board-only 방법은 cube 촬영 포즈 다양성만큼 board를 grippe
 
 | 비교 | 현재 내부 cube 결과 | 해석 |
 | --- | --- | --- |
-| A1 -> A2 | 4.1402 -> 3.5958 px | unified feedback이 내부 cube residual을 낮춤 |
-| A2 -> A3 | 3.5958 -> 6.3959 px | raw FK hard fixed는 현재 내부 cube에서 악화 |
-| A2 -> A4 | 3.5958 -> 3.5805 px | corrected-FK soft factor는 A2와 거의 동률 |
-| B1 -> A4 | 4.1182 -> 3.5805 px | soft-FK 조건에서도 unified 쪽이 낮음 |
-| B2 -> A4 | 4.4827 -> 3.5805 px | board residual이 cube 보정에 도움 |
-| A4 -> A5 | 3.5805 -> 3.2274 px | A5가 현재 내부 cube 지표 최저 |
+| A1 -> A2 | 3.6938 -> 3.5960 px | unified feedback이 내부 cube residual을 낮춤 |
+| A2 -> A3 | 3.5960 -> 6.7199 px | raw FK hard fixed는 현재 내부 cube에서 악화 |
+| A2 -> A4 | 3.5960 -> 3.5786 px | corrected-FK soft factor는 A2와 거의 동률 |
+| B1 -> A4 | 3.6870 -> 3.5786 px | soft-FK 조건에서도 unified 쪽이 낮음 |
+| B2 -> A4 | 4.4608 -> 3.5786 px | board residual이 cube 보정에 도움 |
+| A4 -> A5 | 3.5786 -> 3.4180 px | A5가 현재 내부 cube 지표 최저 |
 
 ## 5. A5 채택 원칙
 

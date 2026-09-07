@@ -97,7 +97,7 @@ Shared Train-only Baseline만 확인하려면 05번에 `--baseline_only`를 추�
 | $T^B_{C_i}$ | 고정카메라 $i$에서 robot base로의 외부 파라미터 | 조건에 따라 자유변수 |
 | $T^G_C$ | eye-in-hand 카메라 좌표에서 gripper 좌표로의 Hand–Eye transform | 조건에 따라 자유변수 |
 | $T^B_G(e)$ | event $e$의 robot FK가 제공한 base–gripper transform | 모든 조건에서 고정 입력 |
-| $T^B_{\mathrm{board}}$ | 작업공간에 고정된 ChArUco board pose | board 조건에서 자유변수 |
+| $T^B_{\mathrm{board}}$ | legacy Session04의 작업공간 고정 ChArUco board pose | board 조건에서 자유변수 |
 | $T^B_{\mathrm{cube}}(s)$ | 배치 set $s$의 cube pose | vision 추정, raw/aligned FK 고정 또는 FK factor |
 | $(K_i,D_i)$ | 카메라 $i$의 intrinsic과 distortion | 사전 보정 후 항상 고정 |
 
@@ -105,7 +105,11 @@ Shared Train-only Baseline만 확인하려면 05번에 `--baseline_only`를 추�
 
 - `vision` 또는 `no-FK`는 **robot FK 전체를 사용하지 않는다는 뜻이 아니다.** Eye-in-hand 카메라 pose $T^B_G(e)T^G_C$를 만들기 위해 robot FK는 모든 조건에서 사용한다.
 - `vision`, `raw-FK-fixed`, `vision-aligned-FK-fixed`, `corrected-FK factor`의 차이는 배치된 cube pose $T^B_{\mathrm{cube}}(s)$를 자유변수로 둘지, raw FK의 mechanical frame map 또는 train-vision-aligned FK에 고정할지, 또는 자유변수에 aligned-FK covariance-whitened factor를 연결할지의 차이다.
-- board는 robot에 부착된 물체가 아니므로 `FK-fixed board`라는 조건은 물리적으로 정의하지 않는다.
+- 현재 Session04 loader/solver에서는 board가 robot에 부착되지 않은 legacy data이므로
+  `FK-fixed board`를 사용하지 않는다. 최종 재촬영은 board와 cube를 하나의 강체 target
+  rig로 묶어 같은 45개 event에서 촬영하며, phase-aware
+  `T_base_rig(event)=T_base_flange(event)T_flange_rig` 모델을 구현한 뒤 사용한다.
+  촬영 계약은 [CALIBRATION_EXPERIMENT_VALIDATION.md](CALIBRATION_EXPERIMENT_VALIDATION.md)를 따른다.
 
 `T^B_G(e)`의 $G$는 한 실행 안에서 반드시 같은 물리 frame이어야 한다. 현재 session02는 event 0--89가 tool3(150 mm TCP), event 90--95가 flange로 기록되어 있어, [`pose_convention_manifest.json`](data/session02/calib_train/pose_convention_manifest.json)으로 모두 flange 기준으로 정규화한다. cube-center 기록도 같은 manifest에서 legacy tool4 177.5 mm를 실제 tool4 143.0 mm 기준으로 바꾼다. 적용식은 강체 좌표변환
 
@@ -425,7 +429,7 @@ $$
 - 초기화: board PnP → 여러 Hand–Eye 후보 → robust SE(3) 선택
 - 최적화: eih board로 Hand–Eye/board를 푼 후 고정, e2h board로 고정카메라만 계산
 - 출력: board 기반 camera/Hand–Eye transform, train/test board px
-- 제한: 현재 기존 Session04 artifact에서는 cube row-local 값이 N/A일 수 있다. 최종 capture에서는 board-on-gripper A0/B3도 같은 cube heldout list로 평가한다.
+- cube 평가: calibration은 board-only로 유지하되, train cube로 set별 evaluation pose만 맞춘 뒤 frozen camera/Hand–Eye로 ALL/Heldout Cube RMSE를 계산한다.
 
 ### 8.2 A1 — Cube 추가·순차
 
@@ -536,10 +540,12 @@ python3 tools/evaluate_cross_target.py \
 train+heldout 전체 cube evaluation data에 frozen calibration을 적용해 cube corner를
 재투영한다. 전체 fit sanity check이며 일반화 지표는 아니다.
 
-### 11.3 Train RMSE px
+### 11.3 Train Cube RMSE px
 
-solver가 사용한 train corner에서 계산한다. 수렴/학습 적합도 진단이며 방법 순위
-지표가 아니다.
+모든 방법의 camera/Hand-Eye를 frozen하고, train cube로 set별 evaluation pose를
+맞춘 뒤 동일한 724개 train cube corner를 재투영한다. A0/B3도 calibration에는 cube를
+쓰지 않지만 이 평가에는 같은 cube 모집단을 사용한다. Pose를 맞춘 동일 관측의
+in-sample fit이므로 방법 순위 지표는 아니다.
 
 ### 11.4 Heldout Cube RMSE px
 
@@ -553,8 +559,9 @@ $$
 ### 11.5 Cross-view pixel transfer RMSE px
 
 한 카메라의 cube PnP pose를 다른 카메라 영상으로 전달해 observed cube corner와
-비교한다. fixed-camera pair와 fixed-gripper pair를 같은 metric family 안에서
-combined 값으로 보고한다.
+비교한다. 동일한 9 fixed-fixed + 27 fixed-gripper pair의 원시 양방향 오차를
+904개 destination-corner에서 직접 pooling한다. Fixed-gripper 27 pair 중 18 pair는
+train fixed-anchor와 heldout gripper event를 연결하므로 mixed-anchor 내부 closure다.
 
 $$
 T^{B,(i)}_{cube}=T^B_{C_i}T^{C_i}_{cube,\mathrm{PnP}}
@@ -568,9 +575,10 @@ $$
 
 ### 11.6 Cam-common Obj-Cam consistency mm/deg
 
-두 카메라가 같은 cube event에서 계산한 base-frame cube pose 차이를 translation mm와
-rotation deg로 계산한다. 공통 systematic error는 검출하지 못하므로 최종 순위 지표가
-아니다.
+Cross-view와 같은 36개 frozen cube pair에서 두 경로가 계산한 base-frame cube pose
+차이를 translation mm와 rotation deg로 pooling한다. Fixed-gripper 경로에는 Hand-Eye와
+Robot FK가 포함된다. Cross-view px와 같은 pair discrepancy를 다른 단위로 본 값이므로
+독립된 두 번째 증거가 아니며, 공통 systematic error도 검출하지 못한다.
 
 $$
 T^{B,(i)}_{cube}=T^B_{C_i}T^{C_i}_{cube,\mathrm{PnP}}
@@ -582,7 +590,7 @@ $$
 
 | Research Question (연구 질문) | Comparison (비교) | Shared Evaluation Metric (동일하게 볼 지표) |
 | --- | --- | --- |
-| board-only에서 순차/통합 차이가 있는가 | A0 -> B3 | External cube GT + heldout cube |
+| 단일 target에서 순차/통합이 사실상 동등한가 | A0 -> B3 | Negative control + External cube GT |
 | cube train 관측 추가가 도움이 되는가 | A0 -> A1 | External cube GT + heldout cube |
 | vision 조건에서 통합 feedback이 도움이 되는가 | A1 -> A2 | External cube GT + heldout cube |
 | unified에서 cube residual이 필요한가 | B3 -> A2 | External cube GT + heldout cube |
@@ -601,10 +609,10 @@ Canonical 결과 인덱스는 [CP_result/README.md](CP_result/README.md), 상세
 
 핵심 요약은 다음과 같다.
 
-- 동일한 cube+board marker population에서 A1→A2 heldout cube는 `4.1402 → 3.5958 px`로 감소해 Unified feedback의 내부 효과를 지원한다.
-- A3 raw-FK-fixed의 heldout cube는 `6.3959 px`로 증가했으므로 raw tool4/mechanical pose를 외부 GT처럼 취급하지 않는다.
-- A2와 A4의 heldout cube는 `3.5958`, `3.5805 px`로 거의 동일하다. A4/B1/B2는 External GT 공개 전에 covariance와 artifact를 frozen해야 최종 후보로 비교할 수 있다.
-- A5의 heldout cube는 `3.2274 px`로 현재 내부 cube 값이 가장 낮다. 따라서 A5는 배제하지 않고, External GT 공개 전에 방법과 train-only alignment artifact를 frozen한 최종 후보로 둔다.
+- 동일한 cube+board marker population에서 A1→A2 heldout cube는 `3.6938 → 3.5960 px`로 감소해 Unified feedback의 내부 효과를 지원한다.
+- A3 raw-FK-fixed의 heldout cube는 `6.7199 px`로 증가했으므로 raw tool4/mechanical pose를 외부 GT처럼 취급하지 않는다.
+- A2와 A4의 heldout cube는 `3.5960`, `3.5786 px`로 거의 동일하다. A4/B1/B2는 External GT 공개 전에 covariance와 artifact를 frozen해야 최종 후보로 비교할 수 있다.
+- A5의 heldout cube는 `3.4180 px`로 현재 내부 cube 값이 가장 낮다. 따라서 A5는 배제하지 않고, External GT 공개 전에 방법과 train-only alignment artifact를 frozen한 최종 후보로 둔다.
 - 최종 물리 순위는 다음주 Independent External cube GT 이후 Translation Error, Rotation Error, P95, Failure Rate로 결정한다.
 - Board heldout, board/cube pooled overall, 별도 pair-type 순위표는 최종 비교표에서 사용하지 않는다.
 

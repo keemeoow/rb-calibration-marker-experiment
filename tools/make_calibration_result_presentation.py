@@ -614,7 +614,7 @@ def slide_comparison_contract(ctx: dict, i: int, n: int) -> Image.Image:
     )
     headers = ["구분", "직접 비교", "질문", "주 지표"]
     rows = [
-        ["Final", "A0 → B3", "board-on-gripper only 순차/통합 차이", "External cube GT + heldout cube"],
+        ["Final", "A0 → B3", "단일 target 순차/통합 동등성 확인", "Negative control + External cube GT"],
         ["Final", "A0 → A1", "cube train 관측 추가 효과", "External cube GT + heldout cube"],
         ["Final", "A1 → A2", "vision-only 통합 feedback 효과", "External cube GT + heldout cube"],
         ["Final", "B3 → A2", "unified에서 cube residual 필요성", "External cube GT + heldout cube"],
@@ -638,7 +638,7 @@ def slide_metric_matrix(ctx: dict, i: int, n: int) -> Image.Image:
     rows = [
         ["External cube TRE/rot/P95/fail", "최종 주 지표", "Independent External GT 후 최종 물리 순위"],
         ["ALL Cube RMSE px", "보조", "train+heldout cube fit sanity check"],
-        ["Train RMSE px", "진단", "수렴/학습 적합도 확인"],
+        ["Train Cube RMSE px", "진단", "동일 724 train cube의 in-sample fit"],
         ["Heldout Cube RMSE px", "보조", "미사용 cube event 재투영"],
         ["Cross-view pixel transfer", "보조", "fixed/gripper camera cube px 일관성"],
         ["Cam-common Obj-Cam mm/deg", "보조", "카메라가 계산한 cube pose 차이"],
@@ -646,7 +646,7 @@ def slide_metric_matrix(ctx: dict, i: int, n: int) -> Image.Image:
     table(draw, 88, y, [440, 220, 740], ["지표", "등급", "사용법"], rows,
           row_font_size=21, header_font_size=18, max_bottom=794)
     card(draw, (88, 760, 1510, 830), "주의",
-         "Board heldout과 pooled overall은 최종 표에서 빼고, heldout 평가는 cube만 사용한다.",
+         "모든 재투영 평가는 cube로 통일한다. Cross-view는 36개 frozen pair의 원시 오차를 pooling한다.",
          ORANGE, title_size=22, body_size=21)
     return img
 
@@ -711,7 +711,7 @@ def slide_a2_a3(ctx: dict, i: int, n: int) -> Image.Image:
     bar_chart(draw, (68, y, 1000, y + 444), "Heldout cube reprojection RMSE px",
               [("A2 cube", a2c, TEAL), ("A3 cube", a3c, ORANGE)],
               max_value=7.0,
-              note="A3는 cube held-out가 3.5958 → 6.3959 px로 크게 악화된다.")
+              note="A3는 cube held-out가 3.5960 → 6.7199 px로 크게 악화된다.")
     card(draw, (1040, y, 1564, y + 202), "의미",
          "raw FK를 GT처럼 못 박으면 tool4/CAD frame 정의 오차가 calibration 결과에 흡수된다.",
          ORANGE)

@@ -11,7 +11,7 @@ A의 방법별 cross-view pixel transfer/e_cross는 held-out 자기 일관성을
 | Board only | **1.4141** | **1.9469** | 6.7698 | 10.1800 | 9 / 8 |
 | Cube only | 6.4928 | 9.1998 | **2.8820** | **3.5148** | 12 / 12 |
 | Board + Cube naive average | 2.2084 | 2.8479 | 6.5830 | 9.4558 | 21 / 11 |
-
+ㅁ
 ## Board-vs-Cube Relative-transform Conflict
 
 같은 물리적 카메라 관계를 board train 관측과 cube train 관측에서 각각 계산한 뒤 비교한 값이다. FK는 들어가지 않는다.

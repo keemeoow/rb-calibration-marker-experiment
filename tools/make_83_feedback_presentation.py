@@ -569,7 +569,7 @@ def slide_metrics(ctx: dict, i: int, n: int) -> Image.Image:
         ["Final", "External cube TRE/rot/P95/fail", "Independent External GT 후 최종 물리 순위"],
         ["Support", "Heldout Cube RMSE px", "미사용 cube event 재투영"],
         ["Support", "ALL Cube RMSE px", "train+heldout cube fit sanity check"],
-        ["Diagnostic", "Train RMSE px", "solver 수렴/학습 적합도"],
+        ["Diagnostic", "Train Cube RMSE px", "동일 724 train cube의 in-sample fit"],
         ["Diagnostic", "Cross-view pixel transfer", "fixed/gripper camera cube px 일관성"],
         ["Diagnostic", "Cam-common Obj-Cam mm/deg", "카메라가 본 cube pose 차이"],
     ]
@@ -665,7 +665,8 @@ def slide_cube_result(ctx: dict, i: int, n: int) -> Image.Image:
         (68, y, 1088, y + 462),
         "Second - first Δ RMSE px",
         entries,
-        note="음수는 두 번째 방법이 더 좋다는 뜻이다. A0/B3는 현재 cube heldout이 없어 최종 capture 후 채운다.",
+        note=("음수는 두 번째 방법이 더 좋다는 뜻이다. A0/B3도 "
+              "train-only cube evaluation pose로 cube heldout을 계산한다."),
     )
     card(
         draw,

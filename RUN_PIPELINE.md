@@ -96,6 +96,7 @@ table1_methods.json
             ├── stages.*.frame_prune_refit
             ├── train_reprojection.overall.rmse_px
             ├── heldout_reprojection.overall.rmse_px
+            ├── cube_evaluation_reprojection.heldout.cube.rmse_px
             └── transforms
                 ├── T_base_Ci.{0,1,3}
                 ├── T_gripper_cam
@@ -143,9 +144,12 @@ stored results`로 중단된다.
 - 계산 원본: `CP_result/session04/late_table1/table1_methods.json`
 - 최종 비교실험표와 평가지표: `CP_result/session04/late_table1/TABLE1_RESULTS.md`
 
-Session04 현재 결과는 9개 행×3개 seed 모두 수렴했다. Held-out reprojection은
-행마다 marker 모집단이 달라 외부 절대 정확도나 전체 방법 순위로 해석하면 안 된다.
-현재 보고서 생성 시점의 robot-base 절대 정확도는 계산하지 않고, 다음주
+Session04 현재 결과는 9개 행×3개 seed 모두 수렴했다. 최종 표의 Train Cube RMSE와
+heldout은 `cube_evaluation_reprojection`의 cube-only 값으로 통일했으며,
+camera/Hand–Eye는 frozen하고 train cube로 set별 evaluation pose만 맞춘다. Row별
+marker 모집단이 다른 solver Train RMSE는 계산 원본에만 남고 최종 비교표에는 쓰지
+않는다. 현재 보고서 생성 시점의
+robot-base 절대 정확도는 계산하지 않고, 다음주
 Independent External GT 태스크에서 Translation Error, Rotation Error, P95,
 Failure Rate를 산출한다.
 

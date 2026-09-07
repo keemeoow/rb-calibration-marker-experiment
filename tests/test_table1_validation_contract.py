@@ -11,6 +11,7 @@ from calibration_pipeline.schema import (
     MAIN_ABLATION_CONDITIONS,
 )
 from tools.sync_table1_canonical_data import (
+    _combined_cross_view_run,
     _data_warnings,
     _load,
     _markdown,
@@ -65,11 +66,15 @@ def test_table1_markdown_groups_tiers_and_surfaces_data_warnings():
     assert "dropped sets `0, 1, 2, 3`" in markdown
     assert "10.8077 mm translation RMSE" in markdown
     assert "## Final Comparison Table" in markdown
+    assert "### 평가지표 (한글로): 설명, 평가 지표 낸 방법" in markdown
+    assert "train cube 관측으로 set별 evaluation pose" in markdown
     assert "## Matched Contrast Decision Table" in markdown
     assert "A0 -> B3" in markdown
     assert "A2 -> A4" in markdown
     assert "## Metric Decision Matrix" in markdown
     assert "External cube TRE / rotation / P95 / failure" in markdown
+    assert "Train Cube RMSE px" in markdown
+    assert "| Train RMSE px |" not in markdown
     assert "Heldout Cube RMSE" in markdown
     assert "## Cross-view Camera Consistency" in markdown
     assert "External GT Task" in markdown
@@ -82,6 +87,54 @@ def test_table1_markdown_groups_tiers_and_surfaces_data_warnings():
     assert "Ours (corrected-FK factor)" not in markdown
     assert "Set-equal-weight Held-out RMSE" not in markdown
     assert "Board/Cube Held-out" not in markdown
+
+
+def test_board_only_rows_report_cube_evaluation_without_heldout_leakage():
+    table1 = _load(TABLE1_JSON)
+    cross = _load(CROSS_JSON)
+    rows = {row["method"]: row for row in _method_rows(table1, cross)}
+
+    for method in ("A0", "B3"):
+        run = table1["rows"][method]["runs"][0]
+        cube_eval = run["cube_evaluation_reprojection"]
+        assert cube_eval["camera_and_hand_eye_frozen"] is True
+        assert cube_eval["heldout_cube_observations_used_for_pose_fit"] is False
+        assert cube_eval["heldout"]["cube"]["n_corners"] == 236
+        assert run["heldout_reprojection"].get("cube") is None
+        assert rows[method]["all_cube_reprojection_rmse_px"] is not None
+        assert rows[method]["heldout_cube_reprojection_rmse_px"] is not None
+
+
+def test_final_train_metric_uses_one_cube_population_for_every_row():
+    table1 = _load(TABLE1_JSON)
+    cross = _load(CROSS_JSON)
+    rows = _method_rows(table1, cross)
+
+    assert {row["train_cube_n_corners"] for row in rows} == {724}
+    for row in rows:
+        run = table1["rows"][row["method"]]["runs"][0]
+        expected = run["cube_evaluation_reprojection"]["train"]["cube"]
+        assert expected["n_corners"] == 724
+        assert row["train_cube_reprojection_rmse_px"] is not None
+
+
+def test_combined_cross_view_pools_raw_pair_directions_and_corners():
+    cross = _load(CROSS_JSON)
+    supports = set()
+    for method, runs in cross["per_run"].items():
+        for run in runs:
+            combined = _combined_cross_view_run(run)
+            supports.add((
+                combined["n_pairs"], combined["n_directions"],
+                combined["n_destination_corners"],
+                combined["n_fixed_to_fixed_pairs"],
+                combined["n_gripper_to_fixed_pairs"],
+                combined["n_train_fixed_anchor_pairs"],
+            ))
+    assert supports == {(36, 72, 904, 9, 27, 18)}
+    a0 = _combined_cross_view_run(cross["per_run"]["A0"][0])
+    assert a0["cross_view_pixel_transfer_rmse_px"] == pytest.approx(
+        7.152744, abs=1e-6)
 
 
 def test_set_equal_weight_gives_every_set_one_vote():
@@ -148,6 +201,7 @@ def test_report_uses_cube_only_final_metric_set():
 
     assert "Heldout Cube RMSE" in markdown
     assert "ALL Cube RMSE" in markdown
+    assert "Train Cube RMSE" in markdown
     assert "External cube TRE / rotation / P95 / failure" in markdown
     assert "Board/Cube Held-out" not in markdown
     assert "Set-equal-weight Held-out RMSE" not in markdown
