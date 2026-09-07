@@ -46,7 +46,7 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from robot.backends.zeus_client import ZeusClient  # noqa: E402
+from robot.backends.zeus_client import ZeusClient, ZeusError  # noqa: E402
 
 from capture_session import (  # noqa: E402
     load_camera_labels, connect_cameras, stop_cameras, LiveView,
@@ -179,9 +179,15 @@ def print_plan(steps):
             print(f"[{i + 1:3d}] ----   {step['desc']}")
 
 
-def execute_plan(steps, rb: ZeusClient, cams, labels, out_root: Path, view, no_step: bool):
-    capture_counter = 0
+def execute_plan(steps, rb: ZeusClient, cams, labels, out_root: Path, view, no_step: bool,
+                  skip_steps: int = 0):
+    # 건너뛰는 스텝 중 몇 개가 "촬영" 스텝이었는지 세어서, 재개했을 때 캡처
+    # 번호가 처음부터 다시 매겨지며 기존 파일을 덮어쓰지 않게 한다.
+    capture_counter = sum(1 for s in steps[:skip_steps] if s["kind"] == "capture")
+
     for i, step in enumerate(steps):
+        if i < skip_steps:
+            continue
         desc = step["desc"]
         if not no_step:
             if view is not None:
@@ -193,20 +199,26 @@ def execute_plan(steps, rb: ZeusClient, cams, labels, out_root: Path, view, no_s
         else:
             print(f"[{i + 1}/{len(steps)}] {desc}")
 
-        if step["kind"] == "movel":
-            rb.movel(step["pose"], lin_speed=step["speed"])
-        elif step["kind"] == "movej":
-            rb.movej(step["joints"], jnt_speed=step["speed"])
-        elif step["kind"] == "grip":
-            rb.grip(step["state"], timeout_s=GRIP_TIMEOUT_S)
-        else:  # capture
-            time.sleep(SETTLE_S)
-            if view is not None:
-                view.show()
-            robot_state = read_robot_state(rb, {"capture_index": capture_counter, "step_index": i})
-            frames = grab_frames(cams, labels)
-            write_capture(frames, out_root / f"{capture_counter:03d}", robot_state)
-            capture_counter += 1
+        try:
+            if step["kind"] == "movel":
+                rb.movel(step["pose"], lin_speed=step["speed"])
+            elif step["kind"] == "movej":
+                rb.movej(step["joints"], jnt_speed=step["speed"])
+            elif step["kind"] == "grip":
+                rb.grip(step["state"], timeout_s=GRIP_TIMEOUT_S)
+            else:  # capture
+                time.sleep(SETTLE_S)
+                if view is not None:
+                    view.show()
+                robot_state = read_robot_state(rb, {"capture_index": capture_counter, "step_index": i})
+                frames = grab_frames(cams, labels)
+                write_capture(frames, out_root / f"{capture_counter:03d}", robot_state)
+                capture_counter += 1
+        except ZeusError as exc:
+            print(f"\n  [ERROR] 스텝 {i + 1} 실패, 중단합니다: {exc}")
+            print(f"  이어서 하려면: --skip-steps {i} (이 스텝부터 다시 시도) "
+                  f"또는 --skip-steps {i + 1} (이 스텝 건너뛰고 다음부터)")
+            return
 
 
 def main():
@@ -223,6 +235,8 @@ def main():
     ap.add_argument("--return-home", action="store_true", help="마지막에 큐브를 GRASP_REF_POSE 위치로 복귀")
     ap.add_argument("--execute", action="store_true", help="실제로 이동/그리퍼/촬영 (없으면 dry-run)")
     ap.add_argument("--no-step", action="store_true", help="스텝마다 Enter로 확인하지 않고 연속 실행")
+    ap.add_argument("--skip-steps", type=int, default=0,
+                    help="이미 실행된 스텝 수 -- 실패/중단 후 이어서 재실행할 때 그만큼 건너뜀")
     ap.add_argument("--no-cam-reset", action="store_true")
     ap.add_argument("--no-preview", action="store_true")
     args = ap.parse_args()
@@ -254,6 +268,8 @@ def main():
     rb.connect()
     print("\n*** 실제 로봇이 자동으로 움직이고 그리퍼를 조작합니다. "
           "GELLO 텔레옵은 완전히 종료된 상태여야 합니다. 비상정지에 손이 닿는지 확인하세요. ***")
+    if args.skip_steps:
+        print(f"처음 {args.skip_steps}스텝은 이미 실행된 것으로 보고 건너뜁니다.")
     if input("계속하려면 'go' 입력: ").strip().lower() != "go":
         print("취소했습니다.")
         rb.close()
@@ -264,7 +280,7 @@ def main():
 
     out_root = Path(args.out_root)
     try:
-        execute_plan(steps, rb, cams, used_labels, out_root, view, args.no_step)
+        execute_plan(steps, rb, cams, used_labels, out_root, view, args.no_step, args.skip_steps)
     finally:
         rb.close()
         if view is not None:
