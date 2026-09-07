@@ -172,21 +172,37 @@ class LiveView:
         cv2.destroyWindow(self.window_name)
 
 
-def save_capture(cams, labels, out_dir: Path, robot_state: dict):
-    out_dir.mkdir(parents=True, exist_ok=True)
-    saved = []
+# PNG 압축 레벨(0~9, 낮을수록 빠르고 파일은 큼) -- 기본값(보통 1~3)도 나쁘진
+# 않지만, 8장(컬러4+depth4)을 SPACE 누른 직후 즉시 써야 해서 최대한 빠르게.
+PNG_FAST = [cv2.IMWRITE_PNG_COMPRESSION, 1]
+
+
+def grab_frames(cams: dict, labels: dict) -> dict:
+    """카메라 버퍼에서 최신 프레임을 메모리로만 즉시 복사해온다 (디스크 I/O 없음,
+    거의 즉시 끝남) -- SPACE를 누른 그 순간의 프레임을 확정해두기 위함."""
+    frames = {}
     for serial, cam in cams.items():
         color, depth, _ts = cam.get_latest()
-        if color is None:
-            print(f"  [WARN] cam {serial}: 프레임 없음, 건너뜀")
-            continue
         label = labels.get(serial, serial)
-        cv2.imwrite(str(out_dir / f"cam_{label}.png"), color)
+        frames[label] = (color, depth)
+    return frames
+
+
+def write_capture(frames: dict, out_dir: Path, robot_state: dict) -> None:
+    """실제 디스크 쓰기 -- 느릴 수 있는 부분이라 백그라운드 스레드에서 돌려서
+    메인 루프(미리보기 갱신)가 멈추지 않게 한다."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    saved = []
+    for label, (color, depth) in frames.items():
+        if color is None:
+            print(f"  [WARN] {label}: 프레임 없음, 건너뜀")
+            continue
+        cv2.imwrite(str(out_dir / f"cam_{label}.png"), color, PNG_FAST)
         if depth is not None:
-            cv2.imwrite(str(out_dir / f"cam_{label}_depth.png"), depth)
+            cv2.imwrite(str(out_dir / f"cam_{label}_depth.png"), depth, PNG_FAST)
         saved.append(label)
     (out_dir / "robot.json").write_text(json.dumps(robot_state, indent=2, ensure_ascii=False) + "\n")
-    return saved
+    print(f"  저장됨 -> {out_dir}  (카메라 {len(saved)}대: {', '.join(saved)})")
 
 
 def read_robot_state(rb: ZeusClient, extra=None) -> dict:
@@ -266,10 +282,10 @@ def main():
                     break
 
             robot_state = read_robot_state(rb, {"capture_index": count})
+            frames = grab_frames(cams, used_labels)
             out_dir = capture_root / f"{count:03d}"
-            saved = save_capture(cams, used_labels, out_dir, robot_state)
-            print(f"  저장됨 -> {out_dir}  (카메라 {len(saved)}대: {', '.join(saved)})  "
-                  f"pose_mm_deg={[round(v, 1) for v in robot_state['pose']]}")
+            write_capture(frames, out_dir, robot_state)
+            print(f"  pose_mm_deg={[round(v, 1) for v in robot_state['pose']]}")
             count += 1
     except (KeyboardInterrupt, EOFError):
         pass
