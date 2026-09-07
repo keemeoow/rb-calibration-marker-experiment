@@ -147,7 +147,7 @@ def load_intrinsics_by_label(zeus_intrinsics_dir: Path, ur3_intrinsics_dir: Path
     return K_map, D_map
 
 
-def build_synthetic_meta(session_root: Path, capture_indices) -> dict:
+def build_synthetic_meta(session_root: Path, capture_indices, capture_subdir: str = "capture") -> dict:
     """In-memory meta dict satisfying load_cube_pixel_observations's schema.
 
     Every capture here is a session1 "cube gripped by the robot" pose, so
@@ -162,7 +162,7 @@ def build_synthetic_meta(session_root: Path, capture_indices) -> dict:
         folder = f"{idx:03d}"
         cams = {}
         for local_id, label in label_by_id.items():
-            rel = f"capture/{folder}/cam_{label}.png"
+            rel = f"{capture_subdir}/{folder}/cam_{label}.png"
             if (session_root / rel).is_file():
                 cams[str(local_id)] = {"saved": True, "rgb_path": rel}
         captures.append({
@@ -174,11 +174,11 @@ def build_synthetic_meta(session_root: Path, capture_indices) -> dict:
     return {"captures": captures}
 
 
-def load_robot_T(session_root: Path, capture_indices) -> dict:
+def load_robot_T(session_root: Path, capture_indices, capture_subdir: str = "capture") -> dict:
     """event_id -> T_base_gripper (metres), via Zeus's own pose6_to_T."""
     robot_T = {}
     for idx in capture_indices:
-        robot_json = session_root / "capture" / f"{idx:03d}" / "robot.json"
+        robot_json = session_root / capture_subdir / f"{idx:03d}" / "robot.json"
         state = json.loads(robot_json.read_text())
         robot_T[int(idx)] = pose6_to_T(state["pose"])
     return robot_T
@@ -256,11 +256,13 @@ def main():
     ap.add_argument("--device-map", default=str(REPO_ROOT / "intrinsics" / "device_map.json"))
     ap.add_argument("--cube-observation-policy", default="legacy", choices=("legacy", "core_multiface"))
     ap.add_argument("--fixed-min-corners", type=int, default=8)
+    ap.add_argument("--capture-subdir", default="capture",
+                    help="session_root 아래 실제 캡처 폴더 이름 (예: capture_replayed)")
     ap.add_argument("--out", default=str(REPO_ROOT / "zeus_gello_calibration" / "pass1_grasp_offset.json"))
     args = ap.parse_args()
 
     session_root = Path(args.session_root)
-    capture_dirs = sorted(p for p in (session_root / "capture").iterdir() if p.is_dir())
+    capture_dirs = sorted(p for p in (session_root / args.capture_subdir).iterdir() if p.is_dir())
     capture_indices = [int(p.name) for p in capture_dirs]
     print(f"session root: {session_root}  ({len(capture_indices)} captures: {capture_indices})")
 
@@ -269,8 +271,8 @@ def main():
     for label, local_id in LOCAL_CAM_IDS.items():
         print(f"  local cam {local_id} ({label}): fx={K_map[local_id][0,0]:.1f} fy={K_map[local_id][1,1]:.1f}")
 
-    meta = build_synthetic_meta(session_root, capture_indices)
-    robot_T = load_robot_T(session_root, capture_indices)
+    meta = build_synthetic_meta(session_root, capture_indices, args.capture_subdir)
+    robot_T = load_robot_T(session_root, capture_indices, args.capture_subdir)
 
     cube_cfg = get_default_cube_config()
     cube = AprilTagCubeTarget(cube_cfg)
