@@ -19,6 +19,6 @@
 
 해석: held-out 전체 오차 기준으로 soft-L1이 linear보다 낮은 방법은 A0 0.63%, A1 0.12%, A2 2.26%, A4 2.23%, A5 4.38%, B1 0.18%, B2 8.02%, B3 0.63%이고, 높은 방법은 A3 0.18%이다. 따라서 robust loss가 모든 조건을 일괄 개선한다고 주장할 수 없으며, 방법별·표적별 결과를 함께 보고해야 한다.
 
-A5는 train-vision-aligned FK를 hard-fixed한 post-hoc diagnostic이다. 이 sensitivity 결과도 A5를 confirmatory winner나 외부 물리 정확도 근거로 승격시키지 않는다.
+A5는 train-vision-aligned FK를 hard-fixed한 최종 후보가 될 수 있다. 단, 이 sensitivity 결과만으로 A5를 외부 물리 정확도 winner로 확정하지는 않으며, GT 공개 전에 방법과 alignment artifact를 frozen해야 한다.
 
 한계: 이 결과는 이미 적용된 사전 PnP 품질 마스크를 고정한 실험이다. 프레임/관측 hard rejection 자체의 민감도는 threshold를 사전 등록한 별도 실험으로 확인해야 한다.

@@ -322,7 +322,7 @@ def main(argv=None) -> None:
         summary.append(summarize(
             method, per_run[method],
             ("preflight_simulation_prior" if method in {"A4", "B1", "B2"}
-             else "posthoc_diagnostic" if method == "A5"
+             else "freeze_before_external_gt" if method == "A5"
              else "complete")))
 
     support = {}

@@ -148,7 +148,7 @@ def markdown_report(summary: Sequence[Mapping], conflict: Mapping) -> str:
         "shared target pose를 사용하지 않는다. SOTA 비교나 절대 정확도 "
         "주장이 아니다.",
         "",
-        "A의 방법별 Fixed-to-Fixed/e_cross는 held-out 자기 일관성을 보는 "
+        "A의 방법별 cross-view pixel transfer/e_cross는 held-out 자기 일관성을 보는 "
         "보조 지표이고, 이 B가 그 값과 독립적으로 계산되는 relative-pose "
         "기준선이다.",
         "",

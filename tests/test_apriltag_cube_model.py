@@ -21,7 +21,9 @@ from calibration_pipeline.apriltag_cube import (
     validate_cube_config,
 )
 from calibration_pipeline.config import (
+    CUBE_BODY_BOTTOM_Z_M,
     CUBE_BODY_HEIGHT_M,
+    CUBE_BODY_TOP_Z_M,
     CUBE_DEPTH_M,
     CUBE_OVERALL_HEIGHT_M,
     CUBE_WIDTH_M,
@@ -32,6 +34,7 @@ from calibration_pipeline.config import (
     get_default_cube_config,
 )
 from calibration_pipeline.cube_config import (
+    cube_config_mismatch_keys,
     cube_configs_equivalent,
     load_cube_config_from_meta,
 )
@@ -70,26 +73,31 @@ def test_default_geometry_is_physically_self_consistent():
     assert CUBE_WIDTH_M == 0.059
     assert CUBE_DEPTH_M == 0.059
     assert CUBE_BODY_HEIGHT_M == 0.057
-    assert TOP_PROTRUSION_HEIGHT_M == 0.002
-    assert np.isclose(CUBE_OVERALL_HEIGHT_M, 0.059)
-    assert np.isclose(TOP_MARKER_PLANE_Z_M, 0.0295)
+    assert TOP_PROTRUSION_HEIGHT_M == 0.035
+    assert np.isclose(CUBE_OVERALL_HEIGHT_M, 0.092)
+    assert np.isclose(TOP_MARKER_PLANE_Z_M, 0.0625)
     assert np.isclose(SIDE_MARKER_CENTER_Z_M, -0.001)
-    assert np.isclose(
-        CUBE_BODY_HEIGHT_M + TOP_PROTRUSION_HEIGHT_M, cfg.cube_side_m)
+    # cube_side_m is the square footprint, not the height: the 35mm protrusion
+    # makes the envelope 59 x 59 x 92mm, spanning z = -29.5mm .. +62.5mm.
+    assert np.isclose(CUBE_WIDTH_M, cfg.cube_side_m)
+    assert np.isclose(CUBE_BODY_TOP_Z_M - CUBE_BODY_BOTTOM_Z_M, CUBE_BODY_HEIGHT_M)
+    assert np.isclose(TOP_MARKER_PLANE_Z_M - CUBE_BODY_BOTTOM_Z_M, CUBE_OVERALL_HEIGHT_M)
+    assert np.isclose(SIDE_MARKER_CENTER_Z_M,
+                      (CUBE_BODY_TOP_Z_M + CUBE_BODY_BOTTOM_Z_M) / 2.0)
 
     expected = {
-        0: ("+Z", 25.0, (0.0, -14.0, 29.5), 0.0),
-        1: ("+Z", 25.0, (0.0, 14.0, 29.5), 0.0),
+        0: ("+Z", 25.0, (0.0, -14.0, 62.5), 0.0),
+        1: ("+Z", 25.0, (0.0, 14.0, 62.5), 0.0),
         2: ("+X", 51.0, (29.5, 0.0, -1.0), 90.0),
         3: ("+Y", 51.0, (0.0, 29.5, -1.0), 180.0),
         4: ("-X", 51.0, (-29.5, 0.0, -1.0), 270.0),
         5: ("-Y", 51.0, (0.0, -29.5, -1.0), 0.0),
     }
     expected_corners_mm = {
-        0: [[12.5, -26.5, 29.5], [-12.5, -26.5, 29.5],
-            [-12.5, -1.5, 29.5], [12.5, -1.5, 29.5]],
-        1: [[12.5, 1.5, 29.5], [-12.5, 1.5, 29.5],
-            [-12.5, 26.5, 29.5], [12.5, 26.5, 29.5]],
+        0: [[12.5, -26.5, 62.5], [-12.5, -26.5, 62.5],
+            [-12.5, -1.5, 62.5], [12.5, -1.5, 62.5]],
+        1: [[12.5, 1.5, 62.5], [-12.5, 1.5, 62.5],
+            [-12.5, 26.5, 62.5], [12.5, 26.5, 62.5]],
         2: [[29.5, 25.5, -26.5], [29.5, -25.5, -26.5],
             [29.5, -25.5, 24.5], [29.5, 25.5, 24.5]],
         3: [[-25.5, 29.5, -26.5], [25.5, 29.5, -26.5],
@@ -186,10 +194,25 @@ def test_id_overlap_is_only_an_error_for_the_same_dictionary():
     assert any("[collision]" in problem for problem in problems)
 
 
-def test_session04_frozen_config_matches_current_default():
+def test_session04_frozen_config_is_the_pre_revision_cube():
+    """session04 predates the 35mm-protrusion CAD revision.
+
+    Its geometry must keep coming from the frozen meta.json, and must differ
+    from the current default in exactly one way: the top-marker plane. Body and
+    side markers are unchanged because the object-frame origin stayed put.
+    """
     _, session_cfg, source = _load_session04()
+    default_cfg = get_default_cube_config()
     assert source == "meta"
-    assert cube_configs_equivalent(session_cfg, get_default_cube_config())
+    assert not cube_configs_equivalent(session_cfg, default_cfg)
+    assert cube_config_mismatch_keys(default_cfg, session_cfg) == ["marker_center_m"]
+
+    for marker_id, center in session_cfg.marker_center_m.items():
+        face = session_cfg.id_to_face[marker_id]
+        if face == "+Z":
+            assert np.isclose(center[2], 0.0295)  # pre-revision 2mm protrusion
+        else:
+            assert np.allclose(center, default_cfg.marker_center_m[marker_id])
 
 
 def test_session04_detector_corners_are_clockwise_for_every_id():

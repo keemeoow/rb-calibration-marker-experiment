@@ -1,7 +1,7 @@
 # Calibration → Table 1 실행 순서
 
 메인 실행 파일은 저장소 root의 `01_...py`부터 `06_...py`까지다. 01~05가
-입력 준비와 calibration을 수행하고, 06은 05 결과만 읽어 상세 보고서를 만든다.
+입력 준비와 calibration을 수행하고, 06은 05 결과만 읽어 CSV와 행렬 JSON을 만든다.
 Cross-target·marker-system·OpenCV baseline은 calibration 완료에 필요하지 않아
 `tools/`의 선택 평가로 분리했다.
 
@@ -46,7 +46,7 @@ python3 05_calibrate.py \
   --observation-manifest data/session04/calib_out/capture_filter/Step2b_observation_manifest.json \
   --out_dir CP_result/session04/late_table1
 
-# 06 — 05 결과만으로 상세 결과·전체 calibration 행렬 출력
+# 06 — 05 결과만으로 요약 CSV·전체 calibration 행렬 출력
 python3 06_make_report.py \
   --root_folder data/session04/calib_train \
   --table1 CP_result/session04/late_table1/table1_methods.json \
@@ -62,7 +62,7 @@ python3 06_make_report.py \
 | 03 `capture` | 02 결과, board/cube, 카메라, robot FK | 프레임을 동기화하고 품질 gate를 통과한 event의 영상·로봇 pose를 저장한다 | `data/sessionNN/calib_train/meta.json`, RGB/depth 이미지 |
 | 04 `filter_observations` | 03 세션, 고정 K/D | 모든 RGB를 다시 검출하고 관측 정책을 적용해 native-pixel corner와 원본 SHA-256을 고정한다 | `Step2b_observation_manifest.json`, QA CSV, overlay, `CAPTURE_FILTER.md` |
 | 05 `calibrate` | 04 manifest, K/D, `meta.json`, robot FK | event 단위 train/held-out 분리, 공통 초기화, 9개 조건 fit, `frame-prune → refit → rollback`, held-out 평가 | `table1_methods.json`, 두 shared artifact |
-| 06 `make_report` | 05의 `table1_methods.json` | 재최적화 없이 수렴·오차·prune 결정과 모든 행렬을 정리한다 | `CALIBRATION_RESULTS.md`, `calibration_summary.csv`, `calibration_matrices.json` |
+| 06 `make_report` | 05의 `table1_methods.json` | 재최적화 없이 수렴·오차·prune 결정과 모든 행렬을 정리한다 | `calibration_summary.csv`, `calibration_matrices.json` |
 
 ## 각 calibration 행렬은 언제 나오는가
 
@@ -78,7 +78,7 @@ python3 06_make_report.py \
 | 05 공통 초기화 | `shared_reference_state`, `row_reference_states` | train 관측만 사용한 PnP/robust pose 초기화 | `shared_train_only_baseline.json`; optimizer 시작점 |
 | 05 FK 정렬 | `T_gripper_cam`, `T_fk_cube_center_to_tag_object`, `raw_fk_pose_by_set`, `aligned_fk_pose_by_set` | train-only board-free FK–cube alignment | `shared_board_free_fk_cube.json`; A4/A5/B1/B2 입력 |
 | 05 각 행·seed 종료 | `T_base_Ci`, `T_gripper_cam`, `T_base_board`, `T_base_cube_by_set` | raw-corner reprojection fit 후 prune/refit 결과가 개선되면 채택, 아니면 첫 fit으로 rollback | `table1_methods.json → rows.<행>.runs[*].transforms`; **최종값** |
-| 06 | 새 행렬 없음 | 05의 최종값을 사람이 읽는 문서와 독립 JSON으로 복사·요약 | `calibration_matrices.json`에 9행×3 seed 전체 보존 |
+| 06 | 새 행렬 없음 | 05의 최종값을 CSV와 독립 JSON으로 복사·요약 | `calibration_matrices.json`에 9행×3 seed 전체 보존 |
 
 최종 배포 대상은 `T_base_Ci = T^B_Ci`와 `T_gripper_cam = T^G_C`다.
 `T_base_board`와 `T_base_cube_by_set`은 카메라들을 같은 좌표계로 묶는 target pose라서
@@ -110,7 +110,7 @@ table1_methods.json
 ## 선택 평가 — calibration 완료 후 필요할 때만
 
 ```bash
-# 동일 frozen split의 fixed↔fixed / gripper↔fixed 내부 경로 평가
+# 동일 frozen split의 cross-view camera consistency 평가
 python3 tools/evaluate_cross_target.py --root_folder data/session04/calib_train
 
 # board-only / cube-only / both marker-system end-to-end 비교
@@ -134,15 +134,14 @@ intrinsics, 모든 영상의 SHA-256 검증은 그대로 수행한다. 즉 무�
 stored results`로 중단된다.
 
 이 세 평가는 05의 calibration 행렬을 만드는 필수 단계가 아니다. 과거의 통합
-Table 1 Markdown/HTML을 갱신할 때만 `tools/sync_table1_canonical_data.py`를 사용한다.
+최종 Table 1 Markdown/HTML을 갱신할 때만 `tools/sync_table1_canonical_data.py`를 사용한다.
 
 ## 현재 Session04 결과 위치
 
-- 상세 결과와 seed 0 행렬: `CP_result/session04/late_table1/CALIBRATION_RESULTS.md`
 - 모든 행·seed의 정확한 행렬: `CP_result/session04/late_table1/calibration_matrices.json`
 - 행별 수렴·오차·prune 요약: `CP_result/session04/late_table1/calibration_summary.csv`
 - 계산 원본: `CP_result/session04/late_table1/table1_methods.json`
-- 기존 확장 평가 표: `CP_result/session04/late_table1/TABLE1_RESULTS.md`
+- 최종 비교실험표와 평가지표: `CP_result/session04/late_table1/TABLE1_RESULTS.md`
 
 Session04 현재 결과는 9개 행×3개 seed 모두 수렴했다. Held-out reprojection은
 행마다 marker 모집단이 달라 외부 절대 정확도나 전체 방법 순위로 해석하면 안 된다.

@@ -1,5 +1,5 @@
 # calibration_pipeline/apriltag_cube.py
-"""AprilTag cube geometry, detection, and solvePnP for the 59mm marker cube.
+"""AprilTag cube geometry, detection, and solvePnP for the marker cube.
 
 This file intentionally keeps only the calibration-critical path:
   detect tags -> build 2D/3D correspondences -> solve PnP -> report reprojection.
@@ -13,7 +13,14 @@ from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
 
-from calibration_pipeline.config import CubeConfig, get_default_cube_config
+from calibration_pipeline.config import (
+    CUBE_BODY_BOTTOM_Z_M,
+    CUBE_BODY_TOP_Z_M,
+    SIDE_MARKER_CENTER_Z_M,
+    TOP_MARKER_PLANE_Z_M,
+    CubeConfig,
+    get_default_cube_config,
+)
 
 
 CUBE_CORNER_REFINEMENT_MODES = ("apriltag", "line_intersection")
@@ -99,15 +106,20 @@ class AprilTagCubeModel:
 
     def __init__(self, cfg: CubeConfig):
         self.cfg = cfg
-        d = float(cfg.cube_side_m) / 2.0
+        d = float(cfg.cube_side_m) / 2.0  # square footprint half-extent (x/y)
+        # The cube is not isotropic in z: the side faces sit on the 57mm body
+        # and the top face sits on the +Z protrusion, so the fallback centers
+        # below use the explicit z constants instead of +/-d. They only apply to
+        # a marker with no entry in ``marker_center_m``.
+        top_z, bottom_z, side_z = TOP_MARKER_PLANE_Z_M, CUBE_BODY_BOTTOM_Z_M, SIDE_MARKER_CENTER_Z_M
         # face -> (fallback center, local +x/u axis, local +y/v axis, outward normal)
         self.face_defs = {
-            "+Z": (np.array([0, 0, d]), np.array([1, 0, 0]), np.array([0, 1, 0]), np.array([0, 0, 1])),
-            "-Z": (np.array([0, 0, -d]), np.array([1, 0, 0]), np.array([0, 1, 0]), np.array([0, 0, -1])),
-            "+X": (np.array([d, 0, 0]), np.array([0, 0, -1]), np.array([0, 1, 0]), np.array([1, 0, 0])),
-            "-X": (np.array([-d, 0, 0]), np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([-1, 0, 0])),
-            "+Y": (np.array([0, d, 0]), np.array([1, 0, 0]), np.array([0, 0, -1]), np.array([0, 1, 0])),
-            "-Y": (np.array([0, -d, 0]), np.array([1, 0, 0]), np.array([0, 0, 1]), np.array([0, -1, 0])),
+            "+Z": (np.array([0, 0, top_z]), np.array([1, 0, 0]), np.array([0, 1, 0]), np.array([0, 0, 1])),
+            "-Z": (np.array([0, 0, bottom_z]), np.array([1, 0, 0]), np.array([0, 1, 0]), np.array([0, 0, -1])),
+            "+X": (np.array([d, 0, side_z]), np.array([0, 0, -1]), np.array([0, 1, 0]), np.array([1, 0, 0])),
+            "-X": (np.array([-d, 0, side_z]), np.array([0, 0, 1]), np.array([0, 1, 0]), np.array([-1, 0, 0])),
+            "+Y": (np.array([0, d, side_z]), np.array([1, 0, 0]), np.array([0, 0, -1]), np.array([0, 1, 0])),
+            "-Y": (np.array([0, -d, side_z]), np.array([1, 0, 0]), np.array([0, 0, 1]), np.array([0, -1, 0])),
         }
 
     def marker_size(self, marker_id: int) -> float:
@@ -714,7 +726,10 @@ def validate_cube_config(
       4. each marker's local +Z axis equals the face outward normal
       5. no marker ID collides with the Charuco board ID range when both targets
          use the same dictionary (overlap across different dictionaries is safe)
-      6. all four corners of every marker fall inside the cube face bounds
+      6. all four corners of every marker fall inside their face bounds: the
+         59mm square footprint in x/y, and for the side faces the 57mm body
+         span in z (the top face lies on the +Z protrusion, whose plane is
+         already pinned by check 3)
 
     Units are meters throughout. Returns ``(ok, problems)``.
     """
@@ -724,8 +739,14 @@ def validate_cube_config(
     model = AprilTagCubeModel(cfg)
     problems: List[str] = []
 
-    d = float(cfg.cube_side_m) / 2.0
+    d = float(cfg.cube_side_m) / 2.0  # square footprint half-extent (x/y)
     inset = float(getattr(cfg, "marker_inset_m", 0.0) or 0.0)
+    # Out-of-plane coordinate of each face surface. z is asymmetric because the
+    # top markers sit on the +Z protrusion while the body spans a different range.
+    face_plane_coord = {
+        "+X": +d, "-X": -d, "+Y": +d, "-Y": -d,
+        "+Z": TOP_MARKER_PLANE_Z_M, "-Z": CUBE_BODY_BOTTOM_Z_M,
+    }
 
     # 1) unique IDs
     ids = [int(m) for m in cfg.marker_ids]
@@ -773,9 +794,9 @@ def validate_cube_config(
         center = pose[:3, 3]
         normal = pose[:3, 2]
 
-        # 3) center lies on the face plane (out-of-plane coord == +/-(d - inset))
+        # 3) center lies on the face plane, recessed by ``inset`` toward the body
         axis, sign = _FACE_AXIS[face]
-        expected_coord = sign * (d - inset)
+        expected_coord = face_plane_coord[face] - sign * inset
         if abs(center[axis] - expected_coord) > tol_m:
             problems.append(
                 f"[center] id {mid} on face {face}: axis-{axis} coord {center[axis]:+.4f} "
@@ -789,13 +810,22 @@ def validate_cube_config(
                 f"!= face normal {FACE_OUTWARD_NORMAL[face].tolist()}"
             )
 
-        # 6) all corners inside the cube bounding box (fit on the face)
+        # 6) all corners fit on the face (footprint in x/y, body span in z)
         corners = model.marker_corners_in_rig(mid)
-        if np.any(np.abs(corners) > d + tol_m):
-            worst = float(np.max(np.abs(corners)))
+        if np.any(np.abs(corners[:, :2]) > d + tol_m):
+            worst = float(np.max(np.abs(corners[:, :2])))
             problems.append(
-                f"[bounds] id {mid} on face {face}: a corner reaches {worst:.4f}m > half-cube {d:.4f}m"
+                f"[bounds] id {mid} on face {face}: a corner reaches {worst:.4f}m in x/y "
+                f"> half-footprint {d:.4f}m"
             )
+        if face not in ("+Z", "-Z"):
+            z = corners[:, 2]
+            if np.any(z < CUBE_BODY_BOTTOM_Z_M - tol_m) or np.any(z > CUBE_BODY_TOP_Z_M + tol_m):
+                problems.append(
+                    f"[bounds] id {mid} on face {face}: corner z range "
+                    f"[{float(z.min()):+.4f}, {float(z.max()):+.4f}]m leaves the body span "
+                    f"[{CUBE_BODY_BOTTOM_Z_M:+.4f}, {CUBE_BODY_TOP_Z_M:+.4f}]m"
+                )
 
     return (len(problems) == 0), problems
 
@@ -805,9 +835,12 @@ def print_cube_sanity_check(cfg: Optional[CubeConfig] = None, charuco_cfg=None, 
     model = AprilTagCubeModel(cfg)
     ok, problems = validate_cube_config(cfg, charuco_cfg=charuco_cfg, tol_m=tol_m)
 
-    print("=== AprilTag 59mm cube sanity check ===")
-    print(f"cube_side_m = {cfg.cube_side_m:.6f}  dictionary = {cfg.dictionary_name}  "
+    print("=== AprilTag cube sanity check ===")
+    print(f"cube_side_m (x/y footprint) = {cfg.cube_side_m:.6f}  "
+          f"dictionary = {cfg.dictionary_name}  "
           f"marker_inset_m = {getattr(cfg, 'marker_inset_m', 0.0):.4f}")
+    print(f"body z = [{CUBE_BODY_BOTTOM_Z_M:+.4f}, {CUBE_BODY_TOP_Z_M:+.4f}]  "
+          f"top-marker plane z = {TOP_MARKER_PLANE_Z_M:+.4f}")
     print(f"{'id':>3} {'face':>4} {'size_m':>8}  {'center_m':>26}  {'normal':>14}")
     for mid in (int(m) for m in cfg.marker_ids):
         size = model.marker_size(mid)

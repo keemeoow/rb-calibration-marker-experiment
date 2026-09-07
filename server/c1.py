@@ -28,16 +28,31 @@ PORT = 12348
 GRIPPER_IO_PORT = 48
 GRIPPER_TIMEOUT_SEC = 5.0
 
-# 이 저장소의 큐브는 59mm 다(config.py CubeConfig.cube_side_m = 0.059, 캘리퍼 확인).
+# 이 저장소의 큐브 단면은 59mm 다(config.py CubeConfig.cube_side_m = 0.059, 캘리퍼 확인).
 # 30.0 은 형제 프로젝트(rb-ArucoCube_Robot_multi_calibration)의 큐브 값이다.
-CUBE_SIZE_MM = 59.0
-# 그리퍼는 큐브 윗면(마커 양옆)을 잡고 윗면보다 이만큼 아래까지 물린다.
-# 2026-08-10: 1.7mm 로는 살짝만 걸쳐 잡혀 옮기다 놓쳤다. 실제로 확실히 물리는 TCP
-# 높이(-5.2)에서 역산한 2.0mm 로 올린다(캘리퍼 1.7mm 와 0.3mm 차이는 측정 오차 범위).
+CUBE_SIZE_MM = 59.0  # x/y 단면(footprint)일 뿐 높이가 아니다
+# 2026-09 CAD 개정: (1) +Z 돌출부가 2mm -> 35mm 로 높아져 전체 높이는 57+35=92mm 가
+# 되고, (2) 양 옆의 큐브 잡는 손잡이가 제거됐다. 큐브 object frame 원점은 그대로
+# 두었으므로(config.py 참조) 윗면만 z=+29.5 -> +62.5 로 올라갔고 본체와 side marker
+# 좌표는 변하지 않았다. 손잡이가 없어졌으므로 그리퍼는 이제 35mm 돌출부의 옆면을
+# 직접 문다 — 무는 위치가 바뀌었으니 아래 CUBE_GRIP_DEPTH_MM 을 반드시 재실측할 것.
+CUBE_OVERALL_HEIGHT_MM = 92.0
+CUBE_TOP_SURFACE_Z_MM = 62.5  # config.py TOP_MARKER_PLANE_Z_M (구 큐브는 29.5)
+# 그리퍼가 큐브 윗면보다 이만큼 아래까지 물린다.
+#
+# !! 2026-09 CAD 개정 미반영 !!  아래 2.0 은 손잡이(윗면 마커 양옆)를 물던 구 큐브의
+# 값이다(2026-08-10: 1.7mm 로는 살짝만 걸쳐 잡혀 옮기다 놓쳤고, 확실히 물리는 TCP
+# 높이 -5.2 에서 역산해 2.0 으로 올렸다). 손잡이가 제거된 새 큐브에서는 35mm 돌출부
+# 옆면을 무는 깊이가 완전히 다른 값이므로 그대로 쓰면 안 된다. 이 값은 tool4(기록용
+# 큐브 중심 = A3 raw-FK 입력)를 직접 결정하므로, 새 큐브로 촬영하기 전에
+#   CUBE_GRIP_DEPTH_MM = (테이블 z + 92.0) - 확실히 물린 fingertip z
+# 로 재실측해 갱신할 것. 아래 GRIP_TCP_Z_MM 재실측과 같은 작업에서 함께 얻으면 된다.
 CUBE_GRIP_DEPTH_MM = 2.0
-# fingertip(TCP) 에서 큐브 중심까지의 거리. 윗면이 중심보다 CUBE_SIZE/2 위에 있고
-# fingertip 은 윗면보다 GRIP_DEPTH 아래이므로, 중심은 fingertip 보다 이만큼 "아래"다.
-CUBE_CENTER_OFFSET_Z = CUBE_SIZE_MM / 2.0 - CUBE_GRIP_DEPTH_MM  # 27.5mm
+# fingertip(TCP) 에서 큐브 중심(= object frame 원점)까지의 거리. 윗면이 원점보다
+# CUBE_TOP_SURFACE_Z_MM 위에 있고 fingertip 은 윗면보다 GRIP_DEPTH 아래이므로,
+# 원점은 fingertip 보다 이만큼 "아래"다. 구 큐브에서는 29.5-2.0=27.5mm 였다.
+# GRIP_DEPTH 가 재실측되면 이 값과 TOOL_CUBE_CENTER_Z 도 함께 따라 바뀐다.
+CUBE_CENTER_OFFSET_Z = CUBE_TOP_SURFACE_Z_MM - CUBE_GRIP_DEPTH_MM  # 60.5mm (잠정)
 
 # ── tool 오프셋: "모션용"과 "기록용"을 분리한다 ──────────────────────────────
 #
@@ -54,7 +69,7 @@ TOOL_FINGERTIP_Z = 115.5  # [기록 전용] fingertip 까지의 실제 오프셋
 # 큐브 중심은 fingertip 보다 아래 = 플랜지에서 더 먼 쪽이므로 tool 오프셋은 "더한다".
 # (뺄셈은 중심을 fingertip 위로 놓아 부호가 뒤집힌다 — 윗면을 잡는 이 그리퍼에서는
 #  큐브가 TCP 아래에 매달리므로 물리적으로 불가능한 배치였다.)
-TOOL_CUBE_CENTER_Z = TOOL_FINGERTIP_Z + CUBE_CENTER_OFFSET_Z  # 143.0mm [기록 전용]
+TOOL_CUBE_CENTER_Z = TOOL_FINGERTIP_Z + CUBE_CENTER_OFFSET_Z  # 176.0mm [기록 전용]
 
 # 그립/놓기가 일어나는 TCP 높이(base frame, mm). 모든 set 에서 이 높이로 강제한다.
 #
@@ -66,6 +81,14 @@ TOOL_CUBE_CENTER_Z = TOOL_FINGERTIP_Z + CUBE_CENTER_OFFSET_Z  # 143.0mm [기록 
 # 값은 실제 로봇에서 큐브를 올바르게 쥔 자세의 TCP z 를 읽어 넣는다. None 이면 정규화하지
 # 않고 place_joints 도달 시 읽은 z 를 그대로 쓴다(구 동작).
 # 2026-08-10 실측: 큐브가 확실히 물리는 TCP z.
+#
+# !! 2026-09 CAD 개정 미반영 !!  아래 -5.2 는 전체 높이 59mm 이고 손잡이가 있던 구
+# 큐브를 놓고 실측한 값이다. 새 큐브는 92mm 로 33mm 더 높고 손잡이가 없어 무는 깊이도
+# 달라졌으므로, 같은 TCP z 로 내려가면 큐브 바닥이 테이블보다 아래를 향해 부딪힌다.
+# 새 큐브로 촬영하기 전에 실제 로봇에서 그립/놓기 TCP z 를 다시 실측해 PLACE_TCP_Z_MM
+# 과 GRIP_TCP_Z_MM 을 갱신하고, 같은 자세에서 CUBE_GRIP_DEPTH_MM 도 함께 얻을 것.
+# (높이 차이만 반영한 기하학적 예상치는 -5.2 + 33.0 = +27.8 이지만, 무는 깊이가 바뀌면
+#  그만큼 더 달라지므로 추정값을 그대로 쓰지 말 것.)
 PLACE_TCP_Z_MM = -5.2
 # 그리퍼가 큐브를 "잡을" 때의 TCP 높이. 놓기와 집기의 적정 높이가 다를 수 있어 상수를
 # 분리해 두었지만, 현재는 같은 실측값을 쓴다. 한쪽만 바꾸고 싶을 때 여기만 고치면 된다.
@@ -183,7 +206,7 @@ def get_tcp():
 
 
 def get_cube_center():
-    """큐브 중심 포즈 [기록 전용]. tool4 = 플랜지 + TOOL_CUBE_CENTER_Z(143.0)."""
+    """큐브 중심 포즈 [기록 전용]. tool4 = 플랜지 + TOOL_CUBE_CENTER_Z(176.0)."""
     rb.changetool(4)
     tcp = rb.getpos().pos2list()[:6]
     rb.changetool(3)
@@ -493,7 +516,7 @@ def do_capture(conn, capture_index, set_cube_center=None, set_index=None,
     tcp = get_tcp()
     # 캘리브레이션에 들어가는 두 값만 물리 기준으로 읽는다.
     flange = get_flange_pose()      # tool1: eye-in-hand FK 기준
-    cube_tcp = get_cube_center()    # tool4: 플랜지 + 143.0
+    cube_tcp = get_cube_center()    # tool4: 플랜지 + TOOL_CUBE_CENTER_Z(176.0)
     joints = get_joints()
     print ''
     print '*** CAPTURE {} (block={} gripped={} grasp={}) ***'.format(

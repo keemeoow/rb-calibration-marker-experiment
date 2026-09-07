@@ -20,6 +20,8 @@ CP_result/session04/
 │   ├── TABLE1_INTERACTIVE.html
 │   ├── table1_methods.json
 │   ├── table1_results.csv
+│   ├── calibration_summary.csv
+│   ├── calibration_matrices.json
 │   ├── shared_train_only_baseline.json
 │   └── shared_board_free_fk_cube.json
 ├── cross_target_evaluation/
@@ -43,7 +45,7 @@ CP_result/session04/
     └── strict_table1/
 ```
 
-상세 보고서는 [`session04/late_table1/TABLE1_RESULTS.md`](session04/late_table1/TABLE1_RESULTS.md), interactive 결과는 [`session04/late_table1/TABLE1_INTERACTIVE.html`](session04/late_table1/TABLE1_INTERACTIVE.html)에서 확인한다.
+상세 보고서는 [`session04/late_table1/TABLE1_RESULTS.md`](session04/late_table1/TABLE1_RESULTS.md), interactive 결과는 [`session04/late_table1/TABLE1_INTERACTIVE.html`](session04/late_table1/TABLE1_INTERACTIVE.html)에서 확인한다. 추가 진단/민감도 실험은 루트의 [`ADDITIONAL_EXPERIMENTS_SUMMARY.md`](../ADDITIONAL_EXPERIMENTS_SUMMARY.md) 한 곳에서 요약한다.
 
 ## 2. 데이터와 split 계약
 
@@ -65,16 +67,15 @@ CP_result/session04/
 [`TABLE1_RESULTS.md`](session04/late_table1/TABLE1_RESULTS.md) 한 곳에서 확인한다.
 이렇게 해야 재실행 뒤 README의 수치만 과거 값으로 남는 문제를 막을 수 있다.
 
-- A1→A2는 같은 cube+board 관측에서 순차법과 통합법의 차이를 검증한다.
-- A2와 A4의 근소한 차이는 A4의 우월성 근거가 아니다. A4/B1/B2는 Simulation prior를 쓰는 preflight다.
-- A3의 raw FK hard constraint는 외부 GT가 아니며 tool/mechanical frame 오차를 그대로 포함한다.
-- A5는 A4와 같은 train-only vision-aligned FK를 hard-fixed한 post-hoc 진단이다. Own held-out와 Fixed-to-Fixed cube는 낮지만 Fixed-to-Fixed board는 A4보다 높아 내부 지표에서도 일관된 승자가 아니다. 이전 A3 성능의 원인은 설명하지만 독립 보정이나 물리 정확도 우월성을 뜻하지 않는다.
-- 현재 확증 대표 행은 A2, 방법론적 확장 후보는 A4, 원인 진단은 A5이며 A4/A5의 실제 순위는 blind external GT 이후 결정한다.
-- 현재 순위는 내부 held-out reprojection 비교이며 절대 정확도 순위가 아니다.
+- 최종 비교 행은 A0~A5, B1~B3 한 벌만 사용한다.
+- heldout 평가는 항상 cube만 사용한다. Board heldout과 board/cube pooled overall ranking은 최종 표에서 제거했다.
+- A0/B3의 board-only 방법은 최종 capture에서 board를 gripper에 붙여 cube pose diversity와 같은 수준으로 촬영하는 프로토콜을 따른다.
+- A3/A4/A5/B1/B2는 FK 처리 방식이 다른 최종 후보 행이다. A5도 External GT 공개 전에 방법과 artifact가 frozen이면 최종 후보로 비교할 수 있다.
+- 최종 물리 순위는 다음주 Independent External cube GT의 TRE, rotation, P95, failure rate로 결정한다.
 
 ## 4. 단일 데이터 원천
 
-`session04/late_table1/table1_methods.json`은 A0~A5/B1~B3의 유일한 원시 실행 결과다. A6는 독립 실측 correction label을 위한 미실행 baseline 예약이다. `table1_results.csv`, `TABLE1_RESULTS.md`, `TABLE1_INTERACTIVE.html`은 이 JSON과 보조 평가 JSON에서 생성한다.
+`session04/late_table1/table1_methods.json`은 A0~A5/B1~B3의 유일한 원시 실행 결과다. A6나 추가 board-only FK row는 최종 표에 넣지 않는다. `table1_results.csv`, `TABLE1_RESULTS.md`, `TABLE1_INTERACTIVE.html`은 이 JSON과 보조 평가 JSON에서 생성하되, 최종 출력은 cube-only 지표만 남긴다.
 
 파생 결과는 `tools/sync_table1_canonical_data.py`로 생성하고 `tools/verify_table1_visual_sync.py`로 JSON/CSV/Markdown/HTML 숫자와 provenance 일치를 검사한다.
 
@@ -113,8 +114,8 @@ session02 경로를 읽거나 쓰는 사고가 났다.
 
 1. `05_calibrate.py --baseline_only`로 공통 baseline만 준비하거나, 바로 전체 fit을 실행한다.
 2. `05_calibrate.py --num_inits 3`으로 A0~A5/B1~B3를 실행한다.
-3. `06_make_report.py`로 calibration 요약 CSV, 전체 행렬 JSON, 상세 Markdown을 생성한다.
+3. `06_make_report.py`로 calibration 요약 CSV와 전체 행렬 JSON을 생성한다.
 4. 필요할 때만 `tools/`의 cross-target, marker-system, OpenCV 평가와 outlier ablation을 갱신한다.
 5. 선택 확장 평가를 갱신했다면 관련 verify 도구를 통과시킨다.
 
-현재 결과는 9개 행×3개 seed의 27 runs를 포함한다. A5는 `posthoc_diagnostic`, A6는 독립 6-DoF correction label이 생기기 전까지 `not_run`이다. JSON/CSV/Markdown/HTML 동기화, 27 runs·243 fixed-camera pairs의 독립 `e_cross` 재계산과 camera-scope 계약을 통과했다.
+현재 결과는 9개 행×3개 seed의 27 runs를 포함한다. A5는 External GT 공개 전에 방법과 artifact를 frozen하면 최종 후보로 비교할 수 있다. JSON/CSV/Markdown/HTML 동기화와 cube-only camera-consistency 계약을 통과했다.

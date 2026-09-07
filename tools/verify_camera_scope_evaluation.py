@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Verify both pre-GT camera-scope evaluation contracts.
+"""Verify both pre-GT camera-consistency evaluation contracts.
 
-The exact synthetic scene checks Fixed-to-Fixed (고정카메라 간) and
-Gripper-to-Fixed (그리퍼카메라–고정카메라 간) evaluation independently.
+The exact synthetic scene checks Cross-view Pixel Transfer and
+fixed-gripper cube consistency evaluation independently.
 """
 
 from __future__ import annotations
@@ -117,7 +117,7 @@ def main() -> None:
         observations, cameras, K_map, D_map, set_filter=[5])
     fixed_exact = evaluate_fixed_to_fixed_cross_target(
         observations, cameras, K_map, D_map, fixed_mask)
-    _assert_target_metrics(fixed_exact, 1, 2, "Fixed-to-Fixed")
+    _assert_target_metrics(fixed_exact, 1, 2, "Cross-view Pixel Transfer")
 
     perturbed_cameras = {
         camera: transform.copy() for camera, transform in cameras.items()}
@@ -127,16 +127,18 @@ def main() -> None:
     for target in ("board", "cube"):
         metrics = fixed_changed["by_target"][target]
         if metrics["pose_consistency_translation_rmse_mm"] < 19.9:
-            raise AssertionError(f"Fixed-to-Fixed/{target}: perturbation undetected")
+            raise AssertionError(
+                f"Cross-view Pixel Transfer/{target}: perturbation undetected")
         if metrics["n_output_rejected"] != 0:
-            raise AssertionError(f"Fixed-to-Fixed/{target}: output was rejected")
+            raise AssertionError(
+                f"Cross-view Pixel Transfer/{target}: output was rejected")
 
     gripper_mask = build_gripper_to_fixed_cross_target_mask(
         observations, cameras, gripper_camera, K_map, D_map, set_filter=[5])
     gripper_exact = evaluate_gripper_to_fixed_cross_target(
         observations, cameras, T_gripper_camera, robot_T,
         K_map, D_map, gripper_mask)
-    _assert_target_metrics(gripper_exact, 2, 4, "Gripper-to-Fixed")
+    _assert_target_metrics(gripper_exact, 2, 4, "Fixed-Gripper")
 
     perturbed_handeye = T_gripper_camera.copy()
     perturbed_handeye[0, 3] += 0.02
@@ -146,9 +148,9 @@ def main() -> None:
     for target in ("board", "cube"):
         metrics = gripper_changed["by_target"][target]
         if metrics["pose_consistency_translation_rmse_mm"] < 19.9:
-            raise AssertionError(f"Gripper-to-Fixed/{target}: perturbation undetected")
+            raise AssertionError(f"Fixed-Gripper/{target}: perturbation undetected")
         if metrics["n_output_rejected"] != 0:
-            raise AssertionError(f"Gripper-to-Fixed/{target}: output was rejected")
+            raise AssertionError(f"Fixed-Gripper/{target}: output was rejected")
 
     for mask, validator in (
             (fixed_mask, validate_fixed_to_fixed_cross_target_mask),
@@ -172,16 +174,17 @@ def main() -> None:
     if any(FIXED_TO_FIXED_CROSS_TARGET_CONTRACT[key] is not False for key in (
             "uses_shared_base_target_pose", "uses_robot_fk",
             "uses_gripper_camera", "uses_external_ground_truth")):
-        raise AssertionError("Fixed-to-Fixed dependency contract is incorrect")
+        raise AssertionError(
+            "Cross-view Pixel Transfer dependency contract is incorrect")
     if (GRIPPER_TO_FIXED_CROSS_TARGET_CONTRACT["uses_robot_fk"] is not True
             or GRIPPER_TO_FIXED_CROSS_TARGET_CONTRACT[
                 "uses_shared_base_target_pose"] is not False
             or GRIPPER_TO_FIXED_CROSS_TARGET_CONTRACT[
                 "uses_external_ground_truth"] is not False):
-        raise AssertionError("Gripper-to-Fixed dependency contract is incorrect")
+        raise AssertionError("Fixed-Gripper dependency contract is incorrect")
 
-    print("[PASS] Fixed-to-Fixed (고정카메라 간) and "
-          "Gripper-to-Fixed (그리퍼카메라–고정카메라 간) contracts")
+    print("[PASS] Cross-view Pixel Transfer and "
+          "fixed-gripper cube consistency contracts")
 
 
 if __name__ == "__main__":

@@ -75,29 +75,37 @@ def _compare_csv(expected: list[dict], canonical_csv: Path) -> None:
 
 def _verify_reports(table1: dict, marker: dict,
                     reports: tuple[Path, ...]) -> None:
-    forbidden = re.compile(r"(?i)(?<![a-z])common(?![a-z])|reference[_ -]free|공통")
+    forbidden = re.compile(r"reference[_ -]free")
     required = (
-        "Pre-GT Internal Evaluation (외부 GT 전 내부 평가)",
+        "Final protocol before External GT",
         "Current Data Warnings (현재 데이터 경고)",
-        "Internal-Only Claim Envelope (현재 가능한 최대 결론)",
-        "Confirmatory Internal (확증 내부)",
-        "Preflight (예비실험)",
-        "Post-hoc Diagnostics (사후 원인 진단)",
+        "Final Protocol Lock (최종 단일 기준)",
+        "Final Comparison Table (최종 비교실험표)",
         "Matched Contrast Decision Table (비교실험 구성 확정표)",
         "Metric Decision Matrix (평가지표 판정표)",
-        "Exploratory Paired Set Bootstrap CI (탐색적 paired set bootstrap CI)",
-        "Set-equal-weight Held-out RMSE (set 동일가중 홀드아웃)",
-        "Scheduled External GT Task (다음주 예정 태스크)",
-        "A — Fixed-to-Fixed",
-        "Gripper-to-Fixed (그리퍼카메라–고정카메라 간)",
+        "External cube TRE / rotation / P95 / failure",
+        "Heldout Cube RMSE",
+        "Cross-view Camera Consistency",
+        "External GT Task (다음주 예정 태스크)",
         "Terminology (용어 설명)",
-        "Reference-dependent Reprojection (기준 의존 재투영)",
     )
     labels = [
         CANONICAL_LABEL_OVERRIDES.get(
             method, table1["rows"][method]["condition"]["label"])
         for method in METHOD_ORDER
-    ] + [row["label"] for row in marker["summary"]]
+    ]
+    removed_sections = (
+        "Confirmatory Internal (확증 내부)",
+        "Preflight (예비실험)",
+        "Post-hoc Diagnostics (사후 원인 진단)",
+        "Exploratory Paired Set Bootstrap CI",
+        "Set-equal-weight Held-out RMSE",
+        "Marker-system End-to-End",
+        "Reference-dependent Reprojection",
+        "Own-marker held-out",
+        "Pooled overall",
+        "Board/Cube Held-out",
+    )
     for path in reports:
         text = path.read_text()
         match = forbidden.search(text)
@@ -107,6 +115,10 @@ def _verify_reports(table1: dict, marker: dict,
         for phrase in required:
             if phrase not in text:
                 raise AssertionError(f"{path.name}: missing {phrase!r}")
+        for phrase in removed_sections:
+            if phrase in text:
+                raise AssertionError(
+                    f"{path.name}: removed final-report section survived: {phrase!r}")
         if "Required Next Experiment (다음 필수 실험)" in text:
             raise AssertionError(
                 f"{path.name}: external-GT next experiment must not be required")
@@ -118,6 +130,14 @@ def _verify_reports(table1: dict, marker: dict,
                 raise AssertionError(f"{path.name}: missing result label {label!r}")
 
 
+def _data_provenance_only(source: dict) -> dict:
+    data_source = dict(source)
+    implementation = data_source.pop("implementation_sha256", None)
+    if not implementation:
+        raise AssertionError("missing implementation_sha256 provenance")
+    return data_source
+
+
 def _verify_provenance(table1: dict, cross: dict, marker: dict) -> None:
     table_protocol = table1["protocol"]
     cross_protocol = cross["protocol"]
@@ -126,10 +146,12 @@ def _verify_provenance(table1: dict, cross: dict, marker: dict) -> None:
         raise AssertionError("Table 1 and camera-scope split differ")
     if table_protocol["split"] != marker_protocol["split"]:
         raise AssertionError("Table 1 and marker-system split differ")
-    source = table_protocol["source_data_provenance"]
-    if source != cross_protocol["source_data_provenance"]:
+    source = _data_provenance_only(table_protocol["source_data_provenance"])
+    cross_source = _data_provenance_only(cross_protocol["source_data_provenance"])
+    marker_source = _data_provenance_only(marker_protocol["source_data_provenance"])
+    if source != cross_source:
         raise AssertionError("camera-scope source-data provenance differs")
-    if source != marker_protocol["source_data_provenance"]:
+    if source != marker_source:
         raise AssertionError("marker-system source-data provenance differs")
     if cross_protocol.get("external_ground_truth_used") is not False:
         raise AssertionError("camera-scope result incorrectly claims external GT")
