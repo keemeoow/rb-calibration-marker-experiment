@@ -82,9 +82,9 @@ def approach_of(pose6, offset_mm):
     return p
 
 
-def load_latest_joints(session_dir: Path, subdir_candidates=("capture_replayed", "capture"),
-                        index: int = -1) -> list:
-    """세션 폴더에서 지정한 인덱스(기본 -1=마지막)의 저장된 joints를 읽는다.
+def load_latest_state(session_dir: Path, subdir_candidates=("capture_replayed", "capture"),
+                       index: int = -1):
+    """세션 폴더에서 지정한 인덱스(기본 -1=마지막)의 저장된 joints/pose를 읽는다.
     capture_replayed가 있으면 그걸 우선한다(더 정확한 정지 상태 재현)."""
     for sub in subdir_candidates:
         d = session_dir / sub
@@ -95,8 +95,16 @@ def load_latest_joints(session_dir: Path, subdir_candidates=("capture_replayed",
             continue
         chosen = dirs[index]
         data = json.loads((chosen / "robot.json").read_text())
-        return data["joints"], chosen
+        return data["joints"], data["pose"], chosen
     raise FileNotFoundError(f"{session_dir} 아래에 저장된 캡처가 없습니다.")
+
+
+def align_rotation(pose_now, target_pose):
+    """target_pose의 회전(rz,ry,rx)만 가져오고 위치(x,y,z)는 pose_now 그대로 -- 즉
+    "제자리에서 회전만 먼저 맞추는" 중간 목표. 위치+회전을 한 movel에 같이
+    넣으면 궤적이 커서 Unreachable이 나기 쉬운데, 회전 따로/이동 따로 나누면
+    각 movel이 훨씬 단순해진다."""
+    return [pose_now[0], pose_now[1], pose_now[2], target_pose[3], target_pose[4], target_pose[5]]
 
 
 def compute_ordered_targets(session2_dir: Path) -> list:
@@ -130,10 +138,15 @@ def cap(desc):
     return {"kind": "capture", "desc": desc}
 
 
-def build_plan(items, start_joints, cam_pose_joints, approach_mm, return_home):
+def build_plan(items, start_pose, start_joints, cam_pose, cam_pose_joints, approach_mm, return_home):
+    """이동 순서: 위치+회전을 한 movel에 같이 넣지 않는다 -- 큰 회전 변화가
+    있는 구간마다 먼저 "제자리에서 회전만 정렬"(align_rotation)한 뒤에
+    위치를 옮긴다. 그래야 각 movel이 더 단순해져서 Unreachable이 덜 난다."""
     steps = []
 
-    def place_only_block(label, dest_pose):
+    def place_only_block(label, current_pose, dest_pose):
+        steps.append(mv(align_rotation(current_pose, dest_pose), MOVE_LIN_SPEED,
+                        f"[{label}] place 방향 정렬 (제자리 회전)"))
         steps.append(mv(approach_of(dest_pose, approach_mm), MOVE_LIN_SPEED, f"[{label}] place approach 이동"))
         steps.append(mv(dest_pose, DESCEND_LIN_SPEED, f"[{label}] place 수직 하강"))
         steps.append(grip("open", f"[{label}] 그리퍼 열기 (place)"))
@@ -142,11 +155,14 @@ def build_plan(items, start_joints, cam_pose_joints, approach_mm, return_home):
         steps.append(cap(f"[{label}] 촬영 자리"))
 
     def pick_place_block(label, source_pose, dest_pose):
+        # 직전 스텝이 항상 촬영 파킹(cam_pose)이므로 거기서부터 방향 정렬.
+        steps.append(mv(align_rotation(cam_pose, source_pose), MOVE_LIN_SPEED,
+                        f"[{label}] pick 방향 정렬 (제자리 회전)"))
         steps.append(mv(approach_of(source_pose, approach_mm), MOVE_LIN_SPEED, f"[{label}] pick approach 이동"))
         steps.append(mv(source_pose, DESCEND_LIN_SPEED, f"[{label}] pick 수직 하강"))
         steps.append(grip("close", f"[{label}] 그리퍼 닫기 (pick)"))
         steps.append(mv(approach_of(source_pose, approach_mm), DESCEND_LIN_SPEED, f"[{label}] pick 수직 상승"))
-        place_only_block(label, dest_pose)
+        place_only_block(label, approach_of(source_pose, approach_mm), dest_pose)
 
     steps.append(mj(start_joints, JNT_SPEED_PARK, "0단계: session1 끝난 자세로 이동 (큐브 쥔 상태)"))
 
@@ -154,7 +170,7 @@ def build_plan(items, start_joints, cam_pose_joints, approach_mm, return_home):
     for order, item in enumerate(items):
         label = f"{order + 1}/{len(items)} (원본 #{item['orig_index']})"
         if current is None:
-            place_only_block(label, item["target"])
+            place_only_block(label, start_pose, item["target"])
         else:
             pick_place_block(label, current, item["target"])
         current = item["target"]
@@ -241,16 +257,17 @@ def main():
     ap.add_argument("--no-preview", action="store_true")
     args = ap.parse_args()
 
-    start_joints, start_src = load_latest_joints(Path(args.session1_dir), index=-1)
-    cam_pose_joints, cam_src = load_latest_joints(Path(args.session3_dir),
-                                                   subdir_candidates=("capture",), index=0)
+    start_joints, start_pose, start_src = load_latest_state(Path(args.session1_dir), index=-1)
+    cam_pose_joints, cam_pose, cam_src = load_latest_state(Path(args.session3_dir),
+                                                            subdir_candidates=("capture",), index=0)
     items = compute_ordered_targets(Path(args.session2_dir))
 
     print(f"고정값: z={Z_FIXED}mm  ry={RY_FIXED}deg  rx={RX_FIXED}deg  approach={args.approach_mm}mm")
     print(f"시작 자세(session1 끝) <- {start_src}")
     print(f"촬영 파킹 자세(session3 첫 캡처, 임시) <- {cam_src}\n")
 
-    steps = build_plan(items, start_joints, cam_pose_joints, args.approach_mm, args.return_home)
+    steps = build_plan(items, start_pose, start_joints, cam_pose, cam_pose_joints,
+                        args.approach_mm, args.return_home)
     print_plan(steps)
 
     if not args.execute:
