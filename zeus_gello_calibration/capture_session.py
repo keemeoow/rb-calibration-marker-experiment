@@ -84,6 +84,17 @@ def connect_cameras(labels: dict, no_reset: bool = False):
     devices = RealSenseCamera.list_devices()
     if not devices:
         raise RuntimeError("연결된 RealSense 카메라가 없습니다.")
+
+    known_serials = set(labels.keys())
+    detected_serials = set(devices.keys())
+    unknown = detected_serials - known_serials
+    missing = known_serials - detected_serials
+    if unknown:
+        print(f"[WARN] intrinsics/device_map.json에 없는(=intrinsics 없는) 카메라가 연결되어 있습니다: "
+              f"{sorted(unknown)} -- 이 카메라로 찍은 데이터는 intrinsics를 못 찾을 수 있습니다.")
+    if missing:
+        print(f"[WARN] device_map.json에 등록된 카메라가 지금 안 보입니다(연결 확인 필요): {sorted(missing)}")
+
     print(f"카메라 {len(devices)}대 발견:")
     cams = {}
     used_labels = {}
