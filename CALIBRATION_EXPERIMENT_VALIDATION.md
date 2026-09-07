@@ -1,227 +1,277 @@
-# Calibration 최종 비교실험표·평가지표 단일 기준
+# Calibration 비교실험·평가지표 검증
 
-상태: External GT 추가 전 최종 프로토콜. 공통 45-event composite-target 촬영 계약 확정,
-phase-aware solver 구현 전
-범위: `A0~A5`, `B1~B3` 한 세트만 사용
-핵심 변경: **heldout 평가는 항상 cube만 본다.** Board heldout은 최종 판정
-지표에서 제거하고, board는 calibration/training 또는 ablation용 관측으로만 쓴다.
+검증 기준: Session04 `A0~A5/B1~B3` 결과 및 현재 calibration 코드  
+상태: Pre-GT internal evaluation  
+검증일: 2026-09-04
 
 논문 기여도와 스토리라인의 최상위 기준은 [RESEARCH_STORYLINE.md](RESEARCH_STORYLINE.md)를 따른다.
-Session04 자동 생성 결과는 [TABLE1_RESULTS.md](CP_result/session04/late_table1/TABLE1_RESULTS.md)에
-이 최종 기준으로 재생성한다. External GT가 들어간 최종 비교표와 평가지표도 이 문서를
-단일 기준으로 사용한다.
 
-## 1. 최종 실험 원칙
+## 0. 비교실험 구성별 평가지표 상단 요약
 
-1. 최종 비교행은 `A0~A5`, `B1~B3`만 사용한다. A6나 추가 board-only FK row는
-   최종 표에 넣지 않는다.
-2. planar board와 multi-face cube를 서로 움직이지 않는 하나의 **composite target rig**로
-   고정한다. 로봇은 이 rig 전체를 grasp/place하며, 모든 행은 같은 45개 raw capture event와
-   같은 pose ID를 사용한다.
-3. A0/B3는 공통 영상에서 cube residual만 제외하고, B2는 board residual만 제외한다.
-   A1~A5/B1은 두 residual을 모두 사용한다. 따라서 target 추가 효과에 별도 촬영 수 증가가
-   섞이지 않는다.
-4. 모든 train/heldout 재투영, cross-view, external-GT 최종 평가는 **cube target만**
-   사용한다. Row별 marker 모집단이 달랐던 solver Train RMSE는 최종 표에서 제거한다.
-5. 내부 pixel 지표와 External GT가 충돌하면 External GT를 최종 판정 기준으로 둔다.
+아래 표를 먼저 보고 발표한다. 모든 row를 하나의 전체 순위로 세우지 않고,
+비교실험 구성별로 **허용되는 평가지표**와 **해석 제한**을 분리한다.V
 
-## 2. 공통 45-event 촬영 프로토콜
-
-`1 capture event`는 하나의 사전등록 robot pose에서 모든 연결 카메라가 동기 촬영한
-한 시점을 뜻한다. 촬영 시간은 예산이나 평가지표로 사용하지 않는다. 검출에 성공한
-event만 골라 수를 맞추지 않고, 계획한 45개 event 전체를 공통 모집단으로 유지한다.
-
-| Phase | 물리 상태 | 횟수 | 필수 관측 | 목적 |
-| --- | --- | ---: | --- | --- |
-| P1 Moving Rig | robot이 composite target을 계속 강체 파지한 채 이동 | 15 events | fixed cameras 동기 촬영 | `T_flange_rig`와 fixed-camera 관계 추정, xyz/회전 다양성 확보 |
-| P2 Pick-and-Place | composite target을 10번 배치하고 배치마다 release 후 정확히 2개 viewpoint 촬영 | 10 placements, 20 events | fixed + gripper cameras 동기 촬영, release FK는 metadata로 기록 | 통합 calibration과 placement prediction 오차 측정 |
-| P3 Stationary Rig | target을 놓은 채 robot/gripper camera만 이동 | 10 events | fixed + gripper cameras 동기 촬영 | eye-in-hand calibration과 cross-view 연결 |
-| Total | calibration train capture | **45 events** | 동일 event/pose manifest | 모든 row의 동일 촬영 예산 |
-
-### 2.1 Pose와 성공/실패 규칙
-
-- P1의 15 pose는 x/y/z 위치와 roll/pitch/yaw를 함께 바꾸며, yaw 한 축 회전만 반복하지 않는다.
-- P2는 `2~3장`처럼 가변적으로 두지 않고 placement마다 release 후 정확히 2 event로
-  고정한다. Release pose 기록 자체는 영상 capture event에 포함하지 않는다.
-- P3의 10 pose는 target rig를 움직이지 않고 camera translation, 높이, 두 축 이상의 회전을 포함한다.
-- marker 미검출이나 PnP 실패 event는 다른 event로 교체하지 않는다. 해당 방법의 유효 관측 수와
-  failure rate에 그대로 반영한다.
-- 평가용 cube/External-GT capture는 이 45개 train event와 분리하며 모든 row가 동일하게 사용한다.
-
-### 2.2 Phase-aware target pose 모델
-
-rig에 대한 board와 cube의 강체 변환 `T_rig_board`, `T_rig_cube`는 전체 촬영에서 변하지
-않아야 한다. P1과 P2의 grasp 구간은 다음 kinematic model을 사용한다.
-
-```text
-T_base_rig(event)   = T_base_flange(event) * T_flange_rig
-T_base_board(event) = T_base_rig(event) * T_rig_board
-T_base_cube(event)  = T_base_rig(event) * T_rig_cube
-```
-
-P2의 release 이후와 P3에서는 placement별 `T_base_rig(set)`을 공유하는 stationary-target
-모델을 사용한다. 기존처럼 하나의 전역 `T_base_board`를 모든 event에 적용하면 움직이는
-P1/P2 board 관측을 설명할 수 없으므로 최종 촬영 전에 solver를 수정해야 한다.
-
-P2의 release FK와 P1에서 구한 `T_flange_rig`로 예측한 pose를 놓인 뒤 vision pose와
-비교하면 robot FK뿐 아니라 grasp 반복성, release slip, 접촉 및 settling 오차까지 포함된다.
-따라서 이 값을 학습하면 `pure FK correction`이 아니라 **effective placement correction**으로
-표기한다. 순수 FK correction은 target이 아직 강체 파지된 train 관측만 사용한다.
-
-## 3. 최종 비교실험표 구성
-
-아래 표가 최종 Table 1 구조다. 모든 row는 같은 camera intrinsics `K/D`, 같은 raw
-corner detector, 같은 split, 같은 solver 설정, 같은 External GT cube pose list를 사용한다.
-
-| Row | Calibration train residual | Capture population | Optimization | FK / target-pose 처리 | Cube heldout / External GT 평가 | 검증 질문 |
-| --- | --- | --- | --- | --- | --- | --- |
-| A0 | board only | 공통 45 events | sequential frozen-stage | phase-aware rig pose visual-estimated, raw FK는 robot motion chain에만 사용 | cube only | 동일 촬영 예산의 board-only sequential baseline |
-| A1 | board + cube | 공통 45 events | sequential frozen-stage | phase-aware rig pose visual-estimated | cube only | 추가 촬영 없이 cube residual을 더한 효과 |
-| A2 | board + cube | 공통 45 events | unified joint optimization | phase-aware rig pose visual-estimated | cube only | visual-only unified feedback 효과 |
-| A3 | board + cube | 공통 45 events | unified joint optimization | grasp 구간 target pose를 raw FK로 hard fixed | cube only | raw FK hard constraint가 cube 정확도에 주는 영향 |
-| A4 | board + cube | 공통 45 events | unified joint optimization | target pose는 free, train-only corrected-FK를 soft factor로 사용 | cube only | corrected-FK soft factor 효과 |
-| A5 | board + cube | 공통 45 events | unified joint optimization | preregistered vision-aligned/corrected FK pose를 hard fixed | cube only | aligned FK hard fixed 효과. 사전등록 없으면 사후 진단 |
-| B1 | board + cube | 공통 45 events | sequential frozen-stage | A4와 같은 corrected-FK soft factor | cube only | soft-FK 조건에서 sequential vs unified |
-| B2 | cube only | 공통 45 events | unified joint optimization | cube/rig pose는 free, corrected-FK soft factor 사용 | cube only | 동일 영상에서 board residual 제거 효과 |
-| B3 | board only | 공통 45 events | unified joint optimization | phase-aware rig pose visual-estimated, raw FK는 robot motion chain에만 사용 | cube only | 동일 영상에서 cube residual 추가 효과의 기준선 |
-
-### A0/B3에서 board-only를 어떻게 해석할지
-
-모든 event에 board와 cube가 함께 촬영되지만 A0/B3의 objective와 초기화에는 cube corner를
-넣지 않는다. Cube 영상은 공통 cube 평가 모집단에서 frozen calibration을 채점할 때만 쓴다.
-따라서 A0/B3는 촬영 수와 pose가 같은 순수 board-residual baseline이다.
-
-하지만 최종 표를 `A0~A5/B1~B3` 하나로 유지하려면 다음처럼 고정한다.
-
-- A0/B3는 phase-aware rig pose를 푸는 board-only **visual-estimated baseline**으로 둔다.
-- grasp/release FK와 rig mount metadata는 모든 행에서 동일하게 기록한다.
-- board-only FK-fixed 또는 board-only corrected-FK를 별도 방법으로 주장하려면 새로운 row가
-  필요하므로, 이번 최종 단일 Table 1에는 넣지 않는다.
-- A3/A4/A5/B1/B2의 FK 처리 설명은 더 이상 cube 전용이 아니라
-  **gripper-mounted target pose에 대한 FK 처리 방식**으로 일반화한다.
-
-## 4. 최종 직접 비교 구조
-
-| 비교 | 고정되는 조건 | 달라지는 조건 | 최종 주 평가 | 해석 |
+| 비교실험 구성 | 확인하려는 효과 | Primary metric | 같이 보는 보조/진단 지표 | 공정성 제한 |
 | --- | --- | --- | --- | --- |
-| A0 -> B3 | 공통 45 events, board residual only | sequential vs unified | External cube GT, heldout cube RMSE | 단일 target에서 두 구조가 사실상 같아야 하는 negative control |
-| A0 -> A1 | 공통 45 events, sequential, 같은 board residual | 같은 영상의 cube residual 추가 | External cube GT, heldout cube RMSE | 촬영 수 증가 없는 cube 관측 추가 효과 |
-| A1 -> A2 | 공통 45 events, board+cube, visual-estimated pose | sequential vs unified | External cube GT, heldout cube RMSE | unified visual feedback 효과 |
-| B3 -> A2 | 공통 45 events, unified, 같은 board residual | 같은 영상의 cube residual 추가 | External cube GT, heldout cube RMSE | cube residual이 최종 cube 평가에 주는 영향 |
-| A2 -> A3 | board+cube, unified | visual-estimated pose vs raw-FK hard fixed | External cube GT, heldout cube RMSE | raw FK를 hard GT처럼 쓰는 것이 좋은지 확인 |
-| A2 -> A4 | board+cube, unified | corrected-FK soft factor 추가 | External cube GT, heldout cube RMSE | soft FK prior가 실제 cube 정확도에 주는 영향 |
-| B1 -> A4 | board+cube, corrected-FK soft factor | sequential vs unified | External cube GT, heldout cube RMSE | FK 조건에서도 unified가 필요한지 확인 |
-| B2 -> A4 | 공통 45 events, cube residual, corrected-FK soft factor, unified | 같은 영상의 board residual 추가 | External cube GT, heldout cube RMSE | board residual이 cube calibration에 도움 되는지 확인 |
-| A3/A4 -> A5 | board+cube, unified, FK 정보 사용 | raw/soft/hard aligned FK 처리 | External cube GT, heldout cube RMSE | A5가 사전등록된 방법인지, 아니면 진단인지 분리 |
+| A0 ↔ B3 | board-only에서 sequential freeze와 unified-style 구조 차이 | held-out board RMSE px | set-equal board RMSE, seed stability, Fixed-to-Fixed board | 같은 board-only population 안에서만 해석 |
+| A0 → A1 | sequential 구조에서 cube 추가가 board에 주는 영향 | held-out board RMSE px, registered fixed cameras | pooled overall은 참고만, support/dropped-set 확인 | cube가 추가되지만 board 개선 여부만 직접 비교 |
+| A1 → A2 | 같은 board+cube population에서 unified visual feedback 효과 | held-out board RMSE px, held-out cube RMSE px | set-equal RMSE, paired set bootstrap CI, seed stability | 현재 가장 깨끗한 internal main contrast |
+| B3 → A2 | unified 구조에서 cube residual이 board calibration에 주는 영향 | held-out board RMSE px | Fixed-to-Fixed board/cube, point-cloud diagnostic | marker-system 전체 우위가 아니라 board component 개선 |
+| A2 → A3 | vision-estimated cube pose와 raw-FK hard fixed 차이 | held-out board/cube RMSE px | Gripper-to-Fixed closure, point-cloud diagnostic | raw FK는 external GT가 아니며 negative control로 해석 |
+| B1 → A4 | soft-FK 조건에서 sequential vs unified 차이 | held-out board/cube RMSE px | FK cost fraction, set-equal RMSE, bootstrap CI | covariance가 simulation prior라 preflight |
+| A2 → A4 | unified visual-only에 soft FK factor를 추가한 효과 | held-out board/cube RMSE px | Objective block diagnostics, FK sensitivity, point-cloud diagnostic | A2와 거의 동률이면 우월성 주장 금지 |
+| B2 → A4 | soft-FK 조건에서 board residual이 cube 보정에 주는 영향 | held-out cube RMSE px | Gripper-to-Fixed cube closure, point-cloud cube RMSE | cube-only와 board+cube의 target support 차이 주의 |
+| A3/A4 → A5 | raw/aligned FK, soft/hard 처리의 원인 분리 | 내부 held-out RMSE, point-cloud diagnostic | Fixed-to-Fixed, Gripper-to-Fixed, FK alignment artifact audit | A5는 post-hoc diagnostic이며 main method 아님 |
+| External GT 예정 | 최종 robot-base 물리 정확도와 task 성능 | TRE, rotation error, P95, failure rate | robot task success, contact/XYZ error | 다음주 Independent External GT 후 최종 판정 |
 
-물리적으로 함께 촬영된 cube가 A0/B3에 정보 누출을 만들지 않도록 cube detection은 해당
-행의 초기화, outlier 선택, residual, hyperparameter 선택에서 모두 차단하고 평가 단계에서만
-연다. 동일 event에서 cube가 더 많은 corner와 camera co-visibility를 제공하는 효과는 제안한
-target system의 장점으로 포함하며, 동일 corner 수 subsampling은 보조 민감도 분석으로 둔다.
+## 최종 판정
 
-## 5. 최종 평가지표 구성
+현재 구성은 **코드 내부 ablation과 calibration 안정성 검증에는 타당**하다.
+하지만 **방법의 최종 물리 정확도나 우월성을 주장하는 비교실험으로는 아직
+불충분**하다.
 
-최종 보고서는 아래 지표 묶음 하나만 사용한다. `Board heldout`은 제거하고,
-모든 heldout 성능 표기는 cube 기준으로 통일한다.
+## 1. 현재 잘 설계된 부분
 
-| 지표 | 계산 | 공정성 | 해석 한계 | 최종 사용 |
+- 모든 행이 같은 frozen manifest, K/D, split, solver와 train-only 초기값을 사용한다.
+- 05의 held-out 계산에는 test-time refit, 결과 기반 관측 제거, frame-prune 누수가 없다.
+- 다른 marker 모집단의 pooled RMSE를 직접 비교하지 않도록 계약이 들어가 있다.
+- 27/27 runs가 수렴했고 42개 solver block 모두 full-rank다. Scaled Jacobian
+  condition number는 약 `18.9~697.8`이다.
+
+비교 조건 정의는 [README의 비교 구성](README.md#8-a0a5b1b3-비교실험), 코드
+계약은 [schema.py](calibration_pipeline/schema.py)에 있다.
+
+## 2. 권장 비교 구성
+
+모든 행을 하나의 전체 순위로 만들지 않고, 한 번에 한 요소만 달라지는 matched
+contrast로 해석한다.
+
+| 구분 | 직접 비교 | 검증 질문 | 사용할 주 지표 | 판정 |
 | --- | --- | --- | --- | --- |
-| External cube TRE / rotation / P95 / failure | GT 공개 전 blind prediction을 저장한 뒤, 독립 External GT cube pose와 비교 | 모든 row가 같은 cube pose list, 같은 GT, 같은 tolerance를 사용 | GT 측정계 uncertainty floor보다 작은 차이는 주장 금지 | **최종 주 지표** |
-| ALL Cube RMSE px | train cube로 set별 evaluation cube pose를 맞춘 뒤 train 724 + heldout 236 cube corner 재투영 | 모든 row에서 camera/hand-eye frozen, 같은 960 corners | train이 75.4%이고 heldout과 섞이므로 일반화 지표가 아님 | 전체 fit sanity check |
-| Train Cube RMSE px | frozen calibration에서 train cube로 set별 evaluation pose를 맞춘 뒤 같은 train cube 재투영 | 모든 row가 동일한 724 train cube corners 사용 | pose를 맞춘 관측을 다시 채점하는 in-sample fit이므로 순위 지표가 아님 | train-split fit 진단 |
-| Heldout Cube RMSE px | train-only cube pose source와 frozen calibration으로 미사용 cube event corner 재투영 | test-time calibration refit 없음, 모든 row가 동일한 236 heldout cube corners 사용 | 같은 set의 다른 event에 대한 corner-pooled image-space 평가이며 새 위치·물리 정확도가 아님 | 내부 보조 지표 |
-| Cross-view pixel transfer RMSE px | 한 카메라의 cube PnP pose를 다른 카메라 영상으로 전달해 observed cube corner와 비교 | 동일한 36 pairs, 72 directions, 904 destination-corners를 직접 pooling; 결과 기반 pair 제거 없음 | 27 fixed-gripper pair 중 18개는 train fixed-anchor를 쓰고 Hand-Eye/FK가 섞이는 내부 closure | 카메라 간 pixel 일관성 |
-| Cam-common Obj-Cam consistency mm/deg | 같은 frozen cube pair의 두 경로가 계산한 `T_base_cube` 차이를 translation mm / rotation deg로 계산 | Cross-view와 같은 36 pair를 직접 pooling | Cross-view px와 같은 discrepancy의 단위 변환적 표현이라 독립 증거가 아니며 공통 계통오차를 검출하지 못함 | 카메라 간 3D 일관성 |
+| 내부 확증 | A0 ↔ B3 | Board-only에서 순차/통합 차이 | held-out board px | 유효, schema 계약 반영 완료 |
+| 내부 확증 | A0 → A1 | 순차법에 cube를 추가한 효과 | held-out board px, 등록 수 | 유효 |
+| 내부 확증 | A1 → A2 | Vision-only 순차/통합 차이 | board/cube px 각각 | 가장 타당 |
+| 내부 확증 | B3 → A2 | 통합법에서 cube residual 효과 | held-out board px | 유효 |
+| 내부 확증 | A2 → A3 | Vision cube pose와 raw-FK hard fixed 차이 | board/cube px 각각 | 유효, FK를 GT로 해석 금지 |
+| Preflight | B1 → A4 | 같은 soft FK factor에서 순차/통합 차이 | board/cube px 각각 | 구조는 유효, covariance가 simulation |
+| Preflight | A2 → A4 | soft FK factor 추가 효과 | board/cube px 각각 | 중요 비교, schema 계약 반영 완료 |
+| Preflight | B2 → A4 | Board residual의 기여 | held-out cube px | 유효, covariance 한계 |
+| Post-hoc | A3 → A5, A4 → A5 | raw/aligned, soft/hard 원인 분리 | 모든 내부 지표 | 진단 전용 |
 
-### 제거하는 지표 / 표기
+따라서 메인 결론은 현재처럼 **A2**, 방법 확장 후보는 **A4**, 원인 진단은
+**A5**로 둔다. A3/A4의 `Ours` 명칭은 확증 전에는 `raw-FK hard`,
+`corrected-FK soft`처럼 중립적으로 표기하는 것이 안전하다.
 
-- `Board heldout RMSE`: 최종 평가는 항상 cube이므로 제거한다.
-- `Board/Cube heldout overall`: Board와 Cube를 섞은 pooled ranking은 제거한다.
-- 그리퍼-고정카메라 closure 별도 지표: 제거한다. 대신 `Cross-view pixel transfer`와
-  `Cam-common Obj-Cam consistency`에 gripper camera pair를 포함한다.
-- 고정카메라-쌍 별도 순위 지표명: 사용하지 않는다. 필요한 경우 support 설명에서만
-  `fixed-camera pair`, `fixed-gripper pair`로 표기한다.
+## 3. 현재 수치로 말할 수 있는 결론
 
-### A0/B3의 cube RMSE 계산 방식
+| 비교 | Board / Cube held-out | 해석 |
+| --- | --- | --- |
+| A0 → A1 | `4.0530 → 4.0645` / cube 신규 | 순차법에서는 cube 추가가 board를 개선하지 않음 |
+| A1 → A2 | `4.0645 → 3.9840` / `4.1402 → 3.5958` | 통합 feedback이 두 target에서 모두 개선 |
+| B1 → A4 | `4.0648 → 3.9884` / `4.1182 → 3.5805` | soft FK 조건에서도 통합법 개선 경향, 단 preflight |
+| A2 → A4 | `3.9840 → 3.9884` / `3.5958 → 3.5805` | Board는 미세 악화, Cube는 미세 개선; 사실상 동률 |
+| A2 → A3 | Cube `3.5958 → 6.3959` | raw FK hard fixed가 현재 데이터에서는 크게 악화 |
+| B2 → A4 | Cube `4.4827 → 3.5805` | soft FK 조건에서 board residual이 cube 보정에 도움 |
+| A4 → A5 | Own overall `3.8899 → 3.7270` | A5가 낮지만 post-hoc이고 다른 cross-view 지표와 불일치 |
 
-A0/B3는 calibration 학습 단계에서는 cube corner를 쓰지 않는 board-only 방법이다.
-하지만 원본 capture에 cube 이미지가 있으므로, 최종 camera/hand-eye transform을
-frozen한 뒤 **train cube 관측으로 set별 evaluation cube pose만** 맞추면
-`Train Cube RMSE px`, `ALL Cube RMSE px`, `Heldout Cube RMSE px`를 계산할 수 있다.
+전체 수치는 [Session04 Table 1 결과](CP_result/session04/late_table1/TABLE1_RESULTS.md)에서
+확인한다.
 
-이때 train cube는 평가용 nuisance pose를 만들기 위한 입력일 뿐이며,
-A0/B3의 camera extrinsic이나 hand-eye transform을 다시 최적화하지 않는다.
-Heldout cube event는 pose fit에도 calibration에도 쓰지 않고, 점수 계산에만 사용한다.
+## 4. 평가지표 판정
 
-## 6. Cross-view 지표에 gripper camera를 넣는 방식
+| 지표 | 판정 | 제한 |
+| --- | --- | --- |
+| Train reprojection RMSE | 적합 | 수렴 진단만 가능 |
+| Own-marker held-out RMSE | 조건부 적합 | 같은 set의 다른 event이므로 새 위치 일반화가 아님 |
+| Pooled overall RMSE | 보조로 변경 권장 | held-out corner가 Board 703, Cube 236이라 Board가 약 75% 지배 |
+| Fixed-to-Fixed | 보조 지표로 적합 | 상대 일관성만 측정하며 공통 systematic error를 검출하지 못함 |
+| Gripper-to-Fixed / `e_e2e` | 내부 체인 진단만 가능 | FK가 포함되고 일부 fixed anchor가 train 관측임 |
+| Seed mean ± std | 안정성 지표로만 적합 | seed 3개는 독립 실험 표본이 아님 |
+| External TRE/rotation/P95/failure | 최종 주 지표로 적합 | 다음주 Independent External GT 태스크에서 산출 |
 
-카메라 pair `a,b`는 fixed-camera pair와 fixed-gripper pair를 모두 포함한다.
-최종 보고서에서는 두 pair type의 **원시 pair/direction 오차를 직접 pooling**하고,
-support 설명에 pair와 destination-corner 수를 표시한다. 이미 서로 다른 방식으로 집계된
-scope별 RMSE를 다시 평균하지 않는다.
+특히 Gripper-to-Fixed는 held-out gripper event에 일부 train fixed-anchor를 연결한다.
+따라서 `held-out 성능`보다는 **mixed train-anchor/held-out internal closure**라고
+표시하는 편이 정확하다.
+
+## 5. 평가지표 결과 산출 방식
+
+모든 내부 지표는 같은 frozen observation manifest, camera intrinsics `K/D`,
+event-grouped split, row별 최종 transform을 사용한다. Held-out 평가에서는
+test-time refit, held-out frame-prune, 결과 기반 관측 제거를 하지 않는다.
+
+### 5.1 Train reprojection RMSE
+
+각 row/seed를 train observations로 최적화한 뒤, 최종 transform을 고정하고
+train image corner를 다시 투영한다.
 
 ```text
-T_base_cam(k, event) =
-    T_base_Ck                            if camera k is fixed
-    T_base_gripper(event) * T_gripper_Ck if camera k is gripper-mounted
-
-T_base_cube_from_a = T_base_cam(a, event) * T_cam_a_cube(PnP)
-T_base_cube_from_b = T_base_cam(b, event) * T_cam_b_cube(PnP)
-
-Obj-Cam translation error mm = || t_a - t_b || * 1000
-Obj-Cam rotation error deg   = angle(R_a^-1 R_b)
+pixel residual = observed corner - projected corner
+RMSE_px = sqrt( sum(du^2 + dv^2) / (2N) )
 ```
 
-Pixel transfer도 gripper camera에 대해 계산 가능하다.
+이 값은 solver가 학습 관측을 얼마나 잘 맞췄는지 보는 수렴/적합 진단이다.
+학습 데이터에 직접 맞춘 값이므로 방법 우월성 지표로 쓰지 않는다.
+
+### 5.2 Own-marker held-out RMSE
+
+각 row의 marker 구성에 해당하는 held-out observations만 사용한다. 예를 들어
+A0/B3는 board만, B2는 cube만, A1/A2/A3/A4/A5/B1은 board+cube를 평가한다.
+최종 transform은 train에서 이미 고정된 상태이며, held-out에서 새로 풀지 않는다.
 
 ```text
-T_cam_b_cube_from_a = inv(T_base_cam(b, event)) * T_base_cube_from_a
-project cube corners into image b
-pixel residual = projected corner - observed corner in image b
-RMSE_px = component-wise pooled RMSE over all frozen pair directions
+for held-out image corners:
+    project 3D target corner -> image
+    compute du, dv
+    aggregate RMSE per target and overall
 ```
 
-현재 Session04 support는 9 fixed-fixed + 27 fixed-gripper pair다. Fixed-gripper 중
-18 pair는 같은 set의 train fixed-anchor와 heldout gripper event를 연결하고, 9 pair만
-양쪽이 heldout이다. 모든 방법에 같은 mask를 적용하므로 방법 간 계산은 공정하지만,
-이를 순수 heldout이나 FK-free metric으로 부르면 안 된다.
+이 지표가 현재 main internal metric이다. 다만 held-out이 같은 set의 다른 event라서
+완전히 새로운 3D 위치 일반화나 robot-base 물리 정확도를 뜻하지 않는다.
 
-px 기준 산출 가능 조건:
+### 5.3 Pooled overall RMSE
 
-- fixed-fixed는 같은 event, fixed-gripper는 cube가 고정된 같은 set에서 source와
-  destination 관측이 연결되어야 한다.
-- destination camera의 cube corner observation이 있어야 한다.
-- destination camera intrinsics `K/D`가 고정되어 있어야 한다.
+Board와 Cube의 held-out corner residual을 한꺼번에 모아 하나의 RMSE로 계산한다.
 
-다음 촬영에서는 heldout cube event마다 fixed cameras와 gripper camera를 같은 event id로
-동기화하면 train fixed-anchor 의존성을 없앨 수 있다. 현재 Session04 값은
-**mixed train-anchor/heldout internal closure**로 유지한다.
+```text
+pooled overall = RMSE(all held-out board/cube corners)
+```
 
-## 7. External GT가 들어오면 최종 순위를 정하는 규칙
+현재 support는 Board 703 corners, Cube 236 corners라 Board가 약 75%를 차지한다.
+따라서 pooled overall은 요약값으로만 쓰고, 최종 판정은 board/cube target별 수치와
+matched contrast를 함께 본다.
 
-1. 최종 순위는 External cube TRE/RMSE, rotation error, P95, failure rate로 정한다.
-2. Heldout Cube RMSE px와 cross-view consistency가 좋아도 External GT가 나쁘면
-   최종 방법으로 주장하지 않는다.
-3. A5는 GT 공개 전에 절차가 사전등록되어 있으면 후보 method로 비교할 수 있다.
-   그렇지 않으면 사후 진단으로만 둔다.
-4. A4의 corrected-FK covariance는 GT 결과를 보기 전에 고정해야 한다.
-5. 모든 비교는 같은 cube heldout pose list에서 paired comparison으로 계산한다.
-6. 예측 누락을 방법별 complete-case 삭제하지 않고 failure로 계산한다.
+### 5.4 Set-equal-weight RMSE
 
-## 8. 구현 전 체크리스트
+corner 수가 많은 set이나 target이 결과를 지배하지 않도록 같은 residual을
+`corner -> event -> set -> set equal-weight` 순서로 다시 집계한다.
 
-- `capture manifest`에 `phase`, `target_rig_id`, `planned_pose_id`, `event_id`,
-  `placement_id`, `grasp_id`, `release_event_id`, 카메라별 capture/detection 성공을 명시한다.
-- `T_rig_board`, `T_rig_cube`, grasp 구간의 `T_flange_rig`와 placement별
-  `T_base_rig(set)`을 구분해 저장한다.
-- 모든 row의 calibration input `event_id`가 같은 45개인지 검사하고, A0/B3/B2의 marker
-  masking이 초기화와 outlier 선택 전부터 적용되는지 자동 검증한다.
-- 하나의 정적 `T_base_board` 전제를 phase-aware moving/stationary rig model로 교체한다.
-  단, 기존 Session04 loader는 legacy mode로 보존한다.
-- heldout evaluator는 `target == cube`만 선택한다.
-- cross-view evaluator는 fixed-camera pair와 fixed-gripper pair를 같은 metric family에서
-  계산하고 최종 보고서는 combined 값만 노출한다.
-- `ALL Cube RMSE`를 train+heldout cube evaluation population으로 추가한다.
-- `Train Cube RMSE`는 모든 row에서 동일한 train cube evaluation population으로 계산한다.
-- External GT evaluator는 GT 공개 전 blind prediction hash를 저장하고, GT 공개 후
-  동일 prediction 파일만 채점한다.
+```text
+event RMSE = one event의 corner residual RMSE
+set RMSE = 같은 set에 속한 event RMSE 집계
+set-equal RMSE = 각 set RMSE를 동일 가중 평균
+```
+
+이 값은 pooled RMSE 옆에 붙는 support-bias check다. 현재 eligible set이 9개라
+통계적 유의성 주장보다 방향성 민감도 점검으로 해석한다.
+
+### 5.5 Paired set bootstrap CI
+
+각 matched contrast에서 같은 held-out set을 paired unit으로 묶고, set 단위로
+replacement resampling을 10,000회 수행한다.
+
+```text
+delta_set = RMSE_second_method(set) - RMSE_first_method(set)
+bootstrap sample = 9 sets를 replacement로 재표본추출
+95% CI = bootstrap delta 분포의 2.5%, 97.5% 분위수
+```
+
+음수는 두 번째 row가 더 낮은 residual을 냈다는 뜻이다. 하지만 `n=9 sets`이므로
+가설검정이 아니라 contrast 방향성이 얼마나 흔들리는지 보는 탐색 지표다.
+
+### 5.6 Fixed-to-Fixed
+
+고정카메라끼리 같은 held-out board/cube target을 본 경우를 사용한다. 한 카메라의
+PnP target pose를 robot base로 올리고, 다른 고정카메라로 다시 투영하거나 두
+robot-base target pose의 차이를 계산한다.
+
+```text
+T_base_target_from_cam_i = T_base_cam_i * T_cam_i_target(PnP)
+pixel transfer = cam_i에서 얻은 target pose를 cam_j image로 재투영
+translation/rotation consistency = 두 T_base_target의 SE(3) 차이
+```
+
+Robot FK를 쓰지 않으므로 FK-free subsystem check로는 좋다. 하지만 모든 고정카메라가
+공유하는 systematic error는 검출하지 못하므로 보조 일관성 지표로만 둔다.
+
+### 5.7 Gripper-to-Fixed / `e_e2e`
+
+Gripper camera observation과 fixed camera anchor를 robot-base chain으로 연결한다.
+이때 gripper camera pose는 robot FK와 hand-eye transform을 통해 계산된다.
+
+```text
+T_base_gripper_cam(event) = T_base_gripper_FK(event) * T_gripper_cam
+T_base_target_from_gripper = T_base_gripper_cam * T_gripper_cam_target(PnP)
+T_base_target_from_fixed = T_base_fixed_cam * T_fixed_cam_target(PnP)
+compare two robot-base target poses
+```
+
+최종값은 pair 성분을 event RMSE로, event를 set RMSE로 집계한 뒤 set별 동일
+가중치로 계산한다. 일부 fixed anchor가 train 관측이고 FK/Hand-Eye가 섞이므로
+`held-out 성능`이 아니라 **mixed train-anchor/held-out internal closure**다.
+
+### 5.8 Seed mean ± std
+
+각 row는 서로 다른 초기 perturbation seed 3개로 실행된다. 표에는 seed별 결과의
+평균과 표준편차를 함께 보고한다.
+
+```text
+mean = average(metric_seed0, metric_seed1, metric_seed2)
+std = sample/summary dispersion across three initializations
+```
+
+이는 optimizer 안정성 확인용이다. 같은 데이터와 같은 split을 반복한 것이므로
+독립 실험 표본이나 통계적 성능 차이로 해석하지 않는다.
+
+### 5.9 Robot-base point-cloud diagnostic
+
+8/3 피드백 #17 대응 지표다. Aligned depth를 calibration 목적함수에는 넣지 않고,
+각 row의 transform으로 robot-base frame에 올린 뒤 target plane과의 거리만 본다.
+
+```text
+depth pixel inside detected target polygon -> 3D point in camera frame
+T_base_point = T_base_camera * point_camera
+depth-to-plane residual = distance(T_base_point, row target plane)
+```
+
+현재 A0-A5/B1-B3 전체 row에 대해 event 24/54/72의 board/cube point cloud를
+생성했다. 이 지표는 3D 공간 정합의 진단 자료지만, depth 자체가 external GT가
+아니므로 최종 robot task accuracy로 쓰지 않는다.
+
+### 5.10 External TRE / rotation / P95 / failure
+
+다음주 Independent External GT가 들어오면 최종 주 지표로 산출한다.
+
+```text
+translation error = || predicted position - GT position ||
+rotation error = angle( R_pred^-1 * R_GT )
+P95 = translation/contact error의 95th percentile
+failure rate = task 또는 tolerance 기준 실패 비율
+```
+
+이 지표만이 최종 robot-base physical accuracy와 task-level claim을 확정할 수 있다.
+내부 지표와 External GT가 충돌하면 External GT를 최종 판정 기준으로 둔다.
+
+## 6. 개선 우선순위
+
+1. 완료: `A0_to_B3`, `A2_to_A4` 비교 계약을 추가하고 결과표를
+   `확증 / preflight / post-hoc` 세 구역으로 분리했다.
+2. 완료: corner-pooled RMSE 외에 `event → set 동일가중 RMSE`와
+   paired set bootstrap CI를 추가했다. 현재 `n=9 sets`이므로 CI는 exploratory로
+   표시한다.
+3. 완료: per-camera/target support, dropped sets `0~3`, detection
+   failure, Board–Cube 충돌 `10.808 mm`를 결과 첫 화면에 경고로 표시했다.
+4. 다음주 예정: Independent External GT로 Translation Error, Rotation Error,
+   P95, Failure Rate를 산출한다. 그 전에는 내부 지표 기반 결론만 유지한다.
+5. 후속 촬영/측정 필요: measured FK covariance, cam0/cam1 intrinsic view 보강,
+   명시적인 robot pose convention, 독립 session과 unseen-position GT를 확보한다.
+6. 논문 비교 필요: A0 같은 내부 baseline 외에 Tsai/Park/Daniilidis 또는 공개
+   robot-world/hand-eye 방법을 동일 입력·동일 평가로 추가한다.
+
+가장 큰 데이터 위험은 [Board–Cube 간 10.808 mm systematic disagreement](data/session04/calib_out/verify/board_cube_relative_pose/BOARD_CUBE_RELATIVE_POSE.md)다.
+현재 joint solve가 이를 완화할 뿐 원인을 제거한 것은 아니다.
+
+## 7. 관련 문서
+
+- 논문 스토리라인 기준: [RESEARCH_STORYLINE.md](RESEARCH_STORYLINE.md)
+- 실행 순서: [RUN_PIPELINE.md](RUN_PIPELINE.md)
+- 비교실험 및 지표 정의: [README.md](README.md)
+- Calibration 수식: [CALIBRATION_EXPLANATION_LATEX.md](CALIBRATION_EXPLANATION_LATEX.md)
+- 상세 결과: [TABLE1_RESULTS.md](CP_result/session04/late_table1/TABLE1_RESULTS.md)
+- 전체 calibration 행렬: [calibration_matrices.json](CP_result/session04/late_table1/calibration_matrices.json)
+
+## 8. 현재 구현 상태와 다음 태스크
+
+비교 계약, 보고서 구조, event/set 균등 집계, paired bootstrap, 데이터 경고 표시는
+현재 구현 완료 상태다. 다음 태스크는 다음주 Independent External GT 수집/평가이며,
+이후에만 robot-base Translation Error, Rotation Error, P95, Failure Rate를 최종
+물리 정확도 지표로 보고한다.
