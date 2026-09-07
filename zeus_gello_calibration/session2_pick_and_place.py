@@ -1,0 +1,278 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""zeus_gello_calibration/session2_pick_and_place.py -- Zeus로 session2 pick-and-place
++ 촬영 (ur3_calibration/session2_pick_and_place.py 와 같은 개념)
+
+session1 끝나는 자세(그리퍼에 큐브를 쥔 채)에서 시작해서, session2에 저장된
+15곳에 순서대로 "놓고 -> (다음 자리로) 다시 집어서 놓고 -> ..."를 반복하며
+매번 놓은 직후 고정 촬영 위치로 가서 카메라 4대 + 로봇 상태를 저장한다.
+
+*** Zeus는 rz,ry,rx가 진짜 오일러각(pose6_to_T의 extrinsic ZYX)이라서, UR3 때
+rotation vector 표현 때문에 필요했던 "짐벌락 회피/moveJ 안전장치" 같은 게
+필요 없다 -- z,ry,rx를 고정값으로 그대로 대입하고 rz만 갈아끼우면 그 자체로
+"기울기 고정, yaw만 회전"이 정확히 성립한다 (rz,ry,rx는 world 축 기준으로
+순서대로 곱해지는 extrinsic 표현이라 rz만 바꾸는 게 그대로 world Z축 회전이다).
+그래도 이동 순서는 인접 자세 간 rz 차이가 작아지도록 정렬해서 불필요하게
+큰 회전을 연달아 하지 않게 한다.
+
+세션2 목표 자세 = [x_i, y_i, Z_FIXED, rz_i, RY_FIXED, RX_FIXED]
+  x_i, y_i, rz_i : session2 각 캡처의 저장된 pose에서 그대로 가져옴
+  Z_FIXED/RY_FIXED/RX_FIXED : GRASP_REF_POSE(아래, 실측값)에서 고정
+
+카메라 촬영 위치(그리퍼가 비었을 때 파킹하는 자세)는 아직 별도로 안 정해서
+**임시로 session3의 첫 번째 저장된 자세를 그대로 쓴다** (session3 캡처 폴더의
+joints를 읽어서 movej) -- 나중에 제대로 된 파킹 자세가 생기면 --cam-pose-joints
+로 바꿔 끼우면 된다.
+
+*** 실제 로봇에 물건을 집었다 놓았다 하는 자동 이동 스크립트다. ***
+GELLO 텔레옵은 반드시 완전히 종료(Ctrl+C)한 상태여야 한다 (motion ownership
+을 이 스크립트가 가져야 movel/movej/grip을 보낼 수 있음 -- server/zeus_gello.py
+참고). 처음 실행은 로봇 옆에서 비상정지에 손이 닿는 상태로, --execute 만 주고
+(스텝별 Enter 확인) 진행할 것.
+
+사용법:
+  python session2_pick_and_place.py                     # dry-run: 계획만 출력
+  python session2_pick_and_place.py --execute            # 스텝별 Enter로 확인하며 실행
+  python session2_pick_and_place.py --execute --no-step  # (검증 후) 연속 실행
+"""
+
+import argparse
+import json
+import sys
+import time
+from pathlib import Path
+
+import cv2
+import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from robot.backends.zeus_client import ZeusClient  # noqa: E402
+
+from capture_session import (  # noqa: E402
+    load_camera_labels, connect_cameras, stop_cameras, LiveView,
+    grab_frames, write_capture, read_robot_state,
+    ROBOT_IP_DEFAULT, ROBOT_PORT_DEFAULT, DEVICE_MAP_DEFAULT,
+)
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+DATA_ROOT_DEFAULT = Path(__file__).resolve().parent / "data"
+
+SESSION1_DIR_DEFAULT = DATA_ROOT_DEFAULT / "session1_handheld_fixed_cam"
+SESSION2_DIR_DEFAULT = DATA_ROOT_DEFAULT / "session2_floor_board_dual_cam"
+SESSION3_DIR_DEFAULT = DATA_ROOT_DEFAULT / "session3_wrist_motion_gripper_cam"
+
+# 실측: "Pos, -292.02, 400.03, 178.75, -90.00, -0.00, 180.00" -- 여기서
+# z/ry/rx만 고정값으로 쓴다 (x,y는 session2 각 자세에서 그대로 가져오므로 안 씀).
+GRASP_REF_POSE = [-292.02, 400.03, 178.75, -90.00, -0.00, 180.00]
+Z_FIXED = GRASP_REF_POSE[2]
+RY_FIXED = GRASP_REF_POSE[4]
+RX_FIXED = GRASP_REF_POSE[5]
+
+APPROACH_MM_DEFAULT = 50.0   # 5cm -- pick/place 직후 수직 유지 거리
+MOVE_LIN_SPEED = 30.0        # mm/s? -- zeus_client movel의 lin_speed, 저속으로 시작
+DESCEND_LIN_SPEED = 15.0     # 수직 하강/상승은 더 느리게
+JNT_SPEED_PARK = 10.0        # 파킹 자세로 갈 때 (movej, joints 직접)
+GRIP_TIMEOUT_S = 3.0
+SETTLE_S = 0.3
+
+
+def approach_of(pose6, offset_mm):
+    p = list(pose6)
+    p[2] += offset_mm  # Zeus pose z는 이미 mm 단위
+    return p
+
+
+def load_latest_joints(session_dir: Path, subdir_candidates=("capture_replayed", "capture"),
+                        index: int = -1) -> list:
+    """세션 폴더에서 지정한 인덱스(기본 -1=마지막)의 저장된 joints를 읽는다.
+    capture_replayed가 있으면 그걸 우선한다(더 정확한 정지 상태 재현)."""
+    for sub in subdir_candidates:
+        d = session_dir / sub
+        if not d.is_dir():
+            continue
+        dirs = sorted((p for p in d.iterdir() if p.is_dir()), key=lambda p: int(p.name))
+        if not dirs:
+            continue
+        chosen = dirs[index]
+        data = json.loads((chosen / "robot.json").read_text())
+        return data["joints"], chosen
+    raise FileNotFoundError(f"{session_dir} 아래에 저장된 캡처가 없습니다.")
+
+
+def compute_ordered_targets(session2_dir: Path) -> list:
+    """session2 캡처들의 pose에서 x,y,rz만 뽑아 목표 자세를 만들고,
+    인접 자세 간 rz 차이가 작아지도록 정렬한다."""
+    capture_root = session2_dir / "capture"
+    dirs = sorted((p for p in capture_root.iterdir() if p.is_dir()), key=lambda p: int(p.name))
+    items = []
+    for d in dirs:
+        data = json.loads((d / "robot.json").read_text())
+        x, y, _z, rz, _ry, _rx = data["pose"]
+        target = [x, y, Z_FIXED, rz, RY_FIXED, RX_FIXED]
+        items.append({"orig_index": int(d.name), "rz": rz, "target": target})
+    items.sort(key=lambda it: it["rz"])
+    return items
+
+
+def mv(pose6, speed, desc):
+    return {"kind": "movel", "pose": pose6, "speed": speed, "desc": desc}
+
+
+def mj(joints, speed, desc):
+    return {"kind": "movej", "joints": joints, "speed": speed, "desc": desc}
+
+
+def grip(state, desc):
+    return {"kind": "grip", "state": state, "desc": desc}
+
+
+def cap(desc):
+    return {"kind": "capture", "desc": desc}
+
+
+def build_plan(items, start_joints, cam_pose_joints, approach_mm, return_home):
+    steps = []
+
+    def place_only_block(label, dest_pose):
+        steps.append(mv(approach_of(dest_pose, approach_mm), MOVE_LIN_SPEED, f"[{label}] place approach 이동"))
+        steps.append(mv(dest_pose, DESCEND_LIN_SPEED, f"[{label}] place 수직 하강"))
+        steps.append(grip("open", f"[{label}] 그리퍼 열기 (place)"))
+        steps.append(mv(approach_of(dest_pose, approach_mm), DESCEND_LIN_SPEED, f"[{label}] place 수직 상승"))
+        steps.append(mj(cam_pose_joints, JNT_SPEED_PARK, f"[{label}] 고정 촬영 위치로 이동"))
+        steps.append(cap(f"[{label}] 촬영 자리"))
+
+    def pick_place_block(label, source_pose, dest_pose):
+        steps.append(mv(approach_of(source_pose, approach_mm), MOVE_LIN_SPEED, f"[{label}] pick approach 이동"))
+        steps.append(mv(source_pose, DESCEND_LIN_SPEED, f"[{label}] pick 수직 하강"))
+        steps.append(grip("close", f"[{label}] 그리퍼 닫기 (pick)"))
+        steps.append(mv(approach_of(source_pose, approach_mm), DESCEND_LIN_SPEED, f"[{label}] pick 수직 상승"))
+        place_only_block(label, dest_pose)
+
+    steps.append(mj(start_joints, JNT_SPEED_PARK, "0단계: session1 끝난 자세로 이동 (큐브 쥔 상태)"))
+
+    current = None
+    for order, item in enumerate(items):
+        label = f"{order + 1}/{len(items)} (원본 #{item['orig_index']})"
+        if current is None:
+            place_only_block(label, item["target"])
+        else:
+            pick_place_block(label, current, item["target"])
+        current = item["target"]
+
+    if return_home and current is not None:
+        pick_place_block("원위치 복귀", current, GRASP_REF_POSE)
+
+    return steps
+
+
+def print_plan(steps):
+    for i, step in enumerate(steps):
+        if step["kind"] == "movel":
+            print(f"[{i + 1:3d}] movel  {step['desc']:<40s} "
+                  f"{[round(v, 1) for v in step['pose']]}")
+        elif step["kind"] == "movej":
+            print(f"[{i + 1:3d}] movej  {step['desc']:<40s} "
+                  f"{[round(v, 1) for v in step['joints']]}")
+        elif step["kind"] == "grip":
+            print(f"[{i + 1:3d}] grip   {step['desc']:<40s} state={step['state']}")
+        else:
+            print(f"[{i + 1:3d}] ----   {step['desc']}")
+
+
+def execute_plan(steps, rb: ZeusClient, cams, labels, out_root: Path, view, no_step: bool):
+    capture_counter = 0
+    for i, step in enumerate(steps):
+        desc = step["desc"]
+        if not no_step:
+            if view is not None:
+                view.show()
+            cmd = input(f"\n[{i + 1}/{len(steps)}] {desc}\nEnter=진행 / q=중단 > ").strip().lower()
+            if cmd == "q":
+                print("중단했습니다.")
+                return
+        else:
+            print(f"[{i + 1}/{len(steps)}] {desc}")
+
+        if step["kind"] == "movel":
+            rb.movel(step["pose"], lin_speed=step["speed"])
+        elif step["kind"] == "movej":
+            rb.movej(step["joints"], jnt_speed=step["speed"])
+        elif step["kind"] == "grip":
+            rb.grip(step["state"], timeout_s=GRIP_TIMEOUT_S)
+        else:  # capture
+            time.sleep(SETTLE_S)
+            if view is not None:
+                view.show()
+            robot_state = read_robot_state(rb, {"capture_index": capture_counter, "step_index": i})
+            frames = grab_frames(cams, labels)
+            write_capture(frames, out_root / f"{capture_counter:03d}", robot_state)
+            capture_counter += 1
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--robot-ip", default=ROBOT_IP_DEFAULT)
+    ap.add_argument("--robot-port", type=int, default=ROBOT_PORT_DEFAULT)
+    ap.add_argument("--device-map", default=str(DEVICE_MAP_DEFAULT))
+    ap.add_argument("--session1-dir", default=str(SESSION1_DIR_DEFAULT))
+    ap.add_argument("--session2-dir", default=str(SESSION2_DIR_DEFAULT))
+    ap.add_argument("--session3-dir", default=str(SESSION3_DIR_DEFAULT),
+                    help="촬영 파킹 자세를 임시로 여기서(첫 캡처) 가져옴")
+    ap.add_argument("--out-root", default=str(SESSION2_DIR_DEFAULT / "capture_placed"))
+    ap.add_argument("--approach-mm", type=float, default=APPROACH_MM_DEFAULT)
+    ap.add_argument("--return-home", action="store_true", help="마지막에 큐브를 GRASP_REF_POSE 위치로 복귀")
+    ap.add_argument("--execute", action="store_true", help="실제로 이동/그리퍼/촬영 (없으면 dry-run)")
+    ap.add_argument("--no-step", action="store_true", help="스텝마다 Enter로 확인하지 않고 연속 실행")
+    ap.add_argument("--no-cam-reset", action="store_true")
+    ap.add_argument("--no-preview", action="store_true")
+    args = ap.parse_args()
+
+    start_joints, start_src = load_latest_joints(Path(args.session1_dir), index=-1)
+    cam_pose_joints, cam_src = load_latest_joints(Path(args.session3_dir),
+                                                   subdir_candidates=("capture",), index=0)
+    items = compute_ordered_targets(Path(args.session2_dir))
+
+    print(f"고정값: z={Z_FIXED}mm  ry={RY_FIXED}deg  rx={RX_FIXED}deg  approach={args.approach_mm}mm")
+    print(f"시작 자세(session1 끝) <- {start_src}")
+    print(f"촬영 파킹 자세(session3 첫 캡처, 임시) <- {cam_src}\n")
+
+    steps = build_plan(items, start_joints, cam_pose_joints, args.approach_mm, args.return_home)
+    print_plan(steps)
+
+    if not args.execute:
+        print(f"\n(dry-run) 총 {len(steps)}스텝 계획. 실제로 움직이지 않았습니다. --execute 를 주면 실행합니다.")
+        return
+
+    labels = load_camera_labels(Path(args.device_map))
+    cams, used_labels = connect_cameras(labels, no_reset=args.no_cam_reset)
+    view = None
+    if not args.no_preview:
+        view = LiveView(cams, used_labels, window_name="session2_pick_and_place (q/ESC=닫기)")
+        view.start()
+
+    rb = ZeusClient(args.robot_ip, args.robot_port)
+    rb.connect()
+    print("\n*** 실제 로봇이 자동으로 움직이고 그리퍼를 조작합니다. "
+          "GELLO 텔레옵은 완전히 종료된 상태여야 합니다. 비상정지에 손이 닿는지 확인하세요. ***")
+    if input("계속하려면 'go' 입력: ").strip().lower() != "go":
+        print("취소했습니다.")
+        rb.close()
+        if view is not None:
+            view.stop()
+        stop_cameras(cams)
+        return
+
+    out_root = Path(args.out_root)
+    try:
+        execute_plan(steps, rb, cams, used_labels, out_root, view, args.no_step)
+    finally:
+        rb.close()
+        if view is not None:
+            view.stop()
+        stop_cameras(cams)
+
+    print(f"\n완료 -- {out_root} 확인해보세요.")
+
+
+if __name__ == "__main__":
+    main()
