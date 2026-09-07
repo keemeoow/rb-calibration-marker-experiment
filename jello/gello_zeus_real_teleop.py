@@ -76,8 +76,8 @@ ur3_test/control/gello_ur3_real_teleop.py 와 같은 "joint twin" 미러링 방�
   - --dry-run: 실제 movej/movel/grip 명령 없이 로그만 출력 (첫 테스트는 반드시 이걸로)
 
 실행 전 로봇 주변 충돌 가능성을 확인하고, 티치펜던트/비상정지에 손이 닿는
-상태에서 사용할 것. 처음엔 --jnt-speed(joint 모드) 또는 --lin-speed(position
-모드)와 --overlap을 낮게 유지할 것.
+상태에서 사용할 것. --jnt-speed/--overlap 기본값(10, 20)은 2026-09-07
+실기 테스트로 정한 값이니, 처음 보는 환경/로봇이면 다시 낮춰서 시작할 것.
 """
 
 from __future__ import annotations
@@ -247,12 +247,12 @@ def parse_args() -> argparse.Namespace:
                              "비례 제어 불가, 문턱값으로 이진화)")
     parser.add_argument("--grip-timeout", type=float, default=2.0,
                         help="grip 명령의 blocking 대기 상한(초) - 이 동안 관절 추종이 멈춘다")
-    parser.add_argument("--jnt-speed", type=float, default=5.0,
-                        help="movej jnt_speed (i611 단위, 서버 상한 30). 낮게 시작할 것")
-    parser.add_argument("--overlap", type=float, default=0.0,
-                        help="movej 블렌딩 파라미터(mm 단위 명목, 서버 상한 20). "
-                             "movej에서 실제로 먹히는지 미검증 - 0(끔)부터 시작해 "
-                             "직접 비교해볼 것")
+    parser.add_argument("--jnt-speed", type=float, default=10.0,
+                        help="movej jnt_speed (i611 단위, 서버 상한 30). 느리면 낮춰서 시작할 것")
+    parser.add_argument("--overlap", type=float, default=20.0,
+                        help="movej 블렌딩 파라미터(mm 단위 명목, 서버 상한 20 - 기본값이 "
+                             "이미 상한값). movej에서 실제로 얼마나 블렌딩되는지는 여전히 "
+                             "체감으로 확인해가며 조정할 것")
     parser.add_argument("--acc", type=float, default=0.3, help="acctime/dacctime (초)")
     parser.add_argument("--max-joint-delta-deg", type=float, default=45.0,
                         help="기준 자세 대비 이 각도(deg) 넘게 벗어나는 목표는 클램프 "
