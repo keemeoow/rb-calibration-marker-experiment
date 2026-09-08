@@ -44,7 +44,7 @@ from tools.make_calibration_result_presentation import (  # noqa: E402
 
 
 DEFAULT_OUT_DIR = ROOT / "CP_result/session04/robot_base_pointcloud"
-DEFAULT_MATRIX_JSON = ROOT / "CP_result/session04/late_table1/calibration_matrices.json"
+DEFAULT_MATRIX_JSON = ROOT / "CP_result/session04/calib_result_table1/calibration_matrices.json"
 DEFAULT_MANIFEST = (
     ROOT / "data/session04/calib_out/capture_filter/Step2b_observation_manifest.json"
 )

@@ -13,6 +13,10 @@ import time
 import socket
 import json
 from waypoint_safety import (
+    PROTOCOL_COMPOSITE_RIG_45,
+    PHASE_P1,
+    PHASE_P2,
+    PHASE_P3,
     SAFE_EMPTY_KEY,
     SAFE_GRIPPED_KEY,
     SAFE_MODE_KEY,
@@ -24,6 +28,7 @@ from waypoint_safety import (
 
 HOST = '0.0.0.0'
 PORT = 12348
+ROBOT_SERVER_SCHEMA_VERSION = 'c1_robot_server_v2'
 
 GRIPPER_IO_PORT = 48
 GRIPPER_TIMEOUT_SEC = 5.0
@@ -114,6 +119,8 @@ RETRACT_Z_MM = 20.0
 SAFE_JOINT_TOL_DEG = 2.0
 MOTION_STILL_TOL_DEG = 0.15
 MOTION_STILL_SAMPLE_SEC = 0.25
+TAUGHT_APPROACH_TOL_MM = 2.0
+TAUGHT_APPROACH_TOL_DEG = 2.0
 # save gate 실패 시: 자동 지터 없이 곧바로 사람이 jog하는 manual_recover로 진입한다.
 
 TCP_AXIS_MAP = {'x': 'dx', 'y': 'dy', 'z': 'dz', 'rz': 'drz', 'ry': 'dry', 'rx': 'drx'}
@@ -240,6 +247,27 @@ def send_teach(conn, kind, data):
 
 def get_joints():
     return rb.getjnt().jnt2list()[:6]
+
+
+def robot_state_snapshot(label):
+    """Capture the robot-side values needed to audit one camera event.
+
+    The flange pose is the FK input.  The tool3 TCP is retained only for motion
+    replay/debugging; it must not replace the flange pose in hand-eye equations.
+    """
+    return {
+        "schema_version": "robot_state_v2",
+        "robot_server_version": ROBOT_SERVER_SCHEMA_VERSION,
+        "label": str(label),
+        "server_epoch_s": float(time.time()),
+        "flange_pose_6dof_mm_deg": [float(x) for x in get_flange_pose()],
+        "motion_tcp_pose_6dof_mm_deg": [float(x) for x in get_tcp()],
+        "joints_deg": [float(x) for x in get_joints()],
+        "gripper_io": list(check_gripper()),
+        "flange_pose_convention": "xyz_mm_rzryrx_deg_RzRyRx",
+        "motion_tool_id": 3,
+        "motion_tool_offset_6dof_mm_deg": [0.0, 0.0, float(TOOL_GRIPPER_Z), 0.0, 0.0, 0.0],
+    }
 
 
 def show_pose():
@@ -504,7 +532,10 @@ def gripper_close():
 def do_capture(conn, capture_index, set_cube_center=None, set_index=None,
                set_joints=None, set_tcp=None, place_joints=None,
                cube_gripped=False, capture_block="A_placement", grasp_id=0,
-               force_save=False, motion_safety=None):
+               force_save=False, motion_safety=None, protocol_version=None,
+               planned_event_id=None, phase=None, target_state=None,
+               placement_id=None, view_index=None, attempt_index=0,
+               release_state=None, planned_waypoint=None):
     """Returns (status, tcp, cube_tcp) or (None, None, None) on disconnect.
 
     capture_block / cube_gripped / grasp_id tag each frame so Step3 can separate:
@@ -513,17 +544,26 @@ def do_capture(conn, capture_index, set_cube_center=None, set_index=None,
     """
     # tcp(tool3) 는 모션 규약 값이다. 화면 표시와 티칭 기록(capture_tcp)에만 쓴다 —
     # 그 값이 나중에 웨이포인트가 되어 로봇을 움직이므로 기준을 바꾸면 안 된다.
-    tcp = get_tcp()
-    # 캘리브레이션에 들어가는 두 값만 물리 기준으로 읽는다.
-    flange = get_flange_pose()      # tool1: eye-in-hand FK 기준
-    cube_tcp = get_cube_center()    # tool4: 플랜지 + TOOL_CUBE_CENTER_Z(176.0)
-    joints = get_joints()
+    state = robot_state_snapshot('capture_command')
+    tcp = state["motion_tcp_pose_6dof_mm_deg"]
+    flange = state["flange_pose_6dof_mm_deg"]
+    joints = state["joints_deg"]
+    # Legacy sessions recorded tool4 as the cube center.  The final composite
+    # protocol intentionally does not: its rig offset is estimated from P1 and
+    # the old cube-only TOOL_CUBE_CENTER_Z is not valid for the new hardware.
+    cube_tcp = None
+    if protocol_version != PROTOCOL_COMPOSITE_RIG_45:
+        cube_tcp = get_cube_center()
     print ''
     print '*** CAPTURE {} (block={} gripped={} grasp={}) ***'.format(
         capture_index, capture_block, cube_gripped, grasp_id)
     print '  fingertip:    {}  (tool3, 모션 기준)'.format(fmt6(tcp))
     print '  flange:       {}  (tool1, 캘리브 기록)'.format(fmt6(flange))
-    print '  cube center:  {}  (tool4, 캘리브 기록)'.format(fmt6(cube_tcp))
+    if cube_tcp is not None:
+        print '  cube center:  {}  (tool4, legacy 캘리브 기록)'.format(fmt6(cube_tcp))
+    if planned_event_id is not None:
+        print '  protocol:     {} / {} / attempt {}'.format(
+            phase, planned_event_id, attempt_index)
 
     msg = {
         "command": "capture",
@@ -535,7 +575,26 @@ def do_capture(conn, capture_index, set_cube_center=None, set_index=None,
         "capture_block": capture_block,
         "grasp_id": int(grasp_id),
         "force_save": bool(force_save),
+        "robot_state": state,
     }
+    if protocol_version is not None:
+        msg["protocol_version"] = protocol_version
+    if planned_event_id is not None:
+        msg["planned_event_id"] = planned_event_id
+    if phase is not None:
+        msg["phase"] = phase
+    if target_state is not None:
+        msg["target_state"] = target_state
+    if placement_id is not None:
+        msg["placement_id"] = placement_id
+    if view_index is not None:
+        msg["view_index"] = int(view_index)
+    if attempt_index is not None:
+        msg["attempt_index"] = int(attempt_index)
+    if release_state is not None:
+        msg["release_state"] = release_state
+    if planned_waypoint is not None:
+        msg["planned_waypoint"] = planned_waypoint
     if motion_safety is not None:
         msg["motion_safety"] = motion_safety
     if set_cube_center is not None:
@@ -771,6 +830,225 @@ def request_waypoints_from_pc(conn, timeout_sec=10.0):
     return data
 
 
+def _move_to_composite_place(rb, placement, safe_joints, safe_kind, label):
+    """Use only explicitly taught approach and contact poses for the final rig."""
+    approach_joints = placement['place_approach_joints']
+    place_tcp = placement['place_tcp']
+    approach_tcp = placement['place_approach_tcp']
+    move_to_validated_safe(rb, safe_joints, safe_kind, label + ' safe')
+    move_joint_shortest(rb, approach_joints, label + ' approach')
+    verify_robot_still(rb)
+    actual_approach_tcp = get_tcp()
+    translation_error = max(
+        abs(actual_approach_tcp[idx] - approach_tcp[idx]) for idx in range(3))
+    rotation_error = []
+    for idx in range(3, 6):
+        delta = abs(actual_approach_tcp[idx] - approach_tcp[idx]) % 360.0
+        rotation_error.append(min(delta, 360.0 - delta))
+    if translation_error > TAUGHT_APPROACH_TOL_MM or \
+            max(rotation_error) > TAUGHT_APPROACH_TOL_DEG:
+        raise RuntimeError(
+            'taught approach mismatch: translation {:.2f}mm, rotation {:.2f}deg'.format(
+                translation_error, max(rotation_error)))
+    print '[Protocol45] line to taught place TCP: {}'.format(fmt6(place_tcp))
+    rb.line(Position(*place_tcp[:6]))
+    verify_robot_still(rb)
+    return [float(x) for x in approach_tcp[:6]]
+
+
+def _release_composite_rig(rb, placement, safe_gripped, safe_empty):
+    placement_id = placement['placement_id']
+    approach_tcp = _move_to_composite_place(
+        rb, placement, safe_gripped, 'gripped',
+        'release {}'.format(placement_id))
+    pre_release = robot_state_snapshot('pre_release')
+    print '[Protocol45] {} gripper OPEN'.format(placement_id)
+    gripper_open()
+    post_release = robot_state_snapshot('post_release')
+    if check_gripper() != ['0', '1', '0', '0']:
+        raise RuntimeError('gripper did not confirm OPEN at {}'.format(placement_id))
+    print '[Protocol45] retreat to taught approach TCP: {}'.format(fmt6(approach_tcp))
+    rb.line(Position(*approach_tcp))
+    verify_robot_still(rb)
+    move_to_validated_safe(
+        rb, safe_empty, 'empty', 'post-release {}'.format(placement_id))
+    return {
+        'schema_version': 'release_state_v1',
+        'placement_id': placement_id,
+        'pre_release': pre_release,
+        'post_release': post_release,
+        'place_approach_joints_commanded': [
+            float(x) for x in placement['place_approach_joints'][:6]],
+        'place_approach_tcp_commanded': approach_tcp,
+        'place_tcp_commanded': [float(x) for x in placement['place_tcp'][:6]],
+    }
+
+
+def _grasp_composite_rig(rb, placement, safe_empty, safe_gripped):
+    placement_id = placement['placement_id']
+    approach_tcp = _move_to_composite_place(
+        rb, placement, safe_empty, 'empty',
+        'grasp {}'.format(placement_id))
+    print '[Protocol45] {} gripper CLOSE'.format(placement_id)
+    gripper_close()
+    if check_gripper() != ['0', '0', '0', '1']:
+        raise RuntimeError('gripper did not confirm CLOSED at {}'.format(placement_id))
+    grasp_state = robot_state_snapshot('post_grasp')
+    rb.line(Position(*approach_tcp))
+    verify_robot_still(rb)
+    move_to_validated_safe(
+        rb, safe_gripped, 'gripped', 'post-grasp {}'.format(placement_id))
+    return grasp_state
+
+
+def _run_auto_composite_45(rb, conn, data, speed, confirm=True):
+    """Execute the preregistered P1(15) -> P2(10x2) -> P3(10) protocol."""
+    validate_waypoint_semantics(data)
+    safe_cfg = validate_safe_joint_config(data)
+    if safe_cfg is None:
+        raise ValueError('composite_rig_45_v1 requires explicit safe joint poses')
+    safe_empty = safe_cfg[SAFE_EMPTY_KEY]
+    safe_gripped = safe_cfg[SAFE_GRIPPED_KEY]
+    waypoints = data['waypoints']
+    placements = dict((p['placement_id'], p) for p in data['placements'])
+    p1 = [wp for wp in waypoints if wp['phase'] == PHASE_P1]
+    p2 = [wp for wp in waypoints if wp['phase'] == PHASE_P2]
+    p3 = [wp for wp in waypoints if wp['phase'] == PHASE_P3]
+    max_attempts = int(data.get('max_transport_attempts_per_event', 3))
+
+    print ''
+    print '=========================================='
+    print '  Composite Rig Final Capture'
+    print '  - protocol: {}'.format(PROTOCOL_COMPOSITE_RIG_45)
+    print '  - target:   {}'.format(data.get('target_rig_id'))
+    print '  - events:   P1={} P2={} P3={} total={}'.format(
+        len(p1), len(p2), len(p3), len(waypoints))
+    print '  - attempts: max {} per event (transport/sync only)'.format(max_attempts)
+    print '=========================================='
+    print 'PRECONDITION: composite rig is gripped and robot is at safe_joints_gripped.'
+    raw_input('Press ENTER after checking payload, guarding, E-stop, rig ID, and camera preview...')
+
+    rb.override(speed)
+    try:
+        verify_at_joint_pose(rb, safe_gripped)
+        verify_robot_still(rb)
+        if check_gripper() != ['0', '0', '0', '1']:
+            raise RuntimeError('gripper does not report CLOSED at protocol start')
+    except Exception as e:
+        print '[SAFETY-ABORT] invalid initial safe(gripped) state: {}'.format(e)
+        send_json(conn, {"command": "quit"})
+        return
+
+    success = 0
+    failed = 0
+
+    print '[Protocol45] P1: moving rig, 15 still-gripped captures'
+    for wp in p1:
+        context = {
+            'protocol_version': PROTOCOL_COMPOSITE_RIG_45,
+            'planned_event_id': wp['planned_event_id'],
+            'phase': PHASE_P1,
+            'target_state': wp['target_state'],
+            'placement_id': None,
+            'view_index': wp['view_index'],
+        }
+        result = _capture_at_pose(
+            rb, conn, wp, None, None, None,
+            cube_gripped=True, capture_block=wp['capture_block'], grasp_id=0,
+            confirm=confirm, safe_joints=safe_gripped, safe_kind='gripped',
+            label=wp['planned_event_id'], protocol_context=context,
+            max_capture_attempts=max_attempts)
+        if result == 'success':
+            success += 1
+        elif result in ('quit', 'disconnect', 'abort'):
+            send_json(conn, {"command": "quit"})
+            return
+        else:
+            failed += 1
+
+    print '[Protocol45] P2: 10 placements x 2 released views'
+    for placement_index in range(10):
+        placement_id = 'S{:02d}'.format(placement_index)
+        placement = placements[placement_id]
+        try:
+            release_state = _release_composite_rig(
+                rb, placement, safe_gripped, safe_empty)
+        except Exception as e:
+            print '[SAFETY-ABORT] {} release failed: {}'.format(placement_id, e)
+            send_json(conn, {"command": "quit"})
+            return
+
+        placement_events = [wp for wp in p2 if wp['placement_id'] == placement_id]
+        for wp in placement_events:
+            context = {
+                'protocol_version': PROTOCOL_COMPOSITE_RIG_45,
+                'planned_event_id': wp['planned_event_id'],
+                'phase': PHASE_P2,
+                'target_state': wp['target_state'],
+                'placement_id': placement_id,
+                'view_index': wp['view_index'],
+                'release_state': release_state,
+            }
+            result = _capture_at_pose(
+                rb, conn, wp, placement_index, None, None,
+                cube_gripped=False, capture_block=wp['capture_block'],
+                grasp_id=placement_index + 1, confirm=confirm,
+                safe_joints=safe_empty, safe_kind='empty',
+                label=wp['planned_event_id'], protocol_context=context,
+                max_capture_attempts=max_attempts)
+            if result == 'success':
+                success += 1
+            elif result in ('quit', 'disconnect', 'abort'):
+                send_json(conn, {"command": "quit"})
+                return
+            else:
+                failed += 1
+
+        if placement_index < 9:
+            try:
+                _grasp_composite_rig(
+                    rb, placement, safe_empty, safe_gripped)
+            except Exception as e:
+                print '[SAFETY-ABORT] {} re-grasp failed: {}'.format(placement_id, e)
+                send_json(conn, {"command": "quit"})
+                return
+
+    print '[Protocol45] P3: stationary rig, 10 eye-in-hand poses'
+    for wp in p3:
+        context = {
+            'protocol_version': PROTOCOL_COMPOSITE_RIG_45,
+            'planned_event_id': wp['planned_event_id'],
+            'phase': PHASE_P3,
+            'target_state': wp['target_state'],
+            'placement_id': wp['placement_id'],
+            'view_index': wp['view_index'],
+            'release_state': release_state,
+        }
+        result = _capture_at_pose(
+            rb, conn, wp, 9, None, None,
+            cube_gripped=False, capture_block=wp['capture_block'], grasp_id=10,
+            confirm=confirm, safe_joints=safe_empty, safe_kind='empty',
+            label=wp['planned_event_id'], protocol_context=context,
+            max_capture_attempts=max_attempts)
+        if result == 'success':
+            success += 1
+        elif result in ('quit', 'disconnect', 'abort'):
+            send_json(conn, {"command": "quit"})
+            return
+        else:
+            failed += 1
+
+    send_json(conn, {"command": "protocol_complete",
+                     "protocol_version": PROTOCOL_COMPOSITE_RIG_45,
+                     "planned_events": 45, "successful_events": success,
+                     "failed_events": failed})
+    ack = recv_json(conn)
+    print '[Protocol45] PC lock response: {}'.format(ack)
+    send_json(conn, {"command": "quit"})
+    print '[Protocol45] complete: success={} failed={} (rig remains at S09)'.format(
+        success, failed)
+
+
 def run_auto_capture(rb, conn, waypoint_file=None, speed=30):
     """Run auto capture. If waypoint_file is None or empty, request waypoints
     from PC over the socket. Otherwise, load from local filesystem (legacy).
@@ -787,8 +1065,20 @@ def run_auto_capture(rb, conn, waypoint_file=None, speed=30):
         with open(waypoint_file, 'r') as f:
             data = json.load(f)
 
-    # Multi-set joint-based: waypoints[] has per-waypoint set_index (5+ sets)
     waypoints = data.get('waypoints', [])
+    protocol = data.get('capture_protocol')
+    if protocol == PROTOCOL_COMPOSITE_RIG_45:
+        try:
+            validate_safe_joint_config(data)
+            validate_waypoint_semantics(data)
+        except ValueError as e:
+            print '[SAFETY-ABORT] {}'.format(e)
+            send_json(conn, {"command": "quit"})
+            return
+        _run_auto_composite_45(rb, conn, data, speed, confirm=confirm)
+        return
+
+    # Multi-set joint-based: waypoints[] has per-waypoint set_index (5+ sets)
     if not waypoints or not any('set_index' in wp for wp in waypoints):
         print '[ERROR] waypoints missing set_index (multi-set format required)'
         send_json(conn, {"command": "quit"})
@@ -807,7 +1097,8 @@ def run_auto_capture(rb, conn, waypoint_file=None, speed=30):
 
 def _capture_at_pose(rb, conn, wp, sidx, place_j, set_cc,
                      cube_gripped, capture_block, grasp_id, confirm,
-                     safe_joints, safe_kind, label='', retract=True):
+                     safe_joints, safe_kind, label='', retract=True,
+                     protocol_context=None, max_capture_attempts=1):
     """safe pose -> waypoint -> 정지 확인 -> 촬영 -> safe pose.
 
     이동 방식: wp 에 'capture_joints' 가 있으면 관절 이동(rb.move), 없고 'capture_tcp'
@@ -902,7 +1193,21 @@ def _capture_at_pose(rb, conn, wp, sidx, place_j, set_cc,
         "force_save": False,
         "motion_safety": motion_safety,
     }
-    status, _, _ = do_capture(conn, pose_idx, **cap_kwargs)
+    if protocol_context is not None:
+        cap_kwargs.update(protocol_context)
+        cap_kwargs["planned_waypoint"] = wp
+
+    max_capture_attempts = max(1, int(max_capture_attempts))
+    status = None
+    for attempt_index in range(max_capture_attempts):
+        cap_kwargs["attempt_index"] = attempt_index
+        status, _, _ = do_capture(conn, pose_idx, **cap_kwargs)
+        if status != 'retryable':
+            break
+        if attempt_index + 1 < max_capture_attempts:
+            print '  [Auto] transport/sync failed; retrying same planned event ({}/{})'.format(
+                attempt_index + 2, max_capture_attempts)
+            time.sleep(0.5)
     try:
         move_to_validated_safe(rb, safe_joints, safe_kind, 'post-capture return',
                                        retract=retract)
@@ -912,10 +1217,10 @@ def _capture_at_pose(rb, conn, wp, sidx, place_j, set_cc,
     if status is None:
         print '[Auto] disconnected, stopping.'
         return 'disconnect'
-    if status != 'success':
+    if status not in ('success', 'already_captured'):
         print '  [Auto] -> rejected by capture gate (status={})'.format(status)
         return 'skip'
-    print '  [Auto] -> captured (gate PASS)'
+    print '  [Auto] -> captured ({})'.format(status)
     return 'success'
 
 
@@ -1311,7 +1616,11 @@ def main():
         # Auto mode
         if '--auto' in sys.argv:
             idx = sys.argv.index('--auto')
-            auto_file = sys.argv[idx + 1] if idx + 1 < len(sys.argv) else 'capture_waypoints.json'
+            auto_file = None
+            if idx + 1 < len(sys.argv) and not sys.argv[idx + 1].startswith('--'):
+                auto_file = sys.argv[idx + 1]
+            if auto_file in ('pc', '-'):
+                auto_file = None
             auto_speed = 30
             if '--speed' in sys.argv:
                 sidx = sys.argv.index('--speed')

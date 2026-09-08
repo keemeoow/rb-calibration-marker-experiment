@@ -263,7 +263,7 @@ def main() -> None:
     scales = [float(raw) for raw in args.scales.split(",") if raw.strip()]
     if not scales or any(scale <= 0.0 for scale in scales):
         raise ValueError("all scales must be positive")
-    baseline = _baseline_a2(ROOT / "CP_result/session04/late_table1/table1_methods.json")
+    baseline = _baseline_a2(ROOT / "CP_result/session04/calib_result_table1/table1_methods.json")
     rows = []
     for scale in scales:
         print(f"[SCALE] {scale:g}x", flush=True)

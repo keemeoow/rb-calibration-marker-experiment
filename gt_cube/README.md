@@ -10,7 +10,7 @@ GT 검증 실험 전용의 **별도 물체**다. 메인 큐브(`calibration_pipe
 | [`cube_config.json`](cube_config.json) | 마커 모델. 파이프라인이 읽는 유일한 파일 |
 | [`cube_solid.json`](cube_solid.json) | 물리 형상(mm 박스 5개). 작도 전용, 캘리브레이션 미사용 |
 
-도면은 [`CP_result/gt_cube/`](../../CP_result/gt_cube/) 에 있다.
+도면은 [`CP_result/gt_cube/`](../CP_result/gt_cube/) 에 있다.
 
 ## 형상
 
@@ -47,8 +47,8 @@ I자 플레이트는 ±Y 블록 31×31 두 개와 그 사이를 잇는 목 15(X)
 
 ```bash
 python tools/visualize_cube_model.py \
-  --cube-config targets/gt_cube/cube_config.json \
-  --solid targets/gt_cube/cube_solid.json \
+  --cube-config gt_cube/cube_config.json \
+  --solid gt_cube/cube_solid.json \
   --title "GT validation cube  |  59(X) x 87(Y) x 104(Z) mm" \
   --output-dir CP_result/gt_cube
 ```

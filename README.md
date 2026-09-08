@@ -85,7 +85,7 @@ python3 05_calibrate.py \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/sessionNN/late_table1
+  --out_dir CP_result/sessionNN/calib_result_table1
 ```
 
 Shared Train-only Baseline만 확인하려면 05번에 `--baseline_only`를 추가한다. 전체 Table 1 실행에도 같은 baseline 코드가 포함되므로 보통은 05번을 한 번만 실행하면 된다.
@@ -521,7 +521,7 @@ python3 tools/evaluate_cross_target.py \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --table1_result CP_result/sessionNN/late_table1/table1_methods.json \
+  --table1_result CP_result/sessionNN/calib_result_table1/table1_methods.json \
   --out_dir CP_result/sessionNN/cross_target_evaluation
 ```
 
@@ -605,7 +605,7 @@ Board heldout, board/cube pooled overall, 별도 camera-scope 순위표는 최�
 
 ## 13. 현재 session04 결과와 비교별 해석
 
-Canonical 결과 인덱스는 [CP_result/README.md](CP_result/README.md), 상세 자동 생성 보고서는 [CP_result/session04/late_table1/TABLE1_RESULTS.md](CP_result/session04/late_table1/TABLE1_RESULTS.md)다. 결과 문서는 A0~A5, B1~B3 한 벌만 사용하며, heldout과 External GT 평가는 항상 cube target으로 통일한다.
+Canonical 결과 인덱스는 [CP_result/README.md](CP_result/README.md), 상세 자동 생성 보고서는 [CP_result/session04/calib_result_table1/TABLE1_RESULTS.md](CP_result/session04/calib_result_table1/TABLE1_RESULTS.md)다. 결과 문서는 A0~A5, B1~B3 한 벌만 사용하며, heldout과 External GT 평가는 항상 cube target으로 통일한다.
 
 핵심 요약은 다음과 같다.
 
@@ -621,7 +621,7 @@ Canonical 결과 인덱스는 [CP_result/README.md](CP_result/README.md), 상세
 ### 14.1 Table 1 원시 출력
 
 ```text
-CP_result/sessionNN/late_table1/
+CP_result/sessionNN/calib_result_table1/
 ├── shared_train_only_baseline.json
 ├── shared_board_free_fk_cube.json
 ├── table1_methods.json
@@ -717,7 +717,7 @@ python3 05_calibrate.py \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/sessionNN/late_table1 \
+  --out_dir CP_result/sessionNN/calib_result_table1 \
   --baseline_only
 
 # A0~A5/B1~B3 최종 9행 실행
@@ -728,13 +728,13 @@ python3 05_calibrate.py \
   --split_seed 20260731 \
   --num_inits 3 \
   --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/sessionNN/late_table1
+  --out_dir CP_result/sessionNN/calib_result_table1
 
 # 상세 calibration 결과와 모든 행렬 출력
 python3 06_make_report.py \
   --root_folder data/sessionNN/calib_train \
-  --table1 CP_result/sessionNN/late_table1/table1_methods.json \
-  --out_dir CP_result/sessionNN/late_table1
+  --table1 CP_result/sessionNN/calib_result_table1/table1_methods.json \
+  --out_dir CP_result/sessionNN/calib_result_table1
 
 # 선택 평가: 저장된 모든 방법의 외부-GT 전 board/cube 내부 평가
 python3 tools/evaluate_cross_target.py \
@@ -743,7 +743,7 @@ python3 tools/evaluate_cross_target.py \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --table1_result CP_result/sessionNN/late_table1/table1_methods.json \
+  --table1_result CP_result/sessionNN/calib_result_table1/table1_methods.json \
   --out_dir CP_result/sessionNN/cross_target_evaluation
 
 # 선택 평가: marker modality별 end-to-end 비교
@@ -813,10 +813,10 @@ python3 tools/verify_camera_scope_evaluation.py
 현재 canonical session04 결과는 다음에서 확인한다.
 
 - [Session04 결과 인덱스](CP_result/README.md)
-- [모든 행·seed의 calibration 행렬 JSON](CP_result/session04/late_table1/calibration_matrices.json)
-- [Table 1 결과 및 평가 계약](CP_result/session04/late_table1/TABLE1_RESULTS.md)
+- [모든 행·seed의 calibration 행렬 JSON](CP_result/session04/calib_result_table1/calibration_matrices.json)
+- [Table 1 결과 및 평가 계약](CP_result/session04/calib_result_table1/TABLE1_RESULTS.md)
 - [추가 진단 실험 단일 요약표](ADDITIONAL_EXPERIMENTS_SUMMARY.md)
-- [Interactive 결과](CP_result/session04/late_table1/TABLE1_INTERACTIVE.html)
+- [Interactive 결과](CP_result/session04/calib_result_table1/TABLE1_INTERACTIVE.html)
 - [OpenCV FK-free reference baseline](CP_result/session04/opencv_relative_baseline/OPENCV_RELATIVE_BASELINE.md)
 - [Soft-L1 vs linear outlier loss 대조](CP_result/session04/outlier_ablation/OUTLIER_LOSS_ABLATION.md)
 - [Standard vs strict hard-rejection 민감도](CP_result/session04/outlier_ablation/HARD_REJECTION_ABLATION.md)

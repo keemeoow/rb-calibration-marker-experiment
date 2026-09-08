@@ -4,17 +4,17 @@
 민감도, 시각화 실험을 한 곳에 모은 인덱스다. 최종 방법 순위는
 [CALIBRATION_EXPERIMENT_VALIDATION.md](CALIBRATION_EXPERIMENT_VALIDATION.md)의
 단일 기준을 따르며, 사람이 읽는 최종 결과표는
-[TABLE1_RESULTS.md](CP_result/session04/late_table1/TABLE1_RESULTS.md) 하나만 사용한다.
+[TABLE1_RESULTS.md](CP_result/session04/calib_result_table1/TABLE1_RESULTS.md) 하나만 사용한다.
 
 삭제 정리: 오래된 overall/board-heldout 중심 생성물인
-`CP_result/session04/late_table1/CALIBRATION_RESULTS.md`는 제거했다. 행렬 근거는
-`CP_result/session04/late_table1/calibration_matrices.json`에 남기고, 최종 비교표는
+`CP_result/session04/calib_result_table1/CALIBRATION_RESULTS.md`는 제거했다. 행렬 근거는
+`CP_result/session04/calib_result_table1/calibration_matrices.json`에 남기고, 최종 비교표는
 `TABLE1_RESULTS.md`, `table1_results.csv`, `TABLE1_INTERACTIVE.html`로만 유지한다.
 
 | 추가 실험 | 확인 질문 | 핵심 결과 | 최종 반영 | 근거 파일 |
 | --- | --- | --- | --- | --- |
 | Observation filter / cube quality | 현재 cube 관측 자체에 큰 데이터 문제가 있는가 | Standard filter 기준 cube 99개, board 147개 관측 선택. Cube quality audit에서는 117 images read, 108 accepted PnP, 99 core multiface, 2 PnP-RMSE rejections. | 데이터 문제는 관리 가능한 수준으로 보고, heldout은 항상 cube-only로 고정. | [CAPTURE_FILTER.md](data/session04/calib_out/capture_filter/CAPTURE_FILTER.md), [cube quality README](data/session04/calib_out/verify/cube_observation_quality/README.md) |
-| Frame-prune / refit / rollback | 피드백처럼 outlier를 image-frame 단위로 제거하면 결과가 좋아지는가 | 42 solver stages 중 prune/refit 15회 시도, accepted 0회, rollback 15회. 제거 전 train robust objective가 더 좋아 canonical은 첫 fit 유지. | frame 단위 outlier 제거 코드는 유지하되, Session04 최종값은 rollback 결과로 사용. | [table1_methods.json](CP_result/session04/late_table1/table1_methods.json), [calibration_summary.csv](CP_result/session04/late_table1/calibration_summary.csv) |
+| Frame-prune / refit / rollback | 피드백처럼 outlier를 image-frame 단위로 제거하면 결과가 좋아지는가 | 42 solver stages 중 prune/refit 15회 시도, accepted 0회, rollback 15회. 제거 전 train robust objective가 더 좋아 canonical은 첫 fit 유지. | frame 단위 outlier 제거 코드는 유지하되, Session04 최종값은 rollback 결과로 사용. | [table1_methods.json](CP_result/session04/calib_result_table1/table1_methods.json), [calibration_summary.csv](CP_result/session04/calib_result_table1/calibration_summary.csv) |
 | Hard rejection standard vs strict | 경계 cube 관측 2개를 빼면 결론이 바뀌는가 | Train 119 obs / 3686 corners -> 117 obs / 3654 corners. 당시 보조 diagnostic residual 변화는 최대 0.49% 수준이고, A1->A2 개선 방향 유지. | strict를 canonical로 채택하지 않고 standard filter 유지. 최종 heldout 판정은 cube-only 지표만 사용. | [HARD_REJECTION_ABLATION.md](CP_result/session04/outlier_ablation/HARD_REJECTION_ABLATION.md) |
 | Hard threshold OFAT | threshold를 넓게 sweep하면 더 좋은 고정 정책이 있는가 | 사전등록 규칙상 어떤 지점도 A0/A2/A3 모두에서 2% 이상 개선하지 못함. C3는 A0 primary endpoint를 +118.6% 악화. | 관측을 더 버리는 정책은 공식 채택하지 않음. | [HARD_THRESHOLD_SENSITIVITY.md](CP_result/session04/outlier_ablation/hard_threshold_sensitivity/HARD_THRESHOLD_SENSITIVITY.md), [PREREGISTRATION_HARD_THRESHOLD.md](CP_result/session04/outlier_ablation/PREREGISTRATION_HARD_THRESHOLD.md) |
 | Soft-L1 vs linear loss | robust loss가 임의 선택인지, 실제로 도움이 되는가 | soft-L1은 A0/A1/A2/A4/A5/B1/B2/B3에서 linear보다 낮고, A3만 +0.18% 악화. B2 개선폭은 8.02%. | canonical solver loss는 `soft_l1`, 단 robust loss가 모든 조건을 자동 개선한다고 주장하지 않음. | [OUTLIER_LOSS_ABLATION.md](CP_result/session04/outlier_ablation/OUTLIER_LOSS_ABLATION.md) |

@@ -26,17 +26,17 @@ from tools.sync_table1_canonical_data import (
 )
 
 
-TABLE1_JSON = ROOT / "CP_result/session04/late_table1/table1_methods.json"
+TABLE1_JSON = ROOT / "CP_result/session04/calib_result_table1/table1_methods.json"
 CROSS_JSON = (
     ROOT / "CP_result/session04/cross_target_evaluation/"
     "cross_target_evaluation.json")
 MARKER_JSON = (
     ROOT / "CP_result/session04/marker_system_end_to_end/"
     "marker_system_end_to_end.json")
-CANONICAL_CSV = ROOT / "CP_result/session04/late_table1/table1_results.csv"
+CANONICAL_CSV = ROOT / "CP_result/session04/calib_result_table1/table1_results.csv"
 REPORTS = (
-    ROOT / "CP_result/session04/late_table1/TABLE1_RESULTS.md",
-    ROOT / "CP_result/session04/late_table1/TABLE1_INTERACTIVE.html",
+    ROOT / "CP_result/session04/calib_result_table1/TABLE1_RESULTS.md",
+    ROOT / "CP_result/session04/calib_result_table1/TABLE1_INTERACTIVE.html",
 )
 
 

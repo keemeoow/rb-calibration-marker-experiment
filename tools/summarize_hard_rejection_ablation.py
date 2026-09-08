@@ -366,7 +366,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--standard_table",
-        default="CP_result/session04/late_table1/table1_methods.json")
+        default="CP_result/session04/calib_result_table1/table1_methods.json")
     parser.add_argument(
         "--strict_table",
         default=("CP_result/session04/outlier_ablation/strict_table1/"

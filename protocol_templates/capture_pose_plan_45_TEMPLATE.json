@@ -1,0 +1,571 @@
+{
+  "schema_version": "capture_pose_plan_v2",
+  "capture_protocol": "composite_rig_45_v1",
+  "template_only": true,
+  "target_rig_id": "FILL_ME",
+  "rig_geometry_file": "FILL_ME/composite_rig_geometry.json",
+  "rig_geometry_sha256": "FILL_ME",
+  "pose_convention": "joint_deg; TCP/flange=[x,y,z,rz,ry,rx] mm/deg, RzRyRx",
+  "max_transport_attempts_per_event": 3,
+  "safe_joints_empty": null,
+  "safe_joints_gripped": null,
+  "placements": [
+    {
+      "placement_id": "S00",
+      "place_approach_joints": null,
+      "place_approach_tcp": null,
+      "place_tcp": null
+    },
+    {
+      "placement_id": "S01",
+      "place_approach_joints": null,
+      "place_approach_tcp": null,
+      "place_tcp": null
+    },
+    {
+      "placement_id": "S02",
+      "place_approach_joints": null,
+      "place_approach_tcp": null,
+      "place_tcp": null
+    },
+    {
+      "placement_id": "S03",
+      "place_approach_joints": null,
+      "place_approach_tcp": null,
+      "place_tcp": null
+    },
+    {
+      "placement_id": "S04",
+      "place_approach_joints": null,
+      "place_approach_tcp": null,
+      "place_tcp": null
+    },
+    {
+      "placement_id": "S05",
+      "place_approach_joints": null,
+      "place_approach_tcp": null,
+      "place_tcp": null
+    },
+    {
+      "placement_id": "S06",
+      "place_approach_joints": null,
+      "place_approach_tcp": null,
+      "place_tcp": null
+    },
+    {
+      "placement_id": "S07",
+      "place_approach_joints": null,
+      "place_approach_tcp": null,
+      "place_tcp": null
+    },
+    {
+      "placement_id": "S08",
+      "place_approach_joints": null,
+      "place_approach_tcp": null,
+      "place_tcp": null
+    },
+    {
+      "placement_id": "S09",
+      "place_approach_joints": null,
+      "place_approach_tcp": null,
+      "place_tcp": null
+    }
+  ],
+  "waypoints": [
+    {
+      "capture_index": 0,
+      "planned_event_id": "P1_00",
+      "phase": "P1_MOVING_RIG",
+      "target_state": "gripped",
+      "placement_id": null,
+      "view_index": 0,
+      "capture_block": "B_eyetohand",
+      "cube_gripped": true,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 1,
+      "planned_event_id": "P1_01",
+      "phase": "P1_MOVING_RIG",
+      "target_state": "gripped",
+      "placement_id": null,
+      "view_index": 1,
+      "capture_block": "B_eyetohand",
+      "cube_gripped": true,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 2,
+      "planned_event_id": "P1_02",
+      "phase": "P1_MOVING_RIG",
+      "target_state": "gripped",
+      "placement_id": null,
+      "view_index": 2,
+      "capture_block": "B_eyetohand",
+      "cube_gripped": true,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 3,
+      "planned_event_id": "P1_03",
+      "phase": "P1_MOVING_RIG",
+      "target_state": "gripped",
+      "placement_id": null,
+      "view_index": 3,
+      "capture_block": "B_eyetohand",
+      "cube_gripped": true,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 4,
+      "planned_event_id": "P1_04",
+      "phase": "P1_MOVING_RIG",
+      "target_state": "gripped",
+      "placement_id": null,
+      "view_index": 4,
+      "capture_block": "B_eyetohand",
+      "cube_gripped": true,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 5,
+      "planned_event_id": "P1_05",
+      "phase": "P1_MOVING_RIG",
+      "target_state": "gripped",
+      "placement_id": null,
+      "view_index": 5,
+      "capture_block": "B_eyetohand",
+      "cube_gripped": true,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 6,
+      "planned_event_id": "P1_06",
+      "phase": "P1_MOVING_RIG",
+      "target_state": "gripped",
+      "placement_id": null,
+      "view_index": 6,
+      "capture_block": "B_eyetohand",
+      "cube_gripped": true,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 7,
+      "planned_event_id": "P1_07",
+      "phase": "P1_MOVING_RIG",
+      "target_state": "gripped",
+      "placement_id": null,
+      "view_index": 7,
+      "capture_block": "B_eyetohand",
+      "cube_gripped": true,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 8,
+      "planned_event_id": "P1_08",
+      "phase": "P1_MOVING_RIG",
+      "target_state": "gripped",
+      "placement_id": null,
+      "view_index": 8,
+      "capture_block": "B_eyetohand",
+      "cube_gripped": true,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 9,
+      "planned_event_id": "P1_09",
+      "phase": "P1_MOVING_RIG",
+      "target_state": "gripped",
+      "placement_id": null,
+      "view_index": 9,
+      "capture_block": "B_eyetohand",
+      "cube_gripped": true,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 10,
+      "planned_event_id": "P1_10",
+      "phase": "P1_MOVING_RIG",
+      "target_state": "gripped",
+      "placement_id": null,
+      "view_index": 10,
+      "capture_block": "B_eyetohand",
+      "cube_gripped": true,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 11,
+      "planned_event_id": "P1_11",
+      "phase": "P1_MOVING_RIG",
+      "target_state": "gripped",
+      "placement_id": null,
+      "view_index": 11,
+      "capture_block": "B_eyetohand",
+      "cube_gripped": true,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 12,
+      "planned_event_id": "P1_12",
+      "phase": "P1_MOVING_RIG",
+      "target_state": "gripped",
+      "placement_id": null,
+      "view_index": 12,
+      "capture_block": "B_eyetohand",
+      "cube_gripped": true,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 13,
+      "planned_event_id": "P1_13",
+      "phase": "P1_MOVING_RIG",
+      "target_state": "gripped",
+      "placement_id": null,
+      "view_index": 13,
+      "capture_block": "B_eyetohand",
+      "cube_gripped": true,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 14,
+      "planned_event_id": "P1_14",
+      "phase": "P1_MOVING_RIG",
+      "target_state": "gripped",
+      "placement_id": null,
+      "view_index": 14,
+      "capture_block": "B_eyetohand",
+      "cube_gripped": true,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 15,
+      "planned_event_id": "P2_S00_V0",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S00",
+      "view_index": 0,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 16,
+      "planned_event_id": "P2_S00_V1",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S00",
+      "view_index": 1,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 17,
+      "planned_event_id": "P2_S01_V0",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S01",
+      "view_index": 0,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 18,
+      "planned_event_id": "P2_S01_V1",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S01",
+      "view_index": 1,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 19,
+      "planned_event_id": "P2_S02_V0",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S02",
+      "view_index": 0,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 20,
+      "planned_event_id": "P2_S02_V1",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S02",
+      "view_index": 1,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 21,
+      "planned_event_id": "P2_S03_V0",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S03",
+      "view_index": 0,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 22,
+      "planned_event_id": "P2_S03_V1",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S03",
+      "view_index": 1,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 23,
+      "planned_event_id": "P2_S04_V0",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S04",
+      "view_index": 0,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 24,
+      "planned_event_id": "P2_S04_V1",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S04",
+      "view_index": 1,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 25,
+      "planned_event_id": "P2_S05_V0",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S05",
+      "view_index": 0,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 26,
+      "planned_event_id": "P2_S05_V1",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S05",
+      "view_index": 1,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 27,
+      "planned_event_id": "P2_S06_V0",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S06",
+      "view_index": 0,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 28,
+      "planned_event_id": "P2_S06_V1",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S06",
+      "view_index": 1,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 29,
+      "planned_event_id": "P2_S07_V0",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S07",
+      "view_index": 0,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 30,
+      "planned_event_id": "P2_S07_V1",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S07",
+      "view_index": 1,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 31,
+      "planned_event_id": "P2_S08_V0",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S08",
+      "view_index": 0,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 32,
+      "planned_event_id": "P2_S08_V1",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S08",
+      "view_index": 1,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 33,
+      "planned_event_id": "P2_S09_V0",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S09",
+      "view_index": 0,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 34,
+      "planned_event_id": "P2_S09_V1",
+      "phase": "P2_PICK_PLACE",
+      "target_state": "released",
+      "placement_id": "S09",
+      "view_index": 1,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 35,
+      "planned_event_id": "P3_00",
+      "phase": "P3_STATIONARY_RIG",
+      "target_state": "stationary",
+      "placement_id": "S09",
+      "view_index": 0,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 36,
+      "planned_event_id": "P3_01",
+      "phase": "P3_STATIONARY_RIG",
+      "target_state": "stationary",
+      "placement_id": "S09",
+      "view_index": 1,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 37,
+      "planned_event_id": "P3_02",
+      "phase": "P3_STATIONARY_RIG",
+      "target_state": "stationary",
+      "placement_id": "S09",
+      "view_index": 2,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 38,
+      "planned_event_id": "P3_03",
+      "phase": "P3_STATIONARY_RIG",
+      "target_state": "stationary",
+      "placement_id": "S09",
+      "view_index": 3,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 39,
+      "planned_event_id": "P3_04",
+      "phase": "P3_STATIONARY_RIG",
+      "target_state": "stationary",
+      "placement_id": "S09",
+      "view_index": 4,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 40,
+      "planned_event_id": "P3_05",
+      "phase": "P3_STATIONARY_RIG",
+      "target_state": "stationary",
+      "placement_id": "S09",
+      "view_index": 5,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 41,
+      "planned_event_id": "P3_06",
+      "phase": "P3_STATIONARY_RIG",
+      "target_state": "stationary",
+      "placement_id": "S09",
+      "view_index": 6,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 42,
+      "planned_event_id": "P3_07",
+      "phase": "P3_STATIONARY_RIG",
+      "target_state": "stationary",
+      "placement_id": "S09",
+      "view_index": 7,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 43,
+      "planned_event_id": "P3_08",
+      "phase": "P3_STATIONARY_RIG",
+      "target_state": "stationary",
+      "placement_id": "S09",
+      "view_index": 8,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    },
+    {
+      "capture_index": 44,
+      "planned_event_id": "P3_09",
+      "phase": "P3_STATIONARY_RIG",
+      "target_state": "stationary",
+      "placement_id": "S09",
+      "view_index": 9,
+      "capture_block": "A_placement",
+      "cube_gripped": false,
+      "capture_joints": null
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "schema_version": "composite_rig_geometry_v1",
+  "template_only": true,
+  "target_rig_id": "FILL_ME",
+  "translation_unit": "meter",
+  "transform_convention": "T_A_B maps coordinates from frame B to frame A",
+  "T_rig_board": null,
+  "T_rig_cube": null,
+  "measurement_method": "FILL_ME",
+  "measured_at_utc": "FILL_ME",
+  "notes": "Replace null/FILL_ME values, set template_only=false, then compute this file's SHA-256 for the pose plan."
+}

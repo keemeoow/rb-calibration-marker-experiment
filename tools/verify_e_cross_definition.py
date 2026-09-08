@@ -62,7 +62,7 @@ def parse_args():
         action="store_true")
     parser.add_argument(
         "--table1_result",
-        default="CP_result/session04/late_table1/table1_methods.json")
+        default="CP_result/session04/calib_result_table1/table1_methods.json")
     parser.add_argument(
         "--evaluation_json",
         default=("CP_result/session04/cross_target_evaluation/"

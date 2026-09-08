@@ -1327,7 +1327,7 @@
     },
     "backbone_fk_used_in_all_conditions": true,
     "shared_train_only_baseline": {
-      "path": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/CP_result/session04/late_table1/shared_train_only_baseline.json",
+      "path": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/CP_result/session04/calib_result_table1/shared_train_only_baseline.json",
       "schema": "table1_shared_train_only_baseline_v2",
       "sha256": "ae077485a1c61e8849ba2599153e833f3e62030a840f7d1aee88ea123bd54d5c",
       "shared_reference_state_sha256": "29d9c7a6e4573be887269f6a0177670f7ebd5b4a77a2c2a8b84148bd1c60ec01",
@@ -23914,7 +23914,7 @@
     }
   },
   "shared_fk_cube_artifact": {
-    "path": "CP_result/session04/late_table1/shared_board_free_fk_cube.json",
+    "path": "CP_result/session04/calib_result_table1/shared_board_free_fk_cube.json",
     "sha256": "c55556f65602ded0adc0900c83eda55514b58375632811b29a64093acc93a05e",
     "consumers": [
       "A4",

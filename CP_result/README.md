@@ -15,7 +15,7 @@
 
 ```text
 CP_result/session04/
-├── late_table1/
+├── calib_result_table1/
 │   ├── TABLE1_RESULTS.md
 │   ├── TABLE1_INTERACTIVE.html
 │   ├── table1_methods.json
@@ -45,7 +45,7 @@ CP_result/session04/
     └── strict_table1/
 ```
 
-상세 보고서는 [`session04/late_table1/TABLE1_RESULTS.md`](session04/late_table1/TABLE1_RESULTS.md), interactive 결과는 [`session04/late_table1/TABLE1_INTERACTIVE.html`](session04/late_table1/TABLE1_INTERACTIVE.html)에서 확인한다. 추가 진단/민감도 실험은 루트의 [`ADDITIONAL_EXPERIMENTS_SUMMARY.md`](../ADDITIONAL_EXPERIMENTS_SUMMARY.md) 한 곳에서 요약한다.
+상세 보고서는 [`session04/calib_result_table1/TABLE1_RESULTS.md`](session04/calib_result_table1/TABLE1_RESULTS.md), interactive 결과는 [`session04/calib_result_table1/TABLE1_INTERACTIVE.html`](session04/calib_result_table1/TABLE1_INTERACTIVE.html)에서 확인한다. 추가 진단/민감도 실험은 루트의 [`ADDITIONAL_EXPERIMENTS_SUMMARY.md`](../ADDITIONAL_EXPERIMENTS_SUMMARY.md) 한 곳에서 요약한다.
 
 ## 2. 데이터와 split 계약
 
@@ -64,7 +64,7 @@ CP_result/session04/
 ## 3. Table 1 결과 요약
 
 숫자 표는 이 인덱스에 복제하지 않는다. 최신 값은 생성·검증되는
-[`TABLE1_RESULTS.md`](session04/late_table1/TABLE1_RESULTS.md) 한 곳에서 확인한다.
+[`TABLE1_RESULTS.md`](session04/calib_result_table1/TABLE1_RESULTS.md) 한 곳에서 확인한다.
 이렇게 해야 재실행 뒤 README의 수치만 과거 값으로 남는 문제를 막을 수 있다.
 
 - 최종 비교 행은 A0~A5, B1~B3 한 벌만 사용한다.
@@ -75,7 +75,7 @@ CP_result/session04/
 
 ## 4. 단일 데이터 원천
 
-`session04/late_table1/table1_methods.json`은 A0~A5/B1~B3의 유일한 원시 실행 결과다. A6나 추가 board-only FK row는 최종 표에 넣지 않는다. `table1_results.csv`, `TABLE1_RESULTS.md`, `TABLE1_INTERACTIVE.html`은 이 JSON과 보조 평가 JSON에서 생성하되, 최종 출력은 cube-only 지표만 남긴다.
+`session04/calib_result_table1/table1_methods.json`은 A0~A5/B1~B3의 유일한 원시 실행 결과다. A6나 추가 board-only FK row는 최종 표에 넣지 않는다. `table1_results.csv`, `TABLE1_RESULTS.md`, `TABLE1_INTERACTIVE.html`은 이 JSON과 보조 평가 JSON에서 생성하되, 최종 출력은 cube-only 지표만 남긴다.
 
 파생 결과는 `tools/sync_table1_canonical_data.py`로 생성하고 `tools/verify_table1_visual_sync.py`로 JSON/CSV/Markdown/HTML 숫자와 provenance 일치를 검사한다.
 

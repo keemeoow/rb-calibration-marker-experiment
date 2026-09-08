@@ -213,9 +213,9 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root_folder", default=DEFAULT_SESSION_ROOT)
     parser.add_argument(
-        "--table1", help="Default: CP_result/<session>/late_table1/table1_methods.json")
+        "--table1", help="Default: CP_result/<session>/calib_result_table1/table1_methods.json")
     parser.add_argument(
-        "--out_dir", help="Default: CP_result/<session>/late_table1")
+        "--out_dir", help="Default: CP_result/<session>/calib_result_table1")
     parser.add_argument(
         "--representative_seed", type=int, default=0,
         help="Fixed seed to print as representative; never selected by held-out score")

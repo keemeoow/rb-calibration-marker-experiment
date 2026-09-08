@@ -25,7 +25,7 @@ DEFAULT_MANIFEST = (
     ROOT / "data/session04/calib_out/capture_filter/"
     "Step2b_observation_manifest.json"
 )
-DEFAULT_TABLE1 = ROOT / "CP_result/session04/late_table1/table1_methods.json"
+DEFAULT_TABLE1 = ROOT / "CP_result/session04/calib_result_table1/table1_methods.json"
 DEFAULT_OUT_DIR = ROOT / "CP_result/session04/external_baseline_package"
 
 

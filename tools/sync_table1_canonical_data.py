@@ -1344,7 +1344,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Regenerate current CSV/Markdown/HTML evaluation artifacts")
     parser.add_argument(
-        "--table1", default="CP_result/session04/late_table1/table1_methods.json")
+        "--table1", default="CP_result/session04/calib_result_table1/table1_methods.json")
     parser.add_argument(
         "--cross", default=(
             "CP_result/session04/cross_target_evaluation/"
@@ -1354,10 +1354,10 @@ def parse_args() -> argparse.Namespace:
             "CP_result/session04/marker_system_end_to_end/"
             "marker_system_end_to_end.json"))
     parser.add_argument(
-        "--late_dir", default="CP_result/session04/late_table1")
+        "--late_dir", default="CP_result/session04/calib_result_table1")
     parser.add_argument(
         "--html",
-        default="CP_result/session04/late_table1/TABLE1_INTERACTIVE.html")
+        default="CP_result/session04/calib_result_table1/TABLE1_INTERACTIVE.html")
     return parser.parse_args()
 
 

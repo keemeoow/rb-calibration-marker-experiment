@@ -1053,9 +1053,9 @@ def session_paths(root_folder: str) -> Dict[str, str]:
         "observation_manifest": os.path.join(
             calib_dir, "capture_filter", "Step2b_observation_manifest.json"),
         "cp_dir": cp_dir,
-        "table1_dir": os.path.join(cp_dir, "late_table1"),
+        "table1_dir": os.path.join(cp_dir, "calib_result_table1"),
         "table1_result": os.path.join(
-            cp_dir, "late_table1", "table1_methods.json"),
+            cp_dir, "calib_result_table1", "table1_methods.json"),
         "cross_target_dir": os.path.join(cp_dir, "cross_target_evaluation"),
         "cross_target_result": os.path.join(
             cp_dir, "cross_target_evaluation", "cross_target_evaluation.json"),

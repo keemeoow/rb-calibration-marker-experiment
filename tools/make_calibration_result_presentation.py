@@ -30,7 +30,7 @@ from tools.sync_table1_canonical_data import (
 
 OUT_PDF = ROOT / "캘리브레이션_실험결과_발표자료.pdf"
 
-TABLE1_JSON = ROOT / "CP_result/session04/late_table1/table1_methods.json"
+TABLE1_JSON = ROOT / "CP_result/session04/calib_result_table1/table1_methods.json"
 CROSS_JSON = (
     ROOT / "CP_result/session04/cross_target_evaluation/"
     "cross_target_evaluation.json"

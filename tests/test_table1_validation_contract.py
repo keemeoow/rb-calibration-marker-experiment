@@ -20,7 +20,7 @@ from tools.sync_table1_canonical_data import (
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TABLE1_JSON = ROOT / "CP_result/session04/late_table1/table1_methods.json"
+TABLE1_JSON = ROOT / "CP_result/session04/calib_result_table1/table1_methods.json"
 CROSS_JSON = (
     ROOT / "CP_result/session04/cross_target_evaluation/"
     "cross_target_evaluation.json")
@@ -197,7 +197,7 @@ def test_pooled_and_equal_weight_agree_only_through_support():
 
 def test_report_uses_cube_only_final_metric_set():
     markdown = (
-        ROOT / "CP_result/session04/late_table1/TABLE1_RESULTS.md").read_text()
+        ROOT / "CP_result/session04/calib_result_table1/TABLE1_RESULTS.md").read_text()
 
     assert "Heldout Cube RMSE" in markdown
     assert "ALL Cube RMSE" in markdown

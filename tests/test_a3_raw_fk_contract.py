@@ -57,7 +57,7 @@ def test_a5_declares_train_only_vision_aligned_hard_constraint():
 
     assert condition.fk_to_cube == POSE_SOURCE_ALIGNED_FK_FIXED
     assert POSE_SOURCE_ALIGNED_FK_FIXED == "vision-aligned-FK-fixed"
-    assert condition.supplementary is True
+    assert condition.supplementary is False
     assert "A5" in FK_ALIGNMENT_SHARED_ROWS
     assert VISION_ALIGNED_FK_FIXED_CONTRACT["training_information_used"] is True
     assert VISION_ALIGNED_FK_FIXED_CONTRACT["heldout_information_used"] is False

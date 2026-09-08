@@ -1912,7 +1912,7 @@ def parse_args(argv=None):
                         help="Default: <session>/calib_out from --root_folder.")
     parser.add_argument(
         "--out_dir",
-        help=("Output directory. Default: CP_result/<sessionNN>/late_table1 "
+        help=("Output directory. Default: CP_result/<sessionNN>/calib_result_table1 "
               "inferred from --root_folder."),
     )
     parser.add_argument(

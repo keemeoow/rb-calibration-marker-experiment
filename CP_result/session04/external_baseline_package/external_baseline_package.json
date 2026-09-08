@@ -10,7 +10,7 @@
     "schema": "post_capture_observation_manifest_v2"
   },
   "source_table1": {
-    "path": "CP_result/session04/late_table1/table1_methods.json",
+    "path": "CP_result/session04/calib_result_table1/table1_methods.json",
     "sha256": "f048caac50d5a3ae3e5b7f735cfddd073bdc0cf21be14b6b5fc51249257bb5d9"
   },
   "split": {

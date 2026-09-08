@@ -37,9 +37,9 @@ A0/B3는 calibration 단계에서는 board-only로 유지한다. 다만 최종 c
 | B2 (−board) | cube only | unified_joint_optimization | cube pose=corrected-FK-factor | 3.0201 | 3.4308 | 4.4608 | 6.4557 | 7.4292 / 1.0493 | Pending | 3/3 | Current data available; measured FK covariance pending (현재 데이터 있음; FK covariance 측정 대기) |
 | B3 (−cube) | board-on-gripper only | unified_joint_optimization | board pose=estimated; cube=eval only | 3.4489 | 3.5061 | 3.6763 | 7.1502 | 8.6736 / 0.9035 | Pending | 3/3 | Current data available (현재 데이터 있음) |
 
-### 평가지표 (한글로): 설명, 평가 지표 낸 방법
+### 평가지표
 
-| 평가지표 | 설명 | 평가 지표 낸 방법 |
+| 평가지표 | 설명 | 평가 지표 원리 |
 | --- | --- | --- |
 | External cube TRE / rotation / P95 / failure | 최종 물리 정확도 지표 | GT 공개 전에 각 방법의 cube pose prediction을 저장하고, 다음주 독립 External cube GT와 같은 pose list에서 translation, rotation, P95, failure를 계산한다. |
 | ALL Cube RMSE px | 전체 cube 영상에 대한 fit sanity check | 카메라/hand-eye는 각 방법의 최종 calibration 결과로 고정한다. 그 뒤 train cube만으로 set별 `T_base_cube`를 nuisance pose로 맞추고, train 724 + heldout 236 cube corner를 합친 corner-pooled RMSE를 낸다. Train이 75.4%이므로 일반화 순위에는 쓰지 않는다. |

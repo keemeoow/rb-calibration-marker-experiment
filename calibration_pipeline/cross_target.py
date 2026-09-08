@@ -242,7 +242,7 @@ def parse_args(argv=None):
     parser.add_argument("--f_scale_px", type=float, default=2.0)
     parser.add_argument(
         "--table1_result", default=None,
-        help="Default: CP_result/<session>/late_table1/table1_methods.json.")
+        help="Default: CP_result/<session>/calib_result_table1/table1_methods.json.")
     parser.add_argument(
         "--out_dir", default=None,
         help="Default: CP_result/<session>/cross_target_evaluation.")

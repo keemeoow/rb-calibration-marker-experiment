@@ -173,7 +173,7 @@ python3 tools/opencv_baseline.py       $COMMON
 
 # 3) A2/A3/A4/A5 blind prediction을 동일 run_index=0으로 생성하고 동결
 python3 -m calibration_pipeline.blind_prediction \
-  --table1_result_json CP_result/<새세션>/late_table1/table1_methods.json \
+  --table1_result_json CP_result/<새세션>/calib_result_table1/table1_methods.json \
   --method A4 --run_index 0 --blind_root data/<새세션>/blind_test \
   --intrinsics_dir intrinsics --output data/<새세션>/predictions/A4.json
 # 위 명령의 --method/--output만 A2, A3, A5로 바꾸어 반복한다.
