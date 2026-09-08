@@ -65,8 +65,9 @@ def fit_frozen(method, data_fold, fk_mode, gtc_init, board_init):
         state, _, _ = solve_unified(data_fold, fk_mode, gtc_init, board_init)
         return state.cams, state.gtc
     state_a, _, _ = solve_independent_group_a(data_fold, fk_mode)
-    T_gc = state_a.grasps[0]
-    state_b, _, _ = solve_independent_group_b(data_fold, fk_mode, gtc_init, board_init, T_gc)
+    # raw-fk 앵커는 통합과 같은 원래 상수(grasp_init)를 써야 공정한 비교가 된다
+    # (그룹A가 다시 정제한 값을 쓰면 raw-fk의 정의가 조건마다 달라짐 -- 실제 버그였음).
+    state_b, _, _ = solve_independent_group_b(data_fold, fk_mode, gtc_init, board_init, data_fold["grasp_init"])
     return state_a.cams, state_b.gtc
 
 

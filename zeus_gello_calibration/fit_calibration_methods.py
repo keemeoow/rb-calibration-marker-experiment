@@ -259,9 +259,15 @@ def solve_independent_group_a(data, fk_mode):
     return final_state, diag, len(observations)
 
 
-def solve_independent_group_b(data, fk_mode, gtc_init, board_init, T_gripper_cube_from_a):
-    """그룹B: 그리퍼캠 1대, session2-그리퍼캠 + session3만. raw-fk는 그룹A에서
-    이미 풀린 T_gripper_cube를 상수로 재사용(동시 최적화 아님 -- 여전히 독립)."""
+def solve_independent_group_b(data, fk_mode, gtc_init, board_init, grasp_init):
+    """그룹B: 그리퍼캠 1대, session2-그리퍼캠 + session3만.
+
+    raw-fk 앵커는 통합(solve_unified)과 반드시 같은 상수(grasp_init, 세션1만으로
+    미리 구해둔 원래 값)를 써야 한다 -- 그룹A가 session1+session2-고정캠으로
+    다시 정제한 T_gripper_cube(state_a.grasps[0])를 여기 넣으면, 통합은 raw
+    상수를 쓰고 독립은 한 번 정제된 상수를 쓰는 셈이 되어 "raw-fk"의 정의가
+    조건마다 달라지고 비교가 불공정해진다 (실측: 두 상수가 1.08mm 차이났고,
+    이게 그대로 그리퍼 RMSE 차이로 새어나갔었다 -- 실제로 겪은 버그)."""
     K_map, D_map = data["K_map"], data["D_map"]
     obs_s2g = data["obs_s2_gripper"]
     set_ids = sorted(data["items_by_index"])
@@ -274,7 +280,7 @@ def solve_independent_group_b(data, fk_mode, gtc_init, board_init, T_gripper_cub
         observations = [o for o in observations
                         if o.set_idx is None or int(o.set_idx) in cubes]
     else:
-        cubes = fk_anchor_cubes(data["items_by_index"], T_gripper_cube_from_a)
+        cubes = fk_anchor_cubes(data["items_by_index"], grasp_init)
         cube_key = []
 
     state = PoseState(cams={}, gtc=gtc_init.copy(), board=board_init.copy(), cubes=dict(cubes), grasps={})
@@ -288,6 +294,11 @@ def solve_independent_group_b(data, fk_mode, gtc_init, board_init, T_gripper_cub
 
 
 def per_corner_errors(state, observations, robot_T, K_map, D_map, gripper_id):
+    """(dx, dy) 성분별 잔차를 펴서 반환 -- solve_corner_reprojection의
+    train_reprojection_rmse_px(=sqrt(mean(raw_residual**2)), 코너별 유클리드
+    거리가 아니라 x/y 성분 각각을 표본으로 취급)와 정의를 맞추기 위함.
+    코너별 유클리드 거리로 RMS를 내면 등방 오차 기준 sqrt(2)배 부풀려진다
+    (실제로 이 차이 때문에 raw-fk에서 통합/독립 RMSE가 다르게 나온 적 있음)."""
     errs = []
     for o in observations:
         if o.marker == "board":
@@ -301,7 +312,7 @@ def per_corner_errors(state, observations, robot_T, K_map, D_map, gripper_id):
         else:
             T_base_cam = state.cams[int(o.cam)]
         pred = project_points(inv_T(T_base_cam) @ target, o.object_points, K_map[int(o.cam)], D_map[int(o.cam)])
-        errs.extend(np.linalg.norm(pred - o.image_points, axis=1).tolist())
+        errs.extend((pred - o.image_points).reshape(-1).tolist())
     return errs
 
 
@@ -340,8 +351,7 @@ def main():
 
     for fk_mode, label in (("no_fk", "독립_no-fk"), ("fixed_fk", "독립_raw-fk")):
         state_a, diag_a, n_a = solve_independent_group_a(data, fk_mode)
-        T_gripper_cube_a = state_a.grasps[0]
-        state_b, diag_b, n_b = solve_independent_group_b(data, fk_mode, gtc_init, board_init, T_gripper_cube_a)
+        state_b, diag_b, n_b = solve_independent_group_b(data, fk_mode, gtc_init, board_init, data["grasp_init"])
         export_fit_json(fit_out_dir / f"fit_{label}.json", state_a.grasps[0], state_a.cams, state_b.gtc)
         errs_a = per_corner_errors(state_a, (data["obs_s1"] +
                                              [o for o in data["obs_s2_fixed"]
