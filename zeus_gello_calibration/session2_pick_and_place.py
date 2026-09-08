@@ -144,33 +144,34 @@ def cap(desc):
     return {"kind": "capture", "desc": desc}
 
 
-def build_plan(items, start_pose, start_joints, cam_pose, cam_pose_joints, approach_mm, return_home):
+def build_plan(items, start_pose, start_joints, cam_pose, cam_pose_joints, approach_mm, return_home,
+               move_speed=MOVE_LIN_SPEED, descend_speed=DESCEND_LIN_SPEED, jnt_speed=JNT_SPEED_PARK):
     """이동 순서: 위치+회전을 한 movel에 같이 넣지 않는다 -- 큰 회전 변화가
     있는 구간마다 먼저 "제자리에서 회전만 정렬"(align_rotation)한 뒤에
     위치를 옮긴다. 그래야 각 movel이 더 단순해져서 Unreachable이 덜 난다."""
     steps = []
 
     def place_only_block(label, current_pose, dest_pose):
-        steps.append(mv(align_rotation(current_pose, dest_pose), MOVE_LIN_SPEED,
+        steps.append(mv(align_rotation(current_pose, dest_pose), move_speed,
                         f"[{label}] place 방향 정렬 (제자리 회전)"))
-        steps.append(mv(approach_of(dest_pose, approach_mm), MOVE_LIN_SPEED, f"[{label}] place approach 이동"))
-        steps.append(mv(dest_pose, DESCEND_LIN_SPEED, f"[{label}] place 수직 하강"))
+        steps.append(mv(approach_of(dest_pose, approach_mm), move_speed, f"[{label}] place approach 이동"))
+        steps.append(mv(dest_pose, descend_speed, f"[{label}] place 수직 하강"))
         steps.append(grip("open", f"[{label}] 그리퍼 열기 (place)"))
-        steps.append(mv(approach_of(dest_pose, approach_mm), DESCEND_LIN_SPEED, f"[{label}] place 수직 상승"))
-        steps.append(mj(cam_pose_joints, JNT_SPEED_PARK, f"[{label}] 고정 촬영 위치로 이동"))
+        steps.append(mv(approach_of(dest_pose, approach_mm), descend_speed, f"[{label}] place 수직 상승"))
+        steps.append(mj(cam_pose_joints, jnt_speed, f"[{label}] 고정 촬영 위치로 이동"))
         steps.append(cap(f"[{label}] 촬영 자리"))
 
     def pick_place_block(label, source_pose, dest_pose):
         # 직전 스텝이 항상 촬영 파킹(cam_pose)이므로 거기서부터 방향 정렬.
-        steps.append(mv(align_rotation(cam_pose, source_pose), MOVE_LIN_SPEED,
+        steps.append(mv(align_rotation(cam_pose, source_pose), move_speed,
                         f"[{label}] pick 방향 정렬 (제자리 회전)"))
-        steps.append(mv(approach_of(source_pose, approach_mm), MOVE_LIN_SPEED, f"[{label}] pick approach 이동"))
-        steps.append(mv(source_pose, DESCEND_LIN_SPEED, f"[{label}] pick 수직 하강"))
+        steps.append(mv(approach_of(source_pose, approach_mm), move_speed, f"[{label}] pick approach 이동"))
+        steps.append(mv(source_pose, descend_speed, f"[{label}] pick 수직 하강"))
         steps.append(grip("close", f"[{label}] 그리퍼 닫기 (pick)"))
-        steps.append(mv(approach_of(source_pose, approach_mm), DESCEND_LIN_SPEED, f"[{label}] pick 수직 상승"))
+        steps.append(mv(approach_of(source_pose, approach_mm), descend_speed, f"[{label}] pick 수직 상승"))
         place_only_block(label, approach_of(source_pose, approach_mm), dest_pose)
 
-    steps.append(mj(start_joints, JNT_SPEED_PARK, "0단계: 지정된 시작 자세로 이동 (큐브 쥔 상태)"))
+    steps.append(mj(start_joints, jnt_speed, "0단계: 지정된 시작 자세로 이동 (큐브 쥔 상태)"))
 
     current = None
     for order, item in enumerate(items):
@@ -253,6 +254,9 @@ def main():
                     help="촬영 파킹 자세를 임시로 여기서(첫 캡처) 가져옴")
     ap.add_argument("--out-root", default=str(SESSION2_DIR_DEFAULT / "capture_placed"))
     ap.add_argument("--approach-mm", type=float, default=APPROACH_MM_DEFAULT)
+    ap.add_argument("--move-speed", type=float, default=MOVE_LIN_SPEED, help="수평 이동/회전정렬 movel 속도")
+    ap.add_argument("--descend-speed", type=float, default=DESCEND_LIN_SPEED, help="수직 하강/상승 movel 속도")
+    ap.add_argument("--jnt-speed", type=float, default=JNT_SPEED_PARK, help="movej(0단계, 촬영 파킹) 속도")
     ap.add_argument("--return-home", action="store_true", help="마지막에 큐브를 GRASP_REF_POSE 위치로 복귀")
     ap.add_argument("--execute", action="store_true", help="실제로 이동/그리퍼/촬영 (없으면 dry-run)")
     ap.add_argument("--no-step", action="store_true", help="스텝마다 Enter로 확인하지 않고 연속 실행")
@@ -272,7 +276,9 @@ def main():
     print(f"촬영 파킹 자세(session3 첫 캡처, 임시) <- {cam_src}\n")
 
     steps = build_plan(items, start_pose, start_joints, cam_pose, cam_pose_joints,
-                        args.approach_mm, args.return_home)
+                        args.approach_mm, args.return_home,
+                        move_speed=args.move_speed, descend_speed=args.descend_speed,
+                        jnt_speed=args.jnt_speed)
     print_plan(steps)
 
     if not args.execute:
