@@ -74,6 +74,17 @@ RX_FIXED = GRASP_REF_POSE[5]
 START_JOINTS = [49.47, -20.79, -115.64, 0.01, -43.57, -130.53]
 START_POSE = [-261.367, 355.019, 259.716, -90.007, -0.005, 179.996]
 
+# 촬영 파킹 자세(그리퍼 카메라로 찍으러 가는 위치): session3 첫 캡처 대신
+# 지정받은 고정 joints로 이동한다.
+# *** CAM_POSE_POSE는 아직 미확정이다 *** -- 이 joints로 실제 movej한 뒤
+# get_state()로 읽은 pose로 채워야 하는데, 지금은 로봇 서버(server/zeus_gello.py)에
+# 연결이 안 돼서(Connection refused) 못 구했다. 로봇이 연결 가능해지면 이 joints로
+# 이동시켜 실제 pose를 받아와 아래 값을 채워 넣을 것 -- 그 전까지 --execute는
+# 막혀 있다(align_rotation이 잘못된 위치를 기준으로 회전-정렬 이동을 만들면
+# 실제로 큰 오조작 이동이 나갈 수 있어서, 정확한 값 없이는 실행하면 안 됨).
+CAM_POSE_JOINTS = [36.48, 14.59, -95.20, 3.08, -80.23, -113.78]
+CAM_POSE_POSE = None  # TODO: 로봇 연결되면 위 joints로 movej 후 get_state()로 채우기
+
 APPROACH_MM_DEFAULT = 50.0   # 5cm -- pick/place 직후 수직 유지 거리
 MOVE_LIN_SPEED = 30.0        # mm/s? -- zeus_client movel의 lin_speed, 저속으로 시작
 DESCEND_LIN_SPEED = 15.0     # 수직 하강/상승은 더 느리게
@@ -267,13 +278,26 @@ def main():
     args = ap.parse_args()
 
     start_joints, start_pose, start_src = START_JOINTS, START_POSE, "고정 지정값 (START_JOINTS/START_POSE)"
-    cam_pose_joints, cam_pose, cam_src = load_latest_state(Path(args.session3_dir),
-                                                            subdir_candidates=("capture",), index=0)
+
+    cam_pose_joints = CAM_POSE_JOINTS
+    if CAM_POSE_POSE is not None:
+        cam_pose, cam_src = CAM_POSE_POSE, "고정 지정값 (CAM_POSE_JOINTS/CAM_POSE_POSE)"
+    else:
+        if args.execute:
+            print("[ERROR] CAM_POSE_POSE가 아직 미확정입니다 (로봇 연결해서 CAM_POSE_JOINTS로 movej 후 "
+                  "get_state()로 채워야 함). 정확한 값 없이 --execute 하면 회전-정렬 이동이 잘못된 "
+                  "위치를 기준으로 계산돼서 위험합니다. 로봇이 연결되면 값을 채운 뒤 다시 실행하세요.")
+            return
+        # dry-run 미리보기 전용 근사치 (실제 실행 전에는 반드시 CAM_POSE_POSE를 채워야 함)
+        _joints_unused, cam_pose, _src = load_latest_state(
+            Path(args.session3_dir), subdir_candidates=("capture",), index=0)
+        cam_src = ("[미확정 -- session3 첫 캡처 pose로 근사, dry-run 미리보기 전용] "
+                   "CAM_POSE_JOINTS는 반영됨, CAM_POSE_POSE는 아직 실측 필요")
     items = compute_ordered_targets(Path(args.session2_dir))
 
     print(f"고정값: z={Z_FIXED}mm  ry={RY_FIXED}deg  rx={RX_FIXED}deg  approach={args.approach_mm}mm")
     print(f"시작 자세 <- {start_src}")
-    print(f"촬영 파킹 자세(session3 첫 캡처, 임시) <- {cam_src}\n")
+    print(f"촬영 파킹 자세 <- {cam_src}\n")
 
     steps = build_plan(items, start_pose, start_joints, cam_pose, cam_pose_joints,
                         args.approach_mm, args.return_home,
