@@ -16,6 +16,7 @@ fit과 무관하니까).
 
 import argparse
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -28,7 +29,7 @@ from calibration_pipeline.cube_config import load_cube_config_from_json_file  # 
 from robot.backends.zeus_client import T_to_pose6  # noqa: E402
 
 from capture_session import (  # noqa: E402
-    load_camera_labels, connect_cameras, stop_cameras, LiveView, grab_frames,
+    load_camera_labels, connect_cameras, stop_cameras, LiveView, grab_frames, write_capture,
     DEVICE_MAP_DEFAULT,
 )
 from fit_grasp_offset import LOCAL_CAM_IDS, load_intrinsics_by_label  # noqa: E402
@@ -51,6 +52,7 @@ def main():
     ap.add_argument("--reproj-thr-px", type=float, default=10.0)
     ap.add_argument("--no-cam-reset", action="store_true")
     ap.add_argument("--no-preview", action="store_true")
+    ap.add_argument("--out-root", default=str(REPO_ROOT / "zeus_gello_calibration" / "gt_compare_captures"))
     args = ap.parse_args()
 
     cube_cfg, src = load_cube_config_from_json_file(args.gt_cube_config)
@@ -73,6 +75,8 @@ def main():
         if view is not None:
             view.show()
         frames = grab_frames(cams, used_labels)
+        out_dir = Path(args.out_root) / time.strftime("%Y%m%d_%H%M%S")
+        write_capture(frames, out_dir, {"note": "gt_compare_fits: 로봇 이동 없음, 검출 비교 전용 촬영"})
     finally:
         if view is not None:
             view.stop()
