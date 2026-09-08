@@ -20,7 +20,16 @@ GELLO 텔레옵으로 촬영할 때는 SPACE를 누르는 순간에도 사람 �
 진행할 것.**
 
 큐브가 계속 그리퍼에 물려있어야 한다(원래 세션1 촬영 때와 같은 방식으로
-쥔 상태) -- 이 스크립트는 그리퍼를 전혀 건드리지 않는다.
+쥔 상태). --regrasp-joints 없이 실행하면 이 스크립트는 그리퍼를 전혀
+건드리지 않는다.
+
+--regrasp-joints X Y Z RZ RY RX 를 주면, 저장된 자세로 이동하기 전에
+사용자 입력을 받아가며 큐브를 새로 쥐는 절차를 먼저 수행한다:
+  1) Enter 입력 대기
+  2) 그리퍼 열기 -> 지정한 joints로 movej
+  3) "큐브를 놓아주세요" 안내 후 Enter 입력 대기
+  4) 그리퍼 닫기
+  이후 평소처럼 저장된 자세들로 이동+촬영을 진행한다.
 
 기본은 기존 capture/<idx>/ 폴더를 덮어쓰지 않고 별도 폴더
 (capture_replayed/<idx>/)에 저장한다 -- 원본과 비교해보고 정말 이걸로
@@ -32,6 +41,8 @@ GELLO 텔레옵으로 촬영할 때는 SPACE를 누르는 순간에도 사람 �
   python replay_and_recapture.py --session 1 --execute            # 스텝별 확인하며 실행
   python replay_and_recapture.py --session 1 --execute --no-step  # (검증 후) 연속 실행
   python replay_and_recapture.py --session 1 --execute --overwrite  # 원본 폴더에 덮어쓰기
+  python replay_and_recapture.py --session 1 --execute \\
+      --regrasp-joints 24.48 -33.28 -111.05 -179.99 35.68 24.48    # 재파지부터 시작
 """
 
 import argparse
@@ -56,6 +67,20 @@ from capture_session import (  # noqa: E402
 JNT_SPEED_DEFAULT = 10.0   # GELLO 텔레옵과 동일한 "실기 테스트로 정한" 기본값
 OVERLAP_DEFAULT = 0.0      # 블렌딩 없이 매번 완전히 멈춰야 정확한 정지 후 촬영이 됨
 SETTLE_S = 0.3             # movej 리턴 직후 잔진동/카메라 버퍼 안정화 대기
+
+
+def run_regrasp_sequence(rb, joints, jnt_speed, overlap):
+    """큐브를 새로 쥐는 절차: Enter -> 그리퍼 열기+이동 -> "놓아주세요" -> Enter -> 그리퍼 닫기."""
+    input("\n[재파지] Enter를 누르면 그리퍼를 열고 지정 자세로 이동합니다 > ")
+    rb.grip("open")
+    time.sleep(SETTLE_S)
+    rb.movej(joints, jnt_speed=jnt_speed, overlap=overlap)
+    time.sleep(SETTLE_S)
+    print(f"[재파지] 이동 완료: {[round(v, 2) for v in joints]}")
+    input("[재파지] 큐브를 그리퍼 위치에 놓아주세요. 다 놓으셨으면 Enter > ")
+    rb.grip("close")
+    time.sleep(SETTLE_S)
+    print("[재파지] 그리퍼 닫음 -- 저장된 자세로 이동+촬영을 시작합니다.\n")
 
 
 def load_saved_joints(capture_root: Path) -> list:
@@ -86,6 +111,10 @@ def main():
     ap.add_argument("--no-preview", action="store_true")
     ap.add_argument("--motion-only", action="store_true",
                     help="카메라를 아예 연결하지 않고 movej 이동만 수행 (충돌/경로 확인용, 촬영/저장 없음)")
+    ap.add_argument("--regrasp-joints", type=float, nargs=6, default=None,
+                    metavar=("J1", "J2", "J3", "J4", "J5", "J6"),
+                    help="저장된 자세로 이동하기 전에, 사용자 확인을 받아가며 이 joints에서 "
+                         "큐브를 새로 쥐는 절차(그리퍼 열기->이동->대기->그리퍼 닫기)를 먼저 수행")
     args = ap.parse_args()
 
     info = SESSIONS[args.session]
@@ -102,8 +131,12 @@ def main():
     print(f"원본: {capture_root}  ({len(items)}개)")
     print(f"저장 위치: {out_root}{' (원본 덮어씀)' if args.overwrite else ' (원본은 그대로 둠)'}")
     print(f"jnt_speed={args.jnt_speed}  overlap={args.overlap}\n")
-    print("큐브가 세션1 촬영 때와 같은 방식으로 그리퍼에 그대로 물려있어야 합니다 "
-          "(이 스크립트는 그리퍼를 건드리지 않습니다).\n")
+    if args.regrasp_joints is not None:
+        print(f"--regrasp-joints 지정됨: 시작 전에 {[round(v, 2) for v in args.regrasp_joints]}에서 "
+              "재파지 절차(그리퍼 열기->이동->대기->닫기)를 먼저 수행합니다.\n")
+    else:
+        print("큐브가 세션1 촬영 때와 같은 방식으로 그리퍼에 그대로 물려있어야 합니다 "
+              "(--regrasp-joints 없이는 이 스크립트가 그리퍼를 건드리지 않습니다).\n")
 
     for it in items:
         print(f"  #{it['index']:03d}  joints(deg)={[round(v, 1) for v in it['joints']]}")
@@ -125,6 +158,10 @@ def main():
     rb = ZeusClient(args.robot_ip, args.robot_port)
     rb.connect()
     print("\n*** 실제 로봇이 자동으로 움직입니다. 비상정지에 손이 닿는 상태인지 확인하세요. ***")
+
+    if args.regrasp_joints is not None:
+        run_regrasp_sequence(rb, args.regrasp_joints, args.jnt_speed, args.overlap)
+
     if not args.no_step:
         if input("계속하려면 'go' 입력: ").strip().lower() != "go":
             print("취소했습니다.")
