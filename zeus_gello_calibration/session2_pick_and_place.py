@@ -3,9 +3,10 @@
 """zeus_gello_calibration/session2_pick_and_place.py -- Zeus로 session2 pick-and-place
 + 촬영 (ur3_calibration/session2_pick_and_place.py 와 같은 개념)
 
-session1 끝나는 자세(그리퍼에 큐브를 쥔 채)에서 시작해서, session2에 저장된
-15곳에 순서대로 "놓고 -> (다음 자리로) 다시 집어서 놓고 -> ..."를 반복하며
-매번 놓은 직후 고정 촬영 위치로 가서 카메라 4대 + 로봇 상태를 저장한다.
+START_JOINTS/START_POSE로 지정한 자세(그리퍼에 큐브를 쥔 채)에서 시작해서,
+session2에 저장된 15곳에 순서대로 "놓고 -> (다음 자리로) 다시 집어서 놓고
+-> ..."를 반복하며 매번 놓은 직후 고정 촬영 위치로 가서 카메라 4대 + 로봇
+상태를 저장한다.
 
 *** Zeus는 rz,ry,rx가 진짜 오일러각(pose6_to_T의 extrinsic ZYX)이라서, UR3 때
 rotation vector 표현 때문에 필요했던 "짐벌락 회피/moveJ 안전장치" 같은 게
@@ -57,7 +58,6 @@ from capture_session import (  # noqa: E402
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DATA_ROOT_DEFAULT = Path(__file__).resolve().parent / "data"
 
-SESSION1_DIR_DEFAULT = DATA_ROOT_DEFAULT / "session1_handheld_fixed_cam"
 SESSION2_DIR_DEFAULT = DATA_ROOT_DEFAULT / "session2_floor_board_dual_cam"
 SESSION3_DIR_DEFAULT = DATA_ROOT_DEFAULT / "session3_wrist_motion_gripper_cam"
 
@@ -67,6 +67,12 @@ GRASP_REF_POSE = [-292.02, 400.03, 178.75, -90.00, -0.00, 180.00]
 Z_FIXED = GRASP_REF_POSE[2]
 RY_FIXED = GRASP_REF_POSE[4]
 RX_FIXED = GRASP_REF_POSE[5]
+
+# 0단계 시작 자세: session1 끝난 자세 대신 지정받은 고정 자세로 이동한다.
+# joints는 실측 지정값, pose는 실제로 이 joints로 movej했을 때 get_state()가
+# 돌려준 값(align_rotation이 여기서부터 회전 정렬을 시작하는 기준점으로 씀).
+START_JOINTS = [49.47, -20.79, -115.64, 0.01, -43.57, -130.53]
+START_POSE = [-261.367, 355.019, 259.716, -90.007, -0.005, 179.996]
 
 APPROACH_MM_DEFAULT = 50.0   # 5cm -- pick/place 직후 수직 유지 거리
 MOVE_LIN_SPEED = 30.0        # mm/s? -- zeus_client movel의 lin_speed, 저속으로 시작
@@ -164,7 +170,7 @@ def build_plan(items, start_pose, start_joints, cam_pose, cam_pose_joints, appro
         steps.append(mv(approach_of(source_pose, approach_mm), DESCEND_LIN_SPEED, f"[{label}] pick 수직 상승"))
         place_only_block(label, approach_of(source_pose, approach_mm), dest_pose)
 
-    steps.append(mj(start_joints, JNT_SPEED_PARK, "0단계: session1 끝난 자세로 이동 (큐브 쥔 상태)"))
+    steps.append(mj(start_joints, JNT_SPEED_PARK, "0단계: 지정된 시작 자세로 이동 (큐브 쥔 상태)"))
 
     current = None
     for order, item in enumerate(items):
@@ -242,7 +248,6 @@ def main():
     ap.add_argument("--robot-ip", default=ROBOT_IP_DEFAULT)
     ap.add_argument("--robot-port", type=int, default=ROBOT_PORT_DEFAULT)
     ap.add_argument("--device-map", default=str(DEVICE_MAP_DEFAULT))
-    ap.add_argument("--session1-dir", default=str(SESSION1_DIR_DEFAULT))
     ap.add_argument("--session2-dir", default=str(SESSION2_DIR_DEFAULT))
     ap.add_argument("--session3-dir", default=str(SESSION3_DIR_DEFAULT),
                     help="촬영 파킹 자세를 임시로 여기서(첫 캡처) 가져옴")
@@ -257,13 +262,13 @@ def main():
     ap.add_argument("--no-preview", action="store_true")
     args = ap.parse_args()
 
-    start_joints, start_pose, start_src = load_latest_state(Path(args.session1_dir), index=-1)
+    start_joints, start_pose, start_src = START_JOINTS, START_POSE, "고정 지정값 (START_JOINTS/START_POSE)"
     cam_pose_joints, cam_pose, cam_src = load_latest_state(Path(args.session3_dir),
                                                             subdir_candidates=("capture",), index=0)
     items = compute_ordered_targets(Path(args.session2_dir))
 
     print(f"고정값: z={Z_FIXED}mm  ry={RY_FIXED}deg  rx={RX_FIXED}deg  approach={args.approach_mm}mm")
-    print(f"시작 자세(session1 끝) <- {start_src}")
+    print(f"시작 자세 <- {start_src}")
     print(f"촬영 파킹 자세(session3 첫 캡처, 임시) <- {cam_src}\n")
 
     steps = build_plan(items, start_pose, start_joints, cam_pose, cam_pose_joints,
