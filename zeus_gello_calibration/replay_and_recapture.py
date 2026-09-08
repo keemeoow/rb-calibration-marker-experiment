@@ -84,6 +84,8 @@ def main():
     ap.add_argument("--no-step", action="store_true", help="스텝마다 Enter로 확인하지 않고 연속 실행")
     ap.add_argument("--no-cam-reset", action="store_true")
     ap.add_argument("--no-preview", action="store_true")
+    ap.add_argument("--motion-only", action="store_true",
+                    help="카메라를 아예 연결하지 않고 movej 이동만 수행 (충돌/경로 확인용, 촬영/저장 없음)")
     args = ap.parse_args()
 
     info = SESSIONS[args.session]
@@ -110,12 +112,15 @@ def main():
         print(f"\n(dry-run) 총 {len(items)}개 이동+촬영 계획. --execute 를 주면 실행합니다.")
         return
 
-    labels = load_camera_labels(Path(args.device_map))
-    cams, used_labels = connect_cameras(labels, no_reset=args.no_cam_reset)
-    view = None
-    if not args.no_preview:
-        view = LiveView(cams, used_labels, window_name="replay_and_recapture (q/ESC=닫기)")
-        view.start()
+    cams, used_labels, view = [], [], None
+    if args.motion_only:
+        print("--motion-only: 카메라를 연결하지 않고 movej 이동만 수행합니다 (촬영/저장 없음).\n")
+    else:
+        labels = load_camera_labels(Path(args.device_map))
+        cams, used_labels = connect_cameras(labels, no_reset=args.no_cam_reset)
+        if not args.no_preview:
+            view = LiveView(cams, used_labels, window_name="replay_and_recapture (q/ESC=닫기)")
+            view.start()
 
     rb = ZeusClient(args.robot_ip, args.robot_port)
     rb.connect()
@@ -143,6 +148,9 @@ def main():
             rb.movej(it["joints"], jnt_speed=args.jnt_speed, overlap=args.overlap)
             time.sleep(SETTLE_S)  # 잔진동 + 카메라 버퍼가 새 프레임으로 채워질 시간
 
+            if args.motion_only:
+                continue
+
             if view is not None:
                 view.show()
 
@@ -156,9 +164,13 @@ def main():
         rb.close()
         if view is not None:
             view.stop()
-        stop_cameras(cams)
+        if cams:
+            stop_cameras(cams)
 
-    print(f"\n완료 -- {out_root} 확인해보세요.")
+    if args.motion_only:
+        print("\n완료 -- movej 이동만 수행했습니다 (촬영/저장 없음).")
+    else:
+        print(f"\n완료 -- {out_root} 확인해보세요.")
 
 
 if __name__ == "__main__":
