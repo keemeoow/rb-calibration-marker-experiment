@@ -81,6 +81,23 @@ FIT_JSON_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "pass1_grasp_offset_re
 SESSION3_EVENT_OFFSET = 2000
 
 
+def export_fit_json(path: Path, T_gripper_cube, T_base_cam: dict, T_gripper_cam=None):
+    """gt_pick_test.py/gt_compare_fits.py의 load_fit()이 읽는 스키마로 저장.
+    T_gripper_cam은 그리퍼캠 추론에 필요 (없으면 그 방식은 그리퍼캠 추론 불가)."""
+    label_by_id = {v: k for k, v in LOCAL_CAM_IDS.items()}
+    payload = {
+        "T_gripper_cube": np.asarray(T_gripper_cube, dtype=np.float64).tolist(),
+        "T_base_cam": {
+            f"{c}_{label_by_id[c]}": np.asarray(T, dtype=np.float64).tolist()
+            for c, T in T_base_cam.items()
+        },
+    }
+    if T_gripper_cam is not None:
+        payload["T_gripper_cam"] = np.asarray(T_gripper_cam, dtype=np.float64).tolist()
+    path.write_text(json.dumps(payload, indent=2))
+    print(f"  -> {path}")
+
+
 def rmse_px(errs):
     errs = np.asarray(errs, dtype=np.float64)
     return float(np.sqrt(np.mean(errs ** 2))) if errs.size else float("nan")
@@ -312,16 +329,20 @@ def main():
         data["obs_s3"], data["robot_T_s3"], K_map, D_map, GRIPPER_LOCAL_ID)
     print(f"T_gripper_cam 초기값 (session3만): t_mm={np.round(gtc_init[:3,3]*1000,2).tolist()} ({eih_diag})\n")
 
+    fit_out_dir = REPO_ROOT / "zeus_gello_calibration"
     results = {}
+    print("각 방식의 T_gripper_cube/T_base_cam을 gt_pick_test.py용 JSON으로 저장:")
     for fk_mode, label in (("no_fk", "통합_no-fk"), ("fixed_fk", "통합_raw-fk")):
         state, diag, n_obs = solve_unified(data, fk_mode, gtc_init, board_init)
         results[label] = {"success": diag["success"], "rmse_px": diag["train_reprojection_rmse_px"],
                           "n_corners": diag["n_residuals"] // 2, "n_observations": n_obs}
+        export_fit_json(fit_out_dir / f"fit_{label}.json", state.grasps[0], state.cams, state.gtc)
 
     for fk_mode, label in (("no_fk", "독립_no-fk"), ("fixed_fk", "독립_raw-fk")):
         state_a, diag_a, n_a = solve_independent_group_a(data, fk_mode)
         T_gripper_cube_a = state_a.grasps[0]
         state_b, diag_b, n_b = solve_independent_group_b(data, fk_mode, gtc_init, board_init, T_gripper_cube_a)
+        export_fit_json(fit_out_dir / f"fit_{label}.json", state_a.grasps[0], state_a.cams, state_b.gtc)
         errs_a = per_corner_errors(state_a, (data["obs_s1"] +
                                              [o for o in data["obs_s2_fixed"]
                                               if o.set_idx is None or int(o.set_idx) in state_a.cubes]),

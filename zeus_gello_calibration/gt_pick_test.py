@@ -72,7 +72,8 @@ def load_fit(fit_json: Path):
     for key, T in d["T_base_cam"].items():
         local_id = int(key.split("_", 1)[0])
         T_base_cam[local_id] = np.asarray(T, dtype=np.float64)
-    return T_gripper_cube, T_base_cam
+    T_gripper_cam = np.asarray(d["T_gripper_cam"], dtype=np.float64) if "T_gripper_cam" in d else None
+    return T_gripper_cube, T_base_cam, T_gripper_cam
 
 
 def detect_cube_pose(frames, K_map, D_map, T_base_cam, cube_target, reproj_thr_mean_px):
@@ -165,7 +166,7 @@ def main():
 
     K_map, D_map = load_intrinsics_by_label(
         Path(args.zeus_intrinsics_dir), Path(args.ur3_intrinsics_dir), Path(args.device_map))
-    T_gripper_cube, T_base_cam = load_fit(Path(args.fit_json))
+    T_gripper_cube, T_base_cam, T_gripper_cam = load_fit(Path(args.fit_json))
     print(f"고정 카메라 extrinsics 로드: {sorted(T_base_cam)} (from {args.fit_json})")
     print(f"고정값: z={Z_FIXED}mm ry={RY_FIXED}deg rx={RX_FIXED}deg approach={args.approach_mm}mm\n")
 
