@@ -41,8 +41,9 @@ GELLO 텔레옵으로 촬영할 때는 SPACE를 누르는 순간에도 사람 �
   python replay_and_recapture.py --session 1 --execute            # 스텝별 확인하며 실행
   python replay_and_recapture.py --session 1 --execute --no-step  # (검증 후) 연속 실행
   python replay_and_recapture.py --session 1 --execute --overwrite  # 원본 폴더에 덮어쓰기
+  python replay_and_recapture.py --session 1 --execute --regrasp-joints  # 재파지부터 (기본 자세)
   python replay_and_recapture.py --session 1 --execute \\
-      --regrasp-joints 24.48 -33.28 -111.05 -179.99 35.68 24.48    # 재파지부터 시작
+      --regrasp-joints 24.48 -33.28 -111.05 -179.99 35.68 24.48    # 재파지 자세 직접 지정
 """
 
 import argparse
@@ -68,6 +69,11 @@ JNT_SPEED_DEFAULT = 10.0   # GELLO 텔레옵과 동일한 "실기 테스트로 �
 OVERLAP_DEFAULT = 0.0      # 블렌딩 없이 매번 완전히 멈춰야 정확한 정지 후 촬영이 됨
 SETTLE_S = 0.3             # movej 리턴 직후 잔진동/카메라 버퍼 안정화 대기
 ROBOT_TIMEOUT_DEFAULT = 30.0  # movej는 완료까지 응답 없는 blocking 방식이라 기본 10초로는 부족할 수 있음
+
+# session1 재파지 기본 자세 (실측 지정값) -- --regrasp-joints를 값 없이 주면 이걸 씀.
+REGRASP_JOINTS_DEFAULT = {
+    1: [24.48, -33.28, -111.05, -179.99, 35.68, 24.48],
+}
 
 
 def run_regrasp_sequence(rb, joints, jnt_speed, overlap):
@@ -113,11 +119,25 @@ def main():
     ap.add_argument("--no-preview", action="store_true")
     ap.add_argument("--motion-only", action="store_true",
                     help="카메라를 아예 연결하지 않고 movej 이동만 수행 (충돌/경로 확인용, 촬영/저장 없음)")
-    ap.add_argument("--regrasp-joints", type=float, nargs=6, default=None,
-                    metavar=("J1", "J2", "J3", "J4", "J5", "J6"),
+    ap.add_argument("--regrasp-joints", type=float, nargs="*", default=None,
+                    metavar="J",
                     help="저장된 자세로 이동하기 전에, 사용자 확인을 받아가며 이 joints에서 "
-                         "큐브를 새로 쥐는 절차(그리퍼 열기->이동->대기->그리퍼 닫기)를 먼저 수행")
+                         "큐브를 새로 쥐는 절차(그리퍼 열기->이동->대기->그리퍼 닫기)를 먼저 수행. "
+                         "값 6개를 직접 주거나(J1..J6), 값 없이 --regrasp-joints만 주면 "
+                         "REGRASP_JOINTS_DEFAULT[세션번호]를 씀")
     args = ap.parse_args()
+
+    if args.regrasp_joints is not None:
+        if len(args.regrasp_joints) == 0:
+            if args.session not in REGRASP_JOINTS_DEFAULT:
+                print(f"[ERROR] --regrasp-joints를 값 없이 줬는데 세션 {args.session}용 기본값이 없습니다. "
+                      "직접 6개 값을 주세요 (J1..J6).")
+                return
+            args.regrasp_joints = REGRASP_JOINTS_DEFAULT[args.session]
+        elif len(args.regrasp_joints) != 6:
+            print(f"[ERROR] --regrasp-joints는 6개 값(J1..J6)이거나 값 없이 줘야 합니다 "
+                  f"({len(args.regrasp_joints)}개 받음).")
+            return
 
     info = SESSIONS[args.session]
     session_dir = Path(args.out_root) / f"session{args.session}_{info['name']}"
