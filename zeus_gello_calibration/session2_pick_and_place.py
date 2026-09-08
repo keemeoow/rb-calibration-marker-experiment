@@ -75,15 +75,10 @@ START_JOINTS = [49.47, -20.79, -115.64, 0.01, -43.57, -130.53]
 START_POSE = [-261.367, 355.019, 259.716, -90.007, -0.005, 179.996]
 
 # 촬영 파킹 자세(그리퍼 카메라로 찍으러 가는 위치): session3 첫 캡처 대신
-# 지정받은 고정 joints로 이동한다.
-# *** CAM_POSE_POSE는 아직 미확정이다 *** -- 이 joints로 실제 movej한 뒤
-# get_state()로 읽은 pose로 채워야 하는데, 지금은 로봇 서버(server/zeus_gello.py)에
-# 연결이 안 돼서(Connection refused) 못 구했다. 로봇이 연결 가능해지면 이 joints로
-# 이동시켜 실제 pose를 받아와 아래 값을 채워 넣을 것 -- 그 전까지 --execute는
-# 막혀 있다(align_rotation이 잘못된 위치를 기준으로 회전-정렬 이동을 만들면
-# 실제로 큰 오조작 이동이 나갈 수 있어서, 정확한 값 없이는 실행하면 안 됨).
+# 지정받은 고정 joints로 이동한다. pose는 실제로 이 joints로 movej한 뒤
+# get_state()로 읽은 실측값.
 CAM_POSE_JOINTS = [36.48, 14.59, -95.20, 3.08, -80.23, -113.78]
-CAM_POSE_POSE = None  # TODO: 로봇 연결되면 위 joints로 movej 후 get_state()로 채우기
+CAM_POSE_POSE = [-80.785, 270.964, 603.407, -120.547, 4.803, 161.178]
 
 APPROACH_MM_DEFAULT = 50.0   # 5cm -- pick/place 직후 수직 유지 거리
 MOVE_LIN_SPEED = 30.0        # mm/s? -- zeus_client movel의 lin_speed, 저속으로 시작
