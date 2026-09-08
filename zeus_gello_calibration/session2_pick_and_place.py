@@ -86,6 +86,11 @@ DESCEND_LIN_SPEED = 15.0     # 수직 하강/상승은 더 느리게
 JNT_SPEED_PARK = 10.0        # 파킹 자세로 갈 때 (movej, joints 직접)
 GRIP_TIMEOUT_S = 3.0
 SETTLE_S = 0.3
+# movel/movej는 서버가 이동 완료까지 응답을 안 보내는 blocking 방식이라, 파킹
+# 위치가 멀어지면(z=603mm 등) 이동거리가 길어져 ZeusClient 기본 타임아웃(10초)을
+# 넘길 수 있다 -- 실제로 로봇은 정상 도착했는데 클라이언트만 먼저 타임아웃난
+# 사례가 있어서 여유있게 잡음.
+ROBOT_TIMEOUT_DEFAULT = 30.0
 
 
 def approach_of(pose6, offset_mm):
@@ -254,6 +259,9 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--robot-ip", default=ROBOT_IP_DEFAULT)
     ap.add_argument("--robot-port", type=int, default=ROBOT_PORT_DEFAULT)
+    ap.add_argument("--robot-timeout", type=float, default=ROBOT_TIMEOUT_DEFAULT,
+                    help="소켓 응답 대기 시간(초) -- movel/movej는 완료될 때까지 서버가 응답을 "
+                         "안 보내는 blocking 방식이라, 이동거리가 길면 기본값(10초)보다 오래 걸릴 수 있음")
     ap.add_argument("--device-map", default=str(DEVICE_MAP_DEFAULT))
     ap.add_argument("--session2-dir", default=str(SESSION2_DIR_DEFAULT))
     ap.add_argument("--session3-dir", default=str(SESSION3_DIR_DEFAULT),
@@ -311,7 +319,7 @@ def main():
         view = LiveView(cams, used_labels, window_name="session2_pick_and_place (q/ESC=닫기)")
         view.start()
 
-    rb = ZeusClient(args.robot_ip, args.robot_port)
+    rb = ZeusClient(args.robot_ip, args.robot_port, timeout=args.robot_timeout)
     rb.connect()
     print("\n*** 실제 로봇이 자동으로 움직이고 그리퍼를 조작합니다. "
           "GELLO 텔레옵은 완전히 종료된 상태여야 합니다. 비상정지에 손이 닿는지 확인하세요. ***")

@@ -67,6 +67,7 @@ from capture_session import (  # noqa: E402
 JNT_SPEED_DEFAULT = 10.0   # GELLO 텔레옵과 동일한 "실기 테스트로 정한" 기본값
 OVERLAP_DEFAULT = 0.0      # 블렌딩 없이 매번 완전히 멈춰야 정확한 정지 후 촬영이 됨
 SETTLE_S = 0.3             # movej 리턴 직후 잔진동/카메라 버퍼 안정화 대기
+ROBOT_TIMEOUT_DEFAULT = 30.0  # movej는 완료까지 응답 없는 blocking 방식이라 기본 10초로는 부족할 수 있음
 
 
 def run_regrasp_sequence(rb, joints, jnt_speed, overlap):
@@ -99,6 +100,7 @@ def main():
     ap.add_argument("--session", type=int, required=True, choices=sorted(SESSIONS))
     ap.add_argument("--robot-ip", default=ROBOT_IP_DEFAULT)
     ap.add_argument("--robot-port", type=int, default=ROBOT_PORT_DEFAULT)
+    ap.add_argument("--robot-timeout", type=float, default=ROBOT_TIMEOUT_DEFAULT)
     ap.add_argument("--device-map", default=str(DEVICE_MAP_DEFAULT))
     ap.add_argument("--out-root", default=str(Path(__file__).resolve().parent / "data"))
     ap.add_argument("--jnt-speed", type=float, default=JNT_SPEED_DEFAULT)
@@ -155,7 +157,7 @@ def main():
             view = LiveView(cams, used_labels, window_name="replay_and_recapture (q/ESC=닫기)")
             view.start()
 
-    rb = ZeusClient(args.robot_ip, args.robot_port)
+    rb = ZeusClient(args.robot_ip, args.robot_port, timeout=args.robot_timeout)
     rb.connect()
     print("\n*** 실제 로봇이 자동으로 움직입니다. 비상정지에 손이 닿는 상태인지 확인하세요. ***")
 
