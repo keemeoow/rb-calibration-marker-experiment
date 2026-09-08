@@ -1,42 +1,37 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """zeus_gello_calibration/fit_calibration_methods.py -- 통합/독립 x raw-fk/no-fk
-4가지 방식을 전부 돌려서 비교한다 (Simulation/core/methods.py의 solve_unified/
-solve_independent 개념을 실측 Zeus 데이터에 이식).
+4가지 방식을 "같은 데이터, 다른 solve 전략"으로 비교한다.
 
-  통합(unified)      -- session1(그리퍼로 쥔 큐브, 고정캠3)+session2(바닥 큐브,
-                        고정캠3)+session3(바닥 보드, 그리퍼캠1)을 전부 하나의
-                        pixel reprojection 최소제곱에 넣어 T_base_Ci(3) +
-                        T_gripper_cam + T_base_board + T_gripper_cube_by_grasp
-                        (+session2 조건별)를 동시에 푼다. (fit_full_calibration.py
-                        그대로 재사용)
-  독립(independent)  -- 고정캠 서브시스템과 그리퍼캠(eye-in-hand) 서브시스템을
-                        *따로* 푼다(서로의 잔차에 관여하지 않음). 원본
-                        Simulation 코드의 solve_independent와 같은 아이디어지만,
-                        원본은 그리퍼가 큐브도 볼 수 있어 그걸로 base-frame
-                        gauge를 잡는 반면, 우리 실측 그리퍼캠은 큐브를 전혀
-                        못 본다(0/16, 0/15 검출) -- 그래서:
-                          raw-fk : 고정캠 각각을 session1에서 구한 T_gripper_cube
-                                   로 만든 FK 앵커(그 placement에서 실제 명령한
-                                   place pose @ T_gripper_cube)에 개별 역산해서
-                                   고정. 세션1 자체는 (원본 코드와 동일하게)
-                                   독립 방식에선 쓰지 않는다.
-                          no-fk  : FK 앵커 없이, 고정캠 3대끼리의 교차 검증만으로
-                                   (카메라 0을 내부 게이지 원점으로 삼아) 상대
-                                   기하를 복원 -- 로봇 base 절대좌표가 아니라
-                                   "카메라 0 기준 상대 gauge"에서의 self-
-                                   consistency다(실측 데이터에 그리퍼-큐브
-                                   앵커가 없어서 절대 gauge를 없이 만들 방법이
-                                   없다 -- 이 caveat을 결과에 명시한다).
-                        그리퍼캠(T_gripper_cam/T_base_board)은 raw-fk/no-fk
-                        조건과 무관하게 항상 session3만으로 독립적으로 구한다
-                        (estimate_board_handeye_initial, 큐브 FK 개념이
-                        아예 안 들어가는 문제라 두 조건에서 동일).
+*** 핵심 원칙: 통합이든 독립이든 캘리브레이션에 쓰는 데이터의 총량은 완전히
+같아야 한다. 차이는 그 데이터를 하나로 묶어서 푸느냐(통합) vs 두 그룹으로
+나눠서 따로 푸느냐(독립)뿐이다. ***
 
-*** 통합은 session1+2+3을 전부 pool하고, 독립은 session2+3만 쓴다(session1은
-원본 방법론 자체가 grasp-FK 앵커 없이는 다룰 수단이 없음) -- 그래서 RMSE 숫자를
-그대로 1:1 비교하면 안 되고, "각 방법론이 자기 방식대로 최선을 다했을 때 남는
-잔차가 어느 정도인가"로 읽어야 한다. table1.py 정식 held-out 지표 아님.
+데이터 풀 (통합/독립 공통, 총 4가지 소스):
+  session1        -- 고정캠 3대가 그리퍼로 쥔 큐브를 봄 (grasp+FK 모델)
+  session2-고정캠  -- 고정캠 3대가 바닥에 놓인 큐브를 봄 (세트별)
+  session2-그리퍼캠 -- ★그리퍼캠도 바닥에 놓인 큐브를 본다★ (capture_placed의
+                      새 파킹 위치에서 실측 확인: PnP 15/15 성공, err<1px).
+                      이전 버전은 이걸 빠뜨렸다.
+  session3-그리퍼캠 -- 그리퍼캠이 바닥 마커보드를 봄 (eye-in-hand)
+
+  no_fk    : session2(고정캠+그리퍼캠 둘 다)의 큐브 pose를 세트별 자유 변수로.
+  raw-fk   : session2의 큐브 pose를 "그 placement에서 실제 명령한 place pose
+             @ T_gripper_cube" FK값으로 고정(정적 상수, 최적화 중 안 바뀜).
+
+  통합(unified)     -- 위 4개 소스를 전부 하나의 최소제곱에 넣어 한 번에 푼다.
+  독립(independent) -- 두 그룹으로 쪼개서 각자 최소제곱을 돌리고 서로의
+                       residual에 관여하지 않는다:
+                         그룹A(고정캠): session1 + session2-고정캠
+                         그룹B(그리퍼캠): session2-그리퍼캠 + session3-그리퍼캠
+                       raw-fk에서 그룹B가 필요한 T_gripper_cube는 그룹A를 먼저
+                       풀어서 나온 값을 (다시 최적화하지 않고) 상수로 넘겨받는다
+                       -- 이건 "독립적으로 각자 풀고, 이미 풀린 값을 순차적으로
+                       재사용"이라 여전히 독립이다(residual을 동시에 최적화하지
+                       않으므로).
+
+table1.py의 정식 held-out 지표 아님 (train-pooled). no_fk/raw-fk x 통합/독립
+네 조건끼리 비교하는 용도.
 
 사용법:
   python fit_calibration_methods.py
@@ -45,7 +40,6 @@ solve_independent 개념을 실측 Zeus 데이터에 이식).
 from __future__ import annotations
 
 import argparse
-import dataclasses
 import json
 import sys
 from pathlib import Path
@@ -56,7 +50,6 @@ import numpy as np
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
-from calibration_pipeline import se3 as cp  # noqa: E402
 from calibration_pipeline.apriltag_cube import AprilTagCubeTarget, inv_T  # noqa: E402
 from calibration_pipeline.board_config import charuco_config_from_dict  # noqa: E402
 from calibration_pipeline.charuco import CharucoTarget  # noqa: E402
@@ -71,17 +64,21 @@ from calibration_pipeline.reprojection import (  # noqa: E402
 from calibration_pipeline.table1 import estimate_board_handeye_initial  # noqa: E402
 from robot.backends.zeus_client import pose6_to_T  # noqa: E402
 
+from calibration_pipeline import se3 as cp  # noqa: E402
 from fit_grasp_offset import LOCAL_CAM_IDS, build_synthetic_meta, load_intrinsics_by_label, load_robot_T  # noqa: E402
-from fit_placement_fk_ablation import (  # noqa: E402
-    SESSION2_EVENT_OFFSET, build_synthetic_meta_placed, init_cube_poses_from_images,
-)
-from fit_full_calibration import (  # noqa: E402
-    CHARUCO_BOARD_CONFIG, GRIPPER_LOCAL_ID, SESSION1_DIR_DEFAULT, SESSION3_DIR_DEFAULT,
-    SESSION3_EVENT_OFFSET, build_synthetic_meta_board,
-)
+from fit_placement_fk_ablation import SESSION2_EVENT_OFFSET, build_synthetic_meta_placed  # noqa: E402
+from fit_full_calibration import CHARUCO_BOARD_CONFIG, GRIPPER_LOCAL_ID, build_synthetic_meta_board  # noqa: E402
 from session2_pick_and_place import SESSION2_DIR_DEFAULT, compute_ordered_targets  # noqa: E402
 
+SESSION1_DIR_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "data" / "session1_handheld_fixed_cam"
+SESSION3_DIR_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "data" / "session3_wrist_motion_gripper_cam"
 FIT_JSON_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "pass1_grasp_offset_replayed.json"
+
+# 이벤트 id 네임스페이스 충돌 방지 (robot_T 딕셔너리 키). session2는
+# build_synthetic_meta_placed가 이미 event_id에 SESSION2_EVENT_OFFSET(1000)을
+# 박아서 만들기 때문에(고정캠/그리퍼캠 공용 meta), 그리퍼캠 쪽도 그대로
+# 재사용한다 -- 별도 offset을 또 더하면 이중 offset 버그가 난다.
+SESSION3_EVENT_OFFSET = 2000
 
 
 def rmse_px(errs):
@@ -89,118 +86,206 @@ def rmse_px(errs):
     return float(np.sqrt(np.mean(errs ** 2))) if errs.size else float("nan")
 
 
-# ------------------------------------------------------------- 독립(independent)
-def solve_independent_fixed_raw_fk(obs_s2_raw, K_map, D_map, cam_ids, items_by_index, T_gripper_cube):
-    """카메라별로 FK 앵커(그 placement에서 실제 명령한 pose @ T_gripper_cube)에
-    개별 역산 -- session1은 안 쓴다(원본 독립 방식과 동일)."""
-    fk_anchor = {idx: pose6_to_T(item["target"]) @ T_gripper_cube for idx, item in items_by_index.items()}
-    cams, errs_by_cam = {}, {}
-    all_errs = []
-    for c in cam_ids:
-        cands = []
-        for o in obs_s2_raw:
-            if int(o.cam) != c or o.set_idx is None or int(o.set_idx) not in fk_anchor:
+def fk_anchor_cubes(items_by_index, T_gripper_cube):
+    return {idx: pose6_to_T(item["target"]) @ T_gripper_cube for idx, item in items_by_index.items()}
+
+
+def init_cube_poses(obs_list, K_map, D_map, cam_init, gtc_init, robot_T, gripper_id, set_ids):
+    """세트별 T_base_cube 초기값 -- 고정캠은 cam_init[c]@T_cam_cube, 그리퍼캠은
+    robot_T[event]@gtc_init@T_cam_cube (그 사진 찍은 순간의 실제 로봇 pose 사용)."""
+    by_set = {s: [] for s in set_ids}
+    for o in obs_list:
+        if o.set_idx is None or int(o.set_idx) not in by_set:
+            continue
+        T_cam_cube = solve_observed_pose(o, K_map, D_map)
+        if T_cam_cube is None:
+            continue
+        c = int(o.cam)
+        if c == gripper_id:
+            if int(o.event) not in robot_T:
                 continue
-            T_cam_cube = solve_observed_pose(o, K_map, D_map)
-            if T_cam_cube is None:
+            cand = robot_T[int(o.event)] @ gtc_init @ T_cam_cube
+        else:
+            if c not in cam_init:
                 continue
-            cands.append(fk_anchor[int(o.set_idx)] @ inv_T(T_cam_cube))
+            cand = cam_init[c] @ T_cam_cube
+        by_set[int(o.set_idx)].append(cand)
+    init = {}
+    for s, cands in by_set.items():
         if not cands:
             continue
-        cams[c] = cands[0] if len(cands) == 1 else cp.robust_se3_average(cands, None)[0]
-    errs = []
-    for o in obs_s2_raw:
-        c = int(o.cam)
-        if c not in cams or o.set_idx is None or int(o.set_idx) not in fk_anchor:
-            continue
-        pred = project_points(inv_T(cams[c]) @ fk_anchor[int(o.set_idx)], o.object_points, K_map[c], D_map[c])
-        e = np.linalg.norm(pred - o.image_points, axis=1)
-        errs.extend(e.tolist())
-    return cams, fk_anchor, rmse_px(errs), len(errs) // 2
+        init[s] = cands[0] if len(cands) == 1 else cp.robust_se3_average(cands, None)[0]
+    return init
 
 
-def solve_independent_fixed_no_fk(obs_s2_raw, K_map, D_map, cam_ids, n_iters=3):
-    """FK 앵커 없이 고정캠 3대끼리의 교차검증만으로 상대 기하 복원.
-    카메라 min(cam_ids)를 내부 게이지 원점(항등)으로 고정 -- 로봇 base 절대좌표가
-    아니라 이 카메라 기준 상대 gauge다 (그리퍼가 큐브를 못 봐서 절대 gauge를
-    잡을 FK-프리 수단이 실측 데이터엔 없음)."""
-    ref_cam = min(cam_ids)
-    cam_cube = {}
-    for o in obs_s2_raw:
-        if o.set_idx is None:
-            continue
-        T = solve_observed_pose(o, K_map, D_map)
-        if T is not None:
-            cam_cube[(int(o.cam), int(o.set_idx))] = T
-    cams = {ref_cam: np.eye(4)}
-    for _ in range(n_iters):
-        target = {}
-        all_sets = {s for (_, s) in cam_cube}
-        for s in all_sets:
-            Ts = [cams[c] @ cam_cube[(c, s)] for c in cams if (c, s) in cam_cube]
-            if Ts:
-                target[s] = Ts[0] if len(Ts) == 1 else cp.robust_se3_average(Ts, None)[0]
-        new_cams = {ref_cam: np.eye(4)}
-        for c in cam_ids:
-            if c == ref_cam:
-                continue
-            Ts = [target[s] @ inv_T(cam_cube[(c, s)]) for s in target if (c, s) in cam_cube]
-            if Ts:
-                new_cams[c] = Ts[0] if len(Ts) == 1 else cp.robust_se3_average(Ts, None)[0]
-        cams = new_cams
-    # final target consensus + RMSE
-    target = {}
-    for s in {s for (_, s) in cam_cube}:
-        Ts = [cams[c] @ cam_cube[(c, s)] for c in cams if (c, s) in cam_cube]
-        if Ts:
-            target[s] = Ts[0] if len(Ts) == 1 else cp.robust_se3_average(Ts, None)[0]
-    errs = []
-    for o in obs_s2_raw:
-        c, s = int(o.cam), o.set_idx
-        if c not in cams or s is None or int(s) not in target:
-            continue
-        pred = project_points(inv_T(cams[c]) @ target[int(s)], o.object_points, K_map[c], D_map[c])
-        e = np.linalg.norm(pred - o.image_points, axis=1)
-        errs.extend(e.tolist())
-    return cams, target, rmse_px(errs), len(errs) // 2, ref_cam
+def load_all_data(args):
+    session1_dir, session2_dir, session3_dir = Path(args.session1_dir), Path(args.session2_dir), Path(args.session3_dir)
+    s1_root = session1_dir / args.session1_capture_subdir
+    s2_root = session2_dir / args.session2_capture_subdir
+    s3_root = session3_dir / args.session3_capture_subdir
+    s1_idx = sorted(int(p.name) for p in s1_root.iterdir() if p.is_dir())
+    s2_idx = sorted(int(p.name) for p in s2_root.iterdir() if p.is_dir())
+    s3_idx = sorted(int(p.name) for p in s3_root.iterdir() if p.is_dir())
+    items = compute_ordered_targets(session2_dir)
+    items_by_index = {idx: items[idx] for idx in s2_idx if idx < len(items)}
 
+    K_map, D_map = load_intrinsics_by_label(
+        Path(args.zeus_intrinsics_dir), Path(args.ur3_intrinsics_dir), Path(args.device_map))
+    fit = json.loads(Path(args.fit_json).read_text())
+    grasp_init = np.asarray(fit["T_gripper_cube"], dtype=np.float64)
+    cam_init = {int(k.split("_", 1)[0]): np.asarray(v, dtype=np.float64) for k, v in fit["T_base_cam"].items()}
+    fixed_ids = sorted(cam_init)
+    all_cam_ids = sorted(set(fixed_ids) | {GRIPPER_LOCAL_ID})
 
-def solve_gripper_eih(obs_s3, robot_T_s3, K_map, D_map):
-    gtc, board, diag = estimate_board_handeye_initial(obs_s3, robot_T_s3, K_map, D_map, GRIPPER_LOCAL_ID)
-    errs = []
-    for o in obs_s3:
-        T_base_cam = robot_T_s3[int(o.event)] @ gtc
-        pred = project_points(inv_T(T_base_cam) @ board, o.object_points, K_map[GRIPPER_LOCAL_ID], D_map[GRIPPER_LOCAL_ID])
-        e = np.linalg.norm(pred - o.image_points, axis=1)
-        errs.extend(e.tolist())
-    return gtc, board, rmse_px(errs), len(errs) // 2, diag
+    cube = AprilTagCubeTarget(get_default_cube_config())
 
+    # session1 (고정캠, grasp+FK) -- 그리퍼캠은 여기선 항상 0검출이라 굳이 안 실음
+    meta_s1 = build_synthetic_meta(session1_dir, s1_idx, args.session1_capture_subdir)
+    robot_T_s1 = load_robot_T(session1_dir, s1_idx, args.session1_capture_subdir)
+    obs_s1, _ = load_cube_pixel_observations(
+        str(session1_dir), meta_s1, cube, K_map, D_map, fixed_ids, gripper_cam_idx=-999,
+        exclude_gripped=False, fixed_min_corners=args.fixed_min_corners, image_scale=1.0,
+        observation_policy=args.cube_observation_policy)
+    obs_s1 = [o for o in obs_s1 if int(o.cam) in cam_init]
 
-# ------------------------------------------------------------- 통합(unified) 재사용
-def solve_unified(obs_s1, obs_s2_raw, obs_s3, robot_T_combined, cam_init, grasp_init,
-                  gtc_init, board_init, K_map, D_map, items_by_index, fk_mode):
-    set_ids = sorted(items_by_index)
-    options = SolverOptions()
-    if fk_mode == "no_fk":
-        cube_init, _ = init_cube_poses_from_images(obs_s2_raw, K_map, D_map, cam_init, set_ids)
-        obs = obs_s1 + [o for o in obs_s2_raw if o.set_idx is not None and int(o.set_idx) in cube_init] + obs_s3
-        state = PoseState(cams=dict(cam_init), gtc=gtc_init.copy(), board=board_init.copy(),
-                          cubes=dict(cube_init), grasps={0: grasp_init.copy()})
-        keys = variable_keys(
-            ["T_base_Ci", "T_gripper_cam", "T_base_board", "T_base_cube_by_set", "T_gripper_cube_by_grasp"], state)
-    else:
-        obs_s2_grasp = [dataclasses.replace(o, set_idx=None, grasp_idx=0)
-                        for o in obs_s2_raw if int(o.event) - SESSION2_EVENT_OFFSET in items_by_index]
-        obs = obs_s1 + obs_s2_grasp + obs_s3
-        state = PoseState(cams=dict(cam_init), gtc=gtc_init.copy(), board=board_init.copy(),
-                          cubes={}, grasps={0: grasp_init.copy()})
-        keys = variable_keys(["T_base_Ci", "T_gripper_cam", "T_base_board", "T_gripper_cube_by_grasp"], state)
-    final_state, diag = solve_corner_reprojection(
-        observations=obs, variable_keys_=keys, reference_state=state,
-        robot_T=robot_T_combined, K_map=K_map, D_map=D_map,
-        gripper_cam_idx=GRIPPER_LOCAL_ID, options=options,
+    # session2 (고정캠 3대 + 그리퍼캠 1대, 전부 큐브-세트) -- 하나의 meta로 같이 로드
+    meta_s2 = build_synthetic_meta_placed(s2_root, s2_idx)
+    obs_s2_all, _ = load_cube_pixel_observations(
+        str(session2_dir), meta_s2, cube, K_map, D_map, all_cam_ids, gripper_cam_idx=-999,
+        exclude_gripped=False, fixed_min_corners=args.fixed_min_corners, image_scale=1.0,
+        observation_policy=args.cube_observation_policy)
+    obs_s2_fixed = [o for o in obs_s2_all if int(o.cam) in cam_init]
+    obs_s2_gripper_raw = [o for o in obs_s2_all if int(o.cam) == GRIPPER_LOCAL_ID]
+    # 그리퍼캠 관측치의 event id를 그 사진을 실제로 찍은 순간(파킹 pose)의 로봇
+    # pose와 연결 -- 큐브를 놓은 순간이 아니라 촬영한 순간의 FK가 카메라 pose다.
+    robot_T_s2_photo = load_robot_T(session2_dir, s2_idx, args.session2_capture_subdir)
+    obs_s2_gripper = obs_s2_gripper_raw  # event id는 이미 build_synthetic_meta_placed가 offset해서 나옴
+    robot_T_s2_gripper = {SESSION2_EVENT_OFFSET + k: v for k, v in robot_T_s2_photo.items()}
+    print(f"session2 그리퍼캠 큐브 관측치: {len(obs_s2_gripper)}개 (신규 -- 예전엔 빠뜨렸음)")
+
+    # session3 (그리퍼캠, 보드)
+    charuco_target = CharucoTarget(charuco_config_from_dict(CHARUCO_BOARD_CONFIG))
+    meta_s3 = build_synthetic_meta_board(session3_dir, args.session3_capture_subdir, s3_idx, charuco_target)
+    robot_T_s3 = {SESSION3_EVENT_OFFSET + k: v
+                  for k, v in load_robot_T(session3_dir, s3_idx, args.session3_capture_subdir).items()}
+    obs_s3 = load_board_pixel_observations(
+        str(session3_dir), meta_s3, [GRIPPER_LOCAL_ID], gripper_cam_idx=GRIPPER_LOCAL_ID, image_scale=1.0)
+
+    print(f"session1 {len(obs_s1)}개 / session2-고정캠 {len(obs_s2_fixed)}개 / "
+          f"session2-그리퍼캠 {len(obs_s2_gripper)}개 / session3-그리퍼캠 {len(obs_s3)}개")
+    print(f"총 관측치: {len(obs_s1)+len(obs_s2_fixed)+len(obs_s2_gripper)+len(obs_s3)}개 "
+          f"(통합/독립 공통, 같은 양)\n")
+
+    return dict(
+        cam_init=cam_init, grasp_init=grasp_init, K_map=K_map, D_map=D_map,
+        obs_s1=obs_s1, robot_T_s1=robot_T_s1,
+        obs_s2_fixed=obs_s2_fixed, obs_s2_gripper=obs_s2_gripper, robot_T_s2_gripper=robot_T_s2_gripper,
+        obs_s3=obs_s3, robot_T_s3=robot_T_s3,
+        items_by_index=items_by_index,
     )
-    return final_state, diag
+
+
+# ------------------------------------------------------------------ 통합(unified)
+def solve_unified(data, fk_mode, gtc_init, board_init):
+    cam_init, grasp_init = data["cam_init"], data["grasp_init"]
+    K_map, D_map = data["K_map"], data["D_map"]
+    obs_s2 = data["obs_s2_fixed"] + data["obs_s2_gripper"]
+    set_ids = sorted(data["items_by_index"])
+    robot_T = {**data["robot_T_s1"], **data["robot_T_s2_gripper"], **data["robot_T_s3"]}
+    observations = data["obs_s1"] + obs_s2 + data["obs_s3"]
+
+    if fk_mode == "no_fk":
+        cubes = init_cube_poses(obs_s2, K_map, D_map, cam_init, gtc_init, robot_T, GRIPPER_LOCAL_ID, set_ids)
+        cube_key = ["T_base_cube_by_set"]
+    else:
+        cubes = fk_anchor_cubes(data["items_by_index"], grasp_init)
+        cube_key = []
+    observations = [o for o in observations
+                    if o.set_idx is None or int(o.set_idx) in cubes or o.grasp_idx is not None]
+
+    state = PoseState(cams=dict(cam_init), gtc=gtc_init.copy(), board=board_init.copy(),
+                      cubes=dict(cubes), grasps={0: grasp_init.copy()})
+    keys = variable_keys(["T_base_Ci", "T_gripper_cam", "T_base_board"] + cube_key + ["T_gripper_cube_by_grasp"], state)
+    final_state, diag = solve_corner_reprojection(
+        observations=observations, variable_keys_=keys, reference_state=state,
+        robot_T=robot_T, K_map=K_map, D_map=D_map,
+        gripper_cam_idx=GRIPPER_LOCAL_ID, options=SolverOptions(),
+    )
+    return final_state, diag, len(observations)
+
+
+# --------------------------------------------------------------- 독립(independent)
+def solve_independent_group_a(data, fk_mode):
+    """그룹A: 고정캠 3대, session1(grasp+FK) + session2-고정캠만."""
+    cam_init, grasp_init = data["cam_init"], data["grasp_init"]
+    K_map, D_map = data["K_map"], data["D_map"]
+    obs_s2 = data["obs_s2_fixed"]
+    set_ids = sorted(data["items_by_index"])
+
+    if fk_mode == "no_fk":
+        cubes = init_cube_poses(obs_s2, K_map, D_map, cam_init, np.eye(4), {}, -999, set_ids)
+        cube_key = ["T_base_cube_by_set"]
+        observations = data["obs_s1"] + [o for o in obs_s2 if o.set_idx is not None and int(o.set_idx) in cubes]
+    else:
+        cubes = fk_anchor_cubes(data["items_by_index"], grasp_init)
+        cube_key = []
+        observations = data["obs_s1"] + obs_s2
+
+    state = PoseState(cams=dict(cam_init), gtc=np.eye(4), board=None,
+                      cubes=dict(cubes), grasps={0: grasp_init.copy()})
+    keys = variable_keys(["T_base_Ci"] + cube_key + ["T_gripper_cube_by_grasp"], state)
+    final_state, diag = solve_corner_reprojection(
+        observations=observations, variable_keys_=keys, reference_state=state,
+        robot_T=data["robot_T_s1"], K_map=K_map, D_map=D_map,
+        gripper_cam_idx=-999, options=SolverOptions(),
+    )
+    return final_state, diag, len(observations)
+
+
+def solve_independent_group_b(data, fk_mode, gtc_init, board_init, T_gripper_cube_from_a):
+    """그룹B: 그리퍼캠 1대, session2-그리퍼캠 + session3만. raw-fk는 그룹A에서
+    이미 풀린 T_gripper_cube를 상수로 재사용(동시 최적화 아님 -- 여전히 독립)."""
+    K_map, D_map = data["K_map"], data["D_map"]
+    obs_s2g = data["obs_s2_gripper"]
+    set_ids = sorted(data["items_by_index"])
+    robot_T = {**data["robot_T_s2_gripper"], **data["robot_T_s3"]}
+    observations = obs_s2g + data["obs_s3"]
+
+    if fk_mode == "no_fk":
+        cubes = init_cube_poses(obs_s2g, K_map, D_map, {}, gtc_init, robot_T, GRIPPER_LOCAL_ID, set_ids)
+        cube_key = ["T_base_cube_by_set"]
+        observations = [o for o in observations
+                        if o.set_idx is None or int(o.set_idx) in cubes]
+    else:
+        cubes = fk_anchor_cubes(data["items_by_index"], T_gripper_cube_from_a)
+        cube_key = []
+
+    state = PoseState(cams={}, gtc=gtc_init.copy(), board=board_init.copy(), cubes=dict(cubes), grasps={})
+    keys = variable_keys(["T_gripper_cam", "T_base_board"] + cube_key, state)
+    final_state, diag = solve_corner_reprojection(
+        observations=observations, variable_keys_=keys, reference_state=state,
+        robot_T=robot_T, K_map=K_map, D_map=D_map,
+        gripper_cam_idx=GRIPPER_LOCAL_ID, options=SolverOptions(),
+    )
+    return final_state, diag, len(observations)
+
+
+def per_corner_errors(state, observations, robot_T, K_map, D_map, gripper_id):
+    errs = []
+    for o in observations:
+        if o.marker == "board":
+            target = state.board
+        elif o.grasp_idx is not None:
+            target = robot_T[int(o.event)] @ state.grasps[int(o.grasp_idx)]
+        else:
+            target = state.cubes[int(o.set_idx)]
+        if int(o.cam) == gripper_id:
+            T_base_cam = robot_T[int(o.event)] @ state.gtc
+        else:
+            T_base_cam = state.cams[int(o.cam)]
+        pred = project_points(inv_T(T_base_cam) @ target, o.object_points, K_map[int(o.cam)], D_map[int(o.cam)])
+        errs.extend(np.linalg.norm(pred - o.image_points, axis=1).tolist())
+    return errs
 
 
 def main():
@@ -220,111 +305,59 @@ def main():
     ap.add_argument("--out", default=str(REPO_ROOT / "zeus_gello_calibration" / "calibration_methods_comparison.json"))
     args = ap.parse_args()
 
-    session1_dir, session2_dir, session3_dir = Path(args.session1_dir), Path(args.session2_dir), Path(args.session3_dir)
-    s1_root = session1_dir / args.session1_capture_subdir
-    s2_root = session2_dir / args.session2_capture_subdir
-    s3_root = session3_dir / args.session3_capture_subdir
-    s1_idx = sorted(int(p.name) for p in s1_root.iterdir() if p.is_dir())
-    s2_idx = sorted(int(p.name) for p in s2_root.iterdir() if p.is_dir())
-    s3_idx = sorted(int(p.name) for p in s3_root.iterdir() if p.is_dir())
-    items = compute_ordered_targets(session2_dir)
-    items_by_index = {idx: items[idx] for idx in s2_idx if idx < len(items)}
+    data = load_all_data(args)
+    K_map, D_map = data["K_map"], data["D_map"]
 
-    K_map, D_map = load_intrinsics_by_label(
-        Path(args.zeus_intrinsics_dir), Path(args.ur3_intrinsics_dir), Path(args.device_map))
-    fit = json.loads(Path(args.fit_json).read_text())
-    grasp_init = np.asarray(fit["T_gripper_cube"], dtype=np.float64)
-    cam_init = {int(k.split("_", 1)[0]): np.asarray(v, dtype=np.float64) for k, v in fit["T_base_cam"].items()}
-    fixed_ids = sorted(cam_init)
-
-    cube_cfg = get_default_cube_config()
-    cube = AprilTagCubeTarget(cube_cfg)
-
-    meta_s1 = build_synthetic_meta(session1_dir, s1_idx, args.session1_capture_subdir)
-    robot_T_s1 = load_robot_T(session1_dir, s1_idx, args.session1_capture_subdir)
-    obs_s1, _ = load_cube_pixel_observations(
-        str(session1_dir), meta_s1, cube, K_map, D_map, fixed_ids, gripper_cam_idx=-999,
-        exclude_gripped=False, fixed_min_corners=args.fixed_min_corners, image_scale=1.0,
-        observation_policy=args.cube_observation_policy)
-    obs_s1 = [o for o in obs_s1 if int(o.cam) in cam_init]
-
-    meta_s2 = build_synthetic_meta_placed(s2_root, s2_idx)
-    obs_s2_raw, _ = load_cube_pixel_observations(
-        str(session2_dir), meta_s2, cube, K_map, D_map, fixed_ids, gripper_cam_idx=-999,
-        exclude_gripped=False, fixed_min_corners=args.fixed_min_corners, image_scale=1.0,
-        observation_policy=args.cube_observation_policy)
-    obs_s2_raw = [o for o in obs_s2_raw if int(o.cam) in cam_init]
-
-    charuco_target = CharucoTarget(charuco_config_from_dict(CHARUCO_BOARD_CONFIG))
-    meta_s3 = build_synthetic_meta_board(session3_dir, args.session3_capture_subdir, s3_idx, charuco_target)
-    robot_T_s3 = {SESSION3_EVENT_OFFSET + k: v
-                  for k, v in load_robot_T(session3_dir, s3_idx, args.session3_capture_subdir).items()}
-    obs_s3 = load_board_pixel_observations(
-        str(session3_dir), meta_s3, [GRIPPER_LOCAL_ID], gripper_cam_idx=GRIPPER_LOCAL_ID, image_scale=1.0)
-
-    robot_T_s2_commanded = {SESSION2_EVENT_OFFSET + idx: pose6_to_T(item["target"])
-                            for idx, item in items_by_index.items()}
-    robot_T_combined = {**robot_T_s1, **robot_T_s2_commanded, **robot_T_s3}
-
-    print(f"session1 {len(obs_s1)}개 / session2 {len(obs_s2_raw)}개 / session3 {len(obs_s3)}개 관측치\n")
+    gtc_init, board_init, eih_diag = estimate_board_handeye_initial(
+        data["obs_s3"], data["robot_T_s3"], K_map, D_map, GRIPPER_LOCAL_ID)
+    print(f"T_gripper_cam 초기값 (session3만): t_mm={np.round(gtc_init[:3,3]*1000,2).tolist()} ({eih_diag})\n")
 
     results = {}
+    for fk_mode, label in (("no_fk", "통합_no-fk"), ("fixed_fk", "통합_raw-fk")):
+        state, diag, n_obs = solve_unified(data, fk_mode, gtc_init, board_init)
+        results[label] = {"success": diag["success"], "rmse_px": diag["train_reprojection_rmse_px"],
+                          "n_corners": diag["n_residuals"] // 2, "n_observations": n_obs}
 
-    # 그리퍼캠 eye-in-hand: raw-fk/no-fk 무관, 통합/독립 공통 초기값으로 재사용
-    gtc_init, board_init, gtc_rmse, gtc_n, eih_diag = solve_gripper_eih(obs_s3, robot_T_s3, K_map, D_map)
-    print(f"[그리퍼캠 eye-in-hand] rmse_px={gtc_rmse:.4f} n_corners={gtc_n} (raw-fk/no-fk 공통, {eih_diag})\n")
-
-    # --- 통합 raw-fk / no-fk ---
-    for fk_mode in ("fixed_fk", "no_fk"):
-        state, diag = solve_unified(obs_s1, obs_s2_raw, obs_s3, robot_T_combined, cam_init, grasp_init,
-                                    gtc_init, board_init, K_map, D_map, items_by_index, fk_mode)
-        label = "통합_raw-fk" if fk_mode == "fixed_fk" else "통합_no-fk"
+    for fk_mode, label in (("no_fk", "독립_no-fk"), ("fixed_fk", "독립_raw-fk")):
+        state_a, diag_a, n_a = solve_independent_group_a(data, fk_mode)
+        T_gripper_cube_a = state_a.grasps[0]
+        state_b, diag_b, n_b = solve_independent_group_b(data, fk_mode, gtc_init, board_init, T_gripper_cube_a)
+        errs_a = per_corner_errors(state_a, (data["obs_s1"] +
+                                             [o for o in data["obs_s2_fixed"]
+                                              if o.set_idx is None or int(o.set_idx) in state_a.cubes]),
+                                   data["robot_T_s1"], K_map, D_map, -999)
+        robot_T_b = {**data["robot_T_s2_gripper"], **data["robot_T_s3"]}
+        errs_b = per_corner_errors(state_b, ([o for o in data["obs_s2_gripper"]
+                                              if o.set_idx is None or int(o.set_idx) in state_b.cubes]
+                                             + data["obs_s3"]),
+                                   robot_T_b, K_map, D_map, GRIPPER_LOCAL_ID)
+        combined_rmse = rmse_px(errs_a + errs_b)
         results[label] = {
-            "success": diag["success"],
-            "rmse_px": diag["train_reprojection_rmse_px"],
-            "n_corners": diag["n_residuals"] // 2,
-            "note": "session1+session2+session3 전체 pool",
+            "success": bool(diag_a["success"] and diag_b["success"]),
+            "rmse_px": combined_rmse,
+            "n_corners": (len(errs_a) + len(errs_b)) // 2,
+            "n_observations": n_a + n_b,
+            "group_a_fixed_cams_rmse_px": rmse_px(errs_a),
+            "group_b_gripper_rmse_px": rmse_px(errs_b),
         }
 
-    # --- 독립 raw-fk ---
-    cams_rawfk, fk_anchor, rmse_rawfk, n_rawfk = solve_independent_fixed_raw_fk(
-        obs_s2_raw, K_map, D_map, fixed_ids, items_by_index, grasp_init)
-    results["독립_raw-fk"] = {
-        "success": len(cams_rawfk) == len(fixed_ids),
-        "rmse_px_fixed_cams": rmse_rawfk, "n_corners_fixed_cams": n_rawfk,
-        "rmse_px_gripper": gtc_rmse, "n_corners_gripper": gtc_n,
-        "note": "고정캠: session2만, FK 앵커(session1 T_gripper_cube) 사용, session1 자체는 미사용. "
-                "그리퍼캠: 위와 공통.",
-    }
-
-    # --- 독립 no-fk ---
-    cams_nofk, target_nofk, rmse_nofk, n_nofk, ref_cam = solve_independent_fixed_no_fk(
-        obs_s2_raw, K_map, D_map, fixed_ids)
-    results["독립_no-fk"] = {
-        "success": len(cams_nofk) == len(fixed_ids),
-        "rmse_px_fixed_cams": rmse_nofk, "n_corners_fixed_cams": n_nofk,
-        "rmse_px_gripper": gtc_rmse, "n_corners_gripper": gtc_n,
-        "note": f"고정캠: session2만, FK 미사용, 카메라{ref_cam}을 내부 게이지 원점으로 삼은 "
-                "상대 gauge에서의 self-consistency (로봇 base 절대좌표 아님). 그리퍼캠: 위와 공통.",
-    }
-
-    print(f"{'condition':>16} {'rmse_px':>12} {'n_corners':>10}   note")
+    total_n = len(data["obs_s1"]) + len(data["obs_s2_fixed"]) + len(data["obs_s2_gripper"]) + len(data["obs_s3"])
+    print(f"{'condition':>14} {'rmse_px':>10} {'n_corners':>10} {'n_obs':>7}   detail")
     for name in ("통합_raw-fk", "통합_no-fk", "독립_raw-fk", "독립_no-fk"):
         r = results[name]
-        if "rmse_px" in r:
-            print(f"{name:>16} {r['rmse_px']:>12.4f} {r['n_corners']:>10d}   {r['note']}")
-        else:
-            print(f"{name:>16} {'fixed:'+format(r['rmse_px_fixed_cams'],'.4f'):>12} "
-                  f"{r['n_corners_fixed_cams']:>10d}   {r['note']}")
-            print(f"{'':>16} {'grip:'+format(r['rmse_px_gripper'],'.4f'):>12} {r['n_corners_gripper']:>10d}")
+        detail = ""
+        if "group_a_fixed_cams_rmse_px" in r:
+            detail = f"고정캠 {r['group_a_fixed_cams_rmse_px']:.4f} / 그리퍼 {r['group_b_gripper_rmse_px']:.4f}"
+        print(f"{name:>14} {r['rmse_px']:>10.4f} {r['n_corners']:>10d} {r['n_observations']:>7d}   {detail}")
+    print(f"\n(참고: 데이터 풀 총 observation 수 = {total_n}, 통합/독립 공통)")
 
     out = {
-        "warning": ("통합은 session1+2+3 pool, 독립은 session2(+session3 그리퍼캠 별도)만 사용 -- "
-                    "직접 1:1 비교가 아니라 각 방법론이 자기 방식으로 최선을 다한 잔차 비교. "
-                    "독립_no-fk의 고정캠 RMSE는 로봇 base 절대좌표가 아닌 카메라 내부 상대 gauge 기준."),
+        "warning": "train-pooled, held-out 분리 없음 -- table1.py 정식 지표 아님. "
+                   "통합/독립 모두 session1+session2(고정+그리퍼)+session3 동일 데이터 사용.",
+        "total_observations": total_n,
         "results": results,
     }
-    Path(args.out).write_text(json.dumps(out, indent=2))
+    Path(args.out).write_text(json.dumps(out, indent=2, default=lambda o: str(o)))
     print(f"\nwrote {args.out}")
 
 
