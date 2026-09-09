@@ -40,7 +40,7 @@ from calibration_pipeline.table1 import estimate_board_handeye_initial  # noqa: 
 
 from fit_calibration_methods import (  # noqa: E402
     GRIPPER_LOCAL_ID, SESSION1_DIR_DEFAULT, SESSION3_DIR_DEFAULT, load_all_data,
-    rmse_px, solve_sequential, solve_unified,
+    rmse_px, solve_parallel_fixed, solve_parallel_gripper, solve_sequential, solve_unified,
 )
 from session2_pick_and_place import SESSION2_DIR_DEFAULT  # noqa: E402
 
@@ -60,13 +60,18 @@ def camera_cube_estimate(obs, cams, gtc, robot_T, K_map, D_map, gripper_id):
 
 
 def fit_frozen(method, data_fold, fk_mode, gtc_init, board_init):
-    """(cams, gtc) 프리즈된 값 반환 -- 통합/sequential 공통 인터페이스.
-    sequential(table1.py A1 방식)은 no_fk(estimated)에서만 존재한다."""
+    """(cams, gtc) 프리즈된 값 반환 -- 통합/sequential/진짜독립 공통 인터페이스.
+    sequential(table1.py A1 방식)과 진짜독립은 no_fk(estimated)에서만 존재한다."""
     if method == "통합":
         state, _, _ = solve_unified(data_fold, fk_mode, gtc_init, board_init)
         return state.cams, state.gtc
-    final1, _, final2, _, _, _ = solve_sequential(data_fold, gtc_init, board_init)
-    return final2.cams, final1.gtc
+    if method == "sequential":
+        final1, _, final2, _, _, _ = solve_sequential(data_fold, gtc_init, board_init)
+        return final2.cams, final1.gtc
+    # method == "독립_true": 고정캠/그리퍼 그룹을 완전히 따로 (핸드오프 없음)
+    state_fixed, _, _ = solve_parallel_fixed(data_fold)
+    state_gripper, _, _ = solve_parallel_gripper(data_fold, gtc_init, board_init)
+    return state_fixed.cams, state_gripper.gtc
 
 
 def evaluate_heldout(method, data, fk_mode, gtc_init, board_init, robot_T_all, K_map, D_map, set_ids):
@@ -166,6 +171,7 @@ def main():
     for method, fk_mode, label in (
         ("통합", "no_fk", "통합_no-fk"), ("통합", "fixed_fk", "통합_raw-fk"),
         ("sequential", "no_fk", "sequential_no-fk"),
+        ("독립_true", "no_fk", "독립_no-fk"),
     ):
         print(f"[{label}] leave-one-out held-out 계산 중 ({len(set_ids)}개 세트)...")
         heldout_rmse, per_set = evaluate_heldout(
@@ -185,7 +191,7 @@ def main():
         }
 
     print(f"\n{'condition':>16} {'heldout_rmse_px':>16} {'cross_cam_mm':>13} {'cross_cam_deg':>14} {'n_pairs':>8}")
-    for name in ("통합_raw-fk", "통합_no-fk", "sequential_no-fk"):
+    for name in ("통합_raw-fk", "통합_no-fk", "sequential_no-fk", "독립_no-fk"):
         r = results[name]
         print(f"{name:>16} {r['heldout_cube_rmse_px']:>16.4f} {r['cross_camera_translation_mm']:>13.4f} "
               f"{r['cross_camera_rotation_deg']:>14.4f} {r['n_camera_pairs']:>8d}")
