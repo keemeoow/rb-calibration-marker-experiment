@@ -7,10 +7,16 @@ mm/deg)를 계산한다. late_table1(CP_result/session04)의 "Heldout Cube RMSE"
 "Cross-view Cube px"/"Cam-common Cube mm/deg" 지표를 Zeus 데이터로 재현한 것.
 
 Held-out: session2의 15개 세트를 하나씩 빼고(session1+session3는 항상 포함)
-나머지로 다시 fit한 뒤, 뺐던 세트의 이미지들로만(그 세트를 본 카메라들의 PnP를
-frozen 카메라 extrinsics로 base 좌표계에 옮겨 평균) 큐브 pose를 추정하고,
-그 pose로 그 세트의 코너들을 재투영해서 오차를 잰다 -- 학습에 전혀 안 쓰인
-세트에 대한 일반화 성능.
+나머지로 다시 fit한 뒤, 뺐던 세트의 코너들을 재투영해서 오차를 잰다 -- 학습에
+전혀 안 쓰인 세트에 대한 일반화 성능.
+
+*** 정답(ground truth) 값 ***: 예전 버전은 "빠진 세트를 그 세트 자신의
+사진들로 삼각측량"해서 정답을 만들었는데, 이러면 정답을 만드는 재료와 검증할
+때 쓰는 재료가 똑같은 카메라의 같은 사진이라 카메라들의 공통 편향을 못 잡는다
+(4명한테 물어보고 평균 내서 정답 삼은 뒤 다시 그 4명한테 맞는지 물어보는 것과
+같음). 지금은 카메라를 전혀 안 쓰고, **그 세트에서 로봇이 실제로 명령받아
+이동한 FK 위치 @ session1에서 구한 T_gripper_cube**로 정답을 만든다 --
+완전히 비전과 무관한 값이라 카메라들의 공통 편향까지 잡아낼 수 있다.
 
 Cross-camera consistency: (held-out 아닌) 전체 데이터로 한 fit에서, 같은
 세트를 본 카메라들이 각자 독립적으로 계산한 큐브 pose끼리 얼마나 다른지
@@ -39,7 +45,7 @@ from calibration_pipeline.reprojection import pose_delta, project_points  # noqa
 from calibration_pipeline.table1 import estimate_board_handeye_initial  # noqa: E402
 
 from fit_calibration_methods import (  # noqa: E402
-    GRIPPER_LOCAL_ID, SESSION1_DIR_DEFAULT, SESSION3_DIR_DEFAULT, load_all_data,
+    GRIPPER_LOCAL_ID, SESSION1_DIR_DEFAULT, SESSION3_DIR_DEFAULT, fk_anchor_cubes, load_all_data,
     rmse_px, solve_parallel_fixed, solve_parallel_gripper, solve_sequential, solve_unified,
 )
 from session2_pick_and_place import SESSION2_DIR_DEFAULT  # noqa: E402
@@ -78,7 +84,10 @@ def evaluate_heldout(method, data, fk_mode, gtc_init, board_init, robot_T_all, K
     all_errs = []
     per_set = {}
     obs_all_s2 = data["obs_s2_fixed"] + data["obs_s2_gripper"]
+    grasp_init = data["grasp_init"]
     for s in set_ids:
+        if s not in data["items_by_index"]:
+            continue
         data_fold = dict(data)
         data_fold["obs_s2_fixed"] = [o for o in data["obs_s2_fixed"] if o.set_idx is None or int(o.set_idx) != s]
         data_fold["obs_s2_gripper"] = [o for o in data["obs_s2_gripper"] if o.set_idx is None or int(o.set_idx) != s]
@@ -89,13 +98,11 @@ def evaluate_heldout(method, data, fk_mode, gtc_init, board_init, robot_T_all, K
             print(f"    [WARN] {method} fk={fk_mode} set={s}: fold fit 실패 ({exc}), 건너뜀")
             continue
 
-        heldout_obs = [o for o in obs_all_s2 if o.set_idx is not None and int(o.set_idx) == s]
-        cands = [camera_cube_estimate(o, cams, gtc, robot_T_all, K_map, D_map, GRIPPER_LOCAL_ID) for o in heldout_obs]
-        cands = [c for c in cands if c is not None]
-        if not cands:
-            continue
-        T_pose = cands[0] if len(cands) == 1 else cp.robust_se3_average(cands, None)[0]
+        # 정답 = 카메라 전혀 안 쓰고, 그 세트에서 로봇이 실제로 명령받아 간
+        # FK 위치 @ session1의 T_gripper_cube로 계산 (비전 무관, 완전 독립).
+        T_gt = fk_anchor_cubes({s: data["items_by_index"][s]}, grasp_init)[s]
 
+        heldout_obs = [o for o in obs_all_s2 if o.set_idx is not None and int(o.set_idx) == s]
         set_errs = []
         for o in heldout_obs:
             c = int(o.cam)
@@ -107,9 +114,11 @@ def evaluate_heldout(method, data, fk_mode, gtc_init, board_init, robot_T_all, K
                 if c not in cams:
                     continue
                 T_base_cam = cams[c]
-            pred = project_points(inv_T(T_base_cam) @ T_pose, o.object_points, K_map[c], D_map[c])
+            pred = project_points(inv_T(T_base_cam) @ T_gt, o.object_points, K_map[c], D_map[c])
             e = np.linalg.norm(pred - o.image_points, axis=1)
             set_errs.extend(e.tolist())
+        if not set_errs:
+            continue
         all_errs.extend(set_errs)
         per_set[s] = rmse_px(set_errs)
     return rmse_px(all_errs), per_set
