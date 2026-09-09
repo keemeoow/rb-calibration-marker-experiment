@@ -88,23 +88,28 @@ CHARUCO_BOARD_CONFIG = {
 
 def build_synthetic_meta_board(session3_dir: Path, capture_subdir: str, capture_indices,
                                charuco_target: CharucoTarget) -> dict:
+    """그리퍼캠뿐 아니라 고정캠 3대도 session3 보드를 본다(실측 확인: 15/15
+    검출, 코너 23~56개) -- 그래서 4대 전부 meta에 넣는다. 예전엔 그리퍼캠만
+    넣어서 고정캠의 보드 관측치를 통째로 빠뜨리고 있었다."""
+    label_by_id = {v: k for k, v in LOCAL_CAM_IDS.items()}
     captures = []
     for idx in capture_indices:
         folder = f"{idx:03d}"
-        img_path = session3_dir / capture_subdir / folder / "cam_gripper.png"
-        if not img_path.is_file():
-            continue
-        image = cv2.imread(str(img_path))
-        n_corners = 0
-        if image is not None:
-            _corners, _ids, n_corners, _mc, _mi = charuco_target.detect(image)
-            n_corners = int(n_corners or 0)
-        rel = f"{capture_subdir}/{folder}/cam_gripper.png"
+        cams = {}
+        for local_id, label in label_by_id.items():
+            img_path = session3_dir / capture_subdir / folder / f"cam_{label}.png"
+            if not img_path.is_file():
+                continue
+            image = cv2.imread(str(img_path))
+            n_corners = 0
+            if image is not None:
+                _corners, _ids, n_corners, _mc, _mi = charuco_target.detect(image)
+                n_corners = int(n_corners or 0)
+            rel = f"{capture_subdir}/{folder}/cam_{label}.png"
+            cams[str(local_id)] = {"saved": True, "rgb_path": rel, "charuco_detect_n": n_corners}
         captures.append({
             "event_id": SESSION3_EVENT_OFFSET + int(idx),
-            "cams": {str(GRIPPER_LOCAL_ID): {
-                "saved": True, "rgb_path": rel, "charuco_detect_n": n_corners,
-            }},
+            "cams": cams,
         })
     return {"captures": captures, "charuco_board_config": CHARUCO_BOARD_CONFIG}
 

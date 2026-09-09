@@ -187,24 +187,30 @@ def load_all_data(args):
     robot_T_s2_gripper = {SESSION2_EVENT_OFFSET + k: v for k, v in robot_T_s2_photo.items()}
     print(f"session2 그리퍼캠 큐브 관측치: {len(obs_s2_gripper)}개 (신규 -- 예전엔 빠뜨렸음)")
 
-    # session3 (그리퍼캠, 보드)
+    # session3 (보드) -- 고정캠 3대도 그리퍼캠만큼 잘 본다(실측 확인: 15/15
+    # 검출, 코너 23~56개). 예전엔 그리퍼캠만 불러와서 고정캠의 보드 관측치를
+    # 통째로 빠뜨리고 있었다.
     charuco_target = CharucoTarget(charuco_config_from_dict(CHARUCO_BOARD_CONFIG))
     meta_s3 = build_synthetic_meta_board(session3_dir, args.session3_capture_subdir, s3_idx, charuco_target)
     robot_T_s3 = {SESSION3_EVENT_OFFSET + k: v
                   for k, v in load_robot_T(session3_dir, s3_idx, args.session3_capture_subdir).items()}
-    obs_s3 = load_board_pixel_observations(
-        str(session3_dir), meta_s3, [GRIPPER_LOCAL_ID], gripper_cam_idx=GRIPPER_LOCAL_ID, image_scale=1.0)
+    obs_s3_all = load_board_pixel_observations(
+        str(session3_dir), meta_s3, all_cam_ids, gripper_cam_idx=GRIPPER_LOCAL_ID, image_scale=1.0)
+    obs_s3_fixed = [o for o in obs_s3_all if int(o.cam) in cam_init]
+    obs_s3_gripper = [o for o in obs_s3_all if int(o.cam) == GRIPPER_LOCAL_ID]
+    print(f"session3 고정캠 보드 관측치: {len(obs_s3_fixed)}개 (신규 -- 예전엔 빠뜨렸음)")
 
     print(f"session1 {len(obs_s1)}개 / session2-고정캠 {len(obs_s2_fixed)}개 / "
-          f"session2-그리퍼캠 {len(obs_s2_gripper)}개 / session3-그리퍼캠 {len(obs_s3)}개")
-    print(f"총 관측치: {len(obs_s1)+len(obs_s2_fixed)+len(obs_s2_gripper)+len(obs_s3)}개 "
-          f"(통합/독립 공통, 같은 양)\n")
+          f"session2-그리퍼캠 {len(obs_s2_gripper)}개 / "
+          f"session3-고정캠 {len(obs_s3_fixed)}개 / session3-그리퍼캠 {len(obs_s3_gripper)}개")
+    total = len(obs_s1) + len(obs_s2_fixed) + len(obs_s2_gripper) + len(obs_s3_fixed) + len(obs_s3_gripper)
+    print(f"총 관측치: {total}개 (통합/독립 공통, 같은 양)\n")
 
     return dict(
         cam_init=cam_init, grasp_init=grasp_init, K_map=K_map, D_map=D_map,
         obs_s1=obs_s1, robot_T_s1=robot_T_s1,
         obs_s2_fixed=obs_s2_fixed, obs_s2_gripper=obs_s2_gripper, robot_T_s2_gripper=robot_T_s2_gripper,
-        obs_s3=obs_s3, robot_T_s3=robot_T_s3,
+        obs_s3=obs_s3_all, obs_s3_fixed=obs_s3_fixed, obs_s3_gripper=obs_s3_gripper, robot_T_s3=robot_T_s3,
         items_by_index=items_by_index,
     )
 
@@ -252,34 +258,55 @@ def solve_unified(data, fk_mode, gtc_init, board_init):
 # 임의의 gauge를 맞추는 rigid-align이 필요 없고, 그냥 두 그룹의 큐브 pose를
 # 직접 비교하면 된다(같은 좌표계이므로). 이 비교 자체가 "완전히 독립적으로
 # 계산한 두 답이 서로 얼마나 맞는가"라는 유의미한 검증 지표가 된다.
+def init_board_pose(obs_board, K_map, D_map, cam_init):
+    """고정캠들의 board 관측치만으로 T_base_board 초기값 (그리퍼 정보 전혀 안 씀)."""
+    cands = []
+    for o in obs_board:
+        c = int(o.cam)
+        if c not in cam_init:
+            continue
+        T_cam_board = solve_observed_pose(o, K_map, D_map)
+        if T_cam_board is not None:
+            cands.append(cam_init[c] @ T_cam_board)
+    if not cands:
+        return np.eye(4)
+    return cands[0] if len(cands) == 1 else cp.robust_se3_average(cands, None)[0]
+
+
 def solve_parallel_fixed(data):
-    """고정캠 그룹: session1(grasp+FK) + session2-고정캠만, 그리퍼 정보 전혀 안 씀."""
+    """고정캠 그룹: session1(grasp+FK) + session2-고정캠 + session3-고정캠(보드),
+    그리퍼 정보 전혀 안 씀. 고정캠도 session3 보드를 잘 본다(실측 확인)."""
     cam_init, grasp_init = data["cam_init"], data["grasp_init"]
     K_map, D_map = data["K_map"], data["D_map"]
     obs_s2 = data["obs_s2_fixed"]
+    obs_s3f = data["obs_s3_fixed"]
     set_ids = sorted(data["items_by_index"])
     cubes = init_cube_poses(obs_s2, K_map, D_map, cam_init, np.eye(4), {}, -999, set_ids)
-    observations = data["obs_s1"] + [o for o in obs_s2 if o.set_idx is not None and int(o.set_idx) in cubes]
-    state = PoseState(cams=dict(cam_init), gtc=np.eye(4), board=None,
+    board_init_fixed = init_board_pose(obs_s3f, K_map, D_map, cam_init)
+    observations = (data["obs_s1"]
+                    + [o for o in obs_s2 if o.set_idx is not None and int(o.set_idx) in cubes]
+                    + obs_s3f)
+    state = PoseState(cams=dict(cam_init), gtc=np.eye(4), board=board_init_fixed,
                       cubes=dict(cubes), grasps={0: grasp_init.copy()})
-    keys = variable_keys(["T_base_Ci", "T_base_cube_by_set", "T_gripper_cube_by_grasp"], state)
+    keys = variable_keys(["T_base_Ci", "T_base_cube_by_set", "T_gripper_cube_by_grasp", "T_base_board"], state)
     final_state, diag = solve_corner_reprojection(
         observations=observations, variable_keys_=keys, reference_state=state,
-        robot_T=data["robot_T_s1"], K_map=K_map, D_map=D_map,
+        robot_T={**data["robot_T_s1"], **data["robot_T_s3"]}, K_map=K_map, D_map=D_map,
         gripper_cam_idx=-999, options=SolverOptions(),
     )
     return final_state, diag, observations
 
 
 def solve_parallel_gripper(data, gtc_init, board_init):
-    """그리퍼 그룹: session2-그리퍼캠 + session3만, 고정캠 정보 전혀 안 씀."""
+    """그리퍼 그룹: session2-그리퍼캠 + session3-그리퍼캠만, 고정캠 정보 전혀 안 씀."""
     K_map, D_map = data["K_map"], data["D_map"]
     obs_s2g = data["obs_s2_gripper"]
+    obs_s3g = data["obs_s3_gripper"]
     set_ids = sorted(data["items_by_index"])
     robot_T = {**data["robot_T_s2_gripper"], **data["robot_T_s3"]}
     cubes = init_cube_poses(obs_s2g, K_map, D_map, {}, gtc_init, robot_T, GRIPPER_LOCAL_ID, set_ids)
     observations = ([o for o in obs_s2g if o.set_idx is not None and int(o.set_idx) in cubes]
-                    + data["obs_s3"])
+                    + obs_s3g)
     state = PoseState(cams={}, gtc=gtc_init.copy(), board=board_init.copy(), cubes=dict(cubes), grasps={})
     keys = variable_keys(["T_gripper_cam", "T_base_board", "T_base_cube_by_set"], state)
     final_state, diag = solve_corner_reprojection(
@@ -291,14 +318,17 @@ def solve_parallel_gripper(data, gtc_init, board_init):
 
 
 def consensus_check(state_fixed, state_gripper):
-    """두 그룹이 완전히 독립적으로 계산한, 같은 session2 세트의 큐브 pose를
-    직접 비교(같은 base 좌표계라 rigid-align 불필요). 세트별 (mm, deg) 차이."""
+    """두 그룹이 완전히 독립적으로 계산한 값들을 직접 비교(같은 base 좌표계라
+    rigid-align 불필요): session2 큐브(세트별) + session3 보드(전체 하나)."""
     common = sorted(set(state_fixed.cubes) & set(state_gripper.cubes))
     per_set = {}
     for s in common:
         d_mm, d_deg = pose_delta(state_fixed.cubes[s], state_gripper.cubes[s])
         per_set[s] = {"translation_mm": d_mm, "rotation_deg": d_deg}
-    return per_set
+    board_mm, board_deg = None, None
+    if state_fixed.board is not None and state_gripper.board is not None:
+        board_mm, board_deg = pose_delta(state_fixed.board, state_gripper.board)
+    return per_set, {"translation_mm": board_mm, "rotation_deg": board_deg}
 
 
 def per_corner_errors(state, observations, robot_T, K_map, D_map, gripper_id):
@@ -373,7 +403,7 @@ def main():
     errs_gripper = per_corner_errors(state_gripper, obs_gripper,
                                      {**data["robot_T_s2_gripper"], **data["robot_T_s3"]},
                                      K_map, D_map, GRIPPER_LOCAL_ID)
-    agreement = consensus_check(state_fixed, state_gripper)
+    agreement, board_agreement = consensus_check(state_fixed, state_gripper)
     agree_mm = [v["translation_mm"] for v in agreement.values()]
     agree_deg = [v["rotation_deg"] for v in agreement.values()]
     results[label2] = {
@@ -386,9 +416,12 @@ def main():
         "consensus_mean_deg": float(np.mean(agree_deg)) if agree_deg else float("nan"),
         "consensus_max_mm": float(np.max(agree_mm)) if agree_mm else float("nan"),
         "consensus_max_deg": float(np.max(agree_deg)) if agree_deg else float("nan"),
+        "consensus_board_mm": board_agreement["translation_mm"],
+        "consensus_board_deg": board_agreement["rotation_deg"],
     }
 
-    total_n = len(data["obs_s1"]) + len(data["obs_s2_fixed"]) + len(data["obs_s2_gripper"]) + len(data["obs_s3"])
+    total_n = (len(data["obs_s1"]) + len(data["obs_s2_fixed"]) + len(data["obs_s2_gripper"])
+              + len(data["obs_s3_fixed"]) + len(data["obs_s3_gripper"]))
     print(f"{'condition':>34} {'rmse_px':>10} {'n_corners':>10} {'n_obs':>7}   detail")
     for name in ("통합_raw-fk", "통합_no-fk"):
         r = results[name]
@@ -396,9 +429,9 @@ def main():
     r2 = results[label2]
     print(f"{label2:>34} {'고정캠:'+format(r2['fixed_group_rmse_px'],'.4f'):>10} {'-':>10} "
           f"{r2['n_observations']:>7d}   그리퍼:{r2['gripper_group_rmse_px']:.4f}")
-    print(f"  -> session2 사후 합의(두 그룹이 각자 계산한 같은 큐브들의 차이): "
-          f"평균 {r2['consensus_mean_mm']:.2f}mm/{r2['consensus_mean_deg']:.2f}deg, "
+    print(f"  -> session2 큐브 사후 합의: 평균 {r2['consensus_mean_mm']:.2f}mm/{r2['consensus_mean_deg']:.2f}deg, "
           f"최대 {r2['consensus_max_mm']:.2f}mm/{r2['consensus_max_deg']:.2f}deg")
+    print(f"  -> session3 보드 사후 합의: {r2['consensus_board_mm']:.2f}mm/{r2['consensus_board_deg']:.2f}deg")
     print(f"\n(참고: 데이터 풀 총 observation 수 = {total_n})")
     print("\n주의: raw-fk(통합_raw-fk)는 table1.py A3와 이름만 같지 실제로는 다른 조건입니다 --")
     print("A3는 비전 개입 0인 순수 기계적 상수를 쓰는데, 여긴 session1 비전 fit값(T_gripper_cube)을 씁니다.")
