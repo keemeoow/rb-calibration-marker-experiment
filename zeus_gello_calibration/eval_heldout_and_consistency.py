@@ -40,7 +40,7 @@ from calibration_pipeline.table1 import estimate_board_handeye_initial  # noqa: 
 
 from fit_calibration_methods import (  # noqa: E402
     GRIPPER_LOCAL_ID, SESSION1_DIR_DEFAULT, SESSION3_DIR_DEFAULT, load_all_data,
-    rmse_px, solve_independent_group_a, solve_independent_group_b, solve_unified,
+    rmse_px, solve_sequential, solve_unified,
 )
 from session2_pick_and_place import SESSION2_DIR_DEFAULT  # noqa: E402
 
@@ -60,15 +60,13 @@ def camera_cube_estimate(obs, cams, gtc, robot_T, K_map, D_map, gripper_id):
 
 
 def fit_frozen(method, data_fold, fk_mode, gtc_init, board_init):
-    """(cams, gtc) 프리즈된 값 반환 -- 통합/독립 공통 인터페이스."""
+    """(cams, gtc) 프리즈된 값 반환 -- 통합/sequential 공통 인터페이스.
+    sequential(table1.py A1 방식)은 no_fk(estimated)에서만 존재한다."""
     if method == "통합":
         state, _, _ = solve_unified(data_fold, fk_mode, gtc_init, board_init)
         return state.cams, state.gtc
-    state_a, _, _ = solve_independent_group_a(data_fold, fk_mode)
-    # raw-fk 앵커는 통합과 같은 원래 상수(grasp_init)를 써야 공정한 비교가 된다
-    # (그룹A가 다시 정제한 값을 쓰면 raw-fk의 정의가 조건마다 달라짐 -- 실제 버그였음).
-    state_b, _, _ = solve_independent_group_b(data_fold, fk_mode, gtc_init, board_init, data_fold["grasp_init"])
-    return state_a.cams, state_b.gtc
+    final1, _, final2, _, _, _ = solve_sequential(data_fold, gtc_init, board_init)
+    return final2.cams, final1.gtc
 
 
 def evaluate_heldout(method, data, fk_mode, gtc_init, board_init, robot_T_all, K_map, D_map, set_ids):
@@ -163,9 +161,11 @@ def main():
         data["obs_s3"], data["robot_T_s3"], K_map, D_map, GRIPPER_LOCAL_ID)
 
     results = {}
+    # sequential(table1.py A1 방식)은 no_fk에서만 존재 -- raw-fk+sequential
+    # 조합은 table1.py에 없어서 안 만듦 (fit_calibration_methods.py 참고).
     for method, fk_mode, label in (
         ("통합", "no_fk", "통합_no-fk"), ("통합", "fixed_fk", "통합_raw-fk"),
-        ("독립", "no_fk", "독립_no-fk"), ("독립", "fixed_fk", "독립_raw-fk"),
+        ("sequential", "no_fk", "sequential_no-fk"),
     ):
         print(f"[{label}] leave-one-out held-out 계산 중 ({len(set_ids)}개 세트)...")
         heldout_rmse, per_set = evaluate_heldout(
@@ -184,10 +184,10 @@ def main():
             "per_set_heldout_rmse_px": per_set,
         }
 
-    print(f"\n{'condition':>14} {'heldout_rmse_px':>16} {'cross_cam_mm':>13} {'cross_cam_deg':>14} {'n_pairs':>8}")
-    for name in ("통합_raw-fk", "통합_no-fk", "독립_raw-fk", "독립_no-fk"):
+    print(f"\n{'condition':>16} {'heldout_rmse_px':>16} {'cross_cam_mm':>13} {'cross_cam_deg':>14} {'n_pairs':>8}")
+    for name in ("통합_raw-fk", "통합_no-fk", "sequential_no-fk"):
         r = results[name]
-        print(f"{name:>14} {r['heldout_cube_rmse_px']:>16.4f} {r['cross_camera_translation_mm']:>13.4f} "
+        print(f"{name:>16} {r['heldout_cube_rmse_px']:>16.4f} {r['cross_camera_translation_mm']:>13.4f} "
               f"{r['cross_camera_rotation_deg']:>14.4f} {r['n_camera_pairs']:>8d}")
 
     Path(args.out).write_text(json.dumps({"results": results}, indent=2))

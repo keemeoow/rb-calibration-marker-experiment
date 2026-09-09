@@ -231,66 +231,59 @@ def solve_unified(data, fk_mode, gtc_init, board_init):
     return final_state, diag, len(observations)
 
 
-# --------------------------------------------------------------- 독립(independent)
-def solve_independent_group_a(data, fk_mode):
-    """그룹A: 고정캠 3대, session1(grasp+FK) + session2-고정캠만."""
-    cam_init, grasp_init = data["cam_init"], data["grasp_init"]
+# --------------------------------------------------------------- 독립(sequential_frozen_stage)
+#
+# table1.py의 공식 sequential_frozen_stage(A0/A1/B1이 쓰는 것)를 그대로 옮긴 것.
+# 이전 버전은 "고정캠 먼저 풀고 그리퍼로 넘김" 순서였는데, 이건 공식 알고리즘과
+# 방향이 반대였다(실제 조사로 확인: table1.py:716-737, solve_stage 두 번 호출,
+# stage1=eih(그리퍼)만 먼저 풀고 얼린 뒤 stage2=e2h(고정캠)만 그 위에서 풂,
+# feedback_from_e2h_to_eih_variables=False로 역방향 피드백 없음이 명시돼 있음).
+#
+# stage1(그리퍼, eih): T_gripper_cam, T_base_board, T_base_cube_by_set 자유
+#   -- session2-그리퍼캠 + session3만 씀.
+# freeze: stage1 결과(gtc, board, cube_by_set)를 상수로 고정.
+# stage2(고정캠, e2h): T_base_Ci만 자유 -- session2-고정캠(+ zeus 전용 확장으로
+#   session1의 grasp+FK도 여기 e2h 쪽에 자연스럽게 포함, T_gripper_cube_by_grasp도
+#   같이 품; table1.py 원본엔 grasp 개념이 아예 없어서 이 부분만 Zeus 데이터
+#   구조에 맞춘 확장이고, stage 경계(1->2 단방향, 얼린 것 안 바뀜)는 원본 그대로).
+#
+# 공식 설계상 sequential은 no_fk(estimated) 조건에서만 존재한다(A1 vs A2가
+# "unified vs sequential" 비교; raw-fk는 A3/A5처럼 항상 unified로만 존재하고
+# sequential+raw-fk 조합 자체가 table1.py에 없음) -- 그래서 이 함수엔 fk_mode
+# 분기가 없다.
+def solve_sequential(data, gtc_init, board_init):
     K_map, D_map = data["K_map"], data["D_map"]
-    obs_s2 = data["obs_s2_fixed"]
     set_ids = sorted(data["items_by_index"])
 
-    if fk_mode == "no_fk":
-        cubes = init_cube_poses(obs_s2, K_map, D_map, cam_init, np.eye(4), {}, -999, set_ids)
-        cube_key = ["T_base_cube_by_set"]
-        observations = data["obs_s1"] + [o for o in obs_s2 if o.set_idx is not None and int(o.set_idx) in cubes]
-    else:
-        cubes = fk_anchor_cubes(data["items_by_index"], grasp_init)
-        cube_key = []
-        observations = data["obs_s1"] + obs_s2
+    # --- stage1: eih(그리퍼)만 ---
+    obs_s2g = data["obs_s2_gripper"]
+    robot_T_stage1 = {**data["robot_T_s2_gripper"], **data["robot_T_s3"]}
+    cube_init_s1 = init_cube_poses(obs_s2g, K_map, D_map, {}, gtc_init, robot_T_stage1, GRIPPER_LOCAL_ID, set_ids)
+    obs_stage1 = ([o for o in obs_s2g if o.set_idx is not None and int(o.set_idx) in cube_init_s1]
+                  + data["obs_s3"])
+    state1 = PoseState(cams={}, gtc=gtc_init.copy(), board=board_init.copy(),
+                       cubes=dict(cube_init_s1), grasps={})
+    keys1 = variable_keys(["T_gripper_cam", "T_base_board", "T_base_cube_by_set"], state1)
+    final1, diag1 = solve_corner_reprojection(
+        observations=obs_stage1, variable_keys_=keys1, reference_state=state1,
+        robot_T=robot_T_stage1, K_map=K_map, D_map=D_map,
+        gripper_cam_idx=GRIPPER_LOCAL_ID, options=SolverOptions(),
+    )
 
-    state = PoseState(cams=dict(cam_init), gtc=np.eye(4), board=None,
-                      cubes=dict(cubes), grasps={0: grasp_init.copy()})
-    keys = variable_keys(["T_base_Ci"] + cube_key + ["T_gripper_cube_by_grasp"], state)
-    final_state, diag = solve_corner_reprojection(
-        observations=observations, variable_keys_=keys, reference_state=state,
+    # --- stage2: e2h(고정캠)만, stage1 결과는 얼려서 상수로 사용 ---
+    cam_init, grasp_init = data["cam_init"], data["grasp_init"]
+    obs_s2f = data["obs_s2_fixed"]
+    obs_stage2 = (data["obs_s1"]
+                  + [o for o in obs_s2f if o.set_idx is not None and int(o.set_idx) in final1.cubes])
+    state2 = PoseState(cams=dict(cam_init), gtc=final1.gtc.copy(), board=final1.board.copy(),
+                       cubes={s: T.copy() for s, T in final1.cubes.items()}, grasps={0: grasp_init.copy()})
+    keys2 = variable_keys(["T_base_Ci", "T_gripper_cube_by_grasp"], state2)  # gtc/board/cube는 얼려서 키에서 제외
+    final2, diag2 = solve_corner_reprojection(
+        observations=obs_stage2, variable_keys_=keys2, reference_state=state2,
         robot_T=data["robot_T_s1"], K_map=K_map, D_map=D_map,
         gripper_cam_idx=-999, options=SolverOptions(),
     )
-    return final_state, diag, len(observations)
-
-
-def solve_independent_group_b(data, fk_mode, gtc_init, board_init, grasp_init):
-    """그룹B: 그리퍼캠 1대, session2-그리퍼캠 + session3만.
-
-    raw-fk 앵커는 통합(solve_unified)과 반드시 같은 상수(grasp_init, 세션1만으로
-    미리 구해둔 원래 값)를 써야 한다 -- 그룹A가 session1+session2-고정캠으로
-    다시 정제한 T_gripper_cube(state_a.grasps[0])를 여기 넣으면, 통합은 raw
-    상수를 쓰고 독립은 한 번 정제된 상수를 쓰는 셈이 되어 "raw-fk"의 정의가
-    조건마다 달라지고 비교가 불공정해진다 (실측: 두 상수가 1.08mm 차이났고,
-    이게 그대로 그리퍼 RMSE 차이로 새어나갔었다 -- 실제로 겪은 버그)."""
-    K_map, D_map = data["K_map"], data["D_map"]
-    obs_s2g = data["obs_s2_gripper"]
-    set_ids = sorted(data["items_by_index"])
-    robot_T = {**data["robot_T_s2_gripper"], **data["robot_T_s3"]}
-    observations = obs_s2g + data["obs_s3"]
-
-    if fk_mode == "no_fk":
-        cubes = init_cube_poses(obs_s2g, K_map, D_map, {}, gtc_init, robot_T, GRIPPER_LOCAL_ID, set_ids)
-        cube_key = ["T_base_cube_by_set"]
-        observations = [o for o in observations
-                        if o.set_idx is None or int(o.set_idx) in cubes]
-    else:
-        cubes = fk_anchor_cubes(data["items_by_index"], grasp_init)
-        cube_key = []
-
-    state = PoseState(cams={}, gtc=gtc_init.copy(), board=board_init.copy(), cubes=dict(cubes), grasps={})
-    keys = variable_keys(["T_gripper_cam", "T_base_board"] + cube_key, state)
-    final_state, diag = solve_corner_reprojection(
-        observations=observations, variable_keys_=keys, reference_state=state,
-        robot_T=robot_T, K_map=K_map, D_map=D_map,
-        gripper_cam_idx=GRIPPER_LOCAL_ID, options=SolverOptions(),
-    )
-    return final_state, diag, len(observations)
+    return final1, diag1, final2, diag2, obs_stage1, obs_stage2
 
 
 def per_corner_errors(state, observations, robot_T, K_map, D_map, gripper_id):
@@ -349,42 +342,43 @@ def main():
                           "n_corners": diag["n_residuals"] // 2, "n_observations": n_obs}
         export_fit_json(fit_out_dir / f"fit_{label}.json", state.grasps[0], state.cams, state.gtc)
 
-    for fk_mode, label in (("no_fk", "독립_no-fk"), ("fixed_fk", "독립_raw-fk")):
-        state_a, diag_a, n_a = solve_independent_group_a(data, fk_mode)
-        state_b, diag_b, n_b = solve_independent_group_b(data, fk_mode, gtc_init, board_init, data["grasp_init"])
-        export_fit_json(fit_out_dir / f"fit_{label}.json", state_a.grasps[0], state_a.cams, state_b.gtc)
-        errs_a = per_corner_errors(state_a, (data["obs_s1"] +
-                                             [o for o in data["obs_s2_fixed"]
-                                              if o.set_idx is None or int(o.set_idx) in state_a.cubes]),
-                                   data["robot_T_s1"], K_map, D_map, -999)
-        robot_T_b = {**data["robot_T_s2_gripper"], **data["robot_T_s3"]}
-        errs_b = per_corner_errors(state_b, ([o for o in data["obs_s2_gripper"]
-                                              if o.set_idx is None or int(o.set_idx) in state_b.cubes]
-                                             + data["obs_s3"]),
-                                   robot_T_b, K_map, D_map, GRIPPER_LOCAL_ID)
-        combined_rmse = rmse_px(errs_a + errs_b)
-        results[label] = {
-            "success": bool(diag_a["success"] and diag_b["success"]),
-            "rmse_px": combined_rmse,
-            "n_corners": (len(errs_a) + len(errs_b)) // 2,
-            "n_observations": n_a + n_b,
-            "group_a_fixed_cams_rmse_px": rmse_px(errs_a),
-            "group_b_gripper_rmse_px": rmse_px(errs_b),
-        }
+    # sequential_frozen_stage(table1.py A1의 공식 알고리즘)는 no_fk(estimated)
+    # 조건에서만 존재한다 -- raw-fk+sequential 조합은 table1.py에 없어서 안 만듦.
+    label = "sequential_no-fk (독립, table1.py A1 방식)"
+    final1, diag1, final2, diag2, obs_stage1, obs_stage2 = solve_sequential(data, gtc_init, board_init)
+    export_fit_json(fit_out_dir / "fit_sequential_no-fk.json", final2.grasps[0], final2.cams, final1.gtc)
+    errs_1 = per_corner_errors(final1, obs_stage1,
+                               {**data["robot_T_s2_gripper"], **data["robot_T_s3"]},
+                               K_map, D_map, GRIPPER_LOCAL_ID)
+    errs_2 = per_corner_errors(final2, obs_stage2, data["robot_T_s1"], K_map, D_map, -999)
+    results[label] = {
+        "success": bool(diag1["success"] and diag2["success"]),
+        "rmse_px": rmse_px(errs_1 + errs_2),
+        "n_corners": (len(errs_1) + len(errs_2)) // 2,
+        "n_observations": len(obs_stage1) + len(obs_stage2),
+        "stage1_gripper_rmse_px": rmse_px(errs_1),
+        "stage2_fixed_cams_rmse_px": rmse_px(errs_2),
+    }
 
     total_n = len(data["obs_s1"]) + len(data["obs_s2_fixed"]) + len(data["obs_s2_gripper"]) + len(data["obs_s3"])
-    print(f"{'condition':>14} {'rmse_px':>10} {'n_corners':>10} {'n_obs':>7}   detail")
-    for name in ("통합_raw-fk", "통합_no-fk", "독립_raw-fk", "독립_no-fk"):
+    print(f"{'condition':>34} {'rmse_px':>10} {'n_corners':>10} {'n_obs':>7}   detail")
+    for name in ("통합_raw-fk", "통합_no-fk", label):
         r = results[name]
         detail = ""
-        if "group_a_fixed_cams_rmse_px" in r:
-            detail = f"고정캠 {r['group_a_fixed_cams_rmse_px']:.4f} / 그리퍼 {r['group_b_gripper_rmse_px']:.4f}"
-        print(f"{name:>14} {r['rmse_px']:>10.4f} {r['n_corners']:>10d} {r['n_observations']:>7d}   {detail}")
-    print(f"\n(참고: 데이터 풀 총 observation 수 = {total_n}, 통합/독립 공통)")
+        if "stage1_gripper_rmse_px" in r:
+            detail = f"stage1(그리퍼) {r['stage1_gripper_rmse_px']:.4f} / stage2(고정캠) {r['stage2_fixed_cams_rmse_px']:.4f}"
+        print(f"{name:>34} {r['rmse_px']:>10.4f} {r['n_corners']:>10d} {r['n_observations']:>7d}   {detail}")
+    print(f"\n(참고: 데이터 풀 총 observation 수 = {total_n})")
+    print("\n주의: raw-fk(통합_raw-fk)는 table1.py A3와 이름만 같지 실제로는 다른 조건입니다 --")
+    print("A3는 비전 개입 0인 순수 기계적 상수를 쓰는데, 여긴 session1 비전 fit값(T_gripper_cube)을 씁니다.")
+    print("Zeus엔 A3에 해당하는 독립 측정된 기계적 상수가 없어서 진짜 A3 재현은 지금 불가능합니다.")
 
     out = {
-        "warning": "train-pooled, held-out 분리 없음 -- table1.py 정식 지표 아님. "
-                   "통합/독립 모두 session1+session2(고정+그리퍼)+session3 동일 데이터 사용.",
+        "warning": ("train-pooled, held-out 분리 없음 -- table1.py 정식 지표 아님. "
+                    "'sequential_no-fk'는 table1.py의 sequential_frozen_stage(A1) 알고리즘을 "
+                    "그대로 재현(stage1=그리퍼만, freeze, stage2=고정캠만). "
+                    "'통합_raw-fk'는 이름만 raw-fk고 A3의 정의(비전 개입 0)를 만족하지 않음 -- "
+                    "session1에서 비전으로 fit한 T_gripper_cube를 앵커로 쓰기 때문."),
         "total_observations": total_n,
         "results": results,
     }
