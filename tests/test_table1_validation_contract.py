@@ -64,7 +64,9 @@ def test_table1_markdown_groups_tiers_and_surfaces_data_warnings():
     assert "## Current Data Warnings" in markdown
     assert "## Final Protocol Lock" in markdown
     assert "dropped sets `0, 1, 2, 3`" in markdown
-    assert "10.8077 mm translation RMSE" in markdown
+    assert "내부 preflight 결과" in markdown
+    assert "composite rig 45-event" in markdown
+    assert "legacy Session04 내부 데이터" in markdown
     assert "## Final Comparison Table" in markdown
     assert "### 평가지표 (한글로): 설명, 평가 지표 낸 방법" in markdown
     assert "train cube 관측으로 set별 evaluation pose" in markdown
