@@ -81,6 +81,7 @@ def fit_frozen(method, data_fold, fk_mode, gtc_init, board_init):
 def evaluate_heldout(method, data, fk_mode, gtc_init, board_init, robot_T_all, K_map, D_map, set_ids):
     all_errs = []
     per_set = {}
+    per_set_mm_deg = {}
     obs_all_s2 = data["obs_s2_fixed"] + data["obs_s2_gripper"]
     grasp_init = data["grasp_init"]
     for s in set_ids:
@@ -119,7 +120,17 @@ def evaluate_heldout(method, data, fk_mode, gtc_init, board_init, robot_T_all, K
             continue
         all_errs.extend(set_errs)
         per_set[s] = rmse_px(set_errs)
-    return rmse_px(all_errs), per_set
+
+        # 실제 mm/deg 오차: 이미지만으로(그 세트 자신의 사진 + frozen 카메라)
+        # 삼각측량한 큐브 위치 vs 위의 FK 기반(비전 무관) 정답을 직접 비교.
+        cands = [camera_cube_estimate(o, cams, gtc, robot_T_all, K_map, D_map, GRIPPER_LOCAL_ID)
+                 for o in heldout_obs]
+        cands = [c for c in cands if c is not None]
+        if cands:
+            T_vision = cands[0] if len(cands) == 1 else cp.robust_se3_average(cands, None)[0]
+            d_mm, d_deg = pose_delta(T_vision, T_gt)
+            per_set_mm_deg[s] = {"translation_mm": d_mm, "rotation_deg": d_deg}
+    return rmse_px(all_errs), per_set, per_set_mm_deg
 
 
 def cross_camera_consistency(obs_all_s2, cams, gtc, robot_T_all, K_map, D_map, gripper_id):
@@ -178,8 +189,10 @@ def main():
         ("독립_true", "no_fk", "독립_no-fk"),
     ):
         print(f"[{label}] leave-one-out held-out 계산 중 ({len(set_ids)}개 세트)...")
-        heldout_rmse, per_set = evaluate_heldout(
+        heldout_rmse, per_set, per_set_mm_deg = evaluate_heldout(
             method, data, fk_mode, gtc_init, board_init, robot_T_all, K_map, D_map, set_ids)
+        heldout_mm = [v["translation_mm"] for v in per_set_mm_deg.values()]
+        heldout_deg = [v["rotation_deg"] for v in per_set_mm_deg.values()]
 
         cams_full, gtc_full = fit_frozen(method, data, fk_mode, gtc_init, board_init)
         trans_mm, rot_deg, n_pairs = cross_camera_consistency(
@@ -188,17 +201,24 @@ def main():
         results[label] = {
             "heldout_cube_rmse_px": heldout_rmse,
             "n_heldout_sets": len(per_set),
+            "heldout_translation_mean_mm": float(np.mean(heldout_mm)) if heldout_mm else float("nan"),
+            "heldout_translation_max_mm": float(np.max(heldout_mm)) if heldout_mm else float("nan"),
+            "heldout_rotation_mean_deg": float(np.mean(heldout_deg)) if heldout_deg else float("nan"),
+            "heldout_rotation_max_deg": float(np.max(heldout_deg)) if heldout_deg else float("nan"),
             "cross_camera_translation_mm": trans_mm,
             "cross_camera_rotation_deg": rot_deg,
             "n_camera_pairs": n_pairs,
             "per_set_heldout_rmse_px": per_set,
+            "per_set_heldout_mm_deg": per_set_mm_deg,
         }
 
-    print(f"\n{'condition':>16} {'heldout_rmse_px':>16} {'cross_cam_mm':>13} {'cross_cam_deg':>14} {'n_pairs':>8}")
+    print(f"\n{'condition':>16} {'heldout_px':>11} {'heldout_mm':>11} {'heldout_deg':>12} "
+          f"{'cross_cam_mm':>13} {'cross_cam_deg':>14}")
     for name in ("통합_raw-fk", "통합_no-fk", "독립_no-fk"):
         r = results[name]
-        print(f"{name:>16} {r['heldout_cube_rmse_px']:>16.4f} {r['cross_camera_translation_mm']:>13.4f} "
-              f"{r['cross_camera_rotation_deg']:>14.4f} {r['n_camera_pairs']:>8d}")
+        print(f"{name:>16} {r['heldout_cube_rmse_px']:>11.4f} "
+              f"{r['heldout_translation_mean_mm']:>11.2f} {r['heldout_rotation_mean_deg']:>12.2f} "
+              f"{r['cross_camera_translation_mm']:>13.4f} {r['cross_camera_rotation_deg']:>14.4f}")
 
     Path(args.out).write_text(json.dumps({"results": results}, indent=2))
     print(f"\nwrote {args.out}")
