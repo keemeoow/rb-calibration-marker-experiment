@@ -1,0 +1,76 @@
+{
+  "warning": "train-pooled (session1+2+3 \ud568\uaed8, \uace0\uc815\ucea03+\uadf8\ub9ac\ud37c\ucea01), held-out \ubd84\ub9ac \uc5c6\uc74c -- table1.py\uc758 \uc815\uc2dd \uc9c0\ud45c\uac00 \uc544\ub2d8. no_fk/fixed_fk \ub450 \uc870\uac74\ub07c\ub9ac \ube44\uad50\ud558\ub294 \uc6a9\ub3c4.",
+  "session1_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session1_handheld_fixed_cam",
+  "session2_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam",
+  "session3_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session3_wrist_motion_gripper_cam",
+  "fit_json_source": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/pass1_grasp_offset_replayed.json",
+  "charuco_board_config": {
+    "squares_x": 11,
+    "squares_y": 7,
+    "square_length_m": 0.025,
+    "marker_length_m": 0.018,
+    "dictionary_name": "DICT_4X4_250",
+    "marker_id_start": 5
+  },
+  "eih_init_diag": {
+    "method": "PARK",
+    "score_mm_equivalent": 11.846323822278777,
+    "n_poses": 15
+  },
+  "results": {
+    "no_fk": {
+      "success": true,
+      "train_reprojection_rmse_px": 0.9155535270892116,
+      "initial_reprojection_rmse_px": 2.5918646238963063,
+      "n_parameters": 126,
+      "n_residuals": 3276,
+      "T_gripper_cube_translation_mm": [
+        -0.644,
+        0.361,
+        161.104
+      ],
+      "T_gripper_cam_translation_mm": [
+        33.102,
+        29.103,
+        39.023
+      ],
+      "T_gripper_cam_shift_from_init_mm": 10.339483797449715,
+      "T_base_board_shift_from_init_mm": 5.284997212473904,
+      "camera_shift_from_init_mm": {
+        "0": 0.8641817928086393,
+        "1": 1.5996817902253908,
+        "2": 1.6587593556743263
+      },
+      "n_session1_obs": 42,
+      "n_session2_sets_free": 15,
+      "n_session3_obs": 15
+    },
+    "fixed_fk": {
+      "success": true,
+      "train_reprojection_rmse_px": 1.2197593498321169,
+      "initial_reprojection_rmse_px": 2.5926123945293327,
+      "n_parameters": 36,
+      "n_residuals": 3276,
+      "T_gripper_cube_translation_mm": [
+        -0.335,
+        -0.015,
+        161.225
+      ],
+      "T_gripper_cam_translation_mm": [
+        33.102,
+        29.104,
+        39.023
+      ],
+      "T_gripper_cam_shift_from_init_mm": 10.339054480552116,
+      "T_base_board_shift_from_init_mm": 5.285070961861018,
+      "camera_shift_from_init_mm": {
+        "0": 2.848856329066598,
+        "1": 1.8080576009729823,
+        "2": 3.3060713174614875
+      },
+      "n_session1_obs": 42,
+      "n_session2_obs_as_grasp": 42,
+      "n_session3_obs": 15
+    }
+  }
+}

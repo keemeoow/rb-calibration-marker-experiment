@@ -20,18 +20,23 @@ KEYS = ["e_X_mm", "e_task_mm", "e_reproj_px"]
 def _job(a):
     ci, seed, sigma, n_sets, n_events, train, splits = a
     from core.scene import SimScene
-    from core.experiment import calibrate, _splits_for_seed
+    from core.experiment import calibrate
     from core.metrics import eval_model
     cfg = CURVES[ci]
     sc = SimScene(seed=seed, n_sets=n_sets, n_events_per_set=n_events, sigma_px=sigma)
+    reproj = float(np.mean(list(sc.reproj.values()))) if sc.reproj else None
     out = {k: [] for k in KEYS}
-    for test in _splits_for_seed(sc.sets, seed, splits):
+    n = 0
+    for test in itertools.combinations(sc.sets, 2):
         tr = [s for s in sc.sets if s not in test][:train]
         m, W = calibrate(sc, cfg, tr)
         r = eval_model(sc, m, tr, list(test), W=W)
         for k in KEYS:
-            if r.get(k) is not None:
-                out[k].append(r[k])
+            if k == "e_reproj_px":
+                if reproj is not None: out[k].append(reproj)
+            elif r.get(k) is not None: out[k].append(r[k])
+        n += 1
+        if n >= splits: break
     return (ci, sigma), out
 
 

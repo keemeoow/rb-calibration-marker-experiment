@@ -7,8 +7,9 @@
 
 ## 표 1 — 시뮬 · 현실 종합 조건 (GT)
 
-*10 sets x 6 eih + gripped 40, 4 seeds. sigma0.3 + 계통2% + FK≈0 + 오검출5%.*
-*EXP6(-cube)은 e_X/reproj/cross 붕괴 → e_task 낮은 건 그리퍼예측 착시(캘리브 실패).*
+*13 sets x 11 eih + gripped 89, 16 seeds × 3 splits, 대표값=median. 실측노이즈: σ0.2 + 계통0.5% + FK≈0 + 오검출2%@2px.*
+*발산%: e_task>100mm(수렴 실패) 비율. reproj_raw: held-out 픽셀 재투영(방법별·FK무관, 논문 주지표).*
+*핵심: 통합 4방법(EXP1/3/4/7)은 task·정합 모두 동률. 차이는 통합 vs 독립(EXP2/5)·큐브유무(EXP6).*
 
 | 방법 | FK 구분 | e_task mm | e_task deg | e_X mm | **cam→base 병진 mm (bTf)** | reproj px | cross mm |
 |---|---|--:|--:|--:|--:|--:|--:|

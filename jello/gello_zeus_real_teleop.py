@@ -264,6 +264,10 @@ def parse_args() -> argparse.Namespace:
                              "0.3 정도로 줄이면 로그에서 축별 타이밍 구분이 쉬워짐")
     parser.add_argument("--dry-run", action="store_true",
                         help="실제 movej/grip 명령을 보내지 않고 로그만 출력 (첫 테스트 필수)")
+    parser.add_argument("--enable-gripper", action="store_true",
+                        help="GELLO 그리퍼 트리거로 실제 그리퍼를 제어함. 기본은 꺼져있어서 "
+                             "GELLO를 연결해도 그리퍼는 연결 당시 상태 그대로 유지되고 "
+                             "트리거를 움직여도 grip 명령이 안 나감")
     return parser.parse_args()
 
 
@@ -405,6 +409,9 @@ def control_worker(state: SharedState, args: argparse.Namespace) -> None:
         print(f"[zeus] connected to {args.robot_ip}:{args.robot_port}")
     else:
         print("[zeus] dry-run: 실제 연결 생략")
+    if not args.enable_gripper:
+        print("[bridge] 그리퍼 비활성 (기본값) - GELLO 트리거 무시, grip 명령 안 보냄. "
+              "실제 그리퍼로 잡고 싶으면 --enable-gripper")
 
     zeus_ref_joints: np.ndarray | None = None
     zeus_ref_pose6: np.ndarray | None = None
@@ -438,6 +445,21 @@ def control_worker(state: SharedState, args: argparse.Namespace) -> None:
                         print(f"[zeus] stop failed: {exc}")
 
             if enabled and not was_enabled:
+                # 레이스 컨디션 방지: 이번 루프 맨 위에서 이미 읽어둔 dq_arm은
+                # gello_reader_worker가 아직 리셋(ref_ticks 재latch)을 반영하기
+                # 전, 즉 "지난 연결 해제 직전"의 값일 수 있다. 그 상태로 새
+                # zeus_ref_joints(방금 읽은 실제 현재 위치)에 더하면 "GELLO를
+                # 안 움직였는데 로봇이 확 움직이는" 버그가 난다 - latch 순간은
+                # 정의상 델타=0이어야 하므로 강제로 0으로 덮어쓴다.
+                dq_arm = np.zeros(6)
+                grip_pct = 0.0  # 같은 이유로 그리퍼 델타도 이번 반복만 0으로 취급
+                # gello_reader_worker가 다음 자기 루프(최대 GELLO_POLL_DT 뒤)에서
+                # 리셋하기 전까지 이 스레드가 몇 번 더 돌 수도 있으므로, 공유
+                # 상태 자체도 0으로 먼저 덮어써서 그 사이 재조회에도 stale 값이
+                # 안 나가게 한다.
+                with state.lock:
+                    state.dq_arm_deg = np.zeros(6)
+                    state.grip_pct = 0.0
                 if args.dry_run:
                     zeus_ref_joints = np.zeros(6)
                     zeus_ref_pose6 = np.zeros(6)
@@ -464,7 +486,8 @@ def control_worker(state: SharedState, args: argparse.Namespace) -> None:
                               f"movej: {exc}")
                 print(f"[bridge] ZEUS 기준 관절각(deg)={np.round(zeus_ref_joints, 1)} "
                       f"gripper={gripper_state}")
-                if (grip_pct < args.grip_close_threshold_pct) != (gripper_state == "open"):
+                if args.enable_gripper and (
+                        (grip_pct < args.grip_close_threshold_pct) != (gripper_state == "open")):
                     print("[bridge] WARNING: GELLO 그리퍼 트리거가 실제 ZEUS 그리퍼 상태랑 "
                           "안 맞는 것 같음 - 다음에 GELLO 트리거를 살짝만 움직여도 즉시 "
                           "grip 명령이 나갈 수 있음 (의도한 게 아니면 트리거를 반대쪽으로 "
@@ -487,20 +510,22 @@ def control_worker(state: SharedState, args: argparse.Namespace) -> None:
                 continue
 
             dq_arm = np.clip(dq_arm, -max_delta, max_delta)
-            want_state = "open" if grip_pct < args.grip_close_threshold_pct else "close"
 
-            if want_state != gripper_state:
-                if args.dry_run:
-                    print(f"[dry-run gripper] {want_state} (grip={grip_pct:.0f}%)")
-                else:
-                    try:
-                        zeus.grip(want_state, timeout_s=args.grip_timeout)
-                    except ZeusError as exc:
-                        print(f"[zeus] grip failed: {exc}")
-                gripper_state = want_state
-                # 그리퍼 명령도 blocking이라 이번 사이클은 여기서 끝내고 다음
-                # 루프에서 최신 GELLO 목표로 관절 이동을 재개한다.
-                continue
+            if args.enable_gripper:
+                want_state = "open" if grip_pct < args.grip_close_threshold_pct else "close"
+
+                if want_state != gripper_state:
+                    if args.dry_run:
+                        print(f"[dry-run gripper] {want_state} (grip={grip_pct:.0f}%)")
+                    else:
+                        try:
+                            zeus.grip(want_state, timeout_s=args.grip_timeout)
+                        except ZeusError as exc:
+                            print(f"[zeus] grip failed: {exc}")
+                    gripper_state = want_state
+                    # 그리퍼 명령도 blocking이라 이번 사이클은 여기서 끝내고 다음
+                    # 루프에서 최신 GELLO 목표로 관절 이동을 재개한다.
+                    continue
 
             if args.control_mode == "position":
                 p_gello_mm = gello_position_delta_mm(dq_arm)  # 1~3번만 반영, 4~6번 무시
@@ -598,10 +623,15 @@ def main() -> int:
     print("연결 전 체크리스트 (UR3 GELLO 연동과 동일한 이유):")
     print("  1) GELLO 팔을 ZEUS 현재 관절 자세와 최대한 비슷하게 손으로 맞춰놓기")
     print("     (팔은 센서로 확인 불가 - 안 맞추면 연결 즉시 그 오차만큼 순간 이동 시도함)")
-    print("  2) GELLO 그리퍼 트리거도 ZEUS 그리퍼의 실제 열림/닫힘 상태와 맞춰놓기")
-    print("     (그리퍼는 연결 순간 실제 센서로 자동 보정하지만, 트리거가 반대로 맞춰져 "
-          "있으면 그 직후 살짝만 움직여도 바로 grip 명령이 나감 - WARNING 뜨면 확인)")
-    print("  3) 위 2개를 맞춘 상태에서 ENTER -> 그 순간 자세로 latch, 추종 시작")
+    if args.enable_gripper:
+        print("  2) GELLO 그리퍼 트리거도 ZEUS 그리퍼의 실제 열림/닫힘 상태와 맞춰놓기")
+        print("     (그리퍼는 연결 순간 실제 센서로 자동 보정하지만, 트리거가 반대로 맞춰져 "
+              "있으면 그 직후 살짝만 움직여도 바로 grip 명령이 나감 - WARNING 뜨면 확인)")
+        print("  3) 위 2개를 맞춘 상태에서 ENTER -> 그 순간 자세로 latch, 추종 시작")
+    else:
+        print("  2) 그리퍼는 비활성 상태(기본값) - GELLO 트리거를 움직여도 무시되고 "
+              "연결 당시 그리퍼 상태 그대로 유지됨")
+        print("  3) 위를 확인한 상태에서 ENTER -> 그 순간 자세로 latch, 추종 시작")
 
     try:
         while not state.shutdown.is_set():

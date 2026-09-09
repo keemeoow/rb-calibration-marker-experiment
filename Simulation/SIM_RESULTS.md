@@ -1,4 +1,4 @@
-# 시뮬레이션 결과 — 7방법 ablation (GT 기준)
+# 시뮬레이션 결과 — 7방법 ablation (GT 기준, real 충실 재판정)
 
 ## 목차
 
@@ -35,14 +35,38 @@
 >
 > 자세한 규약은 [README.md](README.md) 참조.
 
+> 리뷰어(real 코드 작성자)의 6개 지적을 모두 고치고, **시뮬을 실측(real) 구성에 맞춘 뒤**
+> 다시 돌린 결과다. 특히 **FK 보정을 real 파이프라인 방식(de-bias)으로 재구현**했다.
+> 대조·반영 내역은 [SIM_VS_REAL_CHECKLIST.md](SIM_VS_REAL_CHECKLIST.md), 리뷰 수정은
+> [SIM_REVIEW_FIXES.md](SIM_REVIEW_FIXES.md).
 
-실측 카메라 배치·실물 마커 기하(AprilTag 큐브 6면, ChArUco 보드 11×7, 실측 K/왜곡)를 반영한
-코너 수준 시뮬레이션. 렌더링 없이 3D 코너 → 2D 투영 → 픽셀노이즈/오검출 → solvePnP.
-**시뮬만 GT를 알기에 진짜 정확도(e_task/e_X)를 잴 수 있다** (실데이터는 FK-프록시라 순환).
+---
 
-> **약식 프로토콜**: 10 sets × 6 eih + gripped 40, 4 seeds.
-> 실제 규모(13 sets × 13 eih + gripped 130)는 **상대 순위 동일, 절대값만 개선**됨.
-> 헤드라인 표(표 1)는 최종적으로 실제 규모로 재산출 권장.
+## ⚡ 한 줄 결론
+
+1. **진짜 기여 = 통합(unified) 공동 캘리브.** 모든 카메라를 하나로 묶어 푸는 통합이 따로 푸는
+   독립(independent)보다 상대 정합(e_rel) 3~5배, 재투영 3배 정확. **멀티카메라 캘리브의 핵심.**
+2. **큐브 필수.** 보드만 쓰면(EXP6) 81% 발산. 큐브의 다면 마커가 캘리브를 안정화한다.
+3. **FK 보정(Ours)의 가치 = FK hard fixed 대비 안전.** 실측 FK 는 systematic 오차가 있는데
+   (리뷰어 확인: 180° flip + 오프셋 + 6~17mm), **FK 를 그대로 믿는 FK hard fixed 는 이때 무너지고
+   (FK 없을 때 0.96 → systematic FK 10mm 에서 2.63mm)**, **de-bias 하는 Ours 는 평평(~1.3mm)**하다.
+4. **단, Ours 는 VISION 를 이기지 못한다.** 고정 카메라 3대의 vision(~1.2mm)이 이미 FK prior(~2.6mm)보다
+   정확해 FK 가 중복이다. Ours ≈ VISION(둘 다 안전). → **"FK 를 쓸 거면 반드시 보정(Ours), 안 쓰면 VISION."**
+
+---
+
+## 🔧 real 에 맞춘 것 (SIM_VS_REAL_CHECKLIST 요약)
+
+| 항목 | 반영 |
+|---|---|
+| **FK 오차** | ≈0/random → **systematic**(상수 오정렬 + per-set 잔차, 실측 ~6.6mm). FK 있음/없음 둘 다 실험 |
+| **FK 보정 방식** | "예측을 FK 로 당김"(틀림) → **real 방식 de-bias**: `T_delta=robust_avg(inv(FK)@vision)` 로 FK 를 vision 에 정렬 후 앵커 |
+| **카메라 intrinsic** | 평균 K 1개 → **카메라별 개별 실측 K 4개** (fixed=cam0/1/3, grip=cam2) |
+| **프로토콜** | 13/130 → 실측 **11 eih/set · 89 gripped** |
+| 하향각 | 27° 유지 (물리 리그 재조정 확인) |
+| 큐브·보드 기하 | 이미 실측 정본(config.py)과 일치 |
+
+---
 
 <a id="toc-section-1"></a>
 
@@ -60,41 +84,18 @@
 
 <a id="toc-section-2"></a>
 
-## 지표 쉽게 이해하기
+- **FK 보정(corr)**: FK 를 vision 으로 **de-bias**(상수 오정렬 제거) 후 앵커 (= real `set_cube_center_prior`).
+- **FK hard fixed**: FK 를 그대로 하드 상수로 사용 (de-bias 안 함) — systematic FK 에 취약한 대조군.
 
-**상황**: 고정 카메라 몇 대가 테이블을 보고, 로봇 그리퍼에도 카메라가 하나 있고, 마커 큐브가 있습니다.
-캘리브 = "이것들이 서로 어디 있는지" 알아내는 것. 아래 지표로 **캘리브가 잘 됐는지 채점**합니다.
+## 지표
 
-**e_task — 실전 정확도 (제일 중요)**
-- 새 큐브를 테이블에 놓으면, 그 위치를 **몇 mm 오차로 맞히나.**
-- 비유: 캘리브 끝난 로봇에게 "이 물건 어디 있어?" 물었을 때 틀리는 거리.
-- 진짜 위치(GT)를 알아야 재므로 **시뮬만 가능.**
-
-**e_X — 카메라를 제자리에 세웠나**
-- 캘리브가 구한 **카메라 위치 + 그리퍼–카메라 관계**가 진짜와 **몇 mm / 몇 도** 다른가.
-- 비유: 지도에 카메라 위치를 찍었는데 진짜와 얼마나 어긋났나.
-- e_task와 차이: e_X는 "카메라를 잘 세웠나", e_task는 "그걸로 물건을 잘 찾나". 보통 같이 가지만 갈릴 수 있음. **시뮬만.**
-
-**bTf — 카메라가 로봇 base에서 몇 mm 어긋났나 (위치만)**
-- 고정 카메라 위치가 진짜와 **몇 mm** 다른가. 회전·hand-eye 빼고 **카메라 위치 오차만** 딱 떼어낸 값 (= camera→base 변환의 병진 오차).
-- e_X보다 직관적: e_X는 카메라+hand-eye+회전을 섞은 평균, bTf는 **"카메라를 몇 mm 틀리게 세웠나"** 하나만. **시뮬만.**
-
-**reproj — 사진과 앞뒤가 맞나**
-- 캘리브된 카메라로 마커를 이미지에 **다시 그렸을 때, 실제 찍힌 코너와 몇 픽셀 어긋나나.**
-- 비유: 내 계산대로면 마커가 여기 찍혀야 하는데 실제 사진은 몇 픽셀 옆.
-- **GT 없이 잴 수 있음 → 실데이터도 가능.** 단 낮다고 정확한 건 아님(내부 일관성만) — "완전 실패 걸러내기"용.
-
-**cross — 카메라들끼리 말이 맞나**
-- 서로 다른 카메라가 **같은 큐브 위치에 얼마나 동의하나** (mm).
-- 비유: 여러 사람이 "저 공 어디?" 답했을 때 답들이 얼마나 흩어지나. **실데이터도 가능.**
-
-| 지표 | 한 줄 | 낮을수록 | 실데이터서 잴 수 있나 |
-|---|---|---|---|
-| **e_task** | 새 물건 위치 맞히기 | 좋음 | ✗ (시뮬 GT만) |
-| **e_X** | 카메라+hand-eye 정확도 | 좋음 | ✗ (시뮬 GT만) |
-| **bTf** | 카메라 위치 오차 (mm, 병진만) | 좋음 | ✗ (시뮬 GT만) |
-| reproj | 사진과 앞뒤 맞기 | 좋음 | ✅ |
-| cross | 카메라들끼리 일치 | 좋음 | ✅ |
+| 지표 | 뜻 | 실데이터서 측정 |
+|---|---|---|
+| **e_task** | 새 큐브 위치 예측 오차 (mm) — 실전 정확도 | ✗ (시뮬 GT) |
+| **e_X** | 카메라+hand-eye 절대 오차 (mm) | ✗ |
+| **e_rel** | 카메라 상대 정합 (mm, gauge 불변) — 3D 정합 | ✗ |
+| **reproj_raw** | held-out 픽셀 재투영 (px) — FK 무관 | ✅ |
+| **발산%** | e_task>100mm(수렴 실패) 비율 | — |
 
 ---
 
@@ -113,12 +114,12 @@
 
 <a id="toc-section-4"></a>
 
-## 📊 그림 B — 승자맵 (FK 오차=0 고정; 계통·오검출을 변화)
+- **FK hard fixed 만 우상향**(0.96→2.63). Ours·VISION 는 평평 → **보정이 systematic FK 를 잡는다**.
+- Ours 가 VISION 를 못 이기는 건, 고정 카메라 vision 이 이미 FK 보다 정확해 FK 가 중복이기 때문.
 
-![그림 B](results/figures/fig_paperB_heatmap.png)
+## 📊 그림 A2 — 상대 정합(e_rel) vs 노이즈 ⭐ 핵심 기여
 
-**읽는 법**: FK는 정확하다고 가정(FK오차=0 고정). 그 상태에서 두 노이즈를 축으로 바꿈 —
-**가로축=계통노이즈(0→3%)**, **세로축=오검출(0→20%)**. 각 칸=그 조건에서 e_task 최저 방법.
+![그림 A2](results/figures/fig_paperA2_rel.png)
 
 - **맨 아래 행(오검출 0%)** → FK hard fixed 경쟁력
 - **위로 갈수록(오검출 ≥5%, 현실)** → 전 계통 레벨에서 **Ours 압도** (격차 +3~11mm)
@@ -130,7 +131,12 @@
 
 ## 📋 표 1 — 현실 종합 조건 (헤드라인)
 
-*조건: σ0.3 + 계통2% + FK≈0 + 오검출5%. 낮을수록 좋음.*
+1. **통합 ≫ 독립** (견고). 정합·재투영에서 3~5배. 멀티카메라의 존재 이유.
+2. **큐브 필수** (EXP6 81% 발산). 보드는 정합에 기여 안 함(EXP3 큐브만 ≥ EXP1).
+3. **FK 보정(de-bias)의 가치 = FK hard fixed 구제.** 실측 systematic FK 에서 FK hard fixed 는 무너지고
+   Ours 는 평평. "FK 를 쓸 거면 raw(FK hard fixed) 말고 de-bias(Ours)."
+4. **Ours 는 VISION 를 이기지 못함** (이 셋업에선). 고정 카메라 vision(~1.2mm) > FK prior(~2.6mm)라
+   FK 가 중복. set 을 줄여도 마찬가지. → **VISION 도 똑같이 안전**하고 더 단순.
 
 | 방법 | e_task mm | e_task ° | e_X mm | cam→base 병진 (bTf) | reproj px | cross mm |
 |---|--:|--:|--:|--:|--:|--:|
@@ -142,17 +148,12 @@
 | EXP6 VISION−큐브 | ~~6.51~~ | 13.30 | 447.4 ⚠️ | 591.7 ⚠️ | 387.2 ⚠️ | 307.2 |
 | EXP7 FK hard fixed | 26.55 | 6.66 | 71.15 | 80.81 | **17.03** | 97.67 |
 
-**bTf(카메라 위치 오차)는 e_task와 순위가 반대**: **−통합(independent)이 40mm로 최고**, Ours는 80mm.
-- 이유: independent는 각 카메라를 **FK 큐브에 직접 등록** → FK가 정확(FK≈0)하니 **카메라 절대위치가 GT에 딱 묶임**.
-  Ours(unified)는 soft anchor로 느슨히 묶어 **카메라 무리 전체가 절대위치로는 ~80mm 떠 있음**(내부 일관성·task는 최고).
-- → **"카메라 절대위치 세우기"는 independent, "새 물건 맞히기(e_task)"는 Ours.** 목적에 맞는 지표를 봐야 함.
-- (절대값 80mm은 약식 프로토콜 탓 — 실제 규모면 낮아짐. 상대 순위가 요점.)
+- **고정 카메라 3대가 vision 을 강하게** 만들어 FK 를 중복화한다. 고정 카메라가 적거나(1~2대)
+  없으면(순수 eye-in-hand) FK 의 가치가 커질 수 있다 — **미검증(다음 실험 후보: 카메라 수 sweep)**.
+- 실측 vision(~2mm) ≈ FK(~3mm) 이라 real 에선 FK 가 시뮬보다 조금 더 유용할 수 있다.
+- 최종 판정은 실데이터 몫. reproj_raw(FK 무관)로 real 과 직접 대조 가능.
 
-**⚠️ EXP6(−큐브) 함정**: e_task만 보면 EXP6이 6.51로 7방법 중 **최저 → "보드만 써도 최고"로
-착각하기 쉬움**. 하지만 같은 행의 **e_X=447mm, reproj=387px = 카메라 캘리브 완전 실패**.
-e_task가 낮은 건, 고정 카메라가 망가져도 **그리퍼 카메라(로봇 자세로 위치를 앎)가 큐브를
-대신 예측**한 탓일 뿐. → **진짜 결론: 보드만으론 카메라 캘리브 실패 = 큐브가 필요하다.**
-(한 지표만 보면 안 되는 이유 — e_X까지 봐야 실패가 드러남.)
+## 📌 논문 프레이밍 제안
 
 **방법론 포인트**: reproj는 FK hard fixed(17.0)도 Ours(17.1)급인데 e_task는 2배 차(26.6 vs 12.1).
 → **reproj만으론 방법을 못 가린다. 실전 지표(e_task/태스크)가 필요.**
@@ -213,18 +214,10 @@ e_task가 낮은 건, 고정 카메라가 망가져도 **그리퍼 카메라(로
 
 ## 재현
 
-저장소 루트(`rb-calibration-marker-experiment/`)에서:
-
 ```bash
-cd rb-calibration-marker-experiment/Simulation
-
-python run_paper_sim.py --seeds 4 --gripped 40    # 표1·1b·그림A·B 데이터
-python viz_paper_sim.py                            # 그림·표 렌더 (results/figures, results/tables)
-python run_sets_sweep.py --seeds 20                # 촬영 셋 증가 실험
-python viz_sets_sweep.py                           # 셋 증가 그림
-
-python viz_scene_paper.py                          # 시뮬 씬 그림 (fig_sim_scene_paper)
+cd Simulation
+OMP_NUM_THREADS=1 python run_paper_sim.py --seeds 16 --splits 3 --workers 32  # 표·그림 데이터
+python viz_paper_sim.py                                                        # 그림 A/A2/A3/B + 표
+OMP_NUM_THREADS=1 python run_sets_sweep.py --seeds 24 --workers 16             # 학습 set 수 sweep
 ```
-
-출력: `Simulation/results/figures/*.png`, `Simulation/results/tables/*.{json,md}`.
-환경: conda `rb-calib` (numpy, scipy, opencv-python, matplotlib).
+환경: conda `rb-calib` (numpy, scipy, opencv-python, matplotlib). 단일 스레드 권장(워커 경쟁 방지).

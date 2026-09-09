@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xelatex -interaction=nonstopmode -halt-on-error calibration_1_11.tex)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(xelatex -interaction=nonstopmode calibration_1_11.tex)"
+    ]
+  }
+}

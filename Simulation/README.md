@@ -23,8 +23,7 @@
 
 ## 8개 실험 (확정 리스트)
 
-기본 = **EXP1 (Ours)** = 통합 BA + 큐브+보드 + **공분산 가중 robust corrected-FK soft factor**.
-여기서 하나씩 제거:
+기본 = **EXP1 (Ours)** = Step3형 FK prior 보정 + 통합 캘리브 + 큐브+보드. 여기서 하나씩 제거:
 
 | # | FK | 캘리브 | 마커 | 의미 |
 |---|---|---|---|---|
@@ -49,13 +48,24 @@
 - `corr`는 VISION으로 캘리브레이션한 뒤 예측 **위치만** [1,x,y] Ridge로 후보정하는 corrected-FK의 구 비교군이다.
   회전을 보정하지 않아 "3D pose calibration" 으로 설명하기 어렵다.
 
-### 공정성 규약 (모든 방법에 동일 적용)
-1. **초기화**: `_bootstrap_visual` 하나만 사용 — GT(`bTo`/`bTboard`)도 FK 도 쓰지 않고
-   모션 기반 핸드아이(Park) + 로봇 자세만으로 구성. base gauge 는 로봇 자세가 제공한다.
-2. **솔버**: 모든 잔차를 sigma 로 whitening 한 뒤 동일한 Huber loss·동일 solver(trf)로 푼다.
-3. **프론트엔드**: robust PnP(trimming)는 씬이 한 번만 돌려 모든 방법이 **같은 pose·같은
-   인라이어 코너 집합**을 공유한다. 특정 방법만 강건해지는 일이 없다.
-4. **관측이 없는 카메라는 미지수에서 제외** → N_reg 가 정직해진다.
+`[1,x,y]` Ridge는 corr의 일부가 아니다. C1 실데이터의 **출력 post-correction**을 재현할 때만
+`ExpConfig(post_correction="ridge")`로 별도 활성화한다. 실데이터에서 이 지표는 외부 물리 GT가
+아닌 FK proxy 일치도이며, 절대 물리 정확도를 뜻하지 않는다.
+
+### 전체 조건 실행
+
+유효한 `통합/독립 × 보드/큐브/둘 다 × VISION/FK hard fixed/corr` 14개 조합은 다음으로 실행한다.
+
+```bash
+python run_factorial.py --seeds 20 --splits 3 \
+  --dump results/tables/factorial.json
+
+# 실제형 systematic FK 오차와 관측 이상치를 함께 주는 예
+python run_factorial.py --seeds 20 --splits 3 \
+  --fk_sys_mm 10 --fk_sys_deg 5 --outlier_rate 0.02
+```
+
+보드만 조건에는 큐브 FK prior가 존재하지 않으므로 `fixed/corr` 조합을 만들지 않는다.
 
 ---
 
@@ -87,15 +97,11 @@ python run_all.py --seeds 20 --dump results/tables/table2a.json
 
 | 지표 | 뜻 | 비고 |
 |---|---|---|
-| **N_reg** | 등록된 고정 카메라 수 | 커버리지. **이 값이 다르면 bTf/e_X 직접 비교 금지** |
-| **bTf** (mm/°) | 고정 카메라 외부파라미터 GT 대비 오차 | GT 기반 |
-| **gTc** (mm/°) | 핸드아이 GT 대비 오차 | GT 기반 |
-| **e_task** (mm/°) | held-out 큐브 pose 예측 오차 | 실전 성능. p95 도 함께 봄 |
-| **e_cross** (mm) | 카메라 간 큐브위치 일관성 | GT-free |
-| **reproj_test** (px) | **held-out set 의 원본 2D 코너 재투영 RMS** | GT-free. **헤드라인** |
-| **reproj_train** (px) | train set 재투영 RMS | 과적합 진단 |
-| reproj_fail_rate | 재투영이 CAP(800px)에 걸린 비율 | 발산 은폐 방지 |
-| e_reproj_gt (px) | GT 타깃 pose 기준 재투영 | 진단용 |
+| **N_reg** | 등록된 고정 카메라 수 | |
+| **e_X** (mm/°) | 변환행렬(bTf + gTc) GT 대비 오차 | **시뮬 핵심** |
+| **e_task** (mm/°) | held-out 큐브 pose 예측 오차 | 실전 성능 |
+| **e_cross** (mm) | 카메라 간 큐브위치 일관성 | |
+| **e_reproj** (px) | 재투영 오차 | **corner-level 필요(미구현)** |
 
 `e_X`(bTf 와 gTc 의 평균)는 해석이 모호하므로 **bTf 와 gTc 를 분리해 보고**한다.
 
@@ -158,14 +164,7 @@ Simulation/
 
 ## 알려진 한계 (논문에 명시할 것)
 
-- **실물 기하 근사**: 큐브 반변을 옆면 마커 51mm 의 절반(25.5mm)으로 두지만 실물은 약
-  29.5mm 이고, 윗면 두 마커의 중심 오프셋도 반영돼 있지 않다. intrinsic 은 4대 평균
-  하나를 공유하고 카메라 하향각은 27°로 강제한다. → 현재 모델은 "실측 셋업을 그대로
-  옮긴 digital twin" 이 아니라 **실측값 일부를 반영한 합성 장면**으로 기술해야 한다.
-- **단일면 큐브 관측의 평면 모호성**: 마커 1개(4코너)만 보이는 프레임은 PnP 가 뒤집힐 수
-  있다(이상치 주입 시 p95 가 150° 근처). robust 프론트엔드가 모든 방법에 동일하게
-  적용되므로 비교는 공정하지만, 절대 성능의 상한을 제약한다.
-- **e_task 는 GT 기반**이므로 실데이터로 그대로 옮길 수 없다. 실데이터에서는
-  reproj_test / e_cross 만 대응되고, 절대 정확도는 **독립 물리 GT** 가 있어야 한다.
+- **corner-level 시뮬** → `e_reproj(px)`, Fig A(코너 노이즈 σ px). 현재는 pose-level.
+- **Fig A / Fig B / Table 2b** 러너 (scene 은 fk_noise 지원하므로 Fig B 는 바로 확장 가능).
 
 실데이터 backend와의 통합 계획: [MIGRATION_PLAN.md](MIGRATION_PLAN.md).

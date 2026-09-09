@@ -1,0 +1,10 @@
+# LaTeX 중간 산출물
+*.aux
+*.log
+*.nav
+*.out
+*.snm
+*.toc
+*.vrb
+*.fls
+*.fdb_latexmk

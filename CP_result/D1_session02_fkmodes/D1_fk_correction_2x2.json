@@ -1,0 +1,4482 @@
+{
+  "experiment": "D1_fk_fixed_x_residual_correction_2x2",
+  "primary_metric": "heldout_position_error_mm",
+  "primary_metric_label": "FK-proxy",
+  "external_ground_truth_available": false,
+  "split": {
+    "strategy": "leave_one_cube_position_out",
+    "role": "external_GT_or_explicit_FK_proxy_only",
+    "eligible_positions": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "dropped_positions": {},
+    "requested_folds": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ]
+  },
+  "arm_specs": [
+    {
+      "key": "A3",
+      "row": "A3",
+      "anchor_lambda": null,
+      "label": "FK-fixed (hard)"
+    },
+    {
+      "key": "A2",
+      "row": "A2",
+      "anchor_lambda": 0.0,
+      "label": "vision-estimated (no anchor)"
+    }
+  ],
+  "arms": {
+    "A3": "cube+board, unified, T_base_cube_by_set frozen to train-only aligned FK",
+    "A2": "cube+board, unified, T_base_cube_by_set free (vision-estimated)",
+    "A2@lam*": "same as A2 plus a soft FK anchor on the cube pose; the anchor residual is the cube probe-point displacement in mm, so lambda has units px/mm"
+  },
+  "anchor_lever_mm": 29.5,
+  "anchor_lambdas_px_per_mm": [
+    0.0
+  ],
+  "corrections": {
+    "none": 0,
+    "offset": 3,
+    "se3": 6,
+    "ridge": 9
+  },
+  "correction_protocol": "learned from training positions after the fit is frozen; applied only to the held-out position's predicted centre",
+  "prediction_mask": {
+    "artifact_schema": "set_level_cube_centre_prediction_mask_v1",
+    "selection_basis": "measurement_only_PnP_validity_before_model_fit",
+    "model_output_used_for_selection": false,
+    "gripper_camera_id": 2,
+    "set_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "observation_ids_by_set": {
+      "0": [
+        "cube:event=0:set=0:cam=0",
+        "cube:event=0:set=0:cam=1",
+        "cube:event=0:set=0:cam=2",
+        "cube:event=0:set=0:cam=3",
+        "cube:event=1:set=0:cam=2",
+        "cube:event=2:set=0:cam=2",
+        "cube:event=3:set=0:cam=2",
+        "cube:event=4:set=0:cam=2"
+      ],
+      "1": [
+        "cube:event=10:set=1:cam=2",
+        "cube:event=5:set=1:cam=0",
+        "cube:event=5:set=1:cam=1",
+        "cube:event=5:set=1:cam=2",
+        "cube:event=5:set=1:cam=3",
+        "cube:event=6:set=1:cam=2",
+        "cube:event=7:set=1:cam=2",
+        "cube:event=8:set=1:cam=2",
+        "cube:event=9:set=1:cam=2"
+      ],
+      "2": [
+        "cube:event=11:set=2:cam=0",
+        "cube:event=11:set=2:cam=1",
+        "cube:event=11:set=2:cam=2",
+        "cube:event=11:set=2:cam=3",
+        "cube:event=12:set=2:cam=2",
+        "cube:event=13:set=2:cam=2",
+        "cube:event=14:set=2:cam=2",
+        "cube:event=15:set=2:cam=2",
+        "cube:event=16:set=2:cam=2"
+      ],
+      "3": [
+        "cube:event=17:set=3:cam=0",
+        "cube:event=17:set=3:cam=1",
+        "cube:event=17:set=3:cam=2",
+        "cube:event=17:set=3:cam=3",
+        "cube:event=18:set=3:cam=2",
+        "cube:event=19:set=3:cam=2",
+        "cube:event=20:set=3:cam=2",
+        "cube:event=21:set=3:cam=2",
+        "cube:event=22:set=3:cam=2"
+      ],
+      "4": [
+        "cube:event=23:set=4:cam=0",
+        "cube:event=23:set=4:cam=1",
+        "cube:event=23:set=4:cam=2",
+        "cube:event=23:set=4:cam=3",
+        "cube:event=24:set=4:cam=2",
+        "cube:event=25:set=4:cam=2",
+        "cube:event=26:set=4:cam=2",
+        "cube:event=27:set=4:cam=2",
+        "cube:event=28:set=4:cam=2"
+      ],
+      "5": [
+        "cube:event=29:set=5:cam=0",
+        "cube:event=29:set=5:cam=1",
+        "cube:event=29:set=5:cam=2",
+        "cube:event=29:set=5:cam=3",
+        "cube:event=30:set=5:cam=2",
+        "cube:event=31:set=5:cam=2",
+        "cube:event=32:set=5:cam=2",
+        "cube:event=33:set=5:cam=2",
+        "cube:event=34:set=5:cam=2"
+      ],
+      "6": [
+        "cube:event=35:set=6:cam=0",
+        "cube:event=35:set=6:cam=1",
+        "cube:event=35:set=6:cam=2",
+        "cube:event=35:set=6:cam=3",
+        "cube:event=36:set=6:cam=2",
+        "cube:event=37:set=6:cam=2",
+        "cube:event=38:set=6:cam=2",
+        "cube:event=39:set=6:cam=2",
+        "cube:event=40:set=6:cam=2"
+      ],
+      "7": [
+        "cube:event=41:set=7:cam=0",
+        "cube:event=41:set=7:cam=1",
+        "cube:event=41:set=7:cam=2",
+        "cube:event=41:set=7:cam=3",
+        "cube:event=42:set=7:cam=2",
+        "cube:event=43:set=7:cam=2",
+        "cube:event=44:set=7:cam=2",
+        "cube:event=45:set=7:cam=2",
+        "cube:event=46:set=7:cam=2"
+      ],
+      "8": [
+        "cube:event=47:set=8:cam=0",
+        "cube:event=47:set=8:cam=1",
+        "cube:event=47:set=8:cam=2",
+        "cube:event=47:set=8:cam=3",
+        "cube:event=48:set=8:cam=2",
+        "cube:event=49:set=8:cam=2",
+        "cube:event=50:set=8:cam=2",
+        "cube:event=51:set=8:cam=2",
+        "cube:event=52:set=8:cam=2"
+      ],
+      "9": [
+        "cube:event=53:set=9:cam=0",
+        "cube:event=53:set=9:cam=1",
+        "cube:event=53:set=9:cam=2",
+        "cube:event=53:set=9:cam=3",
+        "cube:event=54:set=9:cam=2",
+        "cube:event=55:set=9:cam=2",
+        "cube:event=56:set=9:cam=2",
+        "cube:event=57:set=9:cam=2",
+        "cube:event=58:set=9:cam=2"
+      ],
+      "10": [
+        "cube:event=59:set=10:cam=0",
+        "cube:event=59:set=10:cam=1",
+        "cube:event=59:set=10:cam=2",
+        "cube:event=59:set=10:cam=3",
+        "cube:event=60:set=10:cam=2",
+        "cube:event=61:set=10:cam=2",
+        "cube:event=62:set=10:cam=2",
+        "cube:event=63:set=10:cam=2",
+        "cube:event=64:set=10:cam=2"
+      ],
+      "11": [
+        "cube:event=65:set=11:cam=0",
+        "cube:event=65:set=11:cam=1",
+        "cube:event=65:set=11:cam=2",
+        "cube:event=65:set=11:cam=3",
+        "cube:event=66:set=11:cam=2",
+        "cube:event=67:set=11:cam=2",
+        "cube:event=68:set=11:cam=2",
+        "cube:event=69:set=11:cam=2",
+        "cube:event=70:set=11:cam=2"
+      ],
+      "12": [
+        "cube:event=71:set=12:cam=0",
+        "cube:event=71:set=12:cam=1",
+        "cube:event=71:set=12:cam=2",
+        "cube:event=71:set=12:cam=3",
+        "cube:event=72:set=12:cam=2",
+        "cube:event=73:set=12:cam=2",
+        "cube:event=74:set=12:cam=2",
+        "cube:event=75:set=12:cam=2",
+        "cube:event=76:set=12:cam=2"
+      ]
+    },
+    "pnp_invalid_observation_ids": [],
+    "aggregation": "per_axis_median_of_base_frame_cube_centres",
+    "prediction_mask_sha256": "589d5b342393f3e8d54e9326a4b03c0cfff7ed24c4acce2cf79734f647000946"
+  },
+  "cube_config_source": "config_py:CubeConfig",
+  "cube_detection": "",
+  "solver_options": {
+    "method": "trf",
+    "loss": "soft_l1",
+    "f_scale_px": 2.0,
+    "max_nfev": 300,
+    "xtol": 1e-08,
+    "ftol": 1e-08,
+    "gtol": 1e-08,
+    "parameterization": "left_local_SE3_perturbation_with_retraction",
+    "rotation_scale_rad": 1.0,
+    "translation_scale_m": 1.0,
+    "scipy_x_scale": "jac"
+  },
+  "ridge_lambda": 0.001,
+  "robot_pos_scale": 1.0,
+  "control_invariance": {
+    "statement": "The residual correction is applied to the predicted cube centre after the fit is frozen.  It never modifies T_base_Ci or T_gripper_cam, so control_heldout_reprojection_fk_pose_px and control_heldout_e_cross_translation_mm are identical for every correction state of a given arm.",
+    "verified_by_construction": true,
+    "consequence": "A correction can never be reported as a reprojection improvement. Any claim built on this experiment is a claim about held-out position agreement with the FK proxy only."
+  },
+  "summary": {
+    "n_folds_total": 13,
+    "n_folds_usable": 13,
+    "excluded_folds": [],
+    "arm_keys": [
+      "A3",
+      "A2"
+    ],
+    "cells": {
+      "A3:none": {
+        "arm": "A3",
+        "correction": "none",
+        "n_folds": 13,
+        "rmse_mm": 4.374711090002472,
+        "mean_mm": 4.025943439648541,
+        "std_mm": 1.7116882139401093,
+        "median_mm": 3.749172567062496,
+        "max_mm": 7.431770597555391
+      },
+      "A3:offset": {
+        "arm": "A3",
+        "correction": "offset",
+        "n_folds": 13,
+        "rmse_mm": 3.954524907039624,
+        "mean_mm": 3.7073911261128205,
+        "std_mm": 1.3760516990348353,
+        "median_mm": 3.975074583829971,
+        "max_mm": 5.564887345157038
+      },
+      "A3:se3": {
+        "arm": "A3",
+        "correction": "se3",
+        "n_folds": 13,
+        "rmse_mm": 3.534556007295773,
+        "mean_mm": 3.3518438035430123,
+        "std_mm": 1.1217081997386622,
+        "median_mm": 3.3991634849159458,
+        "max_mm": 5.523674569518687
+      },
+      "A3:ridge": {
+        "arm": "A3",
+        "correction": "ridge",
+        "n_folds": 13,
+        "rmse_mm": 3.2493670689798497,
+        "mean_mm": 3.097046270587683,
+        "std_mm": 0.9832043260734888,
+        "median_mm": 3.0292166758297285,
+        "max_mm": 5.167487549730633
+      },
+      "A2:none": {
+        "arm": "A2",
+        "correction": "none",
+        "n_folds": 13,
+        "rmse_mm": 5.0788150804081855,
+        "mean_mm": 4.512803099913043,
+        "std_mm": 2.3300151935978515,
+        "median_mm": 3.769047757327968,
+        "max_mm": 9.633729761402122
+      },
+      "A2:offset": {
+        "arm": "A2",
+        "correction": "offset",
+        "n_folds": 13,
+        "rmse_mm": 4.731402310457954,
+        "mean_mm": 4.403334720030413,
+        "std_mm": 1.731130025960369,
+        "median_mm": 4.531064300187187,
+        "max_mm": 7.697673805284385
+      },
+      "A2:se3": {
+        "arm": "A2",
+        "correction": "se3",
+        "n_folds": 13,
+        "rmse_mm": 3.8039082910154947,
+        "mean_mm": 3.533663151698293,
+        "std_mm": 1.408170095118522,
+        "median_mm": 3.542749866384027,
+        "max_mm": 6.352965785091023
+      },
+      "A2:ridge": {
+        "arm": "A2",
+        "correction": "ridge",
+        "n_folds": 13,
+        "rmse_mm": 3.3989658476045475,
+        "mean_mm": 3.226627680040401,
+        "std_mm": 1.0685703755856202,
+        "median_mm": 3.1054086972852444,
+        "max_mm": 4.747562097220999
+      }
+    },
+    "controls": {
+      "A3:reprojection_fk_pose_px": {
+        "arm": "A3",
+        "metric": "reprojection_fk_pose_px",
+        "n_folds": 13,
+        "rmse": 9.641977901593139,
+        "mean": 7.273898205954712,
+        "std": 6.329150238714458
+      },
+      "A3:e_cross_translation_mm": {
+        "arm": "A3",
+        "metric": "e_cross_translation_mm",
+        "n_folds": 13,
+        "rmse": 20.358255070994016,
+        "mean": 19.30711931685927,
+        "std": 6.457065372149572
+      },
+      "A2:reprojection_fk_pose_px": {
+        "arm": "A2",
+        "metric": "reprojection_fk_pose_px",
+        "n_folds": 13,
+        "rmse": 10.084997669522142,
+        "mean": 7.692116637268002,
+        "std": 6.522156057082033
+      },
+      "A2:e_cross_translation_mm": {
+        "arm": "A2",
+        "metric": "e_cross_translation_mm",
+        "n_folds": 13,
+        "rmse": 18.875342984468126,
+        "mean": 17.792683139847007,
+        "std": 6.30071420287527
+      }
+    },
+    "conditioning": {
+      "A3": {
+        "n_params": 30,
+        "jacobian_condition_mean": 139.88236808330834,
+        "nfev_mean": 20.76923076923077,
+        "anchor_rms_cube_displacement_mm_mean": null
+      },
+      "A2": {
+        "n_params": 102,
+        "jacobian_condition_mean": 523.0664310151564,
+        "nfev_mean": 150.3846153846154,
+        "anchor_rms_cube_displacement_mm_mean": null
+      }
+    },
+    "claims": {
+      "A3_minus_A2_at_none": {
+        "definition": "A3 \u2212 A2; negative means A3 better",
+        "n_folds": 13,
+        "mean_mm": -0.48685966026450167,
+        "std_mm": 0.8735260589010705,
+        "se_mm": 0.252165252625343,
+        "t": -1.9307166835862917,
+        "folds_negative": 10
+      },
+      "A3_minus_A2_at_offset": {
+        "definition": "A3 \u2212 A2; negative means A3 better",
+        "n_folds": 13,
+        "mean_mm": -0.6959435939175921,
+        "std_mm": 0.7285339551340829,
+        "se_mm": 0.21030963755522278,
+        "t": -3.309137907362197,
+        "folds_negative": 11
+      },
+      "A3_minus_A2_at_se3": {
+        "definition": "A3 \u2212 A2; negative means A3 better",
+        "n_folds": 13,
+        "mean_mm": -0.18181934815528097,
+        "std_mm": 0.7316770908661571,
+        "se_mm": 0.21121698268572903,
+        "t": -0.8608178463841188,
+        "folds_negative": 9
+      },
+      "A3_minus_A2_at_ridge": {
+        "definition": "A3 \u2212 A2; negative means A3 better",
+        "n_folds": 13,
+        "mean_mm": -0.12958140945271873,
+        "std_mm": 0.5695157294934866,
+        "se_mm": 0.1644050298653953,
+        "t": -0.7881839719795192,
+        "folds_negative": 8
+      },
+      "A3_gain_offset": {
+        "definition": "offset \u2212 none within A3; negative means the correction helped",
+        "n_folds": 13,
+        "mean_mm": -0.31855231353572044,
+        "std_mm": 1.211361936445808,
+        "se_mm": 0.3496900700465267,
+        "t": -0.91095613179218,
+        "folds_negative": 8
+      },
+      "A3_gain_se3": {
+        "definition": "se3 \u2212 none within A3; negative means the correction helped",
+        "n_folds": 13,
+        "mean_mm": -0.6740996361055293,
+        "std_mm": 1.4301332272466947,
+        "se_mm": 0.4128439018639537,
+        "t": -1.6328196518394218,
+        "folds_negative": 8
+      },
+      "A3_gain_ridge": {
+        "definition": "ridge \u2212 none within A3; negative means the correction helped",
+        "n_folds": 13,
+        "mean_mm": -0.9288971690608585,
+        "std_mm": 1.7523175887859845,
+        "se_mm": 0.5058505157956521,
+        "t": -1.8363076443636643,
+        "folds_negative": 9
+      },
+      "A2_gain_offset": {
+        "definition": "offset \u2212 none within A2; negative means the correction helped",
+        "n_folds": 13,
+        "mean_mm": -0.10946837988263006,
+        "std_mm": 1.458014196979467,
+        "se_mm": 0.4208924445541957,
+        "t": -0.2600863505605991,
+        "folds_negative": 6
+      },
+      "A2_gain_se3": {
+        "definition": "se3 \u2212 none within A2; negative means the correction helped",
+        "n_folds": 13,
+        "mean_mm": -0.9791399482147496,
+        "std_mm": 2.0828782985359062,
+        "se_mm": 0.6012751731744677,
+        "t": -1.6284390107865632,
+        "folds_negative": 9
+      },
+      "A2_gain_ridge": {
+        "definition": "ridge \u2212 none within A2; negative means the correction helped",
+        "n_folds": 13,
+        "mean_mm": -1.2861754198726414,
+        "std_mm": 2.406464021537812,
+        "se_mm": 0.6946863253150026,
+        "t": -1.8514477297209362,
+        "folds_negative": 8
+      },
+      "best_cells_by_rmse": [
+        {
+          "arm": "A3",
+          "correction": "ridge",
+          "rmse_mm": 3.2493670689798497
+        },
+        {
+          "arm": "A2",
+          "correction": "ridge",
+          "rmse_mm": 3.3989658476045475
+        },
+        {
+          "arm": "A3",
+          "correction": "se3",
+          "rmse_mm": 3.534556007295773
+        },
+        {
+          "arm": "A2",
+          "correction": "se3",
+          "rmse_mm": 3.8039082910154947
+        },
+        {
+          "arm": "A3",
+          "correction": "offset",
+          "rmse_mm": 3.954524907039624
+        }
+      ],
+      "best_A3_ridge_vs_A2_same_correction": {
+        "definition": "A3 \u2212 A2 at correction ridge; negative means the best cell wins",
+        "n_folds": 13,
+        "mean_mm": -0.12958140945271873,
+        "std_mm": 0.5695157294934866,
+        "se_mm": 0.1644050298653953,
+        "t": -0.7881839719795192,
+        "folds_negative": 8
+      }
+    }
+  },
+  "folds": [
+    {
+      "held_out_set": 0,
+      "train_sets": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "fk_artifact_sha256": "f7aeba07a541920adce5055018e9fc761dc8f44148be2d44d45975accb0f3bd8",
+      "handeye_initialization": {
+        "method": "PARK",
+        "score_mm_equivalent": 9.446572149324284,
+        "n_poses": 72
+      },
+      "reference_centre_m": [
+        -0.09850271203484648,
+        0.2879232980281075,
+        0.010771952018569814
+      ],
+      "arms": {
+        "A3": {
+          "row": "A3",
+          "label": "FK-fixed (hard)",
+          "anchor_lambda": null,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 27,
+            "cost": 115189.53228284742,
+            "train_reprojection_rmse_px": 14.78391326487753,
+            "elapsed_s": 7.065705255023204,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13432,
+              30
+            ],
+            "rank": 30,
+            "n_params": 30,
+            "nullity": 0,
+            "rank_tolerance": 3.2957334463213546e-07,
+            "largest_singular_value": 110502.2626620409,
+            "smallest_identifiable_singular_value": 712.0916414540899,
+            "jacobian_condition_number": 155.17983392754826,
+            "gauss_newton_hessian_condition_number": 24080.780857781458,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 215,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 2.2128827012642054,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.235258002341926,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 1.5266532982518777,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.6010904835873756,
+              "parameters": [
+                -0.0015860892086569597,
+                -0.0003364127951637069,
+                0.001529936315292171
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 2.336950591345219,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.957593451760899,
+              "parameters": [
+                [
+                  0.9999831062091201,
+                  -0.005801602098813811,
+                  0.0003587609883392248,
+                  0.0010779472926403244
+                ],
+                [
+                  0.005805852560851718,
+                  0.9998950826282125,
+                  -0.013270863271147942,
+                  0.001443263407521711
+                ],
+                [
+                  -0.0002817310798722663,
+                  0.013272721989361929,
+                  0.9999118738561874,
+                  -0.00466030526719528
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 3.361481708481775,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.281781316555315,
+              "parameters": [
+                [
+                  -0.0045276880428523755,
+                  0.0008577662198390792,
+                  -0.004650277152929932
+                ],
+                [
+                  -0.014847914128519275,
+                  0.005619827793920474,
+                  -0.00027646533240248443
+                ],
+                [
+                  -0.002545786365264993,
+                  0.0007881149061762479,
+                  0.01325234816485037
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 5.602006013455892,
+          "control_heldout_reprojection_corners": 108,
+          "control_heldout_e_cross_translation_mm": 8.964183347712538,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.09718032570457916,
+            0.28676729343219176,
+            0.00942592170044984
+          ]
+        },
+        "A2": {
+          "row": "A2",
+          "label": "vision-estimated (no anchor)",
+          "anchor_lambda": 0.0,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 233,
+            "cost": 109289.36760432964,
+            "train_reprojection_rmse_px": 14.718410641780432,
+            "elapsed_s": 61.6583053439972,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13432,
+              102
+            ],
+            "rank": 102,
+            "n_params": 102,
+            "nullity": 0,
+            "rank_tolerance": 3.3664475160234573e-07,
+            "largest_singular_value": 112873.22646460374,
+            "smallest_identifiable_singular_value": 209.7313254575421,
+            "jacobian_condition_number": 538.180103608098,
+            "gauss_newton_hessian_condition_number": 289637.82391962304,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 215,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 2.650236134546509,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 5.01224077487929,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 2.8356019800659613,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.295407981847592,
+              "parameters": [
+                -0.0017702529089576417,
+                -0.00037019163797983684,
+                0.0018442317219751283
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 1.4683157929365611,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.2576125013820656,
+              "parameters": [
+                [
+                  0.9999341101808026,
+                  -0.010679625325690908,
+                  -0.004209619915176687,
+                  0.003168141031311078
+                ],
+                [
+                  0.010621528724326446,
+                  0.9998512396372603,
+                  -0.013589765391381263,
+                  0.0027607450695051328
+                ],
+                [
+                  0.004354127293235099,
+                  0.01354415736534913,
+                  0.9998987935670174,
+                  -0.0031876763604429103
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 2.9796198608904816,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.4340862720193406,
+              "parameters": [
+                [
+                  -0.002718764687034628,
+                  0.0012342673961249274,
+                  -0.0031775624398800457
+                ],
+                [
+                  -0.016923534790070405,
+                  0.008819406245991137,
+                  0.004328882035367614
+                ],
+                [
+                  -0.008114594679513212,
+                  0.001818545775419861,
+                  0.013505061007267468
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 6.614372556508929,
+          "control_heldout_reprojection_corners": 108,
+          "control_heldout_e_cross_translation_mm": 8.569596855574535,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.09763107070329387,
+            0.28569695569970655,
+            0.009628539234508265
+          ]
+        }
+      }
+    },
+    {
+      "held_out_set": 1,
+      "train_sets": [
+        0,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "fk_artifact_sha256": "128a3fbfd7421b8296101c6e98909bea5b2e9457b62b106f4564408c536809f6",
+      "handeye_initialization": {
+        "method": "PARK",
+        "score_mm_equivalent": 9.385411694420098,
+        "n_poses": 71
+      },
+      "reference_centre_m": [
+        -0.09852723408584085,
+        0.418226220912675,
+        0.01086920051319349
+      ],
+      "arms": {
+        "A3": {
+          "row": "A3",
+          "label": "FK-fixed (hard)",
+          "anchor_lambda": null,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 20,
+            "cost": 111757.92511076429,
+            "train_reprojection_rmse_px": 14.838780409393344,
+            "elapsed_s": 5.757692462997511,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13272,
+              30
+            ],
+            "rank": 30,
+            "n_params": 30,
+            "nullity": 0,
+            "rank_tolerance": 3.240515606414963e-07,
+            "largest_singular_value": 109960.70582835069,
+            "smallest_identifiable_singular_value": 838.2224988318859,
+            "jacobian_condition_number": 131.18319537066546,
+            "gauss_newton_hessian_condition_number": 17209.030747658184,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 5.12939532300758,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.141860162807843,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 3.6391144805943023,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.5809912646187114,
+              "parameters": [
+                -0.0014871072606443304,
+                -0.00025969012589753077,
+                0.0014326828695944312
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 3.837062102641402,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.86950075838277,
+              "parameters": [
+                [
+                  0.9999761165288642,
+                  -0.006807709873217713,
+                  -0.0011922491910480986,
+                  0.0015779051550181
+                ],
+                [
+                  0.006792952253295704,
+                  0.999905246961506,
+                  -0.011973007079857293,
+                  0.0017788880202246893
+                ],
+                [
+                  0.0012736449803242545,
+                  0.01196462223105947,
+                  0.9999276102015248,
+                  -0.003592235214198613
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 1.752478945952036,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.3781095330412416,
+              "parameters": [
+                [
+                  -0.002979407663351574,
+                  0.0019692936385419615,
+                  -0.003594627741666457
+                ],
+                [
+                  -0.012283022068643616,
+                  0.008379677115134255,
+                  0.0012457806099533842
+                ],
+                [
+                  -0.004254371403947413,
+                  0.00020877064523930824,
+                  0.011951243071310765
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 8.234947268445255,
+          "control_heldout_reprojection_corners": 120,
+          "control_heldout_e_cross_translation_mm": 7.682676383762612,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.09348893450091211,
+            0.41789302806229434,
+            0.009966307276617792
+          ]
+        },
+        "A2": {
+          "row": "A2",
+          "label": "vision-estimated (no anchor)",
+          "anchor_lambda": 0.0,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 124,
+            "cost": 106841.29854750446,
+            "train_reprojection_rmse_px": 14.781088650814663,
+            "elapsed_s": 35.05890871700831,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13272,
+              102
+            ],
+            "rank": 102,
+            "n_params": 102,
+            "nullity": 0,
+            "rank_tolerance": 3.3091163782460203e-07,
+            "largest_singular_value": 112288.5419529414,
+            "smallest_identifiable_singular_value": 209.5192413449532,
+            "jacobian_condition_number": 535.9342713926172,
+            "gauss_newton_hessian_condition_number": 287225.5432531355,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 5.5446422673575855,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.932700172713157,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 3.923038235742987,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.307955883182744,
+              "parameters": [
+                -0.0015100977105904356,
+                -0.00031243285117899905,
+                0.0018425628131516377
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 4.411713554708898,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.1068460335834645,
+              "parameters": [
+                [
+                  0.9999158569549139,
+                  -0.011868586116038972,
+                  -0.005235997872962266,
+                  0.0038499510270648685
+                ],
+                [
+                  0.011801773061963812,
+                  0.9998508188056533,
+                  -0.012611831201654974,
+                  0.0031396475936391055
+                ],
+                [
+                  0.005384901365243769,
+                  0.012548975945123934,
+                  0.9999067586730351,
+                  -0.00230604149320565
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 2.0966042501965596,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.482531175211595,
+              "parameters": [
+                [
+                  -0.0009943417848969835,
+                  0.003013914918147706,
+                  -0.002302365504195559
+                ],
+                [
+                  -0.014548248727640559,
+                  0.011999977583291545,
+                  0.0053512448003312126
+                ],
+                [
+                  -0.010116070482164865,
+                  -5.451005522275343e-07,
+                  0.012518178660055551
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 8.788604293409312,
+          "control_heldout_reprojection_corners": 120,
+          "control_heldout_e_cross_translation_mm": 8.387320534649508,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.09323359163228034,
+            0.41755739563945127,
+            0.009361526741873127
+          ]
+        }
+      }
+    },
+    {
+      "held_out_set": 2,
+      "train_sets": [
+        0,
+        1,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "fk_artifact_sha256": "693e1ac68dd6768fecfffc101ab19fbc45b28b69a5866a3e72b9692b67c374b0",
+      "handeye_initialization": {
+        "method": "PARK",
+        "score_mm_equivalent": 9.286918849339049,
+        "n_poses": 71
+      },
+      "reference_centre_m": [
+        -0.07945607548459516,
+        0.5184288653023481,
+        0.010915320684446762
+      ],
+      "arms": {
+        "A3": {
+          "row": "A3",
+          "label": "FK-fixed (hard)",
+          "anchor_lambda": null,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 21,
+            "cost": 111915.56953252245,
+            "train_reprojection_rmse_px": 14.893533638406966,
+            "elapsed_s": 5.816555391997099,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13268,
+              30
+            ],
+            "rank": 30,
+            "n_params": 30,
+            "nullity": 0,
+            "rank_tolerance": 3.208366430330146e-07,
+            "largest_singular_value": 108902.60672371762,
+            "smallest_identifiable_singular_value": 737.206414907948,
+            "jacobian_condition_number": 147.72335742265054,
+            "gauss_newton_hessian_condition_number": 21822.19032822016,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 5.8634595006915635,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.283605265129469,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 4.669510618359041,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.6174748156679573,
+              "parameters": [
+                -0.0013632779942778135,
+                -0.0006097595644393947,
+                0.0017414983230958185
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 3.552146647534154,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.11418607451383,
+              "parameters": [
+                [
+                  0.99998862318855,
+                  -0.004699486060203149,
+                  -0.0008175110016233131,
+                  0.0007160882154941817
+                ],
+                [
+                  0.00468973024405527,
+                  0.9999222755823386,
+                  -0.011552022527529082,
+                  0.0008381317173893899
+                ],
+                [
+                  0.0008717360298920552,
+                  0.011548057196277758,
+                  0.9999329389770525,
+                  -0.003113824815030551
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 3.0151150921568908,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.371304326253614,
+              "parameters": [
+                [
+                  -0.0034709118460926045,
+                  0.0008218857038649786,
+                  -0.003117434090162882
+                ],
+                [
+                  -0.015801545094352606,
+                  0.003747135282813354,
+                  0.0008463908273075832
+                ],
+                [
+                  -0.00520473188817543,
+                  -0.0008761839896875334,
+                  0.011538833425463847
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 6.969744707751915,
+          "control_heldout_reprojection_corners": 120,
+          "control_heldout_e_cross_translation_mm": 12.88073171498216,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.07535171532795265,
+            0.5154565082833991,
+            0.007965832801318573
+          ]
+        },
+        "A2": {
+          "row": "A2",
+          "label": "vision-estimated (no anchor)",
+          "anchor_lambda": 0.0,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 179,
+            "cost": 106918.62455675701,
+            "train_reprojection_rmse_px": 14.818675255345866,
+            "elapsed_s": 47.93755136500113,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13268,
+              102
+            ],
+            "rank": 102,
+            "n_params": 102,
+            "nullity": 0,
+            "rank_tolerance": 3.285169709204835e-07,
+            "largest_singular_value": 111509.56495495731,
+            "smallest_identifiable_singular_value": 209.94073919462926,
+            "jacobian_condition_number": 531.1478152488565,
+            "gauss_newton_hessian_condition_number": 282118.00164363347,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 7.226978161688415,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.933815727956046,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 5.498350965541502,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.206810254495386,
+              "parameters": [
+                -0.001434027043110205,
+                -0.0006391645852801137,
+                0.002044583134199042
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 3.0693024414583263,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.40030157696272,
+              "parameters": [
+                [
+                  0.9999481957811113,
+                  -0.009769588863129865,
+                  -0.002856726718834336,
+                  0.002890883976483627
+                ],
+                [
+                  0.009735661869098468,
+                  0.9998846446637334,
+                  -0.011658226865675449,
+                  0.0022289963393360424
+                ],
+                [
+                  0.002970293263513805,
+                  0.011629810794952048,
+                  0.9999279598345084,
+                  -0.0022622499763352774
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 3.1054086972852444,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.4115666244646614,
+              "parameters": [
+                [
+                  -0.001981125675410381,
+                  0.0019041780724404229,
+                  -0.0022605704323089538
+                ],
+                [
+                  -0.018737183041585965,
+                  0.00816771454781363,
+                  0.0029445742204924612
+                ],
+                [
+                  -0.010589017553247381,
+                  -0.0006037748299907364,
+                  0.011608324530785651
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 8.09267038850318,
+          "control_heldout_reprojection_corners": 120,
+          "control_heldout_e_cross_translation_mm": 9.349790743876321,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.07519934914725784,
+            0.5153699575870874,
+            0.005940124424191451
+          ]
+        }
+      }
+    },
+    {
+      "held_out_set": 3,
+      "train_sets": [
+        0,
+        1,
+        2,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "fk_artifact_sha256": "10021d31df71d5e4787f04f007da0913991a0d81d0707c4946648865c328f558",
+      "handeye_initialization": {
+        "method": "PARK",
+        "score_mm_equivalent": 9.429162678078665,
+        "n_poses": 71
+      },
+      "reference_centre_m": [
+        -0.07836165358844065,
+        0.5682949204618903,
+        0.01102665508573835
+      ],
+      "arms": {
+        "A3": {
+          "row": "A3",
+          "label": "FK-fixed (hard)",
+          "anchor_lambda": null,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 29,
+            "cost": 112838.90468824496,
+            "train_reprojection_rmse_px": 14.876490817642077,
+            "elapsed_s": 7.708179167995695,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13324,
+              30
+            ],
+            "rank": 30,
+            "n_params": 30,
+            "nullity": 0,
+            "rank_tolerance": 3.1425609026046545e-07,
+            "largest_singular_value": 106220.62526237925,
+            "smallest_identifiable_singular_value": 775.1724287906611,
+            "jacobian_condition_number": 137.0283840307543,
+            "gauss_newton_hessian_condition_number": 18776.77803007988,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 5.955571162403776,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.9582366789686425,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 3.975074583829971,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.399240627852466,
+              "parameters": [
+                -0.0014523296511009462,
+                -0.00026680132372707,
+                0.0013900922267534293
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 3.2056107685292905,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.883308003374011,
+              "parameters": [
+                [
+                  0.9999842332008197,
+                  -0.005454104470332353,
+                  -0.001336448351341402,
+                  0.0009401139681124437
+                ],
+                [
+                  0.0054391731134276035,
+                  0.9999254469914377,
+                  -0.010932330712910426,
+                  0.0013883338207692497
+                ],
+                [
+                  0.0013959747889084567,
+                  0.010924889171107394,
+                  0.9999393471861121,
+                  -0.002995147781030442
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 2.2388723137752584,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.3856020552833117,
+              "parameters": [
+                [
+                  -0.0030016305366816105,
+                  0.0010121995237303157,
+                  -0.0029950610933086983
+                ],
+                [
+                  -0.012455581084961606,
+                  0.007178212038689564,
+                  0.0013760224046849836
+                ],
+                [
+                  -0.0044041215843046875,
+                  0.0016547131256339051,
+                  0.010910620650809387
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 7.9800674572154255,
+          "control_heldout_reprojection_corners": 120,
+          "control_heldout_e_cross_translation_mm": 10.917753357718732,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.07344089023967243,
+            0.5690779728203545,
+            0.007764486337837884
+          ]
+        },
+        "A2": {
+          "row": "A2",
+          "label": "vision-estimated (no anchor)",
+          "anchor_lambda": 0.0,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 181,
+            "cost": 108016.28777335805,
+            "train_reprojection_rmse_px": 14.817780538720625,
+            "elapsed_s": 47.79076591896592,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13324,
+              102
+            ],
+            "rank": 102,
+            "n_params": 102,
+            "nullity": 0,
+            "rank_tolerance": 3.207638965089999e-07,
+            "largest_singular_value": 108420.30657398982,
+            "smallest_identifiable_singular_value": 213.9489224858685,
+            "jacobian_condition_number": 506.7578995690014,
+            "gauss_newton_hessian_condition_number": 256803.56877558609,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 7.972034184764979,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.6094378794657125,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 5.919654885278936,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.00332555109558,
+              "parameters": [
+                -0.001425175149386512,
+                -0.0002298758188071931,
+                0.0017709700726148594
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 4.159036579799531,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.0737380130557046,
+              "parameters": [
+                [
+                  0.9999386691663534,
+                  -0.00966453772077751,
+                  -0.005408753688813162,
+                  0.0028317470427283165
+                ],
+                [
+                  0.009594640430928591,
+                  0.9998720038009736,
+                  -0.012803081270792546,
+                  0.0026211410261045565
+                ],
+                [
+                  0.00553179725078328,
+                  0.012750401000321338,
+                  0.9999034085818026,
+                  -0.0022576281434227227
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 2.0032442341473824,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.51473278134719,
+              "parameters": [
+                [
+                  -0.0014553761196490524,
+                  0.002227690220186025,
+                  -0.0022527457808062977
+                ],
+                [
+                  -0.013732308413970135,
+                  0.01115919768879458,
+                  0.005491901762972109
+                ],
+                [
+                  -0.008695913050131798,
+                  0.0014996818343989253,
+                  0.01271171986573777
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 9.190006076350873,
+          "control_heldout_reprojection_corners": 120,
+          "control_heldout_e_cross_translation_mm": 8.020662045531235,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.07164881197046746,
+            0.5674951662725026,
+            0.00680155394001114
+          ]
+        }
+      }
+    },
+    {
+      "held_out_set": 4,
+      "train_sets": [
+        0,
+        1,
+        2,
+        3,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "fk_artifact_sha256": "8a587e94b7f8f6b45322329a2facc20609c47eb2aa8f089245cf484f1587088e",
+      "handeye_initialization": {
+        "method": "DANIILIDIS",
+        "score_mm_equivalent": 6.015374443111424,
+        "n_poses": 71
+      },
+      "reference_centre_m": [
+        -0.22856878145658024,
+        0.6389081822056003,
+        0.011121480148446376
+      ],
+      "arms": {
+        "A3": {
+          "row": "A3",
+          "label": "FK-fixed (hard)",
+          "anchor_lambda": null,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 17,
+            "cost": 80810.14586817885,
+            "train_reprojection_rmse_px": 7.414477763832451,
+            "elapsed_s": 4.528127244964708,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13324,
+              30
+            ],
+            "rank": 30,
+            "n_params": 30,
+            "nullity": 0,
+            "rank_tolerance": 3.225109377576545e-07,
+            "largest_singular_value": 109010.81800572516,
+            "smallest_identifiable_singular_value": 816.9584557183678,
+            "jacobian_condition_number": 133.43495895378155,
+            "gauss_newton_hessian_condition_number": 17804.888270997366,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 7.431770597555391,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.775478488010762,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 5.564887345157038,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.260874096258127,
+              "parameters": [
+                -0.0012743958511374105,
+                -0.00020099911516933502,
+                0.0013987324662313716
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 3.6767719630015105,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.811453817896067,
+              "parameters": [
+                [
+                  0.9999848646806837,
+                  -0.005109993145264202,
+                  -0.0020392105360143636,
+                  0.0009446437098619143
+                ],
+                [
+                  0.005089068642431796,
+                  0.9999356628339837,
+                  -0.010137631533795767,
+                  0.0012818938521184653
+                ],
+                [
+                  0.002090882566634476,
+                  0.010127100415111239,
+                  0.9999465335943092,
+                  -0.002409829211311219
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 3.7714166984221675,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.170617878757768,
+              "parameters": [
+                [
+                  -0.003615250140435657,
+                  0.0010598112418584121,
+                  -0.0024122296335276554
+                ],
+                [
+                  -0.012548879772713732,
+                  0.0069448595400090065,
+                  0.002056439245653266
+                ],
+                [
+                  -0.002329298377832655,
+                  0.001369515473734743,
+                  0.010110167330134682
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 28.31243835201545,
+          "control_heldout_reprojection_corners": 116,
+          "control_heldout_e_cross_translation_mm": 18.17212578079878,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.2227412634327406,
+            0.6394566799576784,
+            0.006542135423217882
+          ]
+        },
+        "A2": {
+          "row": "A2",
+          "label": "vision-estimated (no anchor)",
+          "anchor_lambda": 0.0,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 41,
+            "cost": 75160.1277262537,
+            "train_reprojection_rmse_px": 7.273561685987793,
+            "elapsed_s": 12.615214969031513,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13324,
+              102
+            ],
+            "rank": 102,
+            "n_params": 102,
+            "nullity": 0,
+            "rank_tolerance": 3.307794944846056e-07,
+            "largest_singular_value": 111805.64455889154,
+            "smallest_identifiable_singular_value": 213.35891509109194,
+            "jacobian_condition_number": 524.0261205450777,
+            "gauss_newton_hessian_condition_number": 274603.37501352426,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 9.633729761402122,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.5727258852891435,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 7.697673805284385,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.063918836309004,
+              "parameters": [
+                -0.0012520395263747018,
+                -0.00013593935604728583,
+                0.001675799280868421
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 4.735234745688716,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.0649670935084585,
+              "parameters": [
+                [
+                  0.9999274888138578,
+                  -0.010612768918632734,
+                  -0.005690891871336914,
+                  0.003357540763116895
+                ],
+                [
+                  0.010542797581440005,
+                  0.9998701487396506,
+                  -0.012187496810495123,
+                  0.002845785083284036
+                ],
+                [
+                  0.005819495989201267,
+                  0.012126615159587927,
+                  0.9999095352436653,
+                  -0.0019996894612350803
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 4.684495180659836,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.2296744612104327,
+              "parameters": [
+                [
+                  -0.001784551636830646,
+                  0.0021758861348122487,
+                  -0.001994395764610648
+                ],
+                [
+                  -0.014923456060821358,
+                  0.012020199875884919,
+                  0.005763977330311316
+                ],
+                [
+                  -0.007993462969459164,
+                  0.0020707002664095806,
+                  0.012078020828325807
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 29.10194152591169,
+          "control_heldout_reprojection_corners": 116,
+          "control_heldout_e_cross_translation_mm": 17.96638689056673,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.22051759110073965,
+            0.639279779933795,
+            0.005844265153949285
+          ]
+        }
+      }
+    },
+    {
+      "held_out_set": 5,
+      "train_sets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "fk_artifact_sha256": "5447cad71d485b6cb7091109f184d028a5c5d0d87ade05e23943c2712fbd1957",
+      "handeye_initialization": {
+        "method": "PARK",
+        "score_mm_equivalent": 9.768302056405945,
+        "n_poses": 71
+      },
+      "reference_centre_m": [
+        -0.2994020638865985,
+        0.6389029246644179,
+        0.010602175139228176
+      ],
+      "arms": {
+        "A3": {
+          "row": "A3",
+          "label": "FK-fixed (hard)",
+          "anchor_lambda": null,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 16,
+            "cost": 120814.4189239643,
+            "train_reprojection_rmse_px": 14.9512816364453,
+            "elapsed_s": 4.231897927005775,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13328,
+              30
+            ],
+            "rank": 30,
+            "n_params": 30,
+            "nullity": 0,
+            "rank_tolerance": 3.2106373658169854e-07,
+            "largest_singular_value": 108489.08496635029,
+            "smallest_identifiable_singular_value": 752.2577756966529,
+            "jacobian_condition_number": 144.217964202338,
+            "gauss_newton_hessian_condition_number": 20798.821198666847,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 11
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 2.7457831278883993,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.106920302078294,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 1.622811810585403,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.514352910723861,
+              "parameters": [
+                -0.0012011291710211692,
+                -0.00028534936196284816,
+                0.0017297347896885775
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 3.3991634849159458,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.882135936112424,
+              "parameters": [
+                [
+                  0.999989968949015,
+                  -0.004455435183848142,
+                  -0.00045945475303681567,
+                  0.0007219272999872683
+                ],
+                [
+                  0.004448510060499578,
+                  0.9998905747491287,
+                  -0.01410848277095955,
+                  0.0010466552095013126
+                ],
+                [
+                  0.0005222639076136488,
+                  0.014106297358958332,
+                  0.9999003648440337,
+                  -0.004217175294541535
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 3.576533573153925,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.340138180163856,
+              "parameters": [
+                [
+                  -0.0030155377302772436,
+                  0.0016456825045129287,
+                  -0.004200927326862445
+                ],
+                [
+                  -0.01210612218709788,
+                  0.0044864896884514996,
+                  0.0005096858589828485
+                ],
+                [
+                  -0.003110189734907916,
+                  -0.0017656219362279057,
+                  0.014058972573338822
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 5.116360916431637,
+          "control_heldout_reprojection_corners": 128,
+          "control_heldout_e_cross_translation_mm": 23.972196720332445,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.2976440678525367,
+            0.6376641657810374,
+            0.008895057287858388
+          ]
+        },
+        "A2": {
+          "row": "A2",
+          "label": "vision-estimated (no anchor)",
+          "anchor_lambda": 0.0,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 156,
+            "cost": 116009.97596558424,
+            "train_reprojection_rmse_px": 14.90260703123176,
+            "elapsed_s": 40.856302306987345,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13328,
+              102
+            ],
+            "rank": 102,
+            "n_params": 102,
+            "nullity": 0,
+            "rank_tolerance": 3.230539474676918e-07,
+            "largest_singular_value": 109161.5874426819,
+            "smallest_identifiable_singular_value": 211.9652936213062,
+            "jacobian_condition_number": 514.9974582051543,
+            "gauss_newton_hessian_condition_number": 265222.3819577697,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 11
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 3.007324617634239,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.838519311091615,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 1.976000682856428,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.216834205521319,
+              "parameters": [
+                -0.0014080871787014043,
+                -0.00011492043270399284,
+                0.0019062167238474426
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 4.2629692365999,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.233805722423222,
+              "parameters": [
+                [
+                  0.999948936075447,
+                  -0.009224236242861663,
+                  -0.004127796908630472,
+                  0.0025912775136082145
+                ],
+                [
+                  0.0091612321101936,
+                  0.9998450661522558,
+                  -0.015030486260109001,
+                  0.00246882387765357
+                ],
+                [
+                  0.004265802129281038,
+                  0.014991903038908901,
+                  0.999878515508492,
+                  -0.003444942577312567
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 4.348404317287905,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.5089498279862212,
+              "parameters": [
+                [
+                  -0.0013570485146910225,
+                  0.0029419788558468947,
+                  -0.0034231613673456015
+                ],
+                [
+                  -0.014537355399073536,
+                  0.007961511961508096,
+                  0.0042383543153311515
+                ],
+                [
+                  -0.008901451727027991,
+                  -0.002280444824165577,
+                  0.014922347232265976
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 4.403153416656651,
+          "control_heldout_reprojection_corners": 128,
+          "control_heldout_e_cross_translation_mm": 22.10234177159432,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.29709931026290626,
+            0.6373974660905983,
+            0.009387711641664631
+          ]
+        }
+      }
+    },
+    {
+      "held_out_set": 6,
+      "train_sets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "fk_artifact_sha256": "c5b71e20785c4877b09a98923cbadf56642bd688506e7c0447821797600999bd",
+      "handeye_initialization": {
+        "method": "PARK",
+        "score_mm_equivalent": 9.7657486394504,
+        "n_poses": 71
+      },
+      "reference_centre_m": [
+        -0.39788312430226874,
+        0.5988510321528916,
+        0.010888565235565473
+      ],
+      "arms": {
+        "A3": {
+          "row": "A3",
+          "label": "FK-fixed (hard)",
+          "anchor_lambda": null,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 25,
+            "cost": 121125.44984248508,
+            "train_reprojection_rmse_px": 15.016487853056578,
+            "elapsed_s": 6.699580870044883,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13326,
+              30
+            ],
+            "rank": 30,
+            "n_params": 30,
+            "nullity": 0,
+            "rank_tolerance": 3.1178079966749086e-07,
+            "largest_singular_value": 105368.14446974239,
+            "smallest_identifiable_singular_value": 781.8669728107459,
+            "jacobian_condition_number": 134.76479776470515,
+            "gauss_newton_hessian_condition_number": 18161.55071656188,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 3.749172567062496,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.8186995118492133,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 4.078680078168889,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.2449616452586785,
+              "parameters": [
+                -0.0016744994671724425,
+                -8.856797203428413e-05,
+                0.0011139556236073704
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 4.42945868138023,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.5606290518209955,
+              "parameters": [
+                [
+                  0.9999796035801449,
+                  -0.006202308931722329,
+                  -0.001524397458806611,
+                  0.0010302861979832323
+                ],
+                [
+                  0.006183938102192786,
+                  0.9999115606476952,
+                  -0.011774115365456564,
+                  0.0016236600335681195
+                ],
+                [
+                  0.0015972893429769984,
+                  0.01176444843612774,
+                  0.9999295207262102,
+                  -0.0035946320722820887
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 3.0292166758297285,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.280019914099721,
+              "parameters": [
+                [
+                  -0.001618464431817948,
+                  0.0003845480910362211,
+                  -0.003593552372559686
+                ],
+                [
+                  -0.008680948297625037,
+                  0.005213810364946241,
+                  0.001574009550551164
+                ],
+                [
+                  -0.005164675030450514,
+                  0.0019356460800567918,
+                  0.011746874007762271
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 3.6360584872796116,
+          "control_heldout_reprojection_corners": 124,
+          "control_heldout_e_cross_translation_mm": 23.768117877097428,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.3996050767475393,
+            0.5998777548301597,
+            0.007720440355163172
+          ]
+        },
+        "A2": {
+          "row": "A2",
+          "label": "vision-estimated (no anchor)",
+          "anchor_lambda": 0.0,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 122,
+            "cost": 115697.88607389227,
+            "train_reprojection_rmse_px": 14.979710802458834,
+            "elapsed_s": 31.639327184995636,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13326,
+              102
+            ],
+            "rank": 102,
+            "n_params": 102,
+            "nullity": 0,
+            "rank_tolerance": 3.205887436570189e-07,
+            "largest_singular_value": 108344.84064782572,
+            "smallest_identifiable_singular_value": 211.8463765792836,
+            "jacobian_condition_number": 511.43117195246253,
+            "gauss_newton_hessian_condition_number": 261561.8436446693,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 3.2409584991445564,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 5.003827974627753,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 3.55551596700825,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.407589424089929,
+              "parameters": [
+                -0.0018717391500623938,
+                2.9944389193722887e-05,
+                0.001451601100852928
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 5.130363589472748,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.970765190824501,
+              "parameters": [
+                [
+                  0.9998912598973957,
+                  -0.012982664183906156,
+                  -0.00699419841628564,
+                  0.003806560286824634
+                ],
+                [
+                  0.012887136946150757,
+                  0.9998253575762687,
+                  -0.013534254645825567,
+                  0.003479308458494701
+                ],
+                [
+                  0.0071686876155683844,
+                  0.01344264773676748,
+                  0.9998839458355632,
+                  -0.0025812856959045918
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 3.4998385174580093,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.542763338317886,
+              "parameters": [
+                [
+                  0.0009723058278077277,
+                  0.0022518608161816375,
+                  -0.002574419916932445
+                ],
+                [
+                  -0.011268478022337769,
+                  0.010292811422029782,
+                  0.007128704073141279
+                ],
+                [
+                  -0.013080420118982678,
+                  0.0008528048303139503,
+                  0.0134011395335633
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 2.9522412235868405,
+          "control_heldout_reprojection_corners": 124,
+          "control_heldout_e_cross_translation_mm": 22.008081975485236,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.3989961033983968,
+            0.6003270885909193,
+            0.008226545904960192
+          ]
+        }
+      }
+    },
+    {
+      "held_out_set": 7,
+      "train_sets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "fk_artifact_sha256": "e3d325b4c7bbd755492bff183e954b30cbee7196baec2815e19588b65f5c686b",
+      "handeye_initialization": {
+        "method": "PARK",
+        "score_mm_equivalent": 9.730634467789097,
+        "n_poses": 71
+      },
+      "reference_centre_m": [
+        -0.3991235845236397,
+        0.5090226129509754,
+        0.010713909164571843
+      ],
+      "arms": {
+        "A3": {
+          "row": "A3",
+          "label": "FK-fixed (hard)",
+          "anchor_lambda": null,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 20,
+            "cost": 121466.3141595914,
+            "train_reprojection_rmse_px": 14.991241255122798,
+            "elapsed_s": 5.440466371015646,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13362,
+              30
+            ],
+            "rank": 30,
+            "n_params": 30,
+            "nullity": 0,
+            "rank_tolerance": 3.158763319570978e-07,
+            "largest_singular_value": 106464.64083948097,
+            "smallest_identifiable_singular_value": 810.6721769487274,
+            "jacobian_condition_number": 131.32884520621033,
+            "gauss_newton_hessian_condition_number": 17247.265583196753,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 1.8877569658192181,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.280564632167317,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 1.3449254949750256,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.5959751187763667,
+              "parameters": [
+                -0.0015794124930435503,
+                -0.000334212093457506,
+                0.0016691180212039293
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 2.1088692920588397,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.972111719360826,
+              "parameters": [
+                [
+                  0.9999848375288439,
+                  -0.005403874421951976,
+                  -0.001059647886198049,
+                  0.000815893845304283
+                ],
+                [
+                  0.005390473148500137,
+                  0.9999102365768231,
+                  -0.012266278495005837,
+                  0.0011752169606368268
+                ],
+                [
+                  0.0011258381971881225,
+                  0.012260380504434554,
+                  0.999924204906672,
+                  -0.0034678321470545965
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 1.6070136029937792,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.4618131088484096,
+              "parameters": [
+                [
+                  -0.0033264851000540767,
+                  0.0015767484609610625,
+                  -0.0034618738630168813
+                ],
+                [
+                  -0.012527392310521154,
+                  0.006351075280218244,
+                  0.0011093467612831366
+                ],
+                [
+                  -0.0031904041393836244,
+                  -0.0007010860340639889,
+                  0.012235954786083877
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 3.10642969586087,
+          "control_heldout_reprojection_corners": 124,
+          "control_heldout_e_cross_translation_mm": 22.79908807646285,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.3987773615974965,
+            0.5088507061130475,
+            0.008866152663707771
+          ]
+        },
+        "A2": {
+          "row": "A2",
+          "label": "vision-estimated (no anchor)",
+          "anchor_lambda": 0.0,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 131,
+            "cost": 116229.36730621575,
+            "train_reprojection_rmse_px": 14.929989194480996,
+            "elapsed_s": 34.88356424198719,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13362,
+              102
+            ],
+            "rank": 102,
+            "n_params": 102,
+            "nullity": 0,
+            "rank_tolerance": 3.15616626708279e-07,
+            "largest_singular_value": 106377.10839959125,
+            "smallest_identifiable_singular_value": 207.3167487474503,
+            "jacobian_condition_number": 513.1139140580389,
+            "gauss_newton_hessian_condition_number": 263285.8887999605,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 2.0994986004627076,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 5.069676087326069,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 1.2434849638779815,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.368625785435067,
+              "parameters": [
+                -0.0015950836476757528,
+                -0.00015025194615696236,
+                0.0020124256226829937
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 2.3160637715196795,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.279710643932968,
+              "parameters": [
+                [
+                  0.999923975676441,
+                  -0.010730186760976411,
+                  -0.006075027530402009,
+                  0.003181428549637877
+                ],
+                [
+                  0.010652546850602735,
+                  0.9998629694286212,
+                  -0.012671448653403456,
+                  0.002705636746051787
+                ],
+                [
+                  0.006210162076491515,
+                  0.012605770799704754,
+                  0.9999012593399055,
+                  -0.001993227466760847
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 1.3282173518682108,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.601360155634863,
+              "parameters": [
+                [
+                  -0.001238910981702845,
+                  0.002868040051124513,
+                  -0.0019850662903535096
+                ],
+                [
+                  -0.015082028201731544,
+                  0.01014160586604563,
+                  0.00617122421292352
+                ],
+                [
+                  -0.009406492304439237,
+                  -0.0010452474354562004,
+                  0.012563158559680172
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 3.120536357665164,
+          "control_heldout_reprojection_corners": 124,
+          "control_heldout_e_cross_translation_mm": 21.225894384954973,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.3987393105840876,
+            0.5094559963213379,
+            0.00869588865748594
+          ]
+        }
+      }
+    },
+    {
+      "held_out_set": 8,
+      "train_sets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        9,
+        10,
+        11,
+        12
+      ],
+      "fk_artifact_sha256": "af47093a93fdf711e87b207040c3ca9cd616d7f19bdcde1d4fd666df7ebdd8e0",
+      "handeye_initialization": {
+        "method": "PARK",
+        "score_mm_equivalent": 9.6924501982007,
+        "n_poses": 71
+      },
+      "reference_centre_m": [
+        -0.397936358055547,
+        0.4386040900446184,
+        0.010367965268323925
+      ],
+      "arms": {
+        "A3": {
+          "row": "A3",
+          "label": "FK-fixed (hard)",
+          "anchor_lambda": null,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 19,
+            "cost": 120391.11719687861,
+            "train_reprojection_rmse_px": 14.966799213777943,
+            "elapsed_s": 4.9581145200063474,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13298,
+              30
+            ],
+            "rank": 30,
+            "n_params": 30,
+            "nullity": 0,
+            "rank_tolerance": 3.2222576231869003e-07,
+            "largest_singular_value": 109127.37427490047,
+            "smallest_identifiable_singular_value": 807.3248446926121,
+            "jacobian_condition_number": 135.1715793119814,
+            "gauss_newton_hessian_condition_number": 18271.355853695277,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 4.096763534213114,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.8167318290553034,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 5.463298007675708,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.176950940933184,
+              "parameters": [
+                -0.0017638787155786148,
+                -0.000337765567668985,
+                0.0011176183927681025
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 5.523674569518687,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.5457561007165364,
+              "parameters": [
+                [
+                  0.9999865401803949,
+                  -0.004992080712423824,
+                  -0.0014137143286663306,
+                  0.0004826673351841504
+                ],
+                [
+                  0.004975563096992653,
+                  0.999922001318792,
+                  -0.011455786768659998,
+                  0.0010568504274285906
+                ],
+                [
+                  0.0014707922729865594,
+                  0.011448598550993264,
+                  0.9999333809616058,
+                  -0.003641076665694947
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 4.175793953515246,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.1960155211000236,
+              "parameters": [
+                [
+                  -0.0025507419845917727,
+                  0.000895207508851143,
+                  -0.003637528242090825
+                ],
+                [
+                  -0.009637280157075828,
+                  0.005691013040549313,
+                  0.0014723704251090712
+                ],
+                [
+                  -0.003663327064842822,
+                  0.0004485974991688638,
+                  0.01144019170757905
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 3.7241101630690268,
+          "control_heldout_reprojection_corners": 124,
+          "control_heldout_e_cross_translation_mm": 24.117317755211175,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.4015882661655183,
+            0.43888906175280007,
+            0.00853334548833673
+          ]
+        },
+        "A2": {
+          "row": "A2",
+          "label": "vision-estimated (no anchor)",
+          "anchor_lambda": 0.0,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 91,
+            "cost": 115503.77992808104,
+            "train_reprojection_rmse_px": 14.912458989922648,
+            "elapsed_s": 24.161343946005218,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13298,
+              102
+            ],
+            "rank": 102,
+            "n_params": 102,
+            "nullity": 0,
+            "rank_tolerance": 3.2703949801043124e-07,
+            "largest_singular_value": 110757.62982216966,
+            "smallest_identifiable_singular_value": 204.82326605337846,
+            "jacobian_condition_number": 540.7473084298217,
+            "gauss_newton_hessian_condition_number": 292407.65157409676,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 4.634166859381362,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.539167576747708,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 6.172670318434963,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.843617852255888,
+              "parameters": [
+                -0.0019446462567706685,
+                -0.00023085562798836704,
+                0.0014126927162944637
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 6.352965785091023,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.751191498139422,
+              "parameters": [
+                [
+                  0.9999430153185601,
+                  -0.009185213722014337,
+                  -0.00544040113464193,
+                  0.002204467476909444
+                ],
+                [
+                  0.00911344899183133,
+                  0.9998730238743124,
+                  -0.01307215268850681,
+                  0.002237773847696578
+                ],
+                [
+                  0.005559780849834409,
+                  0.01302182695781447,
+                  0.9998997554053018,
+                  -0.003019954472222532
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 4.747562097220999,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.293339148924474,
+              "parameters": [
+                [
+                  -0.001041700189451188,
+                  0.0018274590499849502,
+                  -0.0030107068492536853
+                ],
+                [
+                  -0.011465005167379258,
+                  0.00888144344821954,
+                  0.0055461329675019185
+                ],
+                [
+                  -0.008459722585206714,
+                  0.0003972624111527027,
+                  0.012991509040612978
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 3.6156755930808853,
+          "control_heldout_reprojection_corners": 124,
+          "control_heldout_e_cross_translation_mm": 22.89317595559819,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.40214298845232194,
+            0.43894934511420114,
+            0.008454705713939026
+          ]
+        }
+      }
+    },
+    {
+      "held_out_set": 9,
+      "train_sets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        10,
+        11,
+        12
+      ],
+      "fk_artifact_sha256": "ea940324faeaa1004d18271ae92274420b10289ed855d00111ac6693c9965299",
+      "handeye_initialization": {
+        "method": "PARK",
+        "score_mm_equivalent": 9.289046930801948,
+        "n_poses": 71
+      },
+      "reference_centre_m": [
+        -0.4240041601318748,
+        0.35884256175296586,
+        0.010585026680894463
+      ],
+      "arms": {
+        "A3": {
+          "row": "A3",
+          "label": "FK-fixed (hard)",
+          "anchor_lambda": null,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 19,
+            "cost": 115137.50069060967,
+            "train_reprojection_rmse_px": 14.863273247219391,
+            "elapsed_s": 5.108617668971419,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13326,
+              30
+            ],
+            "rank": 30,
+            "n_params": 30,
+            "nullity": 0,
+            "rank_tolerance": 3.385323443056793e-07,
+            "largest_singular_value": 114408.98541707323,
+            "smallest_identifiable_singular_value": 806.9421713905402,
+            "jacobian_condition_number": 141.78089765704175,
+            "gauss_newton_hessian_condition_number": 20101.822940436545,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 5.347342356070702,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.148818049371766,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 4.716833391283151,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.482896841615354,
+              "parameters": [
+                -0.0016605771851286994,
+                -0.00012081093257581184,
+                0.0015198713525357756
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 4.979450233698039,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.8855408200507724,
+              "parameters": [
+                [
+                  0.9999851072161119,
+                  -0.004401023036985106,
+                  -0.003227435856763804,
+                  0.0003649941549777602
+                ],
+                [
+                  0.004360867447293519,
+                  0.9999142858992236,
+                  -0.012345188931459694,
+                  0.001120005308719696
+                ],
+                [
+                  0.0032814906808848136,
+                  0.012330930657262889,
+                  0.9999185866699534,
+                  -0.003262984463550273
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 5.167487549730633,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.178664810437391,
+              "parameters": [
+                [
+                  -0.0030831214606241533,
+                  0.001419859829133062,
+                  -0.003246372249854581
+                ],
+                [
+                  -0.014425990875465523,
+                  0.0036769232007425154,
+                  0.00324490553046397
+                ],
+                [
+                  -0.004803707945720057,
+                  -0.0013679805136789709,
+                  0.012272630631985318
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 7.049497669604628,
+          "control_heldout_reprojection_corners": 124,
+          "control_heldout_e_cross_translation_mm": 25.250333078656414,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.4239210894649419,
+            0.36302041425585185,
+            0.007248453888124562
+          ]
+        },
+        "A2": {
+          "row": "A2",
+          "label": "vision-estimated (no anchor)",
+          "anchor_lambda": 0.0,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 213,
+            "cost": 110237.51383340254,
+            "train_reprojection_rmse_px": 14.826200800603225,
+            "elapsed_s": 56.15330990497023,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13326,
+              102
+            ],
+            "rank": 102,
+            "n_params": 102,
+            "nullity": 0,
+            "rank_tolerance": 3.4257544443849083e-07,
+            "largest_singular_value": 115775.37475007273,
+            "smallest_identifiable_singular_value": 226.6685619288925,
+            "jacobian_condition_number": 510.7694413590195,
+            "gauss_newton_hessian_condition_number": 260885.42222620483,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 4.373532293746545,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.821583538641852,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 4.839335854331274,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.097352074579676,
+              "parameters": [
+                -0.0017985977601054175,
+                4.993631498332226e-05,
+                0.0017949724952849282
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 3.542749866384027,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.1866910421557386,
+              "parameters": [
+                [
+                  0.9999427271585041,
+                  -0.00861230971618812,
+                  -0.006353780305145536,
+                  0.00215532261821344
+                ],
+                [
+                  0.008528447104755709,
+                  0.9998776900312445,
+                  -0.013109941562173018,
+                  0.002351141005295432
+                ],
+                [
+                  0.006465910051569497,
+                  0.013055002839320233,
+                  0.9998938738226524,
+                  -0.002519503000864889
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 3.8672420091287725,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.3426042707664685,
+              "parameters": [
+                [
+                  -0.0014964704525284333,
+                  0.002326077291661557,
+                  -0.0025033681423036695
+                ],
+                [
+                  -0.016383637282983313,
+                  0.006912868182560315,
+                  0.0064142923487508245
+                ],
+                [
+                  -0.00967412774378221,
+                  -0.0012092191303497907,
+                  0.01298904775748272
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 6.942653469322408,
+          "control_heldout_reprojection_corners": 124,
+          "control_heldout_e_cross_translation_mm": 23.2640204572613,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.4244470210347525,
+            0.36303494534991615,
+            0.00942073345272193
+          ]
+        }
+      }
+    },
+    {
+      "held_out_set": 10,
+      "train_sets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        11,
+        12
+      ],
+      "fk_artifact_sha256": "4a006f3b3598806bbf5e91a8224ea89399270fd01364d2bc468b429c5f356afa",
+      "handeye_initialization": {
+        "method": "PARK",
+        "score_mm_equivalent": 9.7365612956591,
+        "n_poses": 71
+      },
+      "reference_centre_m": [
+        -0.3844200689909821,
+        0.27805512219339645,
+        0.010529541037740016
+      ],
+      "arms": {
+        "A3": {
+          "row": "A3",
+          "label": "FK-fixed (hard)",
+          "anchor_lambda": null,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 20,
+            "cost": 121474.85551588077,
+            "train_reprojection_rmse_px": 14.958553323697492,
+            "elapsed_s": 5.364014069957193,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13372,
+              30
+            ],
+            "rank": 30,
+            "n_params": 30,
+            "nullity": 0,
+            "rank_tolerance": 3.22242847310272e-07,
+            "largest_singular_value": 108529.22278412717,
+            "smallest_identifiable_singular_value": 701.4238348960178,
+            "jacobian_condition_number": 154.7270243535651,
+            "gauss_newton_hessian_condition_number": 23940.452065308727,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 11
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 214,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 2.42430545777876,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.1503422138095125,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 3.1803378280066354,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.5311410271583674,
+              "parameters": [
+                -0.001474272737204221,
+                -0.00035341787156841403,
+                0.0015678007661819326
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 2.066715635584769,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.9580096496769173,
+              "parameters": [
+                [
+                  0.9999768460472807,
+                  -0.006731202967151165,
+                  -0.0009991376020904983,
+                  0.0016350248211258744
+                ],
+                [
+                  0.006719714325210241,
+                  0.9999159471451179,
+                  -0.011088015344056646,
+                  0.0014875910551242488
+                ],
+                [
+                  0.0010736893035063542,
+                  0.011081044693415995,
+                  0.9999380268995584,
+                  -0.0032730669600120627
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 3.647261496338839,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.3351806076314374,
+              "parameters": [
+                [
+                  -0.0017200854487762738,
+                  0.000913976754626792,
+                  -0.0032645120050170577
+                ],
+                [
+                  -0.013511836665668754,
+                  0.006802238191554828,
+                  0.0010650006670497548
+                ],
+                [
+                  -0.006887295284659577,
+                  0.0009889617912628881,
+                  0.011056531112554151
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 3.3938124957301334,
+          "control_heldout_reprojection_corners": 128,
+          "control_heldout_e_cross_translation_mm": 25.459209508915876,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.3826223325637641,
+            0.2783694648672508,
+            0.012125344714344233
+          ]
+        },
+        "A2": {
+          "row": "A2",
+          "label": "vision-estimated (no anchor)",
+          "anchor_lambda": 0.0,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 165,
+            "cost": 116259.09022742069,
+            "train_reprojection_rmse_px": 14.905961823686157,
+            "elapsed_s": 43.5112866369891,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13372,
+              102
+            ],
+            "rank": 102,
+            "n_params": 102,
+            "nullity": 0,
+            "rank_tolerance": 3.270457424307128e-07,
+            "largest_singular_value": 110146.8055447252,
+            "smallest_identifiable_singular_value": 209.3364264086796,
+            "jacobian_condition_number": 526.1712327585536,
+            "gauss_newton_hessian_condition_number": 276856.166182656,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 11
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 214,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 2.1720431329667997,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.972294341151127,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 3.5363082429077517,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.323806182543303,
+              "parameters": [
+                -0.001671032493708267,
+                -0.00014940514639705713,
+                0.0017926906085671916
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 2.0712973468235787,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.2556149854861505,
+              "parameters": [
+                [
+                  0.9999185088931125,
+                  -0.011684975018720853,
+                  -0.005141685694901546,
+                  0.0037430720745832424
+                ],
+                [
+                  0.011617127764381924,
+                  0.999847576727397,
+                  -0.013033251891129957,
+                  0.002976400069920948
+                ],
+                [
+                  0.005293195205101784,
+                  0.012972458177365047,
+                  0.9999018438893676,
+                  -0.002849818676606216
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 4.215494461198817,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.4054241246922685,
+              "parameters": [
+                [
+                  5.608946968589367e-05,
+                  0.0019000973800205427,
+                  -0.002836370102371601
+                ],
+                [
+                  -0.016269856335695592,
+                  0.010818461367301312,
+                  0.005258444812729606
+                ],
+                [
+                  -0.012675895648401908,
+                  0.0014956654138246908,
+                  0.012922366157516562
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 4.55737001888968,
+          "control_heldout_reprojection_corners": 128,
+          "control_heldout_e_cross_translation_mm": 24.222380503883095,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.3831813754826974,
+            0.27862008789218173,
+            0.01222194274040922
+          ]
+        }
+      }
+    },
+    {
+      "held_out_set": 11,
+      "train_sets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        12
+      ],
+      "fk_artifact_sha256": "02af26bf7d9e8add81719ab2de8531e10413cebd7265feb5c0bcc608b1bac891",
+      "handeye_initialization": {
+        "method": "PARK",
+        "score_mm_equivalent": 9.620605487278015,
+        "n_poses": 71
+      },
+      "reference_centre_m": [
+        -0.3142773668496165,
+        0.2786654328565152,
+        0.010544187190785273
+      ],
+      "arms": {
+        "A3": {
+          "row": "A3",
+          "label": "FK-fixed (hard)",
+          "anchor_lambda": null,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 18,
+            "cost": 120171.56741268978,
+            "train_reprojection_rmse_px": 14.936282165299213,
+            "elapsed_s": 4.784628817054909,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13342,
+              30
+            ],
+            "rank": 30,
+            "n_params": 30,
+            "nullity": 0,
+            "rank_tolerance": 3.231942459102758e-07,
+            "largest_singular_value": 109094.40004870383,
+            "smallest_identifiable_singular_value": 794.0823933273059,
+            "jacobian_condition_number": 137.38423237365137,
+            "gauss_newton_hessian_condition_number": 18874.42730489744,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 3.455970660789245,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.995181629109838,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 4.688706985639365,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.318800077973575,
+              "parameters": [
+                -0.0016131917935147792,
+                -0.00012661700452675415,
+                0.0015259825239892354
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 2.8109091656662337,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.834489362208555,
+              "parameters": [
+                [
+                  0.9999821671019888,
+                  -0.005799104606316851,
+                  -0.001426836982492391,
+                  0.00106942082934669
+                ],
+                [
+                  0.005784643598070506,
+                  0.9999338791469318,
+                  -0.009938572966603563,
+                  0.0014924331633086596
+                ],
+                [
+                  0.0014843774630847661,
+                  0.009930141989629208,
+                  0.9999495931813827,
+                  -0.0026683993330427116
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 2.944415975667942,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.3313403950245752,
+              "parameters": [
+                [
+                  -0.0022594787837230883,
+                  0.0014138538026295488,
+                  -0.002672418186277512
+                ],
+                [
+                  -0.011675904083138214,
+                  0.005891843488754973,
+                  0.0014721860837808
+                ],
+                [
+                  -0.005159058691479976,
+                  -2.9846973162482085e-05,
+                  0.009931020660931475
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 3.982884322605754,
+          "control_heldout_reprojection_corners": 124,
+          "control_heldout_e_cross_translation_mm": 24.383639594840027,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.31331156358849277,
+            0.2803929059532131,
+            0.013377346905524945
+          ]
+        },
+        "A2": {
+          "row": "A2",
+          "label": "vision-estimated (no anchor)",
+          "anchor_lambda": 0.0,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 216,
+            "cost": 114829.60274542854,
+            "train_reprojection_rmse_px": 14.883821786422795,
+            "elapsed_s": 56.80387238797266,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13342,
+              102
+            ],
+            "rank": 102,
+            "n_params": 102,
+            "nullity": 0,
+            "rank_tolerance": 3.2834141033444373e-07,
+            "largest_singular_value": 110831.82830404017,
+            "smallest_identifiable_singular_value": 210.78398672483206,
+            "jacobian_condition_number": 525.8076290620955,
+            "gauss_newton_hessian_condition_number": 276473.6627799023,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 3.769047757327968,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.775584270004184,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 5.514651158877761,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.107898529111248,
+              "parameters": [
+                -0.0018381576895661067,
+                0.00012491351116038682,
+                0.0015927798709977666
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 2.723428021356428,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.1236179963450637,
+              "parameters": [
+                [
+                  0.9999310606133629,
+                  -0.01029379389364386,
+                  -0.005649055488322417,
+                  0.0029391485323860267
+                ],
+                [
+                  0.010223545159361544,
+                  0.9998717592251097,
+                  -0.01232656596371828,
+                  0.002941208533794204
+                ],
+                [
+                  0.0057752181785161215,
+                  0.012267962803928802,
+                  0.9999080677460463,
+                  -0.0025657257725516143
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 2.9052289610069084,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.4893708571120383,
+              "parameters": [
+                [
+                  -0.0006996619090935418,
+                  0.0026942903651574,
+                  -0.0025593577006542715
+                ],
+                [
+                  -0.013662045129169475,
+                  0.009701784252142276,
+                  0.0057477964917779815
+                ],
+                [
+                  -0.010144031319348379,
+                  -0.00012499773085859777,
+                  0.012236958548947458
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 4.753791167526925,
+          "control_heldout_reprojection_corners": 124,
+          "control_heldout_e_cross_translation_mm": 22.201502727092578,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.31417119843912655,
+            0.28066895519446466,
+            0.013734852874771997
+          ]
+        }
+      }
+    },
+    {
+      "held_out_set": 12,
+      "train_sets": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "fk_artifact_sha256": "dc1076cd43fe742c5615fb5d19557e82caec0be3ddb914febd13c2ab368c792b",
+      "handeye_initialization": {
+        "method": "PARK",
+        "score_mm_equivalent": 9.634010658196871,
+        "n_poses": 71
+      },
+      "reference_centre_m": [
+        -0.24310508411136464,
+        0.27889584912406523,
+        0.01044072543879794
+      ],
+      "arms": {
+        "A3": {
+          "row": "A3",
+          "label": "FK-fixed (hard)",
+          "anchor_lambda": null,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 19,
+            "cost": 119515.93706603054,
+            "train_reprojection_rmse_px": 14.9186674979796,
+            "elapsed_s": 5.1371077810181305,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13330,
+              30
+            ],
+            "rank": 30,
+            "n_params": 30,
+            "nullity": 0,
+            "rank_tolerance": 3.182847476817075e-07,
+            "largest_singular_value": 107533.9138077307,
+            "smallest_identifiable_singular_value": 799.237004321272,
+            "jacobian_condition_number": 134.54571450811468,
+            "gauss_newton_hessian_condition_number": 18102.5492924991,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "shared_board_free_FK_artifact_T_gripper_cam",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 2.037090760886587,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.091215313718972,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 3.7252507169402653,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.4773981068278537,
+              "parameters": [
+                -0.00164792185216085,
+                -0.0002565595134712273,
+                0.00136538490362858
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 1.6471863101848385,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.9927047137568317,
+              "parameters": [
+                [
+                  0.9999830199337321,
+                  -0.005549373614865637,
+                  -0.0017788470129983418,
+                  0.0009236559786701681
+                ],
+                [
+                  0.005530455769873989,
+                  0.9999299044924957,
+                  -0.010469009533191107,
+                  0.001336360874105269
+                ],
+                [
+                  0.0018368187690914611,
+                  0.01045899393398871,
+                  0.9999436161817816,
+                  -0.00297209362171706
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 1.9745139316216571,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.4921226990261927,
+              "parameters": [
+                [
+                  -0.0030250567383689198,
+                  0.0005719274317129185,
+                  -0.0029751235241749743
+                ],
+                [
+                  -0.011885291876389488,
+                  0.005818311844501475,
+                  0.0018133518736542906
+                ],
+                [
+                  -0.0038423375570498784,
+                  0.0015464286947549383,
+                  0.010450971960085216
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 7.452319127945638,
+          "control_heldout_reprojection_corners": 120,
+          "control_heldout_e_cross_translation_mm": 22.625177922679516,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.2429356826622591,
+            0.2785395322127768,
+            0.012439244934789984
+          ]
+        },
+        "A2": {
+          "row": "A2",
+          "label": "vision-estimated (no anchor)",
+          "anchor_lambda": 0.0,
+          "converged": true,
+          "solver": {
+            "status": 2,
+            "message": "`ftol` termination condition is satisfied.",
+            "nfev": 103,
+            "cost": 114606.56739852818,
+            "train_reprojection_rmse_px": 14.868541460880335,
+            "elapsed_s": 26.833763470989652,
+            "anchor_rms_cube_displacement_mm": null
+          },
+          "jacobian": {
+            "shape": [
+              13330,
+              102
+            ],
+            "rank": 102,
+            "n_params": 102,
+            "nullity": 0,
+            "rank_tolerance": 3.2167421504637604e-07,
+            "largest_singular_value": 108679.06039141455,
+            "smallest_identifiable_singular_value": 208.68547105632004,
+            "jacobian_condition_number": 520.7792370082354,
+            "gauss_newton_hessian_condition_number": 271211.01369887986,
+            "rank_deficient": false
+          },
+          "initialization": {
+            "T_gripper_cam_source": "train_eih_board_handeye",
+            "fixed_camera_sources": {
+              "0": {
+                "cube": 12,
+                "board": 12
+              },
+              "1": {
+                "cube": 12,
+                "board": 12
+              },
+              "3": {
+                "cube": 12,
+                "board": 10
+              }
+            },
+            "registered_camera_ids": [
+              0,
+              1,
+              3
+            ]
+          },
+          "n_fit_observations": 213,
+          "corrections": {
+            "none": {
+              "heldout_position_error_mm": 2.34224802844577,
+              "correction_dof": 0,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.785731138661459,
+              "parameters": null
+            },
+            "offset": {
+              "heldout_position_error_mm": 4.531064300187187,
+              "correction_dof": 3,
+              "correction_learned": true,
+              "train_position_rmse_mm": 4.1944981157928,
+              "parameters": [
+                -0.0017732521600712311,
+                -0.00015765415749802633,
+                0.0014629183270404623
+              ]
+            },
+            "se3": {
+              "heldout_position_error_mm": 1.6941802402383952,
+              "correction_dof": 6,
+              "correction_learned": true,
+              "train_position_rmse_mm": 3.2012989190843166,
+              "parameters": [
+                [
+                  0.9999344611460094,
+                  -0.009507218507352725,
+                  -0.0063785742053607975,
+                  0.0026514071423127117
+                ],
+                [
+                  0.009422061859517734,
+                  0.9998678195184494,
+                  -0.013250216667527692,
+                  0.0025179387503906914
+                ],
+                [
+                  0.006503703787478682,
+                  0.01318924894277374,
+                  0.9998918669283047,
+                  -0.002896354409603742
+                ],
+                [
+                  0.0,
+                  0.0,
+                  0.0,
+                  1.0
+                ]
+              ]
+            },
+            "ridge": {
+              "heldout_position_error_mm": 2.1647999021760955,
+              "correction_dof": 9,
+              "correction_learned": true,
+              "train_position_rmse_mm": 2.5804742833030687,
+              "parameters": [
+                [
+                  -0.0017689170781811144,
+                  0.0015764690673580675,
+                  -0.0028848991770268257
+                ],
+                [
+                  -0.013639868064324588,
+                  0.009422476117845741,
+                  0.006461428403441611
+                ],
+                [
+                  -0.007842976011240918,
+                  0.0016514623213926432,
+                  0.013138026872268008
+                ]
+              ]
+            }
+          },
+          "control_heldout_reprojection_fk_pose_px": 7.864500197071499,
+          "control_heldout_reprojection_corners": 120,
+          "control_heldout_e_cross_translation_mm": 21.093725971943055,
+          "control_heldout_cross_pairs": 3,
+          "raw_predicted_centre_m": [
+            -0.2440944405987298,
+            0.27849466485695545,
+            0.012525515776335538
+          ]
+        }
+      }
+    }
+  ]
+}

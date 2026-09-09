@@ -1,0 +1,30 @@
+{
+  "created_at_epoch": 1788431122.6429484,
+  "updated_at_epoch": 1788431122.6429493,
+  "serial_to_idx": {
+    "039422061216": 0,
+    "136622073980": 1,
+    "243622070663": 2,
+    "314522062542": 3
+  },
+  "gripper_cam_idx": null,
+  "gripper_serial": null,
+  "detected_now": [
+    {
+      "serial": "136622073980",
+      "name": "RealSense D435"
+    },
+    {
+      "serial": "243622070663",
+      "name": "RealSense D435I"
+    },
+    {
+      "serial": "039422061216",
+      "name": "RealSense D415"
+    },
+    {
+      "serial": "314522062542",
+      "name": "RealSense D415"
+    }
+  ]
+}

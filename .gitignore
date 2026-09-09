@@ -6,6 +6,7 @@ __pycache__/
 .ruff_cache/
 .ipynb_checkpoints/
 .claude/scheduled_tasks.lock
+SOTA_Simulation/outputs/
 
 # Superseded diagnostic outputs; canonical results live in the non-smoke folders.
 CP_result/*_smoke/

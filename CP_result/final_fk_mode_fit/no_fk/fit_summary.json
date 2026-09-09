@@ -1,0 +1,201 @@
+{
+  "arm": "no_fk",
+  "label": "no-FK (큐브 자세를 영상으로 추정)",
+  "row": "A2",
+  "anchor_lambda_px_per_mm": 0.0,
+  "n_positions": 13,
+  "positions": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12
+  ],
+  "converged": true,
+  "solver": {
+    "nfev": 190,
+    "cost": 122917.80286530877,
+    "optimality": 1000.431879778775,
+    "message": "`ftol` termination condition is satisfied.",
+    "success": true
+  },
+  "reference_fixed_cam": 0,
+  "fixed_cams": [
+    0,
+    1,
+    3
+  ],
+  "in_sample": {
+    "fk_proxy_position_rmse_mm": 4.802085450010863,
+    "cross_camera_translation_rmse_mm_by_position": {
+      "0": {
+        "rmse_mm": 15.04196822633916,
+        "n_pairs": 3
+      },
+      "1": {
+        "rmse_mm": 15.67093059580929,
+        "n_pairs": 3
+      },
+      "2": {
+        "rmse_mm": 13.013933789193175,
+        "n_pairs": 3
+      },
+      "3": {
+        "rmse_mm": 11.753120512509073,
+        "n_pairs": 3
+      },
+      "4": {
+        "rmse_mm": 21.694050312384775,
+        "n_pairs": 3
+      },
+      "5": {
+        "rmse_mm": 18.67834160501055,
+        "n_pairs": 3
+      },
+      "6": {
+        "rmse_mm": 16.702101610447382,
+        "n_pairs": 3
+      },
+      "7": {
+        "rmse_mm": 15.893808028236693,
+        "n_pairs": 3
+      },
+      "8": {
+        "rmse_mm": 18.062291757563447,
+        "n_pairs": 3
+      },
+      "9": {
+        "rmse_mm": 17.76506750021534,
+        "n_pairs": 3
+      },
+      "10": {
+        "rmse_mm": 18.57743129561551,
+        "n_pairs": 3
+      },
+      "11": {
+        "rmse_mm": 18.086168276488184,
+        "n_pairs": 3
+      },
+      "12": {
+        "rmse_mm": 16.448458764819804,
+        "n_pairs": 3
+      }
+    },
+    "cross_camera_translation_rmse_mm_mean": 16.722128636510185,
+    "cross_camera_translation_rmse_mm_median": 16.702101610447382,
+    "warning": "hold-out 이 아니다. 방식 판정은 CP_D1 결과로만 한다."
+  },
+  "corrections": {
+    "none": {
+      "dof": 0,
+      "in_sample_position_rmse_mm": 4.802085450010863,
+      "parameters": null,
+      "note": "보정은 T_base_Ci·T_gripper_cam 을 바꾸지 않는다. 예측된 큐브 중심에만 적용한다."
+    },
+    "offset": {
+      "dof": 3,
+      "in_sample_position_rmse_mm": 4.121453411038414,
+      "parameters": [
+        -0.0016394046081481188,
+        -0.0003779697715984853,
+        0.0018008714091756527
+      ],
+      "note": "보정은 T_base_Ci·T_gripper_cam 을 바꾸지 않는다. 예측된 큐브 중심에만 적용한다."
+    },
+    "se3": {
+      "dof": 6,
+      "in_sample_position_rmse_mm": 3.17475234977738,
+      "parameters": [
+        [
+          0.9999418346805382,
+          -0.009484236901248595,
+          -0.005135806277554313,
+          0.0026341892834586544
+        ],
+        [
+          0.009417109905549234,
+          0.9998719222362026,
+          -0.012940524128040818,
+          0.0022736425477305477
+        ],
+        [
+          0.005257879491427649,
+          0.012891406986151564,
+          0.9999030784676937,
+          -0.0025816288769920648
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "note": "보정은 T_base_Ci·T_gripper_cam 을 바꾸지 않는다. 예측된 큐브 중심에만 적용한다."
+    },
+    "ridge": {
+      "dof": 9,
+      "in_sample_position_rmse_mm": 2.529221477305415,
+      "parameters": [
+        [
+          -0.0011737968888774631,
+          0.0012992966003110163,
+          -0.0025800883772038245
+        ],
+        [
+          -0.014290076047627713,
+          0.00812607049798262,
+          0.005216638257280277
+        ],
+        [
+          -0.009447656663807003,
+          0.0010313725676162036,
+          0.01286176138999665
+        ]
+      ],
+      "note": "보정은 T_base_Ci·T_gripper_cam 을 바꾸지 않는다. 예측된 큐브 중심에만 적용한다."
+    }
+  },
+  "cube_config_source": "config_py:CubeConfig",
+  "cube_detection": "",
+  "solver_options": {
+    "method": "trf",
+    "loss": "soft_l1",
+    "f_scale_px": 2.0,
+    "max_nfev": 300,
+    "xtol": 1e-08,
+    "ftol": 1e-08,
+    "gtol": 1e-08,
+    "parameterization": "left_local_SE3_perturbation_with_retraction",
+    "rotation_scale_rad": 1.0,
+    "translation_scale_m": 1.0,
+    "scipy_x_scale": "jac"
+  },
+  "fk_alignment_artifact": {
+    "training_set_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "schema": "board_free_fk_cube_alignment_v1"
+  },
+  "transforms_file": "CP_result/final_fk_mode_fit/no_fk/final_transforms_base_frame.json"
+}

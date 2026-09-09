@@ -1325,7 +1325,8 @@ def detect_observations(args, meta, K_map, D_map, all_cam_ids, gripper):
     cube = AprilTagCubeTarget(cfg)
     observations, observation_diag = load_cube_board_pixel_observations(
         args.root_folder, meta, cube, K_map, D_map, all_cam_ids, gripper,
-        exclude_gripped_cube=True, fixed_cube_min_corners=8,
+        exclude_gripped_cube=not bool(getattr(args, "include_gripped_cube", False)),
+        fixed_cube_min_corners=8,
         image_scale=float(getattr(args, "image_scale", 1.0)),
         cube_observation_policy=str(getattr(
             args, "cube_observation_policy", "core_multiface")))
@@ -1730,7 +1731,7 @@ def build_shared_baseline_artifact(
             "seed_zero_is_unperturbed": True,
         },
         "observation_loader": {
-            "exclude_gripped_cube": True,
+            "exclude_gripped_cube": not bool(getattr(args, "include_gripped_cube", False)),
             "fixed_cube_min_corners": 8,
             "cube_observation_policy": data.cube_detection[
                 "observation_policy"],
@@ -1995,6 +1996,13 @@ def parse_args(argv=None):
         "--baseline_only", action="store_true",
         help="Prepare the authenticated shared baseline/artifacts without fitting rows.")
     parser.add_argument("--sanity_only", action="store_true")
+    parser.add_argument(
+        "--include_gripped_cube", action="store_true",
+        help=("Also load cube_gripped=True observations (grip-target model, "
+              "T_gripper_cube[grasp_idx]) instead of dropping them. Off by "
+              "default to preserve prior runs' behavior; needed for datasets "
+              "whose fixed-camera cube views only exist while the cube is "
+              "gripped (e.g. UR3 session1)."))
     args = parser.parse_args(argv)
     return apply_session_defaults(
         args, {'calib_dir': 'calib_dir', 'out_dir': 'table1_dir',

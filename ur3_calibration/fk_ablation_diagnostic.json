@@ -1,0 +1,36 @@
+{
+  "warning": "NOT table1.py's frozen held-out Table 1 metric -- train-pooled, no held-out split (blocked; see fit_grasp_offset.py docstring). Comparable to each other, not to any table1_methods.json row.",
+  "results": {
+    "no_fk": {
+      "train_reprojection_rmse_px": 1.1712764190318963,
+      "success": true
+    },
+    "fixed_fk": {
+      "train_reprojection_rmse_px": 1.3515855934501264,
+      "success": true
+    },
+    "factor_fk": {
+      "train_reprojection_rmse_px": 1.174836774269063,
+      "success": true,
+      "fk_factor_whitened_residual_norm": {
+        "1": 172.08408581594486,
+        "2": 172.0038905736809,
+        "3": 172.13773459861034,
+        "4": 172.237680496585,
+        "5": 172.3237829572245,
+        "6": 172.09845167605425,
+        "7": 172.11897173665906,
+        "8": 172.22312587963398,
+        "9": 172.1223904912298,
+        "10": 172.1693743752709,
+        "11": 172.18329105229068,
+        "12": 172.18282346723794
+      }
+    }
+  },
+  "delta_train_translation_mm": [
+    -1.7791051270627514,
+    3.580331502058588,
+    -346.13968423116876
+  ]
+}
