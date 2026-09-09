@@ -59,7 +59,7 @@ from calibration_pipeline.observations import (  # noqa: E402
 )
 from calibration_pipeline.path_evaluation import solve_observed_pose  # noqa: E402
 from calibration_pipeline.reprojection import (  # noqa: E402
-    PoseState, SolverOptions, project_points, solve_corner_reprojection, variable_keys,
+    PoseState, SolverOptions, pose_delta, project_points, solve_corner_reprojection, variable_keys,
 )
 from calibration_pipeline.table1 import estimate_board_handeye_initial  # noqa: E402
 from robot.backends.zeus_client import pose6_to_T  # noqa: E402
@@ -286,6 +286,69 @@ def solve_sequential(data, gtc_init, board_init):
     return final1, diag1, final2, diag2, obs_stage1, obs_stage2
 
 
+# --------------------------------------------------------- 독립(parallel, 최종 합의)
+#
+# sequential(위)과는 다른 방식 -- 사용자가 의도한 원래 "독립" 개념: 고정캠
+# 그룹과 그리퍼 그룹이 서로 residual을 전혀 공유하지 않고 **완전히 따로**
+# 풀고(한쪽이 다른 쪽에 값을 넘겨주는 handoff가 아예 없음), 맨 마지막에
+# 두 그룹이 같은 session2 세트에 대해 각자 계산한 큐브 pose를 서로 비교해서
+# "합의(consensus)"를 본다. Simulation/core/methods.py의 solve_independent +
+# _rigid_align이 원래 하던 방식과 같은 개념.
+#
+# Zeus는 두 그룹 다 로봇 FK로 base 좌표계에 이미 묶여 있다(그룹A는 session1의
+# grasp+FK, 그룹B는 session3의 board eye-in-hand+FK) -- 그래서 Simulation 쪽처럼
+# 임의의 gauge를 맞추는 rigid-align이 필요 없고, 그냥 두 그룹의 큐브 pose를
+# 직접 비교하면 된다(같은 좌표계이므로). 이 비교 자체가 "완전히 독립적으로
+# 계산한 두 답이 서로 얼마나 맞는가"라는 유의미한 검증 지표가 된다.
+def solve_parallel_fixed(data):
+    """고정캠 그룹: session1(grasp+FK) + session2-고정캠만, 그리퍼 정보 전혀 안 씀."""
+    cam_init, grasp_init = data["cam_init"], data["grasp_init"]
+    K_map, D_map = data["K_map"], data["D_map"]
+    obs_s2 = data["obs_s2_fixed"]
+    set_ids = sorted(data["items_by_index"])
+    cubes = init_cube_poses(obs_s2, K_map, D_map, cam_init, np.eye(4), {}, -999, set_ids)
+    observations = data["obs_s1"] + [o for o in obs_s2 if o.set_idx is not None and int(o.set_idx) in cubes]
+    state = PoseState(cams=dict(cam_init), gtc=np.eye(4), board=None,
+                      cubes=dict(cubes), grasps={0: grasp_init.copy()})
+    keys = variable_keys(["T_base_Ci", "T_base_cube_by_set", "T_gripper_cube_by_grasp"], state)
+    final_state, diag = solve_corner_reprojection(
+        observations=observations, variable_keys_=keys, reference_state=state,
+        robot_T=data["robot_T_s1"], K_map=K_map, D_map=D_map,
+        gripper_cam_idx=-999, options=SolverOptions(),
+    )
+    return final_state, diag, observations
+
+
+def solve_parallel_gripper(data, gtc_init, board_init):
+    """그리퍼 그룹: session2-그리퍼캠 + session3만, 고정캠 정보 전혀 안 씀."""
+    K_map, D_map = data["K_map"], data["D_map"]
+    obs_s2g = data["obs_s2_gripper"]
+    set_ids = sorted(data["items_by_index"])
+    robot_T = {**data["robot_T_s2_gripper"], **data["robot_T_s3"]}
+    cubes = init_cube_poses(obs_s2g, K_map, D_map, {}, gtc_init, robot_T, GRIPPER_LOCAL_ID, set_ids)
+    observations = ([o for o in obs_s2g if o.set_idx is not None and int(o.set_idx) in cubes]
+                    + data["obs_s3"])
+    state = PoseState(cams={}, gtc=gtc_init.copy(), board=board_init.copy(), cubes=dict(cubes), grasps={})
+    keys = variable_keys(["T_gripper_cam", "T_base_board", "T_base_cube_by_set"], state)
+    final_state, diag = solve_corner_reprojection(
+        observations=observations, variable_keys_=keys, reference_state=state,
+        robot_T=robot_T, K_map=K_map, D_map=D_map,
+        gripper_cam_idx=GRIPPER_LOCAL_ID, options=SolverOptions(),
+    )
+    return final_state, diag, observations
+
+
+def consensus_check(state_fixed, state_gripper):
+    """두 그룹이 완전히 독립적으로 계산한, 같은 session2 세트의 큐브 pose를
+    직접 비교(같은 base 좌표계라 rigid-align 불필요). 세트별 (mm, deg) 차이."""
+    common = sorted(set(state_fixed.cubes) & set(state_gripper.cubes))
+    per_set = {}
+    for s in common:
+        d_mm, d_deg = pose_delta(state_fixed.cubes[s], state_gripper.cubes[s])
+        per_set[s] = {"translation_mm": d_mm, "rotation_deg": d_deg}
+    return per_set
+
+
 def per_corner_errors(state, observations, robot_T, K_map, D_map, gripper_id):
     """(dx, dy) 성분별 잔차를 펴서 반환 -- solve_corner_reprojection의
     train_reprojection_rmse_px(=sqrt(mean(raw_residual**2)), 코너별 유클리드
@@ -360,6 +423,37 @@ def main():
         "stage2_fixed_cams_rmse_px": rmse_px(errs_2),
     }
 
+    # 진짜 독립: 공통 큐브(session2)가 아예 없었다고 가정하고, 고정캠 그룹과
+    # 그리퍼 그룹을 서로 정보 교환 없이 완전히 따로 캘리브레이션한다
+    # (고정캠은 session1 grasp+FK로, 그리퍼는 session3 board eye-in-hand+FK로 --
+    # 둘 다 "공통 큐브 없이도" 원래 이렇게 각자 로봇 FK에 연결해서 캘리브레이션
+    # 했을 방식 그대로). session2는 캘리브레이션에 전혀 안 쓰고, 다 끝난 뒤
+    # "두 그룹이 우연히 같이 본 session2 큐브들에 대해 서로 계산이 얼마나
+    # 일치하는가"를 사후 검증(합의)으로만 쓴다 -- 옵션1, 결과를 바꾸지 않는
+    # 순수 진단 지표.
+    label2 = "독립_no-fk (진짜 독립, session2는 사후검증만)"
+    state_fixed, diag_fixed, obs_fixed = solve_parallel_fixed(data)
+    state_gripper, diag_gripper, obs_gripper = solve_parallel_gripper(data, gtc_init, board_init)
+    export_fit_json(fit_out_dir / "fit_독립_no-fk.json", state_fixed.grasps[0], state_fixed.cams, state_gripper.gtc)
+    errs_fixed = per_corner_errors(state_fixed, obs_fixed, data["robot_T_s1"], K_map, D_map, -999)
+    errs_gripper = per_corner_errors(state_gripper, obs_gripper,
+                                     {**data["robot_T_s2_gripper"], **data["robot_T_s3"]},
+                                     K_map, D_map, GRIPPER_LOCAL_ID)
+    agreement = consensus_check(state_fixed, state_gripper)
+    agree_mm = [v["translation_mm"] for v in agreement.values()]
+    agree_deg = [v["rotation_deg"] for v in agreement.values()]
+    results[label2] = {
+        "success": bool(diag_fixed["success"] and diag_gripper["success"]),
+        "fixed_group_rmse_px": rmse_px(errs_fixed),
+        "gripper_group_rmse_px": rmse_px(errs_gripper),
+        "n_observations": len(obs_fixed) + len(obs_gripper),
+        "consensus_per_set": agreement,
+        "consensus_mean_mm": float(np.mean(agree_mm)) if agree_mm else float("nan"),
+        "consensus_mean_deg": float(np.mean(agree_deg)) if agree_deg else float("nan"),
+        "consensus_max_mm": float(np.max(agree_mm)) if agree_mm else float("nan"),
+        "consensus_max_deg": float(np.max(agree_deg)) if agree_deg else float("nan"),
+    }
+
     total_n = len(data["obs_s1"]) + len(data["obs_s2_fixed"]) + len(data["obs_s2_gripper"]) + len(data["obs_s3"])
     print(f"{'condition':>34} {'rmse_px':>10} {'n_corners':>10} {'n_obs':>7}   detail")
     for name in ("통합_raw-fk", "통합_no-fk", label):
@@ -368,6 +462,12 @@ def main():
         if "stage1_gripper_rmse_px" in r:
             detail = f"stage1(그리퍼) {r['stage1_gripper_rmse_px']:.4f} / stage2(고정캠) {r['stage2_fixed_cams_rmse_px']:.4f}"
         print(f"{name:>34} {r['rmse_px']:>10.4f} {r['n_corners']:>10d} {r['n_observations']:>7d}   {detail}")
+    r2 = results[label2]
+    print(f"{label2:>34} {'고정캠:'+format(r2['fixed_group_rmse_px'],'.4f'):>10} {'-':>10} "
+          f"{r2['n_observations']:>7d}   그리퍼:{r2['gripper_group_rmse_px']:.4f}")
+    print(f"  -> session2 사후 합의(두 그룹이 각자 계산한 같은 큐브들의 차이): "
+          f"평균 {r2['consensus_mean_mm']:.2f}mm/{r2['consensus_mean_deg']:.2f}deg, "
+          f"최대 {r2['consensus_max_mm']:.2f}mm/{r2['consensus_max_deg']:.2f}deg")
     print(f"\n(참고: 데이터 풀 총 observation 수 = {total_n})")
     print("\n주의: raw-fk(통합_raw-fk)는 table1.py A3와 이름만 같지 실제로는 다른 조건입니다 --")
     print("A3는 비전 개입 0인 순수 기계적 상수를 쓰는데, 여긴 session1 비전 fit값(T_gripper_cube)을 씁니다.")
