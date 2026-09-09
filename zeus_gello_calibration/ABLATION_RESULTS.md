@@ -34,6 +34,16 @@ sequential_frozen_stage(A1, 그리퍼가 먼저 정하고 고정캠이 일방적
 
 (독립의 Train은 고정캠/그리퍼캠 두 그룹을 완전히 따로 풀기 때문에 "고정캠값/그리퍼캠값"으로 표기. Heldout px/Cross-view px/Cam-common은 `eval_heldout_and_consistency.py`로 계산. Cross-view Cube px = late_table1과 같은 정의로, 한 카메라의 단일 이미지 PnP pose를 캘리브레이션된 extrinsics로 다른 카메라로 옮겨 재투영했을 때의 코너 px RMSE — 고정캠-고정캠 + 그리퍼캠-고정캠 쌍, 양방향, 세트당 4대 → 81쌍/162방향.)
 
+Cross-view px / Cam-common을 **held-out 방식**(각 fold에서 빠진 세트에 대해서만 재고 15 fold pooled, late_table1이 held-out 세트에서 재는 것과 같은 구조)으로도 계산했다. 위 표의 train-pooled 값과 거의 같다:
+
+| 방법 | Cross-view px (train-pooled) | Cross-view px (**held-out**) | Cam-common mm/deg (train-pooled) | Cam-common mm/deg (**held-out**) |
+|---|---:|---:|---:|---:|
+| 통합_no-fk | 3.9234 | 3.9473 | 4.2250 / 1.0534 | 4.2473 / 1.0570 |
+| 통합_raw-fk | 4.2813 | 4.2703 | 4.6416 / 1.1567 | 4.6214 / 1.1619 |
+| 독립_no-fk | 3.6668 | **3.6836** | 3.9182 / 1.1376 | **3.9319** / 1.1394 |
+
+held-out으로 바꿔도 값이 0.03px / 0.03mm 안에서만 움직이고 순위는 그대로다. 이 두 지표는 "단일 이미지 PnP pose + 카메라 extrinsics"만 쓰는데, 15세트 중 1개를 빼고 다시 fit해도 extrinsics가 거의 안 바뀌기 때문 — 즉 이 지표들은 그 세트를 학습에 썼느냐와 거의 무관한 "카메라 배치 자체의 일치도"라는 뜻이고, held-out cube RMSE(그 세트가 빠지면 2.2→3.8px로 크게 움직임)와 성격이 다르다는 걸 다시 확인해준다.
+
 ## 데이터 풀 (모든 방식 공통, 162개 관측치)
 
 | 소스 | 관측치 수 | 내용 |

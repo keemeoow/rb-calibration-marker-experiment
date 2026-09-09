@@ -79,9 +79,15 @@ def fit_frozen(method, data_fold, fk_mode, gtc_init, board_init):
 
 
 def evaluate_heldout(method, data, fk_mode, gtc_init, board_init, robot_T_all, K_map, D_map, set_ids):
+    """반환: (heldout px RMSE, 세트별 px, 세트별 mm/deg, heldout_cross)
+    heldout_cross = 빠진 세트에 대해서만 잰 cross-view px / cam-common mm/deg를
+    15개 fold에 걸쳐 pooled한 것 -- late_table1처럼 학습에 안 쓴 세트 위에서
+    카메라 간 일치도를 재는 버전."""
     all_errs = []
     per_set = {}
     per_set_mm_deg = {}
+    xview_sq, xview_pairs, xview_dirs = [], 0, 0
+    camcom_mm, camcom_deg = [], []
     obs_all_s2 = data["obs_s2_fixed"] + data["obs_s2_gripper"]
     grasp_init = data["grasp_init"]
     for s in set_ids:
@@ -130,19 +136,38 @@ def evaluate_heldout(method, data, fk_mode, gtc_init, board_init, robot_T_all, K
             T_vision = cands[0] if len(cands) == 1 else cp.robust_se3_average(cands, None)[0]
             d_mm, d_deg = pose_delta(T_vision, T_gt)
             per_set_mm_deg[s] = {"translation_mm": d_mm, "rotation_deg": d_deg}
-    return rmse_px(all_errs), per_set, per_set_mm_deg
+
+        # held-out 세트에 대해서만 카메라 간 일치도 (이 fold의 frozen 카메라로)
+        sq, n_p, n_d = _cross_view_squared(heldout_obs, cams, gtc, robot_T_all, K_map, D_map, GRIPPER_LOCAL_ID)
+        xview_sq.extend(sq)
+        xview_pairs += n_p
+        xview_dirs += n_d
+        t_mm, r_deg = _cross_camera_pairs(heldout_obs, cams, gtc, robot_T_all, K_map, D_map, GRIPPER_LOCAL_ID)
+        camcom_mm.extend(t_mm)
+        camcom_deg.extend(r_deg)
+
+    heldout_cross = {
+        "cross_view_cube_pixel_transfer_rmse_px": float(np.sqrt(np.mean(xview_sq))) if xview_sq else float("nan"),
+        "cross_view_n_pairs": xview_pairs,
+        "cross_view_n_directions": xview_dirs,
+        "cam_common_translation_mm": float(np.mean(camcom_mm)) if camcom_mm else float("nan"),
+        "cam_common_rotation_deg": float(np.mean(camcom_deg)) if camcom_deg else float("nan"),
+        "cam_common_n_pairs": len(camcom_mm),
+    }
+    return rmse_px(all_errs), per_set, per_set_mm_deg, heldout_cross
 
 
-def cross_camera_consistency(obs_all_s2, cams, gtc, robot_T_all, K_map, D_map, gripper_id):
+def _cross_camera_pairs(obs_list, cams, gtc, robot_T_all, K_map, D_map, gripper_id):
+    """세트별로 카메라 pairwise (mm, deg) 차이 리스트를 그대로 반환 (평균 안 냄)."""
     by_set = {}
-    for o in obs_all_s2:
+    for o in obs_list:
         if o.set_idx is None:
             continue
         by_set.setdefault(int(o.set_idx), []).append(o)
-    trans_mm, rot_deg, n_pairs = [], [], 0
-    for s, obs_list in by_set.items():
+    trans_mm, rot_deg = [], []
+    for s, group in by_set.items():
         cam_pose = {}
-        for o in obs_list:
+        for o in group:
             est = camera_cube_estimate(o, cams, gtc, robot_T_all, K_map, D_map, gripper_id)
             if est is not None:
                 cam_pose[int(o.cam)] = est  # 세트당 카메라 1관측 가정 (session2 구조상 맞음)
@@ -152,9 +177,49 @@ def cross_camera_consistency(obs_all_s2, cams, gtc, robot_T_all, K_map, D_map, g
                 d_mm, d_deg = pose_delta(cam_pose[cam_ids[i]], cam_pose[cam_ids[j]])
                 trans_mm.append(d_mm)
                 rot_deg.append(d_deg)
-                n_pairs += 1
+    return trans_mm, rot_deg
+
+
+def cross_camera_consistency(obs_all_s2, cams, gtc, robot_T_all, K_map, D_map, gripper_id):
+    trans_mm, rot_deg = _cross_camera_pairs(obs_all_s2, cams, gtc, robot_T_all, K_map, D_map, gripper_id)
     return (float(np.mean(trans_mm)) if trans_mm else float("nan"),
-            float(np.mean(rot_deg)) if rot_deg else float("nan"), n_pairs)
+            float(np.mean(rot_deg)) if rot_deg else float("nan"), len(trans_mm))
+
+
+def _cross_view_squared(obs_list, cams, gtc, robot_T_all, K_map, D_map, gripper_id):
+    """cross_view_pixel_transfer의 재료: 성분별 제곱오차 리스트, 쌍 수, 방향 수."""
+    by_set = {}
+    for o in obs_list:
+        if o.set_idx is None:
+            continue
+        by_set.setdefault(int(o.set_idx), []).append(o)
+
+    def base_cam_pose(o):
+        c = int(o.cam)
+        if c == gripper_id:
+            if gtc is None or int(o.event) not in robot_T_all:
+                return None
+            return robot_T_all[int(o.event)] @ gtc
+        return cams.get(c)
+
+    sq_all, n_directions, n_pairs = [], 0, 0
+    for s, group in by_set.items():
+        entries = []
+        for o in group:
+            T_base_cam = base_cam_pose(o)
+            T_cam_cube = solve_observed_pose(o, K_map, D_map)
+            if T_base_cam is None or T_cam_cube is None:
+                continue
+            entries.append((o, T_base_cam, T_base_cam @ T_cam_cube))
+        for i in range(len(entries)):
+            for j in range(i + 1, len(entries)):
+                n_pairs += 1
+                for (src, _, T_base_cube_src), (dst, T_base_cam_dst, _) in ((entries[i], entries[j]), (entries[j], entries[i])):
+                    c = int(dst.cam)
+                    pred = project_points(inv_T(T_base_cam_dst) @ T_base_cube_src, dst.object_points, K_map[c], D_map[c])
+                    sq_all.extend(np.square(pred - np.asarray(dst.image_points).reshape(-1, 2)).reshape(-1).tolist())
+                    n_directions += 1
+    return sq_all, n_pairs, n_directions
 
 
 def cross_view_pixel_transfer(obs_all_s2, cams, gtc, robot_T_all, K_map, D_map, gripper_id):
@@ -169,37 +234,8 @@ def cross_view_pixel_transfer(obs_all_s2, cams, gtc, robot_T_all, K_map, D_map, 
     Cam-common(mm/deg)이 "두 카메라의 3D pose 추정치 차이"라면, 이건 "한쪽
     pose를 다른 쪽 이미지로 가져갔을 때 픽셀이 얼마나 어긋나는가"라 카메라 간
     상대 extrinsics를 더 직접적으로 본다. 둘 다 카메라 공통 편향은 못 잡는다."""
-    by_set = {}
-    for o in obs_all_s2:
-        if o.set_idx is None:
-            continue
-        by_set.setdefault(int(o.set_idx), []).append(o)
-
-    def base_cam_pose(o):
-        c = int(o.cam)
-        if c == gripper_id:
-            if gtc is None or int(o.event) not in robot_T_all:
-                return None
-            return robot_T_all[int(o.event)] @ gtc
-        return cams.get(c)
-
-    sq_all, n_directions, n_pairs = [], 0, 0
-    for s, obs_list in by_set.items():
-        entries = []
-        for o in obs_list:
-            T_base_cam = base_cam_pose(o)
-            T_cam_cube = solve_observed_pose(o, K_map, D_map)
-            if T_base_cam is None or T_cam_cube is None:
-                continue
-            entries.append((o, T_base_cam, T_base_cam @ T_cam_cube))
-        for i in range(len(entries)):
-            for j in range(i + 1, len(entries)):
-                n_pairs += 1
-                for (src, _, T_base_cube_src), (dst, T_base_cam_dst, _) in ((entries[i], entries[j]), (entries[j], entries[i])):
-                    c = int(dst.cam)
-                    pred = project_points(inv_T(T_base_cam_dst) @ T_base_cube_src, dst.object_points, K_map[c], D_map[c])
-                    sq_all.extend(np.square(pred - np.asarray(dst.image_points).reshape(-1, 2)).reshape(-1).tolist())
-                    n_directions += 1
+    sq_all, n_pairs, n_directions = _cross_view_squared(
+        obs_all_s2, cams, gtc, robot_T_all, K_map, D_map, gripper_id)
     return (float(np.sqrt(np.mean(sq_all))) if sq_all else float("nan")), n_pairs, n_directions
 
 
@@ -235,7 +271,7 @@ def main():
         ("독립_true", "no_fk", "독립_no-fk"),
     ):
         print(f"[{label}] leave-one-out held-out 계산 중 ({len(set_ids)}개 세트)...")
-        heldout_rmse, per_set, per_set_mm_deg = evaluate_heldout(
+        heldout_rmse, per_set, per_set_mm_deg, heldout_cross = evaluate_heldout(
             method, data, fk_mode, gtc_init, board_init, robot_T_all, K_map, D_map, set_ids)
         heldout_mm = [v["translation_mm"] for v in per_set_mm_deg.values()]
         heldout_deg = [v["rotation_deg"] for v in per_set_mm_deg.values()]
@@ -259,11 +295,13 @@ def main():
             "cross_view_cube_pixel_transfer_rmse_px": xview_px,
             "cross_view_n_pairs": xview_pairs,
             "cross_view_n_directions": xview_dirs,
+            "heldout_cross": heldout_cross,
             "per_set_heldout_rmse_px": per_set,
             "per_set_heldout_mm_deg": per_set_mm_deg,
         }
 
-    print(f"\n{'condition':>16} {'heldout_px':>11} {'heldout_mm':>11} {'heldout_deg':>12} "
+    print(f"\n[train-pooled: 전체 데이터 fit에서 잰 카메라 간 일치도]")
+    print(f"{'condition':>16} {'heldout_px':>11} {'heldout_mm':>11} {'heldout_deg':>12} "
           f"{'cross_view_px':>14} {'cross_cam_mm':>13} {'cross_cam_deg':>14}")
     for name in ("통합_raw-fk", "통합_no-fk", "독립_no-fk"):
         r = results[name]
@@ -271,6 +309,12 @@ def main():
               f"{r['heldout_translation_mean_mm']:>11.2f} {r['heldout_rotation_mean_deg']:>12.2f} "
               f"{r['cross_view_cube_pixel_transfer_rmse_px']:>14.4f} "
               f"{r['cross_camera_translation_mm']:>13.4f} {r['cross_camera_rotation_deg']:>14.4f}")
+    print(f"\n[held-out: 빠진 세트에 대해서만 잰 카메라 간 일치도, 15 fold pooled]")
+    print(f"{'condition':>16} {'xview_px':>10} {'xview_pairs':>12} {'camcom_mm':>10} {'camcom_deg':>11} {'camcom_pairs':>13}")
+    for name in ("통합_raw-fk", "통합_no-fk", "독립_no-fk"):
+        h = results[name]["heldout_cross"]
+        print(f"{name:>16} {h['cross_view_cube_pixel_transfer_rmse_px']:>10.4f} {h['cross_view_n_pairs']:>12d} "
+              f"{h['cam_common_translation_mm']:>10.4f} {h['cam_common_rotation_deg']:>11.4f} {h['cam_common_n_pairs']:>13d}")
 
     Path(args.out).write_text(json.dumps({"results": results}, indent=2))
     print(f"\nwrote {args.out}")

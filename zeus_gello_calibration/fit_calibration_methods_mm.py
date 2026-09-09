@@ -349,7 +349,7 @@ def main():
         robot_T_all = {**data["robot_T_s1"], **data["robot_T_s2_gripper"], **data["robot_T_s3"]}
         for method, fk_mode, label in conditions:
             for tag, fn in (("px", fit_frozen), ("mm", fit_frozen_mm)):
-                heldout_px, _per_set, per_set_mm_deg = _evaluate_heldout_with(
+                heldout_px, _per_set, per_set_mm_deg, _heldout_cross = _evaluate_heldout_with(
                     fn, method, data, fk_mode, gtc_init, board_init, robot_T_all, K_map, D_map, set_ids)
                 heldout_mm = [v["translation_mm"] for v in per_set_mm_deg.values()]
                 heldout_deg = [v["rotation_deg"] for v in per_set_mm_deg.values()]
