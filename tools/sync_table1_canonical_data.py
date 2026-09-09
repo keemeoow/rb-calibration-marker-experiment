@@ -17,9 +17,9 @@ from statistics import fmean
 METHOD_ORDER = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
 # Label-only migrations for numerical artifacts that predate corrected prose.
 CANONICAL_LABEL_OVERRIDES = {
-    "A3": "raw-FK hard fixed",
+    "A3": "FK hard fixed",
     "A4": "corrected-FK soft factor",
-    "A5": "vision-aligned FK hard fixed",
+    "A5": "corrected-FK hard fixed (VISION-aligned)",
 }
 SYSTEM_ORDER = ("board_only", "cube_only", "board_cube")
 FINAL_TARGET = "cube"
@@ -499,10 +499,21 @@ def _final_train_target(row: dict) -> str:
     return "board+cube"
 
 
+def _canonical_pose_method(row: dict) -> str:
+    """Map compatibility identifiers to the canonical publication terminology."""
+    return {
+        "estimated": "VISION",
+        "raw-FK-fixed": "FK hard fixed",
+        "corrected-FK-factor": "corrected-FK soft factor",
+        "vision-aligned-FK-fixed": (
+            "corrected-FK hard fixed (VISION-aligned)"),
+    }.get(row["cube_pose_handling"], row["cube_pose_handling"])
+
+
 def _final_pose_handling(row: dict) -> str:
     if row["method"] in {"A0", "B3"}:
-        return f"board pose={row['board_pose_handling']}; cube=eval only"
-    return f"cube pose={row['cube_pose_handling']}"
+        return "board pose=VISION; cube=evaluation only"
+    return f"cube pose={_canonical_pose_method(row)}"
 
 
 def _design_target(row: dict) -> str:
@@ -521,13 +532,11 @@ def _design_optimization(row: dict) -> str:
 
 def _design_pose_handling(row: dict) -> str:
     if row["method"] in {"A0", "B3"}:
-        return "Board: vision-estimated; Cube: evaluation only"
-    return {
-        "estimated": "Cube: vision-estimated",
-        "raw-FK-fixed": "Cube: raw FK hard fixed",
-        "corrected-FK-factor": "Cube: corrected FK soft factor",
-        "vision-aligned-FK-fixed": "Cube: vision-aligned FK hard fixed",
-    }.get(row["cube_pose_handling"], row["cube_pose_handling"])
+        return "VISION (board pose free); Cube: evaluation only"
+    pose_method = _canonical_pose_method(row)
+    if pose_method == "VISION":
+        return "VISION (cube pose free)"
+    return pose_method
 
 
 def _experiment_design_table(rows: list[dict]) -> str:
@@ -535,10 +544,10 @@ def _experiment_design_table(rows: list[dict]) -> str:
         "A0": "Board-only sequential baseline",
         "A1": "A0 대비 cube 관측 추가 효과",
         "A2": "A1 대비 unified feedback 효과",
-        "A3": "A2 대비 raw FK hard fixed 효과",
+        "A3": "A2 대비 FK hard fixed 효과",
         "A4": "A2 대비 corrected-FK soft factor 효과",
-        "A5": "A3/A4 대비 aligned FK hard fixed 효과",
-        "B1": "A4와 같은 soft FK에서 sequential 효과",
+        "A5": "A3/A4 대비 corrected-FK hard fixed 효과",
+        "B1": "A4와 같은 corrected-FK soft factor에서 sequential 효과",
         "B2": "A4 대비 board residual 제거 효과",
         "B3": "A2 대비 cube residual 제거; A0/B3 구조 대조",
     }
@@ -614,11 +623,11 @@ def _result_snapshot(rows: list[dict]) -> str:
         f"Cam-common {_fmt(a5['cam_common_cube_translation_rmse_mm'])} mm / "
         f"{_fmt(a5['cam_common_cube_rotation_rmse_deg'])} deg | heldout과 두 camera-consistency "
         "지표에서 모두 최소인 최종 후보. 물리 정확도 1위 확정은 External GT 이후 |",
-        f"| Raw FK hard fixed는 유효한가 | A2 {_fmt(a2['heldout_cube_reprojection_rmse_px'])} "
+        f"| FK hard fixed는 유효한가 | A2 {_fmt(a2['heldout_cube_reprojection_rmse_px'])} "
         f"-> A3 {_fmt(a3['heldout_cube_reprojection_rmse_px'])} px | 현재 데이터에서는 "
         f"{a3['heldout_cube_reprojection_rmse_px'] - a2['heldout_cube_reprojection_rmse_px']:+.4f} "
         "px 악화되어 채택 근거가 없음 |",
-        f"| Corrected-FK soft factor 이득은 큰가 | A2 {_fmt(a2['heldout_cube_reprojection_rmse_px'])} "
+        f"| corrected-FK soft factor 이득은 큰가 | A2 {_fmt(a2['heldout_cube_reprojection_rmse_px'])} "
         f"-> A4 {_fmt(a4['heldout_cube_reprojection_rmse_px'])} px | 개선은 "
         f"{a2['heldout_cube_reprojection_rmse_px'] - a4['heldout_cube_reprojection_rmse_px']:.4f} px로 "
         "작아 External GT 없이 우수성을 주장하기 어려움 |",
@@ -644,7 +653,7 @@ def _objective_block_table(rows: list[dict]) -> str:
     for row in rows:
         if row["method"] not in {"A2", "A3", "A4", "A5", "B1", "B2"}:
             continue
-        fk_description = row["cube_pose_handling"]
+        fk_description = _canonical_pose_method(row)
         if row["method"] in {"A3", "A5"}:
             fk_description += " (hard constant; residual 없음)"
         fraction = row["final_fk_robust_cost_fraction_mean"]
@@ -775,10 +784,10 @@ def _implementation_audit() -> str:
         "현재 목적함수의 additive term은 최대 **2개**다.",
         "",
         "- A0·A1·A2·A3·A5·B3: robust visual reprojection **1항**",
-        "- A4·B1·B2: robust visual reprojection + whitened robust FK factor "
+        "- A4·B1·B2: robust visual reprojection + whitened robust corrected-FK soft factor "
         "**2항**",
         "- `pose_error`와 `FK_constraint`: 서로 다른 두 항이 아니라 동일한 "
-        "FK factor의 두 표현",
+        "corrected-FK soft factor의 두 표현",
         "- `w1`, `w2`, `w3`: 사용하지 않음",
         "- 상대 scale: visual pixel `f_scale`과 FK covariance whitening "
         "`Sigma^(-1/2)`로 결정",
@@ -786,29 +795,29 @@ def _implementation_audit() -> str:
         "> **판정:** `w1·reprojection + w2·pose_error + w3·FK_constraint`는 "
         "현재 코드에 없는 부정확한 서술이다.",
         "",
-        "### A3의 raw-FK-fixed 의미",
+        "### A3의 FK hard fixed 의미",
         "",
         r"$$T_{B\,cube}(s)=F_s^{raw}T_{cube\ center\rightarrow object}^{mech}$$",
         "",
-        "A3가 고정하는 cube pose는 set별 controller raw FK pose에 영상과 "
+        "A3가 고정하는 cube pose는 set별 controller FK pose에 영상과 "
         "무관하게 사전 등록한 mechanical frame map `R_y(180°)`를 적용한 "
-        "pose다. cube-center 원점 이동은 0이고, `Delta_train`이나 aligned FK "
+        "pose다. cube-center 원점 이동은 0이고, `Delta_train`이나 corrected-FK "
         "artifact를 사용하지 않는다. A3 최종 optimizer에서는 이 pose를 "
         "상수로 고정하고 visual reprojection 1항만 최소화한다.",
         "",
-        "> **판정:** A3는 pure raw-FK hard constraint이지만 external GT는 "
+        "> **판정:** A3는 FK hard constraint이지만 external GT는 "
         "아니다. tool4/CAD frame 정의 오차가 그대로 결과에 들어간다.",
         "",
-        "### A5의 vision-aligned-FK-fixed 의미",
+        "### A5의 corrected-FK hard fixed (VISION-aligned) 의미",
         "",
         r"$$T_{B\,cube}(s)=F_s^{raw}\Delta_{train}$$",
         "",
         "A5는 board와 held-out을 제외한 train eye-in-hand cube 영상으로 "
         "추정한 `Delta_train`을 적용한 뒤 set별 cube pose를 상수로 "
-        "고정한다. A4와 동일한 aligned-FK artifact를 사용하지만 A4처럼 "
+        "고정한다. A4와 동일한 corrected-FK artifact를 사용하지만 A4처럼 "
         "covariance factor로 완화하지 않는다.",
         "",
-        "> **판정:** A5는 train-only vision-aligned FK를 쓰는 최종 후보 "
+        "> **판정:** A5는 train-only corrected-FK를 hard fixed로 쓰는 최종 후보 "
         "방법으로 둘 수 있다. 단, External GT 공개 전에 alignment artifact와 "
         "평가 코드를 frozen해야 한다.",
     ])
@@ -855,7 +864,7 @@ def _contrast_definitions() -> list[tuple[str, str, str, str, str, tuple[str, ..
             "A1",
             "A2",
             "A1 -> A2",
-            "Vision-only 조건에서 unified feedback이 도움이 되는가",
+            "VISION 조건에서 unified feedback이 도움이 되는가",
             ("cube",),
             "현재 0.0978 px 개선으로 unified feedback을 약하게 지지한다.",
         ),
@@ -873,16 +882,16 @@ def _contrast_definitions() -> list[tuple[str, str, str, str, str, tuple[str, ..
             "A2",
             "A3",
             "A2 -> A3",
-            "Vision-estimated cube pose를 raw-FK hard fixed로 바꾸면 어떤가",
+            "VISION cube pose를 FK hard fixed로 바꾸면 어떤가",
             ("cube",),
-            "현재 3.1239 px 악화되어 raw FK hard fixed를 반박한다.",
+            "현재 3.1239 px 악화되어 FK hard fixed를 반박한다.",
         ),
         (
             "Final protocol",
             "B1",
             "A4",
             "B1 -> A4",
-            "같은 soft FK factor에서 sequential과 unified 중 무엇이 나은가",
+            "같은 corrected-FK soft factor에서 sequential과 unified 중 무엇이 나은가",
             ("cube",),
             "현재 0.1084 px 개선으로 unified 구조를 약하게 지지한다.",
         ),
@@ -891,16 +900,16 @@ def _contrast_definitions() -> list[tuple[str, str, str, str, str, tuple[str, ..
             "A2",
             "A4",
             "A2 -> A4",
-            "Unified vision-only에 soft FK factor를 추가하면 이득이 있는가",
+            "Unified VISION에 corrected-FK soft factor를 추가하면 이득이 있는가",
             ("cube",),
-            "현재 개선은 0.0174 px로 작아 soft FK 우수성 근거로 부족하다.",
+            "현재 개선은 0.0174 px로 작아 corrected-FK 우수성 근거로 부족하다.",
         ),
         (
             "Final protocol",
             "B2",
             "A4",
             "B2 -> A4",
-            "Soft FK 조건에서 board residual이 cube 보정에 도움 되는가",
+            "corrected-FK soft factor 조건에서 board residual이 cube 보정에 도움 되는가",
             ("cube",),
             "현재 0.8821 px 개선으로 board residual의 내부 이득을 지지한다.",
         ),
@@ -909,7 +918,7 @@ def _contrast_definitions() -> list[tuple[str, str, str, str, str, tuple[str, ..
             "A3",
             "A5",
             "A3 -> A5",
-            "Raw FK hard fixed와 vision-aligned FK hard fixed의 차이는 무엇인가",
+            "FK hard fixed와 corrected-FK hard fixed의 차이는 무엇인가",
             ("cube",),
             "현재 3.3019 px 개선으로 raw frame mismatch 보정 필요성을 지지한다.",
         ),
@@ -918,7 +927,7 @@ def _contrast_definitions() -> list[tuple[str, str, str, str, str, tuple[str, ..
             "A4",
             "A5",
             "A4 -> A5",
-            "같은 aligned FK를 soft factor와 hard fixed로 쓰면 무엇이 달라지는가",
+            "같은 corrected-FK를 soft factor와 hard fixed로 쓰면 무엇이 달라지는가",
             ("cube",),
             "현재 0.1606 px 개선으로 A5를 External GT 전 고정할 후보로 둔다.",
         ),

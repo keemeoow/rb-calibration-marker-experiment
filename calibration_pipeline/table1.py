@@ -7,19 +7,19 @@ The runner implements the contract in ``calibration_pipeline.schema``:
 * ``seq`` is eih-only fitting followed by an e2h-only camera fit, with an
   explicit freeze boundary and no alternating pass;
 * ``U`` fits both paths in one objective;
-* A3 freezes raw FK after a preregistered mechanical frame conversion;
-* A4/A5/B1/B2 reuse one train-only image-aligned FK cube artifact;
+* A3 uses FK hard fixed after a preregistered mechanical frame conversion;
+* A4/A5/B1/B2 reuse one train-only corrected-FK cube artifact;
 * every row starts from one train-only shared reference state for overlapping
   transforms, before its declared marker/FK treatment is applied;
 * A0/A1/A2/A3/A4/A5/B1/B2/B3 are emitted by this runner only;
 * A3/A5 use the same canonical corner solver directly, with cube poses frozen;
-* A4/B1/B2 use one shared covariance-whitened robust FK-factor implementation;
+* A4/B1/B2 use one shared covariance-whitened robust corrected-FK soft factor;
 * the primary metric is event-grouped, set-stratified held-out corner
   reprojection with every fitted transform frozen;
 * a noise-free A1=A2 sequential-vs-unified test must pass before real data are fitted.
 
-No FK anchor, Ridge, SE(3), or other post-correction is used in estimated-cube
-rows.  Camera intrinsics and distortion are constants in every stage.
+VISION rows use neither a cube-pose FK anchor nor Ridge, SE(3), or another
+post-correction. Camera intrinsics and distortion are constants in every stage.
 """
 
 from __future__ import annotations
@@ -505,7 +505,7 @@ def make_initial_state(
     elif condition.fk_to_cube == POSE_SOURCE_ALIGNED_FK_FIXED:
         if aligned_fixed_cubes is None:
             raise ValueError(
-                f"{condition.row}: vision-aligned FK fixed poses are required")
+                f"{condition.row}: corrected-FK hard-fixed poses are required")
         state.cubes = {
             int(s): np.asarray(T, dtype=np.float64).copy()
             for s, T in aligned_fixed_cubes.items()
@@ -1200,7 +1200,7 @@ def solve_synthetic(condition: AblationCondition, observations, truth: PoseState
     init = perturbed_state(truth)
     if condition.fk_to_cube in {
             POSE_SOURCE_FK_FIXED, POSE_SOURCE_ALIGNED_FK_FIXED}:
-        # FK-fixed transforms are constants, not perturbed initialization
+        # FK hard-fixed transforms are constants, not perturbed initialization
         # variables.  Perturbing them would simulate FK noise, not solver init.
         source = truth.cubes if fixed_cube_poses is None else fixed_cube_poses
         init.cubes = {int(s): np.asarray(T, float).copy() for s, T in source.items()}
@@ -1631,16 +1631,16 @@ def prepare_ablation_data(args) -> PreparedAblationData:
         if isinstance(event, int) and int(event) in set(split["test_events"])}
     if leaked_raw_events:
         raise RuntimeError(
-            f"board-free FK artifact raw FK came from held-out events "
+            f"board-free corrected-FK artifact used held-out FK events "
             f"{sorted(leaked_raw_events)}")
     missing_aligned_fk = sorted(eligible - set(aligned_fk_all))
     if missing_aligned_fk:
         raise RuntimeError(
-            "board-free aligned FK cube pose missing for sets "
+            "board-free corrected-FK cube pose missing for sets "
             f"{missing_aligned_fk}")
     missing_raw_fk = sorted(eligible - set(raw_fk_all))
     if missing_raw_fk:
-        raise RuntimeError(f"raw FK cube pose missing for sets {missing_raw_fk}")
+        raise RuntimeError(f"FK cube pose missing for sets {missing_raw_fk}")
     mechanical_frame_map = np.asarray(
         RAW_FK_CUBE_CENTER_TO_OBJECT, dtype=np.float64)
     fixed_cubes = {

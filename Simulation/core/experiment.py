@@ -10,7 +10,7 @@ ExpConfig:
 FK 사용방식:
   none   FK 미사용 (순수 시각).
   fixed  큐브를 FK 상수로 하드 고정.
-  factor 큐브 자유 + FK 를 공분산 가중 robust 잔차 인자로 BA 에 추가.   ← **Ours**
+  factor cube pose 자유 + corrected-FK soft factor를 BA에 추가.
   corr   none 으로 풀고 예측 위치에 Ridge 후보정 (구 방식. 위치만 보정 → 비교군).
 
 Ours 는 factor 하나로 동결한다. sigma_FK / Huber f_scale 은 core.methods 의 모듈 상수이며

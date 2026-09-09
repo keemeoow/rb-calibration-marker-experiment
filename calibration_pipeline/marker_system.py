@@ -11,7 +11,7 @@ This runner answers a different question from the shared-initialization Table 1:
 All systems still share the event split, raw detections, K/D, solver options,
 random seeds, held-out observations, and evaluation masks.  The cube-only
 initializer is board-free but uses the preregistered train-only robot-FK cube
-artifact to initialize hand-eye; its final visual objective has no FK factor.
+artifact to initialize hand-eye; its final VISION objective has no corrected-FK soft factor.
 Pre-GT reporting keeps fixed-to-fixed cross-view as supplementary,
 method-specific held-out consistency without FK.  Gripper-to-fixed cross-view
 evaluates the full hand-eye+FK+fixed-camera chain.  Both use board/cube image
@@ -33,6 +33,7 @@ from calibration_pipeline.runtime import (
 
 from calibration_pipeline import table1
 from calibration_pipeline.schema import (
+    canonicalize_relative_pose_reporting,
     DEFAULT_SPLIT_SEED,
     MARKER_COMPARISON_CONTRACT,
     RELATIVE_POSE_REPORTING_CONTRACT,
@@ -329,8 +330,9 @@ def validate_end_to_end_contract(result: Mapping) -> None:
                 "may_rank_methods_before_external_gt") is not False):
         raise ValueError(
             "marker-system fixed-to-fixed evaluation must remain supplementary")
-    if protocol.get("relative_pose_reporting") != \
-            RELATIVE_POSE_REPORTING_CONTRACT:
+    relative_pose_reporting = canonicalize_relative_pose_reporting(
+        protocol.get("relative_pose_reporting", {}))
+    if relative_pose_reporting != RELATIVE_POSE_REPORTING_CONTRACT:
         raise ValueError("marker-system relative-pose reporting policy drift")
     evaluation_mask_sha256 = fixed_evaluation.get("evaluation_mask_sha256")
     if not evaluation_mask_sha256:
@@ -549,7 +551,7 @@ def main(argv=None) -> None:
             "schema_contract": MARKER_COMPARISON_CONTRACT["end_to_end_system"],
             "cube_only_initialization_caveat": (
                 "board-free train-only FK cube artifact initializes hand-eye; "
-                "the final cube-only visual objective has no FK factor"),
+                "the final cube-only VISION objective has no corrected-FK soft factor"),
         },
         "initialization": init_diagnostics,
         "runs": runs,

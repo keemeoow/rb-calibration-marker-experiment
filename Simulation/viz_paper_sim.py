@@ -19,10 +19,10 @@ STYLE = {
     "EXP1": ("#0072B2", "-",  3.0, "o", "Ours"),
     "EXP2": ("#E69F00", "-",  1.6, "s", "-unified"),
     "EXP3": ("#009E73", "-",  1.6, "^", "-board"),
-    "EXP4": ("#D55E00", "--", 1.6, "v", "-FK"),
-    "EXP5": ("#CC79A7", "--", 1.6, "D", "-FK-unified"),
+    "EXP4": ("#D55E00", "--", 1.6, "v", "VISION"),
+    "EXP5": ("#CC79A7", "--", 1.6, "D", "VISION-unified"),
     "EXP6": ("#000000", ":",  1.6, "P", "-cube(board-only)"),
-    "EXP7": ("#56B4E9", "-.", 2.0, "X", "fixed-FK"),
+    "EXP7": ("#56B4E9", "-.", 2.0, "X", "FK hard fixed"),
 }
 ORDER = ["EXP4", "EXP5", "EXP2", "EXP3", "EXP7", "EXP6", "EXP1"]
 COLLAPSE = {"EXP6"}

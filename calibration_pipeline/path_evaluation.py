@@ -930,7 +930,7 @@ def evaluate_gripper_to_fixed_cross_target(
         "n_output_rejected": 0,
         "interpretation": (
             "visual cross-view residual through the calibrated hand-eye and "
-            "robot FK chain; it is not an FK-free or absolute-accuracy metric"),
+            "robot FK chain; it is an internal chain metric, not absolute accuracy"),
     }
 
 

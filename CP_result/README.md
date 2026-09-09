@@ -83,7 +83,7 @@ CP_result/session04/
 
 - `cross_target_evaluation`: 모든 방법의 동결 transform을 같은 held-out target/camera mask로 평가한다.
 - `marker_system_end_to_end`: board-only, cube-only, board+cube를 modality별 초기화부터 분리해 평가한다.
-- `opencv_relative_baseline`: OpenCV PnP 기반 FK-free fixed-camera reference baseline이다.
+- `opencv_relative_baseline`: OpenCV PnP 기반 VISION fixed-camera reference baseline이다.
 - `outlier_ablation`: 동일 관측에서 soft-L1과 linear loss를 비교하고, standard/strict 사전 관측 제외 민감도를 동일 held-out에서 검증한다.
 - [`BOARD_CUBE_RELATIVE_POSE.md`](../data/session04/calib_out/verify/board_cube_relative_pose/BOARD_CUBE_RELATIVE_POSE.md): Board/Cube geometry, corner ordering, detector refinement, intrinsic 및 target-dependent PnP 충돌을 진단한다. 여기서 direct-PnP 충돌은 최종 joint calibration 정확도나 외부 GT 오차가 아니다.
 - 모든 카메라 범위 평가는 내부 consistency/transfer 평가이며 독립 외부 GT 정확도가 아니다.

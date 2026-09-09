@@ -7,6 +7,21 @@
 [CALIBRATION_EXPERIMENT_VALIDATION.md](CALIBRATION_EXPERIMENT_VALIDATION.md)를
 단일 기준으로 따른다.
 
+## 용어 표기 계약
+
+앞으로 논문, 발표, 문서와 자동 생성 결과에는 아래 세 표현만 기본 방법명으로 사용한다.
+
+| 표준 표현 | 정확한 의미 | 세부 방식 표기 예시 |
+| --- | --- | --- |
+| **VISION** | cube pose에 robot FK prior를 연결하지 않고 영상 residual로 추정 | `VISION`, `VISION unified` |
+| **FK** | controller FK pose를 별도 학습 보정 없이 사용 | `FK hard fixed` |
+| **corrected-FK** | train 정보로 FK pose/frame을 보정해 사용 | `corrected-FK soft factor`, `corrected-FK hard fixed (VISION-aligned)` |
+
+`VISION`도 eye-in-hand camera pose를 구성하기 위한 robot FK backbone은 사용한다.
+따라서 세 이름은 **robot FK 전체의 사용 여부**가 아니라, calibration에서 cube target
+pose를 어떻게 처리하는지를 구분한다. 내부 artifact의 과거 schema 문자열은 호환성을
+위해 유지할 수 있지만 사용자에게 보이는 방법명으로 출력하지 않는다.
+
 ## 0. 현재 한 문장 결론
 
 본 연구는 여러 고정 카메라와 그리퍼 카메라를 로봇 베이스 좌표계로 정합하는
@@ -21,7 +36,7 @@ multi-camera calibration framework를 제안한다. 최종 비교는 `A0~A5`, `B
 | --- | --- | --- |
 | C1. Unified multi-camera calibration | sequential/frozen-stage보다 unified feedback이 multi-camera 정합에 유리한지 검증 | A1 -> A2, B1 -> A4 |
 | C2. Graspable multi-face cube | gripper-mounted cube가 board-only 대비 최종 cube 정합을 개선하는지 검증 | A0 -> A1, B3 -> A2, B2 -> A4 |
-| C3. FK-aware target-pose handling | raw FK hard fixed, corrected-FK soft factor, vision-aligned FK hard fixed 중 무엇이 실제 3D 정합에 좋은지 검증 | A2 -> A3, A2 -> A4, A3/A4 -> A5 |
+| C3. FK-aware target-pose handling | FK hard fixed, corrected-FK soft factor, corrected-FK hard fixed 중 무엇이 실제 3D 정합에 좋은지 검증 | A2 -> A3, A2 -> A4, A3/A4 -> A5 |
 | C4. Real-world validation | 내부 px가 아니라 독립 External cube GT로 최종 물리 정확도를 판정 | TRE, rotation, P95, failure rate |
 
 ## 2. 최종 비교실험 구조
@@ -30,10 +45,10 @@ multi-camera calibration framework를 제안한다. 최종 비교는 `A0~A5`, `B
 | --- | --- | --- |
 | A0 | board-on-gripper only sequential baseline | board-only 순차 기준선 |
 | A1 | board-on-gripper + cube sequential | cube train 관측 추가 효과 |
-| A2 | board+cube unified visual-only | vision-only unified 후보 |
-| A3 | board+cube unified raw-FK hard fixed | raw FK hard constraint 후보 |
+| A2 | board+cube unified VISION | VISION unified 후보 |
+| A3 | board+cube unified FK hard fixed | FK hard constraint 후보 |
 | A4 | board+cube unified corrected-FK soft factor | corrected-FK soft 후보 |
-| A5 | board+cube unified vision-aligned FK hard fixed | GT 전 frozen 시 최종 후보 |
+| A5 | board+cube unified corrected-FK hard fixed (VISION-aligned) | GT 전 frozen 시 최종 후보 |
 | B1 | board+cube sequential corrected-FK soft factor | A4 대비 unified 효과 제거 |
 | B2 | cube-only corrected-FK soft factor | A4 대비 board residual 제거 |
 | B3 | board-on-gripper only unified baseline | board-only unified 기준선 |
@@ -75,9 +90,9 @@ calibration은 board-only로 유지하고, cube RMSE는 train cube로 set별 eva
 | 비교 | 현재 내부 cube 결과 | 해석 |
 | --- | --- | --- |
 | A1 -> A2 | 3.6938 -> 3.5960 px | unified feedback이 내부 cube residual을 낮춤 |
-| A2 -> A3 | 3.5960 -> 6.7199 px | raw FK hard fixed는 현재 내부 cube에서 악화 |
+| A2 -> A3 | 3.5960 -> 6.7199 px | FK hard fixed는 현재 내부 cube에서 악화 |
 | A2 -> A4 | 3.5960 -> 3.5786 px | corrected-FK soft factor는 A2와 거의 동률 |
-| B1 -> A4 | 3.6870 -> 3.5786 px | soft-FK 조건에서도 unified 쪽이 낮음 |
+| B1 -> A4 | 3.6870 -> 3.5786 px | corrected-FK soft factor 조건에서도 unified 쪽이 낮음 |
 | B2 -> A4 | 4.4608 -> 3.5786 px | board residual이 cube 보정에 도움 |
 | A4 -> A5 | 3.5786 -> 3.4180 px | A5가 현재 내부 cube 지표 최저 |
 

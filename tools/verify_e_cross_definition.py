@@ -216,7 +216,8 @@ def main() -> None:
     print(
         "OK: e_cross is pairwise fixed-camera cube-pose consistency and "
         "pixel-transfer is bidirectional measurement-only reprojection; "
-        f"{checked_runs} runs, {checked_pairs} pairs, no FK/GT/gripper path")
+        f"{checked_runs} runs, {checked_pairs} pairs, VISION fixed-camera path; "
+        "no GT/gripper path")
 
 
 if __name__ == "__main__":

@@ -35,6 +35,12 @@ def test_report_contains_every_final_calibration_matrix(tmp_path):
     assert sum(int(row["converged_runs"]) for row in summary) == 27
     assert sum(int(row["prune_refit_attempts"]) for row in summary) == 15
     assert sum(int(row["prune_refit_rollbacks"]) for row in summary) == 15
+    by_method = {row["method"]: row for row in summary}
+    assert by_method["A2"]["fk_to_cube"] == "VISION"
+    assert by_method["A3"]["fk_to_cube"] == "FK hard fixed"
+    assert by_method["A4"]["fk_to_cube"] == "corrected-FK soft factor"
+    assert by_method["A5"]["fk_to_cube"] == (
+        "corrected-FK hard fixed (VISION-aligned)")
 
     assert not (tmp_path / "CALIBRATION_RESULTS.md").exists()
     assert result["rows"] == 9

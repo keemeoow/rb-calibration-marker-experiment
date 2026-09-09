@@ -13,8 +13,8 @@ from core import ExpConfig
 CB = ("cube", "board")
 METHODS = [
     ExpConfig("EXP1", fk="factor", solve="unified",     markers=CB, label="Ours"),
-    ExpConfig("EXP7", fk="fixed", solve="unified",     markers=CB, label="fixed-FK"),
-    ExpConfig("EXP4", fk="none",  solve="unified",     markers=CB, label="no-FK"),
+    ExpConfig("EXP7", fk="fixed", solve="unified",     markers=CB, label="FK hard fixed"),
+    ExpConfig("EXP4", fk="none",  solve="unified",     markers=CB, label="VISION"),
     ExpConfig("EXP2", fk="factor", solve="independent", markers=CB, label="-unified(indep)"),
 ]
 SETS = [4, 6, 8, 10, 13, 16]

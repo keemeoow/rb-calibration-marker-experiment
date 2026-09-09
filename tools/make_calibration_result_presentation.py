@@ -471,7 +471,7 @@ def slide_meeting_status(ctx: dict, i: int, n: int) -> Image.Image:
     small_stat(draw, (1124, y, 1564, y + 138), "다음주", "Independent External GT 예정", BLUE)
     card(draw, (68, y + 178, 760, y + 418), "반영 완료의 핵심",
          "frame-prune/refit/rollback, 목적함수 항 구분, 동일 split/mask, "
-         "FK-free/FK-dependent 평가 분리, OpenCV reference baseline, "
+         "VISION/FK/corrected-FK 평가 분리, OpenCV reference baseline, "
          "mm/deg 보조 지표를 문서와 결과표에 반영했다.", GREEN)
     card(draw, (804, y + 178, 1564, y + 418), "아직 완료라고 말하면 안 되는 것",
          "robot task 정확도, 눈금 큐브 재파지 실측, peg-in-hole/success rate, "
@@ -560,12 +560,12 @@ def slide_objective(ctx: dict, i: int, n: int) -> Image.Image:
         i, n, "OBJECTIVE", "목적함수와 연결 구조",
         "교수님 질문: reprojection error인가, 3D error인가, camera-to-camera 관계도 넣었는가?",
     )
-    card(draw, (68, y, 760, y + 208), "Visual-only rows",
+    card(draw, (68, y, 760, y + 208), "VISION rows",
          "A0 · A1 · A2 · A3 · A5 · B3\n"
          "robust native-pixel corner reprojection 1항만 사용한다.", BLUE)
-    card(draw, (804, y, 1564, y + 208), "FK-factor rows",
+    card(draw, (804, y, 1564, y + 208), "corrected-FK soft factor rows",
          "A4 · B1 · B2\n"
-         "visual reprojection + covariance-whitened robust FK factor, 총 2항이다.", TEAL)
+         "visual reprojection + covariance-whitened robust corrected-FK soft factor, 총 2항이다.", TEAL)
     card(draw, (68, y + 246, 760, y + 452), "없는 것",
          "optimizer 내부에는 camera-to-camera residual, relative-pose 평균, "
          "w1·reprojection + w2·pose_error + w3·FK_constraint 형태가 없다.", RED)
@@ -584,13 +584,13 @@ def slide_methods(ctx: dict, i: int, n: int) -> Image.Image:
     headers = ["Row", "Marker", "Optimization", "Cube pose", "역할"]
     rows = [
         ["A0", "board", "seq", "없음", "baseline"],
-        ["A1", "board+cube", "seq", "estimated", "cube 추가"],
-        ["A2", "board+cube", "unified", "estimated", "vision-only unified 후보"],
-        ["A3", "board+cube", "unified", "raw-FK hard", "FK hard stress"],
-        ["A4", "board+cube", "unified", "corrected-FK soft", "FK cov 대기 후보"],
-        ["A5", "board+cube", "unified", "aligned-FK hard", "GT 전 frozen 최종 후보"],
-        ["B1", "board+cube", "seq", "corrected-FK soft", "A4 대비 -Unified"],
-        ["B2", "cube", "unified", "corrected-FK soft", "A4 대비 -board"],
+        ["A1", "board+cube", "seq", "VISION", "cube 추가"],
+        ["A2", "board+cube", "unified", "VISION", "VISION unified 후보"],
+        ["A3", "board+cube", "unified", "FK hard fixed", "FK hard stress"],
+        ["A4", "board+cube", "unified", "corrected-FK soft factor", "FK cov 대기 후보"],
+        ["A5", "board+cube", "unified", "corrected-FK hard fixed", "GT 전 frozen 최종 후보"],
+        ["B1", "board+cube", "seq", "corrected-FK soft factor", "A4 대비 -Unified"],
+        ["B2", "cube", "unified", "corrected-FK soft factor", "A4 대비 -board"],
         ["B3", "board", "unified", "없음", "A2 대비 -cube"],
     ]
     table(draw, 86, y, [110, 210, 220, 300, 460], headers, rows,
@@ -616,13 +616,13 @@ def slide_comparison_contract(ctx: dict, i: int, n: int) -> Image.Image:
     rows = [
         ["Final", "A0 → B3", "단일 target 순차/통합 동등성 확인", "Negative control + External cube GT"],
         ["Final", "A0 → A1", "cube train 관측 추가 효과", "External cube GT + heldout cube"],
-        ["Final", "A1 → A2", "vision-only 통합 feedback 효과", "External cube GT + heldout cube"],
+        ["Final", "A1 → A2", "VISION 통합 feedback 효과", "External cube GT + heldout cube"],
         ["Final", "B3 → A2", "unified에서 cube residual 필요성", "External cube GT + heldout cube"],
-        ["Final", "A2 → A3", "vision cube pose 대신 raw FK hard fixed", "External cube GT + heldout cube"],
-        ["Final", "B1 → A4", "soft FK에서 순차/통합 차이", "External cube GT + heldout cube"],
-        ["Final", "A2 → A4", "soft FK factor 추가 효과", "External cube GT + heldout cube"],
+        ["Final", "A2 → A3", "VISION cube pose 대신 FK hard fixed", "External cube GT + heldout cube"],
+        ["Final", "B1 → A4", "corrected-FK soft factor에서 순차/통합 차이", "External cube GT + heldout cube"],
+        ["Final", "A2 → A4", "corrected-FK soft factor 추가 효과", "External cube GT + heldout cube"],
         ["Final", "B2 → A4", "board residual의 cube 보정 기여", "External cube GT + heldout cube"],
-        ["Final", "A3/A4 → A5", "aligned FK hard fixed 최종 후보성", "External cube GT + heldout cube"],
+        ["Final", "A3/A4 → A5", "corrected-FK hard fixed 최종 후보성", "External cube GT + heldout cube"],
     ]
     table(draw, 68, y, [150, 190, 690, 360], headers, rows,
           row_font_size=18, header_font_size=17, max_bottom=820)
@@ -705,7 +705,7 @@ def slide_a2_a3(ctx: dict, i: int, n: int) -> Image.Image:
     a2c = metric(ctx, "A2", "heldout_cube_reprojection_rmse_px")
     a3c = metric(ctx, "A3", "heldout_cube_reprojection_rmse_px")
     img, draw, y = content_base(
-        i, n, "A2 → A3", "raw FK hard fixed는 왜 위험한가",
+        i, n, "A2 → A3", "FK hard fixed는 왜 위험한가",
         "A3는 cube pose를 raw controller FK + mechanical frame map으로 상수 고정한다.",
     )
     bar_chart(draw, (68, y, 1000, y + 444), "Heldout cube reprojection RMSE px",
@@ -713,10 +713,10 @@ def slide_a2_a3(ctx: dict, i: int, n: int) -> Image.Image:
               max_value=7.0,
               note="A3는 cube held-out가 3.5960 → 6.7199 px로 크게 악화된다.")
     card(draw, (1040, y, 1564, y + 202), "의미",
-         "raw FK를 GT처럼 못 박으면 tool4/CAD frame 정의 오차가 calibration 결과에 흡수된다.",
+         "FK를 GT처럼 못 박으면 tool4/CAD frame 정의 오차가 calibration 결과에 흡수된다.",
          ORANGE)
     card(draw, (1040, y + 242, 1564, y + 444), "말할 문장",
-         "“이 결과는 raw FK를 독립 정답으로 쓰면 안 된다는 교수님 지적을 수치로 확인한 것입니다.”",
+         "“이 결과는 FK를 독립 정답으로 쓰면 안 된다는 교수님 지적을 수치로 확인한 것입니다.”",
          BLUE)
     return img
 
@@ -737,9 +737,9 @@ def slide_a2_a4_a5(ctx: dict, i: int, n: int) -> Image.Image:
                ("A5 cube", vals["A5 cube"], PURPLE)],
               max_value=4.4,
               note="A5는 GT 공개 전에 frozen하면 최종 후보로 비교 가능하다.")
-    card(draw, (1060, y, 1564, y + 130), "A2", "Vision-only unified 후보.", BLUE)
-    card(draw, (1060, y + 154, 1564, y + 286), "A4", "Corrected-FK soft factor 후보.", TEAL)
-    card(draw, (1060, y + 310, 1564, y + 444), "A5", "Vision-aligned FK hard fixed 후보.", PURPLE)
+    card(draw, (1060, y, 1564, y + 130), "A2", "VISION unified 후보.", BLUE)
+    card(draw, (1060, y + 154, 1564, y + 286), "A4", "corrected-FK soft factor 후보.", TEAL)
+    card(draw, (1060, y + 310, 1564, y + 444), "A5", "corrected-FK hard fixed (VISION-aligned) 후보.", PURPLE)
     return img
 
 

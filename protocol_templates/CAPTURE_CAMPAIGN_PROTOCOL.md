@@ -74,7 +74,7 @@ Session04에는 held-out 누수 없이 이를 추정할 반복 관측이 없다.
 
 ## 4. Track C — 외부 GT
 
-**목적:** A4, A2, A5, A3가 예측한 $T^B_{cube}$를 캘리브레이션 영상·robot FK·aligned-FK와 독립적으로 측정한 $T^B_{cube,GT}$와 비교한다. `calibration_pipeline/external_gt.py`가 이미 구현돼 있고 **독립 GT 데이터만 없다.** `protocol_templates/external_gt_eval_manifest_TEMPLATE.json`을 채우면 바로 채점된다.
+**목적:** A4, A2, A5, A3가 예측한 $T^B_{cube}$를 캘리브레이션 영상·robot FK·corrected-FK와 독립적으로 측정한 $T^B_{cube,GT}$와 비교한다. `calibration_pipeline/external_gt.py`가 이미 구현돼 있고 **독립 GT 데이터만 없다.** `protocol_templates/external_gt_eval_manifest_TEMPLATE.json`을 채우면 바로 채점된다.
 
 ### 4.1 권장 측정계 구성
 

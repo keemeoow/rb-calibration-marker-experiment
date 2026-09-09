@@ -99,9 +99,9 @@ P2의 release 예측은 다음과 같다.
 T_base_rig_pred = T_base_flange(release) * T_flange_rig
 ```
 
-이 예측과 post-release vision pose의 차이는 robot FK뿐 아니라 grasp 반복성, release
+이 예측과 post-release VISION pose의 차이는 robot FK뿐 아니라 grasp 반복성, release
 slip, 접촉 및 settling 오차를 함께 포함한다. 따라서 이를 **effective placement
-correction**으로 부르며, pure FK correction이라고 해석하지 않는다.
+correction**으로 부르며, 순수 FK correction이라고 해석하지 않는다.
 
 ### 3.3 P3 Stationary Rig: 10 events
 
@@ -171,7 +171,7 @@ flange FK가 effective placement prediction의 입력이고, release 이후 상�
 
 최종 composite rig에서는 기존 `capture_cube_center_6dof`를 저장하거나 FK 정답으로
 사용하지 않는다. 현재 robot tool4는 과거 cube-only offset이므로 새 rig의 중심을
-나타내지 않는다. `T_flange_rig`는 P1의 실제 flange FK와 vision observation으로 추정한다.
+나타내지 않는다. `T_flange_rig`는 P1의 실제 flange FK와 VISION observation으로 추정한다.
 
 #### PC에서 함께 저장되는 값
 
@@ -215,14 +215,14 @@ flange FK가 effective placement prediction의 입력이고, release 이후 상�
 | Row | Calibration에 사용하는 관측 | FK 사용 |
 | --- | --- | --- |
 | A0 | board-only | sequential baseline |
-| A1 | board + cube | sequential, visual-only |
-| A2 | board + cube | unified, visual-only |
-| A3 | board + cube | unified, raw placement FK hard fixed |
+| A1 | board + cube | sequential, VISION |
+| A2 | board + cube | unified, VISION |
+| A3 | board + cube | unified, FK hard fixed (보정 전 controller pose) |
 | A4 | board + cube | unified, train-only effective placement correction soft factor |
-| A5 | board + cube | unified, train-only vision-aligned FK hard fixed |
+| A5 | board + cube | unified, corrected-FK hard fixed (train-only VISION alignment) |
 | B1 | board + cube | sequential corrected-FK soft factor |
 | B2 | cube-only | unified corrected-FK soft factor |
-| B3 | board-only | unified, visual-only |
+| B3 | board-only | unified, VISION |
 
 - A0/B3는 cube corner를 초기화, filtering, objective, prune, hyperparameter 선택에서 모두
   가린다.

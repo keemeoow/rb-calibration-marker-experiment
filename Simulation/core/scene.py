@@ -132,7 +132,7 @@ class SimScene:
 
         # ---- 카메라별 부정확 intrinsic (K_pnp) — intrinsic 캘리브 오차 모델 ----
         #   참값 DEFAULT_K/DIST 로 투영하지만 PnP 는 카메라마다 고정 섭동된 K_pnp 를 씀
-        #   → 위치의존 systematic 편향(FK 후보정이 학습 가능). 그리퍼는 키 'g'.
+        #   → 위치의존 systematic 편향(corrected-FK이 학습 가능). 그리퍼는 키 'g'.
         self.K_pnp = {}
         rk = np.random.default_rng(9000 + seed)
         cam_keys = list(self.fixed_cam_ids) + ["g"]

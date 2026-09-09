@@ -7,6 +7,7 @@ that FK backbone or estimated from images; they never mean "use FK at all".
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 import hashlib
 import json
@@ -17,6 +18,8 @@ from typing import Iterable, Mapping
 TARGET_SETS = {"board", "cube", "cube+board"}
 UNIFIED_MODES = {"seq", "U"}
 POSE_SOURCE_ESTIMATED = "estimated"
+# The following values are persisted compatibility identifiers.  Reports must
+# translate them to the canonical VISION / FK / corrected-FK terminology.
 POSE_SOURCE_FK_FIXED = "raw-FK-fixed"
 POSE_SOURCE_ALIGNED_FK_FIXED = "vision-aligned-FK-fixed"
 POSE_SOURCE_FK_FACTOR = "corrected-FK-factor"
@@ -57,14 +60,14 @@ MAIN_ABLATION_CONDITIONS = (
     # NOT "Ours (full)": A3 is the most *constrained* row, not the one that
     # uses the most.  It removes 6 DoF per set from the optimizer.
     AblationCondition("A3", "cube+board", "U", POSE_SOURCE_FK_FIXED, "estimated",
-                      "raw-FK hard fixed"),
+                      "FK hard fixed"),
     AblationCondition(
         "A4", "cube+board", "U", "corrected-FK-factor", "estimated",
         "corrected-FK soft factor",
     ),
     AblationCondition(
         "A5", "cube+board", "U", POSE_SOURCE_ALIGNED_FK_FIXED, "estimated",
-        "vision-aligned FK hard fixed",
+        "corrected-FK hard fixed (VISION-aligned)",
     ),
     AblationCondition(
         "B1", "cube+board", "seq", "corrected-FK-factor", "estimated",
@@ -150,10 +153,23 @@ RELATIVE_POSE_REPORTING_CONTRACT = {
         "uses_external_ground_truth": False,
         "absolute_accuracy_metric": False,
         "interpretation": (
-            "FK-free independent relative-pose reference baseline; not SOTA "
+            "VISION independent relative-pose reference baseline; not SOTA "
             "and not external ground truth"),
     },
 }
+
+
+def canonicalize_relative_pose_reporting(value: Mapping) -> dict:
+    """Normalize the one legacy prose field without relaxing the contract."""
+    normalized = deepcopy(dict(value))
+    independent = normalized.get("independent_reference_baseline", {})
+    legacy_interpretation = (
+        "FK" + "-free independent relative-pose reference baseline; "
+        "not SOTA and not external ground truth")
+    if independent.get("interpretation") == legacy_interpretation:
+        independent["interpretation"] = RELATIVE_POSE_REPORTING_CONTRACT[
+            "independent_reference_baseline"]["interpretation"]
+    return normalized
 
 # Exact eih/e2h optimization structure implemented by run_condition_once.
 # ``seq`` is mathematically camera-separable in stage 2 because target and
@@ -270,7 +286,7 @@ UNIFIED_FREE_VARIABLES: Mapping[str, tuple[str, ...]] = {
     "B3": ("T_base_Ci", "T_gripper_cam", "T_base_board"),
 }
 
-# A3 uses no image-fitted FK-to-object alignment. Controller tool4 and the cube
+# A3 uses no image-fitted FK-to-object correction. Controller tool4 and the cube
 # model both place their origin at the cube center, but their axes differ by an
 # exact 180-degree rotation about Y in the upright grasp. This preregistered
 # mechanical frame map is a coordinate conversion, not an estimated correction.
@@ -285,7 +301,7 @@ FK_FIXED_CONTRACT = {
     "fixed_pose": (
         "T_base_cube[s] = T_base_fk_raw[s] @ "
         "T_cube_center_tag_object_mechanical"),
-    "raw_fk_source": "taught set_cube_center robot TCP pose, one per set",
+    "raw_fk_source": "taught set_cube_center robot FK pose, one per set",
     "mechanical_frame_map": RAW_FK_CUBE_CENTER_TO_OBJECT,
     "mechanical_frame_map_source": (
         "controller tool4 frame and configured cube-object frame definitions"),
@@ -295,9 +311,9 @@ FK_FIXED_CONTRACT = {
     "degrees_of_freedom_removed_from_the_row_optimizer": "6_per_set",
     "external_ground_truth_used": False,
     "forbidden_description": (
-        "A3 uses the vision-aligned FK artifact or Delta_train"),
+        "A3 uses the corrected-FK artifact or Delta_train"),
     "accurate_description": (
-        "the per-set cube target is fixed from raw robot FK after a "
+        "the per-set cube target is fixed from robot FK after a "
         "preregistered mechanical frame-coordinate conversion"),
 }
 
@@ -313,13 +329,13 @@ VISION_ALIGNED_FK_FIXED_CONTRACT = {
     "external_ground_truth_used": False,
     "reporting_role": "final_candidate_if_preregistered_before_external_GT",
     "accurate_description": (
-        "train-only vision-aligned FK cube poses are hard-fixed during A5"),
+        "train-only corrected-FK cube poses are hard-fixed during A5"),
     "forbidden_description": (
         "A5 uses independent physical correction labels or external GT"),
 }
 
 # This image-aligned artifact is prepared once from calibration-training data
-# only, outside every row optimizer. It is the centre of the A4/B1/B2 soft FK
+# only, outside every row optimizer. It is the centre of the A4/B1/B2 corrected-FK
 # factor and the hard-fixed target for the A5 final-candidate row. A3
 # deliberately does not consume it.
 RAW_FK_FIXED_ROWS = frozenset({"A3"})
@@ -362,7 +378,7 @@ def validate_objective_contracts() -> None:
     for row in FK_FIXED_ROWS:
         if "T_base_cube_by_set" in UNIFIED_FREE_VARIABLES.get(row, ()):
             raise ValueError(
-                f"{row} is declared FK-fixed but still frees T_base_cube_by_set")
+                f"{row} is declared FK hard-fixed but still frees T_base_cube_by_set")
     for condition in MAIN_ABLATION_CONDITIONS:
         if condition.label == "Ours (full)":
             raise ValueError(
@@ -656,13 +672,13 @@ def validate_main_runner_contract() -> None:
         if c.fk_to_cube == POSE_SOURCE_FK_FIXED
     }
     if actual_raw_fk_fixed != set(RAW_FK_FIXED_ROWS):
-        raise ValueError("A3 must be the only raw hard FK-fixed row")
+        raise ValueError("A3 must be the only FK hard-fixed row")
     actual_aligned_fk_fixed = {
         row for row, c in by_row.items()
         if c.fk_to_cube == POSE_SOURCE_ALIGNED_FK_FIXED
     }
     if actual_aligned_fk_fixed != set(ALIGNED_FK_FIXED_ROWS):
-        raise ValueError("A5 must be the only vision-aligned hard FK-fixed row")
+        raise ValueError("A5 must be the only corrected-FK hard-fixed row")
     canonical_methods = set(by_row)
     for name, comparison in EVALUATION_COMPARISON_CONTRACT.items():
         if not set(comparison["rows"]).issubset(canonical_methods):

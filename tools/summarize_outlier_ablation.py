@@ -125,7 +125,7 @@ def write(rows: list[dict], populations: dict, output_dir: Path) -> None:
         "따라서 robust loss가 모든 조건을 일괄 개선한다고 주장할 수 없으며, "
         "방법별·표적별 결과를 함께 보고해야 한다.",
         "",
-        "A5는 train-vision-aligned FK를 hard-fixed한 최종 후보가 될 수 있다. "
+        "A5는 corrected-FK hard fixed (train-only VISION alignment) 최종 후보가 될 수 있다. "
         "단, 이 sensitivity 결과만으로 A5를 외부 물리 정확도 winner로 "
         "확정하지는 않으며, GT 공개 전에 방법과 alignment artifact를 frozen해야 한다.",
         "",

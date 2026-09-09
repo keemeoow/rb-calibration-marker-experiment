@@ -122,7 +122,7 @@ def reproj_gt(sc, model):
 
 # ---------------------------------------------------------------- 종합
 def eval_model(sc, model, train_sets, test_sets, W=None):
-    """한 model 에 대해 지표 dict 반환. W: FK 후보정 계수(구 corr 방식만)."""
+    """한 model 에 대해 지표 dict 반환. W: corrected-FK 계수(구 corr 방식만)."""
     from .methods import apply_fk_correction
     out = {}
     cams = model["cams"]

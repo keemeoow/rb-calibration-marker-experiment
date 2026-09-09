@@ -8,7 +8,7 @@ transform.  OpenCV PnP plus a preregistered robust SE(3) average produces the
 calibration, which is then frozen and evaluated on the same held-out
 fixed-to-fixed board/cube mask used by the main methods.
 
-This is policy B: an independent FK-free reference baseline.  It is a
+This is policy B: an independent VISION reference baseline. It is a
 transparent public-library reference, not external GT or a SOTA claim.
 """
 
@@ -143,7 +143,7 @@ def markdown_report(summary: Sequence[Mapping], conflict: Mapping) -> str:
         "# B — Independent OpenCV Relative-pose Reference Baseline",
         "",
         "이 기준선은 OpenCV PnP로 학습 영상의 고정카메라 상대 자세를 직접 "
-        "계산하는 독립 FK-free 기준선이다. Main-method transform, Joint "
+        "계산하는 독립 VISION 기준선이다. Main-method transform, Joint "
         "optimizer, Robot FK, Hand–Eye, "
         "shared target pose를 사용하지 않는다. SOTA 비교나 절대 정확도 "
         "주장이 아니다.",
@@ -221,7 +221,7 @@ def validate_payload(payload: Mapping) -> None:
 
 def parse_args(argv=None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="OpenCV PnP FK-free fixed-camera reference baseline")
+        description="OpenCV PnP VISION fixed-camera reference baseline")
     parser.add_argument("--root_folder", default=DEFAULT_SESSION_ROOT)
     parser.add_argument("--intrinsics_dir", default="intrinsics")
     parser.add_argument("--calib_dir", default="data/session/calib_out")

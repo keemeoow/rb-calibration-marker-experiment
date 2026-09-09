@@ -49,7 +49,7 @@ SE(3) 변수는 접평면 파라미터화로 갱신한다. 회전은 3-벡터 ro
     A0 / A1 / B1 : 순차(sequential) 2단계. stage1에서 eye-in-hand를,
                    stage2에서 eye-to-hand를 풀며 앞 단계 결과를 고정한다.
 
-A3는 큐브 자세를 컨트롤러 raw FK로, A5는 train 영상으로 정렬한 FK로 **하드 고정**한다.
+A3는 큐브 자세를 컨트롤러 FK로, A5는 train 영상으로 정렬한 FK로 **하드 고정**한다.
 고정이란 상태에는 존재하되 자유변수 목록에서 빠진다는 뜻이고, 잔차 항이 따로 생기지
 않는다. A4/B1/B2는 반대로 FK를 soft factor로 넣어 잔차 블록을 추가한다.
 
@@ -89,7 +89,7 @@ A3는 큐브 자세를 컨트롤러 raw FK로, A5는 train 영상으로 정렬�
       build_shared_reference_state()  - 모든 행이 공유하는 초기 상태 하나를 구성
       make_initial_state()            - 행별 freeze/고정 자세 특수화
       run_condition_once()            - 한 행 한 seed 적합 (unified / sequential)
-      run_factor_condition_once()     - FK soft factor 행(A4/B1/B2) 전용 경로
+      run_factor_condition_once()     - corrected-FK soft factor 행(A4/B1/B2) 전용 경로
       fit_train_only_cube_evaluation()- held-out cube 평가용 자세 적합
       canonical_solver_options()      - 전 행 공통 solver 설정
       write_outputs()                 - 계약 검증 후 JSON 기록

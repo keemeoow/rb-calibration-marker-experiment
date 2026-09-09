@@ -4,7 +4,7 @@
 This is not a confirmatory physical-accuracy experiment.  It keeps the Session04
 manifest, split, solver, and A4 row fixed, then changes only the Simulation
 prior standard deviation used by the corrected-FK soft factor.  Smaller scale
-means a stronger FK factor.
+means a stronger corrected-FK soft factor.
 """
 
 from __future__ import annotations
@@ -163,23 +163,23 @@ def _write(rows: list[dict], args: argparse.Namespace, baseline: dict) -> None:
         "scale_semantics": (
             "preflight_std_scale multiplies both translation and rotation "
             "Simulation-prior standard deviations; smaller scale makes the "
-            "FK factor stronger"),
+            "corrected-FK soft factor stronger"),
         "rows": rows,
     }, indent=2) + "\n")
 
     lines = [
-        "# FK Factor Sensitivity (Preflight)",
+        "# corrected-FK soft factor Sensitivity (Preflight)",
         "",
         "목적: 8/3 피드백 #4, 즉 \"카메라 관측 수가 많아 FK 항이 묻히는가\"에 "
         "답하기 위한 preflight 분석이다.",
         "",
         "이 실험은 canonical Table 1을 덮어쓰지 않는다. Session04 manifest, split, "
         "solver, A4 row를 고정하고 Simulation prior covariance의 표준편차 scale만 "
-        "바꾼다. `preflight_std_scale < 1`은 FK factor를 더 강하게, `> 1`은 더 약하게 "
+        "바꾼다. `preflight_std_scale < 1`은 corrected-FK soft factor를 더 강하게, `> 1`은 더 약하게 "
         "넣는다는 뜻이다.",
         "",
         "> External GT를 사용하지 않았으므로 이 결과는 물리 정확도 우월성 근거가 "
-        "아니라 FK factor 영향도 점검이다.",
+        "아니라 corrected-FK soft factor 영향도 점검이다.",
         "",
         f"- A2 held-out baseline: overall `{baseline['overall']:.4f}` px, "
         f"board `{baseline['board']:.4f}` px, cube `{baseline['cube']:.4f}` px",
@@ -217,7 +217,7 @@ def _write(rows: list[dict], args: argparse.Namespace, baseline: dict) -> None:
         f"- 가장 강한 FK 설정 `{strongest['preflight_std_scale']:.2f}x`와 가장 약한 "
         f"설정 `{weakest['preflight_std_scale']:.2f}x` 사이의 held-out overall 차이는 "
         f"`{strongest['heldout_overall_rmse_px'] - weakest['heldout_overall_rmse_px']:+.4f}` px다.",
-        "- 따라서 현재 데이터에서는 FK factor가 완전히 무시된다고 보기는 어렵지만, "
+        "- 따라서 현재 데이터에서는 corrected-FK soft factor가 완전히 무시된다고 보기는 어렵지만, "
         "A2 대비 A4의 내부 held-out 차이는 매우 작아 최종 우월성 claim으로 쓰기에는 부족하다.",
         "- 이 결과는 #4에 대한 개선된 답변이다. 단순 residual 개수나 FK cost fraction만 "
         "보지 않고, covariance scale을 바꿨을 때 출력 지표가 실제로 움직이는지도 같이 본다.",

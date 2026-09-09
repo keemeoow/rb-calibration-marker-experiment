@@ -15,7 +15,7 @@
 >
 > 2026-08-06 공정성 수정으로 아래가 모두 바뀌었습니다. **재산출 전까지 인용하지 마세요.**
 >
-> 1. **GT 누출 제거** — no-FK(vision) 비교군까지 초기화에 `fk_cube`(FK)와 `bTboard`(GT 보드)를
+> 1. **GT 누출 제거** — VISION 비교군까지 초기화에 `fk_cube`(FK)와 `bTboard`(GT 보드)를
 >    썼고, board-only 핸드아이는 잔차에 GT 보드를 직접 넣었습니다. 이제 모든 방법이
 >    GT·FK 를 쓰지 않는 동일한 모션 기반 초기화(`_bootstrap_visual`)를 씁니다.
 > 2. **재투영 열이 방법별 성능이 아니었음** — 프론트엔드 PnP 자체 잔차(`reproj_seed`)를
@@ -23,7 +23,7 @@
 >    leave-one-camera-out 으로 재투영합니다.
 > 3. **independent 의 rigid 정합이 예측에 적용되지 않았음** (계산만 하고 버려짐).
 > 4. **Ours 재정의** — `[1,x,y]` Ridge 후보정(위치만 보정)에서 **BA 안의 공분산 가중
->    robust FK factor**(회전 포함)로 바뀌었습니다. 스크립트마다 5.0/0.5/0.0 으로
+>    robust corrected-FK soft factor**(회전 포함)로 바뀌었습니다. 스크립트마다 5.0/0.5/0.0 으로
 >    달랐던 anchor weight 는 제거되고 sigma_FK 가 전 실험 동결됩니다.
 > 5. **프론트엔드 통일** — robust PnP(trimming)를 씬이 한 번만 돌려 모든 방법이 같은
 >    코너 집합을 공유합니다. 이상치 실험이 Ours 에 유리하던 편향이 사라집니다.
@@ -35,14 +35,14 @@
 > 자세한 규약은 [README.md](README.md) 참조.
 
 
-**FK 표시 구분 3가지**(no-FK(vision) / FK-fixed / corrected-FK)를 사용하되, corrected-FK는 A/B 두 세부형으로 나누어 **FK 오차 × 카메라 노이즈(랜덤·계통)** 조건에서
+**FK 표시 구분 3가지**(VISION / FK hard fixed / corrected-FK)를 사용하되, corrected-FK는 A/B 두 세부형으로 나누어 **FK 오차 × 카메라 노이즈(랜덤·계통)** 조건에서
 전수 비교하여, "각 조건에서 held-out 큐브 예측(e_task)이 가장 낮은 방법"을 구했다.
 
 <a id="toc-section-1"></a>
 
 ## TL;DR
 
-- **FK-fixed**는 **FK가 정확하고 카메라 계통노이즈가 0인 이상적 코너에서만** 최고다.
+- **FK hard fixed**는 **FK가 정확하고 카메라 계통노이즈가 0인 이상적 코너에서만** 최고다.
 - **corrected-FK (B)**는 **카메라 계통노이즈가 조금이라도(≥1%) 있으면 거의 전 영역에서 최고**다.
 - 실제 카메라 인지 오차는 계통적(intrinsic·왜곡·검출 편향)이므로, **현실 조건에서는 corrected-FK (B)가 사실상 항상 최고**다.
 - **corrected-FK (A, anchor=0)가 corrected-FK (B, anchor=0.5)를 이긴 경우는 시뮬 36개 조건 중 0개** — 약한 anchor가 항상 안전하게 낫다.
@@ -64,12 +64,12 @@
 
 | 방법 | 1차: 큐브 FK를 | 2차 보정 | anchor λ |
 |---|---|---|---|
-| **FK-fixed** | 하드 고정 | ✗ | (하드) |
-| **no-FK(vision)** | 안 씀(자유변수) | ✗ | 0 |
+| **FK hard fixed** | 하드 고정 | ✗ | (하드) |
+| **VISION** | 안 씀(자유변수) | ✗ | 0 |
 | **corrected-FK (A)** | 보정 전 자유변수(anchor=0) | ✓ | 0 |
 | **corrected-FK (B)** | 보정 전 soft anchor | ✓ | 0.5 |
 
-- **corrected-FK (A) vs no-FK(vision) 차이** = 2차 FK 잔차보정 유무
+- **corrected-FK (A) vs VISION 차이** = 2차 FK 잔차보정 유무
 - **corrected-FK (A) vs corrected-FK (B) 차이** = 1차 soft anchor(λ) 유무
 - 세 방법 모두 eye-in-hand FK(`bTg`)는 공통 사용(gauge 앵커). 차이는 **큐브 위치 FK(`fk_cube`)를 어떻게 쓰나**.
 
@@ -92,13 +92,13 @@
 
 | FK오차 ↓ \ 계통노이즈 → | **0** | 1% | 2% | 3% |
 |---|---|---|---|---|
-| **16mm** | no-FK(vision) | **corrected-FK (B)** | **corrected-FK (B)** | **corrected-FK (B)** |
-| **8mm** | FK-fixed | **corrected-FK (B)** | **corrected-FK (B)** | **corrected-FK (B)** |
-| **4mm** | FK-fixed | **corrected-FK (B)** | **corrected-FK (B)** | **corrected-FK (B)** |
-| **2mm** | FK-fixed | **corrected-FK (B)** | **corrected-FK (B)** | **corrected-FK (B)** |
-| **0mm** | FK-fixed | **corrected-FK (B)** | **corrected-FK (B)** | **corrected-FK (B)** |
+| **16mm** | VISION | **corrected-FK (B)** | **corrected-FK (B)** | **corrected-FK (B)** |
+| **8mm** | FK hard fixed | **corrected-FK (B)** | **corrected-FK (B)** | **corrected-FK (B)** |
+| **4mm** | FK hard fixed | **corrected-FK (B)** | **corrected-FK (B)** | **corrected-FK (B)** |
+| **2mm** | FK hard fixed | **corrected-FK (B)** | **corrected-FK (B)** | **corrected-FK (B)** |
+| **0mm** | FK hard fixed | **corrected-FK (B)** | **corrected-FK (B)** | **corrected-FK (B)** |
 
-→ **계통노이즈 열(≥1%)은 전부 corrected-FK (B).** FK-fixed는 **계통노이즈=0인 맨 왼쪽 열에서만** 승리.
+→ **계통노이즈 열(≥1%)은 전부 corrected-FK (B).** FK hard fixed는 **계통노이즈=0인 맨 왼쪽 열에서만** 승리.
 
 ---
 
@@ -112,34 +112,34 @@
 
 | e_task (mm) | fk=0 | 1 | 2 | 4 | 8 | 16 |
 |---|---|---|---|---|---|---|
-| FK-fixed | **0.52** | **0.64** | **0.87** | **1.44** | **2.68** | 5.25 |
-| no-FK(vision) | 2.97 | 2.97 | 2.97 | 2.97 | 2.97 | **2.97** |
+| FK hard fixed | **0.52** | **0.64** | **0.87** | **1.44** | **2.68** | 5.25 |
+| VISION | 2.97 | 2.97 | 2.97 | 2.97 | 2.97 | **2.97** |
 | corrected-FK (A) | 0.78 | 1.32 | 2.26 | 4.30 | 8.48 | 16.91 |
 | corrected-FK (B) | 0.61 | 1.20 | 2.17 | 4.24 | 8.44 | 16.87 |
 
-**카메라가 완벽하면 FK-fixed 승.** FK가 극단(16mm)이면 no-FK(vision)가 앞선다.
+**카메라가 완벽하면 FK hard fixed 승.** FK가 극단(16mm)이면 VISION가 앞선다.
 
 ### (2) 계통 카메라노이즈 sweep — FK 완벽
 
 | e_task (mm) | 0 | 0.5% | 1% | 2% | 3% |
 |---|---|---|---|---|---|
-| FK-fixed | **0.52** | 14.37 | 27.93 | 45.30 | 60.16 |
-| no-FK(vision) | 2.97 | 27.91 | 41.55 | 76.64 | 73.56 |
+| FK hard fixed | **0.52** | 14.37 | 27.93 | 45.30 | 60.16 |
+| VISION | 2.97 | 27.91 | 41.55 | 76.64 | 73.56 |
 | corrected-FK (A) | 0.78 | 6.27 | 11.02 | 24.36 | 38.66 |
 | corrected-FK (B) | 0.61 | **5.69** | **9.50** | **23.77** | **36.50** |
 
-**FK-fixed가 0.5→60mm로 붕괴**, corrected-FK (B)가 매 지점 최저. **계통오차엔 ours 압도.**
+**FK hard fixed가 0.5→60mm로 붕괴**, corrected-FK (B)가 매 지점 최저. **계통오차엔 ours 압도.**
 
 ### (3) 랜덤 픽셀 sweep — FK 완벽
 
 | e_task (mm) | 0.3 | 0.5 | 1.0 | 1.5 | 2.0 |
 |---|---|---|---|---|---|
-| FK-fixed | **0.52** | **1.03** | **2.35** | 7.88 | 14.70 |
-| no-FK(vision) | 2.97 | 5.72 | 12.81 | 29.96 | 41.03 |
+| FK hard fixed | **0.52** | **1.03** | **2.35** | 7.88 | 14.70 |
+| VISION | 2.97 | 5.72 | 12.81 | 29.96 | 41.03 |
 | corrected-FK (A) | 0.78 | 1.43 | 3.27 | 5.68 | 8.61 |
 | corrected-FK (B) | 0.61 | 1.16 | 2.63 | **4.78** | **7.57** |
 
-저노이즈는 FK-fixed, **1px 넘으면 corrected-FK (B) 역전**(변동성엔 보정+자유큐브가 유리).
+저노이즈는 FK hard fixed, **1px 넘으면 corrected-FK (B) 역전**(변동성엔 보정+자유큐브가 유리).
 
 전체 지표(gTc/e_X/reproj)는 [fig_ww_metrics.png](results/figures/fig_ww_metrics.png) 참고.
 
@@ -187,11 +187,11 @@
 
 | 방법 | 이기는 조건 | 실제 해당? |
 |---|---|---|
-| **FK-fixed** | FK 정확 **&** 카메라 계통노이즈 0 | ✗ (이상적 코너뿐) |
+| **FK hard fixed** | FK 정확 **&** 카메라 계통노이즈 0 | ✗ (이상적 코너뿐) |
 | **corrected-FK (B)** | 계통노이즈 존재(현실) → 거의 전 영역 | ✅ |
-| **no-FK(vision)** | FK 극단 오차 + 카메라 완벽 | ✗ (극단 코너) |
+| **VISION** | FK 극단 오차 + 카메라 완벽 | ✗ (극단 코너) |
 
-- **논문 메시지**: 완벽 FK·이상 카메라에서는 FK-fixed로 충분하나, 실제 시스템의 **FK 오차 + 카메라 계통노이즈** 아래에서 FK-fixed는 붕괴하고, **corrected-FK(soft anchor + 잔차보정)만이 전 조건에서 강건**하다.
+- **논문 메시지**: 완벽 FK·이상 카메라에서는 FK hard fixed로 충분하나, 실제 시스템의 **FK 오차 + 카메라 계통노이즈** 아래에서 FK hard fixed는 붕괴하고, **corrected-FK(soft anchor + 잔차보정)만이 전 조건에서 강건**하다.
 - **실용 권고**: anchor는 **작게(λ≈0.5)**. 실코드 기본값 5.0은 최적을 지나쳐 있으니 하향 검토 권장.
 
 ---

@@ -9,11 +9,11 @@
 | A0 | board-only sequential baseline | board | 12 | 8777 | 9.544 mm | N/A | 9.544 mm |
 | A1 | board+cube sequential | board+cube | 24 | 11837 | 9.339 mm | 9.649 mm | 9.420 mm |
 | A2 | board+cube unified internal main | board+cube | 24 | 11837 | 9.042 mm | 8.580 mm | 8.925 mm |
-| A3 | raw-FK hard fixed diagnostic | board+cube | 24 | 11837 | 9.494 mm | 9.890 mm | 9.598 mm |
-| A4 | soft-FK preflight | board+cube | 24 | 11837 | 9.027 mm | 8.569 mm | 8.911 mm |
-| A5 | vision-aligned FK hard fixed | board+cube | 24 | 11837 | 8.996 mm | 7.953 mm | 8.738 mm |
-| B1 | -Unified soft-FK baseline | board+cube | 24 | 11837 | 9.331 mm | 9.628 mm | 9.409 mm |
-| B2 | -board cube-only soft-FK | cube | 12 | 3060 | N/A | 8.010 mm | 8.010 mm |
+| A3 | FK hard fixed diagnostic | board+cube | 24 | 11837 | 9.494 mm | 9.890 mm | 9.598 mm |
+| A4 | corrected-FK soft factor preflight | board+cube | 24 | 11837 | 9.027 mm | 8.569 mm | 8.911 mm |
+| A5 | corrected-FK hard fixed (VISION-aligned) | board+cube | 24 | 11837 | 8.996 mm | 7.953 mm | 8.738 mm |
+| B1 | -Unified corrected-FK soft factor baseline | board+cube | 24 | 11837 | 9.331 mm | 9.628 mm | 9.409 mm |
+| B2 | -board cube-only corrected-FK soft factor | cube | 12 | 3060 | N/A | 8.010 mm | 8.010 mm |
 | B3 | -cube board-only unified | board | 12 | 8777 | 9.543 mm | N/A | 9.543 mm |
 
 ## Target-level Detail
@@ -80,7 +80,7 @@
 
 ![Robot-base point cloud A2 event 0072](robot_base_pointcloud_A2_event0072.png)
 
-### A3 — raw-FK hard fixed diagnostic
+### A3 — FK hard fixed diagnostic
 
 #### Event 0024
 
@@ -94,7 +94,7 @@
 
 ![Robot-base point cloud A3 event 0072](robot_base_pointcloud_A3_event0072.png)
 
-### A4 — soft-FK preflight
+### A4 — corrected-FK soft factor preflight
 
 #### Event 0024
 
@@ -108,7 +108,7 @@
 
 ![Robot-base point cloud A4 event 0072](robot_base_pointcloud_A4_event0072.png)
 
-### A5 — vision-aligned FK hard fixed
+### A5 — corrected-FK hard fixed (VISION-aligned)
 
 #### Event 0024
 
@@ -122,7 +122,7 @@
 
 ![Robot-base point cloud A5 event 0072](robot_base_pointcloud_A5_event0072.png)
 
-### B1 — -Unified soft-FK baseline
+### B1 — -Unified corrected-FK soft factor baseline
 
 #### Event 0024
 
@@ -136,7 +136,7 @@
 
 ![Robot-base point cloud B1 event 0072](robot_base_pointcloud_B1_event0072.png)
 
-### B2 — -board cube-only soft-FK
+### B2 — -board cube-only corrected-FK soft factor
 
 #### Event 0024
 

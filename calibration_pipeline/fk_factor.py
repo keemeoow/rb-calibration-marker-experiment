@@ -1,6 +1,6 @@
-"""Pixel-level bundle adjustment with a Simulation-compatible FK factor.
+"""Pixel-level bundle adjustment with a corrected-FK soft factor.
 
-The visual term is identical whether the FK factor is disabled (A2) or enabled
+The visual term is identical whether the corrected-FK soft factor is disabled (A2) or enabled
 (A4).  Visual and FK losses are converted to explicit least-squares residuals,
 so SciPy's global ``loss`` option cannot accidentally apply one loss to both
 terms.  As in ``Simulation/core/methods.py``, the final A4 factor is
@@ -128,7 +128,7 @@ class FKFactorSpec:
     """Simulation-compatible FK mode and factor loss.
 
     ``none`` leaves cube poses free, ``fixed`` removes them from the variable
-    manifest, and ``factor`` leaves them free and adds the whitened FK factor.
+    manifest, and ``factor`` leaves them free and adds the whitened corrected-FK soft factor.
     ``corr`` is a post-calibration baseline and therefore is not solved here.
     """
 
@@ -138,13 +138,13 @@ class FKFactorSpec:
 
     def validate(self) -> None:
         if self.mode not in {FK_MODE_NONE, FK_MODE_FIXED, FK_MODE_FACTOR}:
-            raise ValueError(f"unknown FK factor mode {self.mode!r}")
+            raise ValueError(f"unknown corrected-FK soft factor mode {self.mode!r}")
         if self.loss not in _LOSSES or float(self.robust_scale) <= 0.0:
             raise ValueError("invalid FK robust loss configuration")
 
 
 class FactorizedFKProblem:
-    """Common visual problem plus an optional FK factor on free cube poses."""
+    """Common visual problem plus an optional corrected-FK soft factor."""
 
     def __init__(
         self,
@@ -189,7 +189,7 @@ class FactorizedFKProblem:
                 raise ValueError("mode='factor' requires at least one free cube pose")
             if target_sets != variable_sets:
                 raise ValueError(
-                    "FK factor target sets must exactly match free cube sets: "
+                    "corrected-FK soft factor target sets must exactly match free cube sets: "
                     f"variables={sorted(variable_sets)}, targets={sorted(target_sets)}")
             if covariance_sets != variable_sets:
                 raise ValueError(
@@ -292,7 +292,7 @@ def factorized_objective_cost(
     fk_covariances: Optional[Mapping[int, np.ndarray]] = None,
     fk_spec: FKFactorSpec = FKFactorSpec(),
 ) -> float:
-    """Evaluate the exact visual-plus-FK robust objective without fitting."""
+    """Evaluate the exact visual-plus-corrected-FK robust objective without fitting."""
     options.validate()
     fk_spec.validate()
     problem = FactorizedFKProblem(
@@ -343,8 +343,8 @@ def solve_factorized_fk(
 ) -> Tuple[PoseState, dict]:
     """Solve A2/A4 with explicitly separated visual and FK robust losses."""
     options.validate()
-    # With no FK factor, use the canonical visual solver verbatim.  This makes
-    # every visual-only/hard-FK Table 1 row share one numerical implementation;
+    # In VISION mode, use the canonical visual solver verbatim.  This makes
+    # every VISION/FK hard fixed Table 1 row share one numerical implementation;
     # the factorized implementation is entered only when an FK residual exists.
     if fk_spec.mode in {FK_MODE_NONE, FK_MODE_FIXED}:
         return solve_corner_reprojection(
@@ -422,7 +422,7 @@ def solve_factorized_fk(
         "backend": "factorized_visual_plus_fk_v1",
         "objective_contract": {
             # Two additive terms, never three, and never scalar-weighted.  The
-            # FK factor IS the pose-error term; they are not separate terms.
+            # The corrected-FK soft factor is the pose-error term.
             "n_objective_terms": 2,
             "terms": ("robust_corner_reprojection", "whitened_robust_FK_factor"),
             "scalar_term_weights_used": bool(

@@ -15,10 +15,10 @@
 
 | Row | 한 줄 정의 | 최종 역할 |
 | --- | --- | --- |
-| A2 | board+cube pose를 모두 영상 reprojection으로 free하게 추정하는 unified visual-only 방법 | vision-only unified 후보 |
-| A3 | cube pose를 raw FK로 hard fixed하고 나머지를 visual reprojection으로 푸는 방법 | raw FK hard constraint 후보 |
-| A4 | cube pose는 free로 두고, vision-aligned FK를 soft factor/prior로 추가하는 방법 | corrected-FK soft 후보 |
-| A5 | vision-aligned FK cube pose를 hard fixed하고 visual reprojection만 푸는 방법 | GT 전 frozen 시 최종 후보 |
+| A2 | board+cube pose를 모두 영상 reprojection으로 free하게 추정하는 unified VISION 방법 | VISION unified 후보 |
+| A3 | cube pose를 FK로 hard fixed하고 나머지를 visual reprojection으로 푸는 방법 | FK hard constraint 후보 |
+| A4 | cube pose는 free로 두고, corrected-FK를 soft factor/prior로 추가하는 방법 | corrected-FK soft 후보 |
+| A5 | corrected-FK cube pose를 hard fixed하는 방법(train-only VISION alignment) | GT 전 frozen 시 최종 후보 |
 
 ## 공통 구조
 
@@ -34,9 +34,9 @@
 | Row | Cube pose source | Cube pose in optimizer | Objective term | FK residual |
 | --- | --- | --- | --- | --- |
 | A2 | visual initialization 후 영상 residual로 추정 | free | robust visual reprojection 1항 | 없음 |
-| A3 | controller raw FK + mechanical frame map | hard fixed | robust visual reprojection 1항 | 없음 |
-| A4 | train-only vision-aligned FK artifact | free | robust visual reprojection + whitened robust FK factor 2항 | 있음 |
-| A5 | train-only vision-aligned FK artifact | hard fixed | robust visual reprojection 1항 | 없음 |
+| A3 | controller FK + mechanical frame map | hard fixed | robust visual reprojection 1항 | 없음 |
+| A4 | train-only corrected-FK artifact | free | robust visual reprojection + whitened robust corrected-FK soft factor 2항 | 있음 |
+| A5 | train-only corrected-FK artifact | hard fixed (VISION-aligned) | robust visual reprojection 1항 | 없음 |
 
 ## 현재 Session04 내부 cube 결과
 
@@ -44,9 +44,9 @@
 
 | Row | Train overall px | Heldout Cube px | Cross-view Cube px | Cam-common Cube mm/deg | 해석 |
 | --- | ---: | ---: | ---: | ---: | --- |
-| A2 | 3.7421 | 3.5960 | 6.3003 | 7.2868 / 1.0280 | vision-only unified 후보 |
-| A3 | 5.1587 | 6.7199 | 6.8626 | 8.3382 / 2.0892 | raw FK hard fixed는 현재 내부 cube에서 악화 |
-| A4 | 3.7441 | 3.5786 | 6.3126 | 7.3077 / 1.0151 | A2와 거의 동률인 soft-FK 후보 |
+| A2 | 3.7421 | 3.5960 | 6.3003 | 7.2868 / 1.0280 | VISION unified 후보 |
+| A3 | 5.1587 | 6.7199 | 6.8626 | 8.3382 / 2.0892 | FK hard fixed는 현재 내부 cube에서 악화 |
+| A4 | 3.7441 | 3.5786 | 6.3126 | 7.3077 / 1.0151 | A2와 거의 동률인 corrected-FK soft factor 후보 |
 | A5 | 3.9648 | 3.4180 | 5.7166 | 6.6745 / 0.8862 | 현재 내부 cube 지표 최저, GT 전 frozen 필요 |
 
 ## A5를 채택할 수 있는가?

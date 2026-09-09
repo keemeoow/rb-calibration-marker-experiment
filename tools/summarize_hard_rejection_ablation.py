@@ -346,7 +346,7 @@ def write_outputs(
         f"{summary['a2_minus_a4_standard_px']:+.4f} px, strict "
         f"{summary['a2_minus_a4_strict_px']:+.4f} px로 둘 다 사실상 동률이다. "
         "따라서 이 실험도 A4 우월성 주장의 근거가 아니다.",
-        "- A3 raw-FK-fixed는 두 정책 모두 A2/A4보다 높은 오차를 유지했다. "
+        "- A3 FK hard fixed는 두 정책 모두 A2/A4보다 높은 오차를 유지했다. "
         "즉 A3의 차이는 해당 두 경계 관측만으로 설명되지 않는다.",
         "- A5도 두 정책에서 낮은 내부 px를 유지한다. External GT 공개 전에 "
         "방법과 alignment artifact가 frozen이면 최종 후보지만, strict 민감도 "

@@ -27,6 +27,7 @@ from calibration_pipeline.runtime import (
 
 from calibration_pipeline import table1
 from calibration_pipeline.schema import (
+    canonicalize_relative_pose_reporting,
     DEFAULT_SPLIT_SEED,
     RELATIVE_POSE_REPORTING_CONTRACT,
 )
@@ -157,8 +158,9 @@ def validate_result_contract(result: Mapping) -> None:
                 "may_rank_methods_before_external_gt") is not False):
         raise ValueError(
             "fixed-to-fixed consistency was promoted above supplementary")
-    if protocol.get("relative_pose_reporting") != \
-            RELATIVE_POSE_REPORTING_CONTRACT:
+    relative_pose_reporting = canonicalize_relative_pose_reporting(
+        protocol.get("relative_pose_reporting", {}))
+    if relative_pose_reporting != RELATIVE_POSE_REPORTING_CONTRACT:
         raise ValueError("relative-pose reporting policy drift")
     gripper_to_fixed_protocol = protocol.get("gripper_to_fixed_evaluation", {})
     gripper_mask_sha256 = gripper_to_fixed_protocol.get(

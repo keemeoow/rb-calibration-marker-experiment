@@ -74,11 +74,11 @@ METHOD_ROLES = {
     "A0": "board-only sequential baseline",
     "A1": "board+cube sequential",
     "A2": "board+cube unified internal main",
-    "A3": "raw-FK hard fixed diagnostic",
-    "A4": "soft-FK preflight",
-    "A5": "vision-aligned FK hard fixed",
-    "B1": "-Unified soft-FK baseline",
-    "B2": "-board cube-only soft-FK",
+    "A3": "FK hard fixed diagnostic",
+    "A4": "corrected-FK soft factor preflight",
+    "A5": "corrected-FK hard fixed (VISION-aligned)",
+    "B1": "-Unified corrected-FK soft factor baseline",
+    "B2": "-board cube-only corrected-FK soft factor",
     "B3": "-cube board-only unified",
 }
 

@@ -98,15 +98,15 @@ Shared Train-only Baseline만 확인하려면 05번에 `--baseline_only`를 추�
 | $T^G_C$ | eye-in-hand 카메라 좌표에서 gripper 좌표로의 Hand–Eye transform | 조건에 따라 자유변수 |
 | $T^B_G(e)$ | event $e$의 robot FK가 제공한 base–gripper transform | 모든 조건에서 고정 입력 |
 | $T^B_{\mathrm{board}}$ | legacy Session04의 작업공간 고정 ChArUco board pose | board 조건에서 자유변수 |
-| $T^B_{\mathrm{cube}}(s)$ | 배치 set $s$의 cube pose | vision 추정, raw/aligned FK 고정 또는 FK factor |
+| $T^B_{\mathrm{cube}}(s)$ | 배치 set $s$의 cube pose | VISION 추정, FK hard fixed 또는 corrected-FK 방식 |
 | $(K_i,D_i)$ | 카메라 $i$의 intrinsic과 distortion | 사전 보정 후 항상 고정 |
 
 중요한 용어 규칙은 다음과 같다.
 
-- `vision` 또는 `no-FK`는 **robot FK 전체를 사용하지 않는다는 뜻이 아니다.** Eye-in-hand 카메라 pose $T^B_G(e)T^G_C$를 만들기 위해 robot FK는 모든 조건에서 사용한다.
-- `vision`, `raw-FK-fixed`, `vision-aligned-FK-fixed`, `corrected-FK factor`의 차이는 배치된 cube pose $T^B_{\mathrm{cube}}(s)$를 자유변수로 둘지, raw FK의 mechanical frame map 또는 train-vision-aligned FK에 고정할지, 또는 자유변수에 aligned-FK covariance-whitened factor를 연결할지의 차이다.
+- `VISION`은 **robot FK 전체를 사용하지 않는다는 뜻이 아니다.** Eye-in-hand 카메라 pose $T^B_G(e)T^G_C$를 만들기 위해 robot FK는 모든 조건에서 사용한다.
+- `VISION`, `FK hard fixed`, `corrected-FK soft factor`, `corrected-FK hard fixed (VISION-aligned)`의 차이는 배치된 cube pose $T^B_{\mathrm{cube}}(s)$를 자유변수로 둘지, controller FK에 고정할지, 또는 train-only corrected-FK를 soft factor나 hard fixed pose로 사용할지의 차이다.
 - 현재 Session04 loader/solver에서는 board가 robot에 부착되지 않은 legacy data이므로
-  `FK-fixed board`를 사용하지 않는다. 최종 재촬영은 board와 cube를 하나의 강체 target
+  `FK hard fixed board`를 사용하지 않는다. 최종 재촬영은 board와 cube를 하나의 강체 target
   rig로 묶어 같은 45개 event에서 촬영하며, phase-aware
   `T_base_rig(event)=T_base_flange(event)T_flange_rig` 모델을 구현한 뒤 사용한다.
   촬영 계약은 [CALIBRATION_EXPERIMENT_VALIDATION.md](CALIBRATION_EXPERIMENT_VALIDATION.md)를 따른다.
@@ -414,14 +414,14 @@ $$
 | ID | 입력 marker | 최적화 | Cube pose 처리 | 자유변수 | 핵심 출력/질문 |
 | --- | --- | --- | --- | --- | --- |
 | A0 | board | 순차 `seq` | cube 없음 | 1단계 $T^G_C,T^B_{\mathrm{board}}$, 2단계 $T^B_{C_i}$ | board-only optimization baseline |
-| A1 | board+cube | 순차 `seq` | vision 자유변수 | 1단계 $T^G_C,T^B_{\mathrm{board}},T^B_{\mathrm{cube}}(s)$, 2단계 $T^B_{C_i}$ | 같은 순차법에서 cube residual 추가 효과 |
-| A2 | board+cube | 통합 `U` | vision 자유변수 | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}},T^B_{\mathrm{cube}}(s)$ | vision-only 통합 효과 |
-| A3 | board+cube | 통합 `U` | raw FK + mechanical frame map으로 hard fixed | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}}$ | 영상 정렬 없는 raw FK hard constraint 효과 |
-| A4 | board+cube | 통합 `U` | covariance-whitened soft FK factor | A2와 같음 | vision과 FK 불확실성을 함께 쓰는 효과 |
-| A5 | board+cube | 통합 `U` | train-only vision-aligned FK로 hard fixed | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}}$ | GT 전 frozen 시 최종 후보 |
-| B1 | board+cube | 순차 `seq` | A4와 동일 soft FK factor | 1단계 Hand–Eye/board/cube, 2단계 camera별 | 같은 FK factor에서 통합 효과 검증 |
-| B2 | cube | 통합 `U` | A4와 동일 soft FK factor | $T^B_{C_i},T^G_C,T^B_{\mathrm{cube}}(s)$ | 같은 FK factor에서 board residual 제거 효과 |
-| B3 | board | 통합 `U` | cube 없음 | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}}$ | vision 통합 조건에서 cube residual 제거 효과 |
+| A1 | board+cube | 순차 `seq` | VISION 자유변수 | 1단계 $T^G_C,T^B_{\mathrm{board}},T^B_{\mathrm{cube}}(s)$, 2단계 $T^B_{C_i}$ | 같은 순차법에서 cube residual 추가 효과 |
+| A2 | board+cube | 통합 `U` | VISION 자유변수 | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}},T^B_{\mathrm{cube}}(s)$ | VISION 통합 효과 |
+| A3 | board+cube | 통합 `U` | FK + mechanical frame map으로 hard fixed | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}}$ | 영상 정렬 없는 FK hard constraint 효과 |
+| A4 | board+cube | 통합 `U` | covariance-whitened corrected-FK soft factor | A2와 같음 | vision과 FK 불확실성을 함께 쓰는 효과 |
+| A5 | board+cube | 통합 `U` | corrected-FK hard fixed (train-only VISION alignment) | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}}$ | GT 전 frozen 시 최종 후보 |
+| B1 | board+cube | 순차 `seq` | A4와 동일 corrected-FK soft factor | 1단계 Hand–Eye/board/cube, 2단계 camera별 | 같은 corrected-FK soft factor에서 통합 효과 검증 |
+| B2 | cube | 통합 `U` | A4와 동일 corrected-FK soft factor | $T^B_{C_i},T^G_C,T^B_{\mathrm{cube}}(s)$ | 같은 corrected-FK soft factor에서 board residual 제거 효과 |
+| B3 | board | 통합 `U` | cube 없음 | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}}$ | VISION 통합 조건에서 cube residual 제거 효과 |
 
 ### 8.1 A0 — Board·순차 baseline
 
@@ -438,23 +438,23 @@ $$
 - 최적화: eih 단계에서 board와 set별 cube pose까지 추정한 뒤 고정카메라 단계로 진행
 - 비교 목적: A0 대비 최적화 목적함수에 cube residual을 추가한 효과
 
-### 8.3 A2 — Vision-only 통합
+### 8.3 A2 — VISION 통합
 
 - 입력: A1과 동일
 - 최적화: eih/e2h, 고정카메라, Hand–Eye, board/cube pose를 하나의 raw-corner 문제에서 동시 계산
 - 비교 목적: A1 대비 관측 종류나 FK 처리는 그대로 두고 통합 feedback만 추가한 효과
 
-### 8.4 A3 — raw-FK-fixed 통합
+### 8.4 A3 — FK hard fixed 통합
 
 - 입력: A2 입력 + raw set-cube-center FK + 사전 등록한 $R_y(180^\circ)$ mechanical frame map
 - 최적화: cube pose는 변수 목록에서 제거하여 완전히 고정하고 나머지만 통합 최적화
-- 비교 목적: A2 대비 cube pose를 vision으로 추정하는 대신 FK 상수로 두는 효과
+- 비교 목적: A2 대비 cube pose를 VISION으로 추정하는 대신 FK 상수로 두는 효과
 - 주의: FK가 실제로 정확하지 않다면 hard constraint가 결과를 편향시킬 수 있으므로 실측 FK 검증이 필요
 
-### 8.5 A4 — Corrected-FK factor 통합
+### 8.5 A4 — corrected-FK soft factor 통합
 
-- 입력: A2 입력 + aligned FK target + set별 6×6 FK covariance
-- 최적화: cube pose는 자유변수로 유지하면서 visual residual에 FK factor를 추가
+- 입력: A2 입력 + corrected-FK target + set별 6×6 FK covariance
+- 최적화: cube pose는 자유변수로 유지하면서 visual residual에 corrected-FK soft factor를 추가
 
 $$
 \mathbf r_{\mathrm{FK},s}
@@ -466,22 +466,22 @@ $$
 \quad \Sigma_s=L_sL_s^T
 $$
 
-FK factor에는 Huber loss를 적용한다. `--fk_covariance_json`이 없으면 고정 Simulation prior를 사용한다. 최종 후보로 비교하려면 External GT 공개 전에 covariance와 artifact를 frozen해야 한다. 실측 파일은 측정 source와 estimator가 명시되어야 하고, full-rank 6D 표본 covariance의 수학적 최소 조건인 7회 이상의 독립 반복, 대칭성, positive-definiteness를 통과해야 한다.
+corrected-FK soft factor에는 Huber loss를 적용한다. `--fk_covariance_json`이 없으면 고정 Simulation prior를 사용한다. 최종 후보로 비교하려면 External GT 공개 전에 covariance와 artifact를 frozen해야 한다. 실측 파일은 측정 source와 estimator가 명시되어야 하고, full-rank 6D 표본 covariance의 수학적 최소 조건인 7회 이상의 독립 반복, 대칭성, positive-definiteness를 통과해야 한다.
 
-### 8.6 A5 — vision-aligned-FK-fixed 최종 후보
+### 8.6 A5 — corrected-FK hard fixed (VISION-aligned) 최종 후보
 
-A5는 A4와 동일한 board-free train-only aligned-FK artifact를 사용하되, set별 cube pose를 자유변수와 FK factor에서 모두 제거하고 상수로 고정한다.
+A5는 A4와 동일한 board-free train-only corrected-FK artifact를 사용하되, set별 cube pose를 자유변수와 corrected-FK soft factor에서 모두 제거하고 상수로 고정한다.
 
 $$
 T^B_{\mathrm{cube}}(s)=T^B_{\mathrm{FK,cube,raw}}(s)\Delta_{\mathrm{train}}
 $$
 
-따라서 A3↔A5는 mechanical raw FK와 train-vision alignment의 차이를, A4↔A5는 동일 aligned target을 soft factor와 hard constraint로 사용하는 차이를 분리한다. `\Delta_{\mathrm{train}}`이 train 영상으로 적합되었으므로 External GT 공개 전에 절차와 artifact hash를 frozen해야 최종 후보로 사용할 수 있다.
+따라서 A3↔A5는 FK와 train-only corrected-FK의 차이를, A4↔A5는 동일 corrected-FK target을 soft factor와 hard constraint로 사용하는 차이를 분리한다. `\Delta_{\mathrm{train}}`이 train 영상으로 적합되었으므로 External GT 공개 전에 절차와 artifact hash를 frozen해야 최종 후보로 사용할 수 있다.
 
 ### 8.7 B1/B2/B3 — 원인 분리용 ablation
 
-- B1↔A4: marker와 FK factor는 같고 순차/통합만 다르다.
-- B2↔A4: cube와 FK factor는 같고 board residual 유무만 다르다.
+- B1↔A4: marker와 corrected-FK soft factor는 같고 순차/통합만 다르다.
+- B2↔A4: cube와 corrected-FK soft factor는 같고 board residual 유무만 다르다.
 - B3↔A2: Board-based Unified Optimization (보드 기반 통합 최적화)이라는 동일 조건에서 Cube Residual (큐브 잔차) 유무를 본다.
 
 B2/B3는 all-marker shared initializer에서 시작한 뒤 residual과 변수를 제거한다. 따라서 “처음부터 cube-only/board-only 시스템을 구축했을 때의 성능”이 아니라 **동일 초기조건에서 최적화 항의 기여도**를 측정한다.
@@ -505,7 +505,7 @@ python3 tools/compare_markers.py \
 | `cube_only` | cube만 | cube만 | cameras, Hand–Eye, cube poses |
 | `board_cube` | board+cube | board+cube | cameras, Hand–Eye, board/cube poses |
 
-세 시스템은 split, raw detection, $(K,D)$, solver, seed와 held-out 평가 population을 공유하지만 초기값은 modality별로 별도 생성한다. cube-only는 board-free train-only FK artifact로 Hand–Eye를 초기화하지만, 최종 목적함수에는 FK factor가 없다.
+세 시스템은 split, raw detection, $(K,D)$, solver, seed와 held-out 평가 population을 공유하지만 초기값은 modality별로 별도 생성한다. cube-only는 board-free train-only FK artifact로 Hand–Eye를 초기화하지만, 최종 목적함수에는 corrected-FK soft factor가 없다.
 
 최종 Table 1에서는 어떤 Marker (마커)로 캘리브레이션했는지와 무관하게 cube target 평가만 사용한다. Cross-view pixel transfer와 Cam-common Obj-Cam consistency는 fixed-camera pair와 fixed-gripper pair를 하나의 보조 지표로 함께 집계하며, External GT (외부 정답)가 아니므로 절대 정확도 주장은 할 수 없다.
 
@@ -592,13 +592,13 @@ $$
 | --- | --- | --- |
 | 단일 target에서 순차/통합이 사실상 동등한가 | A0 -> B3 | Negative control + External cube GT |
 | cube train 관측 추가가 도움이 되는가 | A0 -> A1 | External cube GT + heldout cube |
-| vision 조건에서 통합 feedback이 도움이 되는가 | A1 -> A2 | External cube GT + heldout cube |
+| VISION 조건에서 통합 feedback이 도움이 되는가 | A1 -> A2 | External cube GT + heldout cube |
 | unified에서 cube residual이 필요한가 | B3 -> A2 | External cube GT + heldout cube |
-| raw FK hard fixed가 좋은가 | A2 -> A3 | External cube GT + heldout cube |
+| FK hard fixed가 좋은가 | A2 -> A3 | External cube GT + heldout cube |
 | corrected-FK soft factor가 좋은가 | A2 -> A4 | External cube GT + heldout cube |
-| soft FK 조건에서도 통합이 필요한가 | B1 -> A4 | External cube GT + heldout cube |
+| corrected-FK soft factor 조건에서도 통합이 필요한가 | B1 -> A4 | External cube GT + heldout cube |
 | board residual이 cube 보정에 도움이 되는가 | B2 -> A4 | External cube GT + heldout cube |
-| aligned FK hard fixed를 최종 방법으로 둘 수 있는가 | A3/A4 -> A5 | External cube GT + heldout cube |
+| corrected-FK hard fixed를 최종 방법으로 둘 수 있는가 | A3/A4 -> A5 | External cube GT + heldout cube |
 
 Board heldout, board/cube pooled overall, 별도 camera-scope 순위표는 최종 Table 1
 순위에 사용하지 않는다.
@@ -610,7 +610,7 @@ Canonical 결과 인덱스는 [CP_result/README.md](CP_result/README.md), 상세
 핵심 요약은 다음과 같다.
 
 - 동일한 cube+board marker population에서 A1→A2 heldout cube는 `3.6938 → 3.5960 px`로 감소해 Unified feedback의 내부 효과를 지원한다.
-- A3 raw-FK-fixed의 heldout cube는 `6.7199 px`로 증가했으므로 raw tool4/mechanical pose를 외부 GT처럼 취급하지 않는다.
+- A3 FK hard fixed의 heldout cube는 `6.7199 px`로 증가했으므로 보정 전 tool4/mechanical pose를 외부 GT처럼 취급하지 않는다.
 - A2와 A4의 heldout cube는 `3.5960`, `3.5786 px`로 거의 동일하다. A4/B1/B2는 External GT 공개 전에 covariance와 artifact를 frozen해야 최종 후보로 비교할 수 있다.
 - A5의 heldout cube는 `3.4180 px`로 현재 내부 cube 값이 가장 낮다. 따라서 A5는 배제하지 않고, External GT 공개 전에 방법과 train-only alignment artifact를 frozen한 최종 후보로 둔다.
 - 최종 물리 순위는 다음주 Independent External cube GT 이후 Translation Error, Rotation Error, P95, Failure Rate로 결정한다.
@@ -691,12 +691,12 @@ Markdown/HTML은 새 JSON/CSV만 입력으로 사용해 다시 생성한다. 이
 | `calibration_pipeline/se3.py` | PnP pose의 robust 평균과 meta/FK 로딩 |
 | `calibration_pipeline/fk_alignment.py` | board-free train-only FK–cube alignment |
 | `calibration_pipeline/reprojection.py` | 모든 조건에서 동일하게 쓰는 Raw-corner Pixel Solver (원시 코너 픽셀 최적화기) |
-| `calibration_pipeline/fk_factor.py` | covariance-whitened corrected-FK factor |
+| `calibration_pipeline/fk_factor.py` | covariance-whitened corrected-FK soft factor |
 | `calibration_pipeline/evaluation.py` | Train/heldout reprojection과 set-level diagnostic 계산 |
 | `calibration_pipeline/path_evaluation.py` | Cross-view pixel transfer와 camera consistency 계산 |
 | `calibration_pipeline/cross_target.py` | 모든 Table 1 transform의 두 camera scope 재평가 |
 | `calibration_pipeline/marker_system.py` | modality별 초기화부터 수행하는 end-to-end 비교 |
-| `calibration_pipeline/opencv_relative_baseline.py` | OpenCV PnP 기반 FK-free fixed-camera reference baseline |
+| `calibration_pipeline/opencv_relative_baseline.py` | OpenCV PnP 기반 VISION fixed-camera reference baseline |
 | `calibration_pipeline/blind_prediction.py` | GT-blind pose prediction |
 | `calibration_pipeline/external_gt.py` | 독립 GT 통계 평가 |
 | `calibration_pipeline/task_trial.py` | Paired peg-in-hole/grasp success·접촉 오차 평가 |
@@ -755,7 +755,7 @@ python3 tools/compare_markers.py \
   --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
   --out_dir CP_result/sessionNN/marker_system_end_to_end
 
-# 선택 평가: OpenCV PnP 독립 FK-free relative-pose 기준선
+# 선택 평가: OpenCV PnP 독립 VISION relative-pose 기준선
 python3 tools/opencv_baseline.py \
   --root_folder data/sessionNN/calib_train \
   --intrinsics_dir intrinsics \
@@ -817,18 +817,18 @@ python3 tools/verify_camera_scope_evaluation.py
 - [Table 1 결과 및 평가 계약](CP_result/session04/calib_result_table1/TABLE1_RESULTS.md)
 - [추가 진단 실험 단일 요약표](ADDITIONAL_EXPERIMENTS_SUMMARY.md)
 - [Interactive 결과](CP_result/session04/calib_result_table1/TABLE1_INTERACTIVE.html)
-- [OpenCV FK-free reference baseline](CP_result/session04/opencv_relative_baseline/OPENCV_RELATIVE_BASELINE.md)
+- [OpenCV VISION reference baseline](CP_result/session04/opencv_relative_baseline/OPENCV_RELATIVE_BASELINE.md)
 - [Soft-L1 vs linear outlier loss 대조](CP_result/session04/outlier_ablation/OUTLIER_LOSS_ABLATION.md)
 - [Standard vs strict hard-rejection 민감도](CP_result/session04/outlier_ablation/HARD_REJECTION_ABLATION.md)
 - [Corner refinement와 weighting 대조](CP_result/session04/corner_weighting_ablation/CORNER_WEIGHTING_ABLATION.md)
-- [순차/통합 및 FK factor 수식 상세](CALIBRATION_EXPLANATION_LATEX.md)
+- [순차/통합 및 corrected-FK soft factor 수식 상세](CALIBRATION_EXPLANATION_LATEX.md)
 - [Simulation backend migration 계획](Simulation/MIGRATION_PLAN.md)
 
 ## 17. 현재 해석 한계
 
-1. A3는 raw FK와 mechanical frame map만 hard constraint로 사용한다. 눈금 cube jig의 반복 파지 실측 없이 FK를 정답으로 주장할 수 없다.
+1. A3는 FK와 mechanical frame map만 hard constraint로 사용한다. 눈금 cube jig의 반복 파지 실측 없이 FK를 정답으로 주장할 수 없다.
 2. A4/B1/B2는 External GT 공개 전에 corrected-FK covariance와 artifact를 frozen해야 최종 후보로 비교할 수 있다.
-3. A5는 train vision으로 정렬한 FK를 hard-fixed한 방법이다. External GT 공개 전에 frozen하면 최종 후보이고, GT를 본 뒤 정의하면 사후 진단으로만 둔다.
+3. A5는 train-only VISION으로 보정한 `corrected-FK hard fixed` 방법이다. External GT 공개 전에 frozen하면 최종 후보이고, GT를 본 뒤 정의하면 사후 진단으로만 둔다.
 4. Cross-view pixel transfer와 Cam-common Obj-Cam consistency는 외부 GT 전 내부 일관성 지표일 뿐 External Absolute Accuracy (외부 절대 정확도)가 아니다.
 5. heldout cube pixel 평가는 관측 일반화 검증이며 새로운 작업 위치 전체에 대한 물리 정확도를 직접 보장하지 않는다.
 6. B2/B3 shared-baseline ablation과 marker-system end-to-end 비교는 연구 질문이 다르므로 최종 Table 1 순위와 섞지 않는다.

@@ -19,8 +19,8 @@ FIG = os.path.join(os.path.dirname(__file__), "results", "figures")
 
 # (색, 선스타일, 굵기, 마커, 라벨)  — 색맹안전 Okabe-Ito
 STYLE = {
-    "fixed": ("#56B4E9", "-.", 1.8, "X", "fixed-FK"),
-    "noFK":  ("#D55E00", "--", 1.8, "v", "no-FK"),
+    "fixed": ("#56B4E9", "-.", 1.8, "X", "FK hard fixed"),
+    "noFK":  ("#D55E00", "--", 1.8, "v", "VISION"),
     "oursA": ("#009E73", "-",  1.9, "^", "ours-A (λ=0)"),
     "oursB": ("#0072B2", "-",  3.0, "o", "ours-B (λ=0.5)"),
 }
@@ -28,7 +28,7 @@ ORDER = ["fixed", "noFK", "oursA", "oursB"]     # oursB 마지막(위)
 
 
 def _cap(curves, key, exclude_hi=True):
-    """관심 방법(ours/fixed) 최대의 1.25배를 y캡으로. no-FK 폭주는 축 밖."""
+    """관심 방법(ours/fixed) 최대의 1.25배를 y캡으로. VISION 폭주는 축 밖."""
     base = ["fixed", "oursA", "oursB"] if exclude_hi else list(STYLE)
     mx = 0.0
     for n in base:

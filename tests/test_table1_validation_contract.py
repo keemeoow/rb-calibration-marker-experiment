@@ -46,8 +46,9 @@ def test_a3_a4_labels_are_neutral_before_external_gt():
     labels = {condition.row: condition.label
               for condition in MAIN_ABLATION_CONDITIONS}
 
-    assert labels["A3"] == "raw-FK hard fixed"
+    assert labels["A3"] == "FK hard fixed"
     assert labels["A4"] == "corrected-FK soft factor"
+    assert labels["A5"] == "corrected-FK hard fixed (VISION-aligned)"
 
 
 def test_table1_markdown_groups_tiers_and_surfaces_data_warnings():
@@ -82,9 +83,9 @@ def test_table1_markdown_groups_tiers_and_surfaces_data_warnings():
     assert "External GT Task" in markdown
     assert "Internal-Only Stopping Point" not in markdown
     assert "Required Next Experiment" not in markdown
-    assert "A3 (raw-FK hard fixed)" in markdown
+    assert "A3 (FK hard fixed)" in markdown
     assert "A4 (corrected-FK soft factor)" in markdown
-    assert "A5 (vision-aligned FK hard fixed)" in markdown
+    assert "A5 (corrected-FK hard fixed (VISION-aligned))" in markdown
     assert "Ours (raw-FK-fixed target)" not in markdown
     assert "Ours (corrected-FK factor)" not in markdown
     assert "Set-equal-weight Held-out RMSE" not in markdown

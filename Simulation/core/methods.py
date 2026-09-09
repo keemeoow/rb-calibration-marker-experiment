@@ -16,7 +16,7 @@ FK 사용방식 (fk_mode):
 
 공정성 규약 (모든 방법에 동일 적용):
   1. 초기화는 `_bootstrap_visual` 하나만 사용 — GT·FK 를 쓰지 않고 관측과 로봇 자세만으로
-     구성한다. (이전 버전은 no-FK 비교군까지 fk_cube / bTboard(GT) 로 초기화했음.)
+     구성한다. (이전 버전은 VISION 비교군까지 fk_cube / bTboard(GT) 로 초기화했음.)
   2. 모든 잔차는 sigma 로 whitening 되고 동일한 Huber loss·동일 solver 로 푼다.
   3. 프론트엔드(robust PnP)는 씬이 한 번만 돌려 모든 방법이 공유한다.
 
@@ -169,7 +169,7 @@ def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=300):
     fk_mode:
       'none'   FK 항 없음 (큐브 자유)
       'fixed'  큐브를 FK 상수로 고정 (미지수에서 제외)
-      'factor' 큐브 자유 + FK 를 공분산 가중 robust 잔차 블록으로 추가  ← Ours
+      'factor' cube pose 자유 + corrected-FK soft factor 추가
     """
     use_cube = "cube" in markers
     use_board = "board" in markers
@@ -242,7 +242,7 @@ def solve_unified(sc, markers, fk_mode, train_sets, max_nfev=300):
                 r.append(_whiten(se3_residual(cams[a] @ T_obs, Cs)))
             else:
                 r.append(_whiten(se3_residual(sc.bTg[a] @ gTc @ T_obs, Cs)))
-        # FK factor (Ours): FK 를 별도 공분산의 잔차 블록으로. Huber 가 나쁜 FK 를 감쇠.
+        # corrected-FK soft factor: 별도 공분산의 잔차 블록이며 Huber가 나쁜 FK를 감쇠한다.
         if use_fk_factor:
             for s in train_sets:
                 if ("cube", s) in idx:
@@ -304,7 +304,7 @@ def solve_independent(sc, markers, fk_mode, train_sets):
             elif ci in cams0:                 # 큐브는 못 봤지만 보드로는 초기화된 카메라
                 cams[ci] = cams0[ci]          # (관측 없는 카메라는 아예 등록하지 않는다)
     if fk_mode == "factor" and use_cube:
-        # 독립판 Ours: 고정 카메라 블록을 FK factor 와 함께 따로 BA (그리퍼 정보 미사용).
+        # 독립판: 고정 카메라 블록을 corrected-FK soft factor와 함께 따로 BA한다.
         cams = _refine_fixed_block(sc, cams, train_sets)
     # 그리퍼 핸드아이 (독립: 고정 카메라 정보 미사용)
     if use_cube:
@@ -329,13 +329,15 @@ def _handeye_to_fk(sc, train_sets):
 
 
 def _fk_resid(cube_T, fk_T):
-    """FK factor 잔차 블록 (공분산 가중). 통합/독립이 같은 sigma 를 쓴다."""
+    """corrected-FK soft factor 잔차 블록. 통합/독립이 같은 sigma를 쓴다."""
     return _whiten(se3_residual(cube_T, fk_T),
                    s_rot=np.deg2rad(SIGMA_FK_DEG), s_t=SIGMA_FK_MM / 1000.0)
 
 
 def _refine_fixed_block(sc, cams0, train_sets, max_nfev=200):
-    """독립 방식의 고정 카메라 블록만 따로 BA (카메라 + 자유 큐브 + FK factor).
+    """독립 방식의 고정 카메라 블록만 따로 BA한다.
+
+    카메라, 자유 cube pose, corrected-FK soft factor를 함께 사용한다.
        그리퍼 관측은 쓰지 않는다 — '통합하지 않음'이 이 비교군의 정의이므로."""
     cam_ids = [ci for ci in cams0]
     sets = [s for s in train_sets
@@ -435,7 +437,7 @@ def _rigid_align(sc, cams, gTc, markers, train_sets):
     return None
 
 
-# ---------------------------------------------------------------- FK 후보정 (구 corr 방식)
+# ---------------------------------------------------------------- corrected-FK (구 corr 방식)
 def _feat(t, degree=1):
     """위치 특징. degree=1: [1,x,y] (CP_C1 정합, 기본). degree=2: [1,x,y,x²,y²,xy,z]."""
     x, y, z = t[0], t[1], t[2]

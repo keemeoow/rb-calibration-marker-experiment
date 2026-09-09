@@ -2811,7 +2811,7 @@
         "optimization_label": "unified_joint_optimization",
         "fk_to_cube": "raw-FK-fixed",
         "fk_to_board": "estimated",
-        "label": "raw-FK hard fixed"
+        "label": "FK hard fixed"
       },
       "initialization_dispersion": {
         "T_gripper_cam": {
@@ -5143,7 +5143,7 @@
         "optimization_label": "unified_joint_optimization",
         "fk_to_cube": "vision-aligned-FK-fixed",
         "fk_to_board": "estimated",
-        "label": "vision-aligned FK hard fixed"
+        "label": "corrected-FK hard fixed (VISION-aligned)"
       },
       "initialization_dispersion": {
         "T_gripper_cam": {

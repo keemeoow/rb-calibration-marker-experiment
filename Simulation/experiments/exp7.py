@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""실험 7: FK 고정 — fixed FK + 통합(=독립) + 큐브/보드
+"""실험 7: FK 고정 — FK hard fixed + 통합(=독립) + 큐브/보드
 
 core(통합 엔진)에서 EXP7 설정을 가져와 실행한다.
   python experiments/exp7.py --seeds 20

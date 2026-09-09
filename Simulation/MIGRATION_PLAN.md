@@ -23,9 +23,9 @@
 
 기존 계획·감사 문서에서 현재 코드에도 유효한 결정만 이 문서에 통합한다.
 
-1. FK 처리는 `no-FK(vision)`, `raw-FK-fixed`, `corrected-FK factor`의 세 모드로 분리한다.
-2. A3의 hard constraint는 controller raw FK에 사전 등록한 mechanical frame map만 적용하며, 영상으로 추정한 정렬값을 사용하지 않는다.
-3. Board-only 조건에는 cube FK prior나 corrected-FK factor를 적용하지 않는다.
+1. FK 처리는 `VISION`, `FK hard fixed`, `corrected-FK soft factor`의 세 모드로 분리한다.
+2. A3의 hard constraint는 controller FK에 사전 등록한 mechanical frame map만 적용하며, 영상으로 추정한 정렬값을 사용하지 않는다.
+3. Board-only 조건에는 cube FK prior나 corrected-FK soft factor를 적용하지 않는다.
 4. PnP는 초기화에만 사용하고 최종 visual objective는 raw distorted-pixel corner reprojection으로 통일한다.
 5. FK 불확실성은 DH joint-noise를 가정하지 않고 cube-pose FK에 직접 가한 SE(3) perturbation으로 모델링한다.
 6. `e_cross`는 held-out 평가 전용이며 최적화 목적함수에 넣지 않는다.
@@ -42,7 +42,7 @@
 | 최종 visual residual | raw corner pixel reprojection | PnP pose consistency |
 | residual 단위 | px | translation/rotation 정규화값 |
 | 통합 방식 | eih+e2h pixel residual 한 벡터 | eih+e2h pose residual 한 벡터 |
-| FK factor | covariance-whitened SE(3) factor | 동일 개념이나 다른 visual backend와 결합 |
+| corrected-FK soft factor | covariance-whitened SE(3) factor | 동일 개념이나 다른 visual backend와 결합 |
 
 PnP pose를 먼저 확정하면 PnP 단계에서 손실된 corner별 정보와 비등방 관측 불확실성을 최종 solver가 복구할 수 없다. 그러므로 시뮬레이션도 PnP는 초기화에만 사용하고, 최종 해는 원시 픽셀 corner로 결정해야 한다.
 
@@ -55,11 +55,11 @@ PnP pose를 먼저 확정하면 PnP 단계에서 손실된 corner별 정보와 �
 실제 데이터의 다음 구현을 시뮬레이션에서도 그대로 호출한다.
 
 - visual problem/state/solver: `calibration_pipeline/reprojection.py`
-- FK factor: `calibration_pipeline/fk_factor.py`
+- corrected-FK soft factor: `calibration_pipeline/fk_factor.py`
 - 조건과 freeze mask: `calibration_pipeline/schema.py`
 - px 평가 정의: `calibration_pipeline/evaluation.py`, `calibration_pipeline/path_evaluation.py`
 
-시뮬레이션 전용 코드는 scene 생성, noise 주입, 반복 Monte Carlo, ground-truth 평가만 담당한다. projection·SE(3) 변수화·robust loss·FK factor를 별도로 재구현하지 않는다.
+시뮬레이션 전용 코드는 scene 생성, noise 주입, 반복 Monte Carlo, ground-truth 평가만 담당한다. projection·SE(3) 변수화·robust loss·corrected-FK soft factor를 별도로 재구현하지 않는다.
 
 ## 4. 통합 목적함수
 
@@ -132,7 +132,7 @@ E_{FK}(\theta_U)
 - 현재 pose-domain `se3_residual` 기반 최종 solver를 canonical 최종법에서 제거한다.
 - 생성 관측을 `calibration_pipeline.reprojection.PixelObs`로 변환한다.
 - `PoseState`, `variable_keys`, `solve_corner_reprojection`을 실제 데이터와 동일하게 사용한다.
-- `none`: cube pose 자유변수, FK factor 없음.
+- `none`: cube pose 자유변수, corrected-FK soft factor 없음.
 - `fixed`: cube pose를 FK 값으로 설정하고 variable key에서 제외.
 - `factor`: cube pose 자유변수 + `solve_factorized_fk`의 covariance-whitened robust factor.
 - 기존 pose-consistency solver는 명시적인 `pose_consistency_ablation`으로만 남기며 기본법이나 자동 fallback으로 사용하지 않는다.
@@ -178,7 +178,7 @@ E_{FK}(\theta_U)
 ## 8. 필수 검증
 
 1. noise-free scene에서 sequential과 unified가 각각 GT를 수치 허용오차 내 복원해야 한다.
-2. FK noise가 0일 때 A3 hard-FK가 GT cube pose와 일치해야 한다.
+2. FK noise가 0일 때 A3 FK hard fixed가 GT cube pose와 일치해야 한다.
 3. FK covariance를 크게 할수록 A4가 A2에 접근하고, 작게 할수록 A3에 접근해야 한다.
 4. 동일 synthetic observations를 실제 데이터 adapter와 Simulation adapter에 넣었을 때 residual vector가 원소 단위로 같아야 한다.
 5. `e_cross`는 공통 base-frame transform을 좌측 곱해도 불변이어야 한다.

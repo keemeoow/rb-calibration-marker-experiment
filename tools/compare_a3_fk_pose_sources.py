@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare formal A3 raw-FK-fixed and A5 vision-aligned-FK-fixed rows."""
+"""Compare formal A3 FK hard fixed and A5 corrected-FK hard fixed (VISION-aligned) rows."""
 
 from __future__ import annotations
 

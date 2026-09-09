@@ -16,9 +16,15 @@ from calibration_pipeline.runtime import DEFAULT_SESSION_ROOT, session_paths
 
 METHOD_ORDER = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
 CANONICAL_LABEL_OVERRIDES = {
-    "A3": "raw-FK hard fixed",
+    "A3": "FK hard fixed",
     "A4": "corrected-FK soft factor",
-    "A5": "vision-aligned FK hard fixed",
+    "A5": "corrected-FK hard fixed (VISION-aligned)",
+}
+CANONICAL_POSE_OVERRIDES = {
+    "estimated": "VISION",
+    "raw-FK-fixed": "FK hard fixed",
+    "corrected-FK-factor": "corrected-FK soft factor",
+    "vision-aligned-FK-fixed": "corrected-FK hard fixed (VISION-aligned)",
 }
 
 MATRIX_SEMANTICS = {
@@ -117,7 +123,8 @@ def _row_summary(method: str, row: dict,
         "label": condition["label"],
         "targets": condition["target_set"],
         "optimization": condition["optimization_label"],
-        "fk_to_cube": condition["fk_to_cube"],
+        "fk_to_cube": CANONICAL_POSE_OVERRIDES.get(
+            condition["fk_to_cube"], condition["fk_to_cube"]),
         "converged_runs": sum(bool(run.get("converged")) for run in runs),
         "total_runs": len(runs),
         "train_rmse_px_mean": train_mean,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""실험 5: −FK −통합 — FK 안씀 + 따로 + 큐브/보드
+"""실험 5: VISION + 순차 + 큐브/보드
 
 core(통합 엔진)에서 EXP5 설정을 가져와 실행한다.
   python experiments/exp5.py --seeds 20

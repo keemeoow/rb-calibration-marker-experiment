@@ -3,8 +3,8 @@
 "어떤 조건에서 어떤 방법이 이기나" — 4방법 × (FK오차, 카메라 랜덤/계통노이즈) 전수 sweep.
 
 4방법:
-  fixed-FK : 큐브를 FK 로 하드 고정
-  no-FK    : 큐브 자유, anchor 없음, 보정 없음 (순수 vision)
+  FK hard fixed : 큐브를 FK 로 하드 고정
+  VISION    : 큐브 자유, anchor 없음, 보정 없음 (순수 VISION)
   ours-A   : 큐브 자유, anchor=0, 2차 보정 O
   ours-B   : 큐브 자유, anchor=0.5, 2차 보정 O
 
@@ -24,9 +24,9 @@ from core import ExpConfig
 
 CB = ("cube", "board")
 METHODS = [
-    ExpConfig("fixed", fk="fixed", solve="unified", markers=CB, label="fixed-FK"),
-    ExpConfig("noFK",  fk="none",  solve="unified", markers=CB, label="no-FK"),
-    ExpConfig("ours",  fk="factor", solve="unified", markers=CB, label="Ours (FK factor)"),
+    ExpConfig("fixed", fk="fixed", solve="unified", markers=CB, label="FK hard fixed"),
+    ExpConfig("noFK",  fk="none",  solve="unified", markers=CB, label="VISION"),
+    ExpConfig("ours",  fk="factor", solve="unified", markers=CB, label="Ours (corrected-FK soft factor)"),
     ExpConfig("corr",  fk="corr",  solve="unified", markers=CB, label="구 Ridge 후보정"),
 ]
 KEYS = ["e_task_mm", "gTc_mm", "e_X_mm", "e_cross_mm", "e_reproj_px"]

@@ -11,8 +11,8 @@
 - [6. 두 종류 카메라의 관측 경로](#toc-section-7)
 - [7. 두 자세가 얼마나 다른지 계산하는 방법](#toc-section-8)
 - [8. 모든 방법이 공유하는 기본 목적함수](#toc-section-9)
-- [9. 방법 1: no-FK(vision)](#toc-section-10)
-- [10. 방법 2: raw-FK-fixed](#toc-section-11)
+- [9. 방법 1: VISION](#toc-section-10)
+- [10. 방법 2: FK hard fixed](#toc-section-11)
 - [11. 방법 3: corrected-FK](#toc-section-12)
 - [12. 네 FK 방식 비교](#toc-section-13)
 - [13. Unified 방식](#toc-section-14)
@@ -27,7 +27,7 @@
 - [22. 예상 질문과 짧은 답변](#toc-section-23)
 
 > 대상: 캘리브레이션을 처음 배우는 사람  
-> 목표: 이 문서만 읽고 `no-FK(vision)`, `raw-FK-fixed`, `corrected-FK factor`, `vision-aligned-FK-fixed`, `Unified`, `Sequential`, `Board-only`, `Cube-only`, `Both`를 실제 코드와 같은 수식으로 설명하기
+> 목표: 이 문서만 읽고 `VISION`, `FK hard fixed`, `corrected-FK soft factor`, `corrected-FK hard fixed (VISION-aligned)`, `Unified`, `Sequential`, `Board-only`, `Cube-only`, `Both`를 실제 코드와 같은 수식으로 설명하기
 > 표기 원칙: 모든 수학 변수와 기호는 Markdown LaTeX인 `$...$` 또는 `$$...$$` 안에 작성했다. 따라서 수식 부분을 그대로 복사할 수 있다.
 
 ---
@@ -286,7 +286,7 @@ $$
 {}^{B}\mathbf{T}_{O,s}
 $$
 
-우리 multi-cam calibration에서 비교하는 네 FK 방식의 가장 큰 차이는 $\mathbf{O}_s$를 vision으로만 자유롭게 찾는지, raw FK와 mechanical frame map에 고정하는지, 영상 정렬 FK에 고정하는지, 또는 자유변수로 두되 영상 정렬 FK의 공분산 인자를 추가하는지다.
+우리 multi-cam calibration에서 비교하는 네 target-pose 방식의 가장 큰 차이는 $\mathbf{O}_s$를 VISION으로 자유롭게 찾는지, FK와 mechanical frame map에 고정하는지, corrected-FK에 고정하는지, 또는 자유변수로 두되 corrected-FK의 공분산 인자를 추가하는지다.
 
 ---
 
@@ -452,7 +452,7 @@ $$
 
 ### 8.1 식에 나오는 기호
 
-$\mathcal{E}_{\mathrm{vis}}$의 아래첨자 vis는 vision, 즉 카메라로 본 정보에서 나온 오차라는 뜻이다. 로봇 관절값에서 나온 FK 정보와 구분하려고 붙인 이름이다.
+$\mathcal{E}_{\mathrm{vis}}$의 아래첨자 vis는 영상, 즉 카메라로 본 정보에서 나온 오차라는 뜻이다. 로봇 관절값에서 나온 FK 정보와 구분하려고 붙인 이름이다.
 
 | 기호 | 뜻 | 값을 아는가 |
 |---|---|---|
@@ -482,11 +482,11 @@ $\mathcal{E}_{\mathrm{vis}}$를 최소로 만드는 $\mathbf{C}_i$와 $\mathbf{X
 
 <a id="toc-section-10"></a>
 
-## 9. 방법 1: no-FK(vision)
+## 9. 방법 1: VISION
 
 ### 9.1 쉬운 설명
 
-로봇이 알려주는 큐브 자세를 사용하지 않는다. 카메라 위치, hand-eye, 세트별 큐브 자세를 vision 관측만으로 함께 찾는다.
+로봇이 알려주는 큐브 자세를 사용하지 않는다. 카메라 위치, hand-eye, 세트별 큐브 자세를 VISION 관측만으로 함께 찾는다.
 
 ### 9.2 정확한 목적함수
 
@@ -522,37 +522,37 @@ $$
 | $\mathbf{O}_s$ | 그 자리를 채우는 자유변수 |
 | $\widehat{\mathbf{O}}_s$ | 최적화가 끝난 뒤 나온 추정 결과 |
 
-따라서 $\mathbf{Q}_s=\mathbf{O}_s$는 두 값이 같다는 뜻이 아니라, 기준 자리를 고정값이 아니라 자유변수로 채운다는 선언이다. `raw-FK-fixed`는 같은 자리를 raw FK와 mechanical frame map으로 채운다.
+따라서 $\mathbf{Q}_s=\mathbf{O}_s$는 두 값이 같다는 뜻이 아니라, 기준 자리를 고정값이 아니라 자유변수로 채운다는 선언이다. `FK hard fixed`는 같은 자리를 FK와 mechanical frame map으로 채운다.
 
 셋 중 어느 것도 큐브의 진짜 자세는 아니다. 진짜 자세는 10.3절에서 $\mathbf{O}^{\mathrm{true}}_s$로 따로 표기한다.
 
 ### 9.3 장점과 주의점
 
-- raw FK의 계통오차가 캘리브레이션에 직접 들어오지 않는다.
+- FK의 계통오차가 캘리브레이션에 직접 들어오지 않는다.
 - 대신 세트마다 $6$자유도인 $\mathbf{O}_s$가 추가되어 미지수가 많아진다.
 - 카메라 연결이나 로봇 움직임이 충분하지 않으면 전체 좌표계의 gauge가 흔들릴 수 있다.
-- `no-FK(vision)`도 $\mathbf{G}_e$는 사용한다. 큐브 FK prior $\mathbf{F}_s$만 사용하지 않는다.
+- `VISION`도 $\mathbf{G}_e$는 사용한다. 큐브 FK prior $\mathbf{F}_s$만 사용하지 않는다.
 
 ---
 
 <a id="toc-section-11"></a>
 
-## 10. 방법 2: raw-FK-fixed
+## 10. 방법 2: FK hard fixed
 
 ### 10.1 쉬운 설명
 
-로봇 controller가 기록한 raw cube-center FK pose를 고정 상수로 두고 움직이지 못하게 한다. controller tool4 frame과 AprilTag cube object frame은 축 정의만 다르므로, 영상에서 적합한 $\boldsymbol{\Delta}_{train}$ 대신 사전 등록된 mechanical 좌표변환 $\mathbf{M}=R_y(180^\circ)$를 적용한다. 두 frame의 원점은 모두 cube center이므로 $\mathbf{M}$의 translation은 0이다. 즉 cube 표적의 set별 6자유도를 최적화에서 제거하지만, 이 raw FK를 외부 정답이라고 가정하지는 않는다.
+로봇 controller가 기록한 보정 전 cube-center FK pose를 고정 상수로 두고 움직이지 못하게 한다. controller tool4 frame과 AprilTag cube object frame은 축 정의만 다르므로, 영상에서 적합한 $\boldsymbol{\Delta}_{train}$ 대신 사전 등록된 mechanical 좌표변환 $\mathbf{M}=R_y(180^\circ)$를 적용한다. 두 frame의 원점은 모두 cube center이므로 $\mathbf{M}$의 translation은 0이다. 즉 cube 표적의 set별 6자유도를 최적화에서 제거하지만, 이 FK를 외부 정답이라고 가정하지는 않는다.
 
-raw FK cube-center 자세와 tag-object 좌표계 정렬을 다음과 같이 정의한다.
+FK cube-center 자세와 tag-object 좌표계 정렬을 다음과 같이 정의한다.
 
 $$
-\mathbf{F}^{\mathrm{raw}}_s
+\mathbf{F}^{\mathrm{FK}}_s
 \equiv
 {}^{B}\mathbf{T}^{\mathrm{FK}}_{\mathrm{cube\ center},s},
 \qquad
-\widetilde{\mathbf{F}}^{raw}_s
+\widetilde{\mathbf{F}}^{\mathrm{FK}}_s
 =
-\mathbf{F}^{\mathrm{raw}}_s\mathbf{M},
+\mathbf{F}^{\mathrm{FK}}_s\mathbf{M},
 \qquad
 \mathbf{M}=
 \begin{bmatrix}
@@ -566,7 +566,7 @@ $$
 큐브 자세는 다음 제약을 만족해야 한다.
 
 $$
-\mathbf{O}_s=\widetilde{\mathbf{F}}^{raw}_s
+\mathbf{O}_s=\widetilde{\mathbf{F}}^{\mathrm{FK}}_s
 $$
 
 ### 10.2 정확한 목적함수
@@ -584,7 +584,7 @@ $$
 \left(
 \{\mathbf{C}_i\},
 \mathbf{X},
-\{\widetilde{\mathbf{F}}^{raw}_s\}
+\{\widetilde{\mathbf{F}}^{\mathrm{FK}}_s\}
 \right)
 $$
 
@@ -592,23 +592,23 @@ $$
 
 ### 10.3 왜 FK 오차가 카메라로 전파되는가?
 
-실제 큐브 자세를 $\mathbf{O}^{\mathrm{true}}_s$라고 하자. raw FK와 mechanical frame map에 남는 계통오차 $\mathbf{D}$가 있으면 다음처럼 쓸 수 있다.
+실제 큐브 자세를 $\mathbf{O}^{\mathrm{true}}_s$라고 하자. FK와 mechanical frame map에 남는 계통오차 $\mathbf{D}$가 있으면 다음처럼 쓸 수 있다.
 
 $$
-\widetilde{\mathbf{F}}^{raw}_s
+\widetilde{\mathbf{F}}^{\mathrm{FK}}_s
 =
 \mathbf{O}^{\mathrm{true}}_s\mathbf{D}
 $$
 
-그런데 최적화는 $\widetilde{\mathbf{F}}^{raw}_s$를 움직일 수 없다. 따라서 남은 오차를 줄이기 위해 $\mathbf{C}_i$나 $\mathbf{X}$가 잘못 움직일 수 있다.
+그런데 최적화는 $\widetilde{\mathbf{F}}^{\mathrm{FK}}_s$를 움직일 수 없다. 따라서 남은 오차를 줄이기 위해 $\mathbf{C}_i$나 $\mathbf{X}$가 잘못 움직일 수 있다.
 
-raw-FK-fixed는 FK가 정확할 때 미지수가 적고 안정적이지만, FK에 공통적인 오정렬이 있으면 그 오차를 캘리브레이션 결과에 흡수시킬 위험이 있다.
+FK hard fixed는 FK가 정확할 때 미지수가 적고 안정적이지만, FK에 공통적인 오정렬이 있으면 그 오차를 캘리브레이션 결과에 흡수시킬 위험이 있다.
 
 ### 10.4 카메라에도 계통오차가 있으면
 
 카메라도 내부파라미터나 왜곡 보정이 조금 틀리면 항상 같은 방향으로 치우친 $\mathbf{Z}$를 내놓는다. 예를 들어 큐브를 늘 $3\,\mathrm{mm}$ 멀리 있다고 보고하는 식이다.
 
-이 경우 raw-FK-fixed에서는 두 계통오차를 구분할 수 없다. $\widetilde{\mathbf{F}}^{raw}_s$가 고정되어 있으므로 어긋남은 전부 $\mathbf{C}_i$와 $\mathbf{X}$로 밀려 들어가는데, 그 어긋남 안에는 FK가 틀린 몫과 카메라가 틀린 몫이 섞여 있다. 최적화 입장에서 두 몫은 똑같이 생겼고, 어느 쪽 책임인지 판단할 정보가 목적함수 안에 없다. 결국 둘 다 캘리브레이션 결과에 흡수된다.
+이 경우 FK hard fixed에서는 두 계통오차를 구분할 수 없다. $\widetilde{\mathbf{F}}^{\mathrm{FK}}_s$가 고정되어 있으므로 어긋남은 전부 $\mathbf{C}_i$와 $\mathbf{X}$로 밀려 들어가는데, 그 어긋남 안에는 FK가 틀린 몫과 카메라가 틀린 몫이 섞여 있다. 최적화 입장에서 두 몫은 똑같이 생겼고, 어느 쪽 책임인지 판단할 정보가 목적함수 안에 없다. 결국 둘 다 캘리브레이션 결과에 흡수된다.
 
 더 곤란한 점은 이 상황에서 잔차가 오히려 작게 나온다는 것이다. $\mathbf{C}_i$가 카메라 편향만큼 반대로 움직이면 관측은 깔끔하게 설명되기 때문이다. 수렴은 잘 된 것처럼 보이지만 $\mathbf{C}_i$는 물리적 진짜 위치에서 벗어나 있다.
 
@@ -620,13 +620,13 @@ raw-FK-fixed는 FK가 정확할 때 미지수가 적고 안정적이지만, FK�
 
 ### 11.1 가장 쉬운 설명
 
-raw FK를 정답처럼 고정하지 않는다. 먼저 **학습 EIH cube 코너만** 사용해 raw FK와 tag-object 좌표계 사이의 공통 정렬 $\boldsymbol{\Delta}$를 구한다. 최종 캘리브레이션에서는 세트별 cube pose $\mathbf{O}_s$를 계속 자유변수로 두고, 정렬 FK $\widetilde{\mathbf{F}}_s$와의 차이를 6차원 공분산으로 whitening한 robust soft factor를 추가한다.
+FK를 정답처럼 고정하지 않는다. 먼저 **학습 EIH cube 코너만** 사용해 FK와 tag-object 좌표계 사이의 공통 정렬 $\boldsymbol{\Delta}$를 구한다. 최종 캘리브레이션에서는 세트별 cube pose $\mathbf{O}_s$를 계속 자유변수로 두고, corrected-FK $\widetilde{\mathbf{F}}_s$와의 차이를 6차원 공분산으로 whitening한 robust soft factor를 추가한다.
 
-따라서 현재 코드의 `corrected-FK`는 hard gate나 pose 교체가 아니다. vision과 FK가 가까우면 FK factor가 자세를 안정시키고, 멀면 Huber loss가 그 영향력을 연속적으로 낮춘다.
+따라서 현재 코드의 `corrected-FK`는 hard gate나 pose 교체가 아니다. VISION과 FK가 가까우면 corrected-FK soft factor가 자세를 안정시키고, 멀면 Huber loss가 그 영향력을 연속적으로 낮춘다.
 
 ### 11.2 단계 1: board-free train-only FK 정렬
 
-raw FK의 cube-center 좌표계와 영상에서 사용하는 tag-object 좌표계는 그대로 같다고 가정할 수 없다. 현재 구현은 학습 세트의 EIH cube 코너와 robot gripper pose를 사용해 $\mathbf{X}$와 공통 우측 정렬 $\boldsymbol{\Delta}$를 함께 추정한다.
+FK의 cube-center 좌표계와 영상에서 사용하는 tag-object 좌표계는 그대로 같다고 가정할 수 없다. 현재 구현은 학습 세트의 EIH cube 코너와 robot gripper pose를 사용해 $\mathbf{X}$와 공통 우측 정렬 $\boldsymbol{\Delta}$를 함께 추정한다.
 
 $$
 \widetilde{\mathbf{F}}_s
@@ -646,7 +646,7 @@ $$
 
 ### 11.3 단계 2: 6차원 FK 오차와 공분산 whitening
 
-세트별 자유 cube pose $\mathbf{O}_s$와 정렬 FK 사이의 상대변환을 6차원으로 쓴다.
+세트별 자유 cube pose $\mathbf{O}_s$와 corrected-FK 사이의 상대변환을 6차원으로 쓴다.
 
 $$
 \mathbf{e}^{\mathrm{FK}}_s
@@ -671,7 +671,7 @@ $$
 
 이렇게 하면 회전과 이동을 임의의 가중치로 더하지 않고, 측정된 불확실성의 표준편차 단위로 비교할 수 있다. 공분산은 대칭 positive-definite $6\times6$이어야 한다.
 
-### 11.4 단계 3: raw-corner vision 항과 robust FK factor의 결합
+### 11.4 단계 3: raw-corner VISION 항과 robust corrected-FK soft factor의 결합
 
 최종 A4 목적함수는 다음 구조다.
 
@@ -697,23 +697,23 @@ $o$는 camera-event-target 관측, $j$는 코너, $q\in\{u,v\}$는 픽셀 성분
 
 ### 11.5 hard gate가 아닌 이유
 
-$\mathbf{O}_s$는 최적화 변수에서 제거되지 않는다. 또한 어떤 임계값으로 FK pose와 vision pose 중 하나를 선택하지도 않는다. 각 세트는 모든 반복에서 vision 코너와 FK factor의 영향을 동시에 받으며, 영향의 상대 크기는 $\boldsymbol{\Sigma}_s$와 Huber 함수로 결정된다. 따라서 갑작스러운 all-or-nothing 전환이 없고, 공분산이 큰 방향은 약하게, 작은 방향은 강하게 구속된다.
+$\mathbf{O}_s$는 최적화 변수에서 제거되지 않는다. 또한 어떤 임계값으로 FK pose와 VISION pose 중 하나를 선택하지도 않는다. 각 세트는 모든 반복에서 VISION 코너와 corrected-FK soft factor의 영향을 동시에 받으며, 영향의 상대 크기는 $\boldsymbol{\Sigma}_s$와 Huber 함수로 결정된다. 따라서 갑작스러운 all-or-nothing 전환이 없고, 공분산이 큰 방향은 약하게, 작은 방향은 강하게 구속된다.
 
 ### 11.6 실측 covariance와 현재 결과의 경계
 
 `--fk_covariance_json`이 없으면 코드는 Simulation과 맞춘 등방성 prior인 이동 $2.0\,\mathrm{mm}$, 회전 $0.30^\circ$를 사용한다. 이 결과는 **preflight**이며 confirmatory 결과가 아니다. 다음주 Independent External GT 평가 전에는 GT를 보지 않고 미리 등록한 물리 반복측정 covariance가 필요하다.
 
-따라서 현재 A4 수치는 ``Simulation covariance를 사용한 동일 marker population의 held-out reprojection preflight''로만 기술한다. A2보다 절대 정확도가 높다거나 corrected-FK factor의 우월성이 입증됐다고 기술하지 않는다.
+따라서 현재 A4 수치는 ``Simulation covariance를 사용한 동일 marker population의 held-out reprojection preflight''로만 기술한다. A2보다 절대 정확도가 높다거나 corrected-FK soft factor의 우월성이 입증됐다고 기술하지 않는다.
 
 6차원 표본 공분산의 rank는 반복 수 $N$에 대해 최대 $N-1$이므로, full-rank $6\times6$ 공분산에는 최소 $N=7$개의 독립 반복이 필요하다. 코드도 7회 미만, 비대칭, 비양정치 covariance를 거부한다. 실제로는 안정적인 추정을 위해 7회보다 충분히 많은 반복을 사용하는 편이 바람직하다.
 
-### 11.7 A5: vision-aligned-FK-fixed 최종 후보와 사후 진단의 경계
+### 11.7 A5: corrected-FK hard fixed (VISION-aligned) 최종 후보와 사후 진단의 경계
 
-A5는 11.2절에서 만든 동일한 train-only 정렬 FK를 사용하지만, A4와 달리 cube pose를 자유변수로 두지 않는다.
+A5는 11.2절에서 만든 동일한 train-only corrected-FK를 사용하지만, A4와 달리 cube pose를 자유변수로 두지 않는다.
 
 $$
 \mathbf{O}_s=\widetilde{\mathbf{F}}_s
-=\mathbf{F}^{\mathrm{raw}}_s\boldsymbol{\Delta}_{\mathrm{train}}
+=\mathbf{F}^{\mathrm{FK}}_s\boldsymbol{\Delta}_{\mathrm{train}}
 $$
 
 $$
@@ -726,9 +726,9 @@ $$
 \{\widetilde{\mathbf{F}}_s\}\right).
 $$
 
-A3와 A5는 모두 set당 cube 6자유도를 제거하며 목적함수에는 visual residual 한 항만 남는다. 차이는 A3가 영상과 무관한 mechanical $R_y(180^\circ)$를 쓰고, A5가 train EIH cube 영상으로 적합한 $\boldsymbol{\Delta}_{\mathrm{train}}$을 쓴다는 점이다. A4와 A5는 동일 aligned-FK artifact를 공유하므로 soft factor와 hard constraint의 차이를 진단할 수 있다.
+A3와 A5는 모두 set당 cube 6자유도를 제거하며 목적함수에는 visual residual 한 항만 남는다. 차이는 A3가 영상과 무관한 mechanical $R_y(180^\circ)$를 쓰고, A5가 train EIH cube 영상으로 적합한 $\boldsymbol{\Delta}_{\mathrm{train}}$을 쓴다는 점이다. A4와 A5는 동일 corrected-FK artifact를 공유하므로 soft factor와 hard constraint의 차이를 진단할 수 있다.
 
-A5의 올바른 판정은 External GT 공개 시점으로 결정한다. GT 공개 전에 방법, parameter, train-only aligned-FK artifact, split, 평가 코드를 모두 frozen하면 A5는 최종 후보로 비교할 수 있다. 반대로 GT 결과를 본 뒤 A5를 정의하거나 alignment artifact를 바꾸면 그때는 사후 진단으로만 보고한다. A5의 aligned pose는 train 영상에서 온 correction이므로 그 자체가 독립 외부 정답은 아니며, 최종 물리 순위는 다음주 Independent External GT에서 cube pose로 판정한다.
+A5의 올바른 판정은 External GT 공개 시점으로 결정한다. GT 공개 전에 방법, parameter, train-only corrected-FK artifact, split, 평가 코드를 모두 frozen하면 A5는 최종 후보로 비교할 수 있다. 반대로 GT 결과를 본 뒤 A5를 정의하거나 alignment artifact를 바꾸면 그때는 사후 진단으로만 보고한다. A5의 aligned pose는 train 영상에서 온 correction이므로 그 자체가 독립 외부 정답은 아니며, 최종 물리 순위는 다음주 Independent External GT에서 cube pose로 판정한다.
 
 ---
 
@@ -738,17 +738,17 @@ A5의 올바른 판정은 External GT 공개 시점으로 결정한다. GT 공�
 
 | 방법 | 공통 큐브 자세 $\mathbf{Q}_s$ | 큐브 자세의 상태 | 핵심 의미 |
 |---|---:|---|---|
-| `no-FK(vision)` | 없음 | $\mathbf{O}_s$ 자유변수 | cube FK prior 없이 raw-corner vision으로 추정 |
-| `raw-FK-fixed` | $\mathbf{O}_s=\widetilde{\mathbf{F}}^{raw}_s$ | cube 변수 제거 | raw FK와 mechanical frame map을 hard constraint로 사용 |
-| `corrected-FK factor` | $\mathbf{w}_s=\mathbf{L}_s^{-1}\mathbf{e}^{\mathrm{FK}}_s$ | $\mathbf{O}_s$ 자유변수 | vision 목적함수에 covariance-whitened robust FK factor 추가 |
-| `vision-aligned-FK-fixed` | $\mathbf{O}_s=\mathbf{F}^{raw}_s\boldsymbol{\Delta}_{train}$ | cube 변수 제거 | External GT 공개 전 frozen이면 최종 후보, 이후 변경이면 사후 진단 |
+| `VISION` | 없음 | $\mathbf{O}_s$ 자유변수 | cube FK prior 없이 raw-corner VISION으로 추정 |
+| `FK hard fixed` | $\mathbf{O}_s=\widetilde{\mathbf{F}}^{\mathrm{FK}}_s$ | cube 변수 제거 | FK와 mechanical frame map을 hard constraint로 사용 |
+| `corrected-FK soft factor` | $\mathbf{w}_s=\mathbf{L}_s^{-1}\mathbf{e}^{\mathrm{FK}}_s$ | $\mathbf{O}_s$ 자유변수 | VISION 목적함수에 covariance-whitened robust corrected-FK soft factor 추가 |
+| `corrected-FK hard fixed (VISION-aligned)` | $\mathbf{O}_s=\mathbf{F}^{\mathrm{FK}}_s\boldsymbol{\Delta}_{train}$ | cube 변수 제거 | External GT 공개 전 frozen이면 최종 후보, 이후 변경이면 사후 진단 |
 
 한 문장으로 요약하면 다음과 같다.
 
-- `no-FK(vision)`: 큐브 자세도 직접 찾는다.
-- `raw-FK-fixed`: 큐브 자세를 raw FK와 mechanical frame map에 못 박는다.
-- `corrected-FK factor`: 큐브 자세를 자유롭게 두고 정렬 FK를 불확실성이 있는 soft measurement로 사용한다.
-- `vision-aligned-FK-fixed`: 같은 정렬 FK에 큐브 자세를 못 박아 이전 A3 성능의 원인을 진단한다.
+- `VISION`: 큐브 자세도 직접 찾는다.
+- `FK hard fixed`: 큐브 자세를 FK와 mechanical frame map에 못 박는다.
+- `corrected-FK soft factor`: 큐브 자세를 자유롭게 두고 corrected-FK를 불확실성이 있는 soft measurement로 사용한다.
+- `corrected-FK hard fixed (VISION-aligned)`: 같은 corrected-FK에 큐브 자세를 못 박아 이전 A3 성능의 원인을 진단한다.
 
 ---
 
@@ -789,7 +789,7 @@ $$
 \right]
 $$
 
-여기서 pixel 항은 각 행에 포함된 모든 native-pixel corner residual이다. A4/B1/B2에는 eligible set 9개에 대응하는 FK factor 9개, 즉 6D residual 54개가 추가된다. A3에서는 $\mathbf{O}_s=\widetilde{\mathbf{F}}^{raw}_s$, A5에서는 $\mathbf{O}_s=\mathbf{F}^{raw}_s\boldsymbol{\Delta}_{train}$을 고정하므로 cube pose가 자유변수 목록에서 제거된다.
+여기서 pixel 항은 각 행에 포함된 모든 native-pixel corner residual이다. A4/B1/B2에는 eligible set 9개에 대응하는 corrected-FK soft factor 9개, 즉 6D residual 54개가 추가된다. A3에서는 $\mathbf{O}_s=\widetilde{\mathbf{F}}^{\mathrm{FK}}_s$, A5에서는 $\mathbf{O}_s=\mathbf{F}^{\mathrm{FK}}_s\boldsymbol{\Delta}_{train}$을 고정하므로 cube pose가 자유변수 목록에서 제거된다.
 
 Unified의 핵심은 한쪽 관측이 $\mathbf{O}_s$를 움직이면, 같은 $\mathbf{O}_s$를 공유하는 다른 쪽의 $\mathbf{C}_i$와 $\mathbf{X}$도 같은 반복 안에서 영향을 받는다는 것이다. $e_{cross}$ 같은 평가 지표는 이 목적함수에 들어가지 않는다.
 
@@ -820,7 +820,7 @@ $$
 \right].
 $$
 
-A0는 board만, A1은 board와 cube, B1은 board와 cube에 corrected-FK factor까지 사용한다. 행에 없는 target 변수와 잔차는 식에서 제거된다.
+A0는 board만, A1은 board와 cube, B1은 board와 cube에 corrected-FK soft factor까지 사용한다. 행에 없는 target 변수와 잔차는 식에서 제거된다.
 
 ### 14.3 Freeze boundary
 
@@ -879,7 +879,7 @@ f_v^2\rho_{\mathrm{softL1}}
 \left((\widehat u_{o,j,q}-u_{o,j,q})^2/f_v^2\right)
 $$
 
-보드는 로봇이 잡고 이동시키는 큐브 FK prior를 갖지 않는다. 따라서 이 프로젝트에서는 `Board-only + raw-FK-fixed`, `Board-only + corrected-FK factor`, `Board-only + vision-aligned-FK-fixed`를 정의하지 않는다.
+보드는 로봇이 잡고 이동시키는 큐브 FK prior를 갖지 않는다. 따라서 이 프로젝트에서는 `Board-only + FK hard fixed`, `Board-only + corrected-FK soft factor`, `Board-only + corrected-FK hard fixed (VISION-aligned)`를 정의하지 않는다.
 
 ### 15.3 Both
 
@@ -912,7 +912,7 @@ $$
 =24
 $$
 
-하지만 `Board-only`에는 큐브 FK prior가 없으므로 `raw-FK-fixed`, `corrected-FK factor`, `vision-aligned-FK-fixed`를 사용할 수 없다.
+하지만 `Board-only`에는 큐브 FK prior가 없으므로 `FK hard fixed`, `corrected-FK soft factor`, `corrected-FK hard fixed (VISION-aligned)`를 사용할 수 없다.
 
 제외되는 조합 수는 다음과 같다.
 
@@ -943,7 +943,7 @@ $$
 
 ### 17.1 corrected-FK
 
-캘리브레이션 목적함수 안에서 raw FK 자세를 train-only vision으로 정렬하고, 정렬 pose와의 6차원 오차를 공분산으로 whitening한 robust factor를 사용한다.
+캘리브레이션 목적함수 안에서 FK 자세를 train-only VISION으로 보정하고, corrected-FK pose와의 6차원 오차를 공분산으로 whitening한 robust factor를 사용한다.
 
 $$
 \mathbf{F}_s
@@ -958,7 +958,7 @@ $$
 
 ### 17.2 선택적 Ridge 출력 후보정
 
-legacy simulation의 `corr` 출력 후보정은 캘리브레이션이 끝난 뒤 예측 위치의 잔차를 회귀로 학습한다. 이것은 현재 real-data Table 1의 A4 corrected-FK factor가 아니다.
+legacy simulation의 `corr` 출력 후보정은 캘리브레이션이 끝난 뒤 예측 위치의 잔차를 회귀로 학습한다. 이것은 현재 real-data Table 1의 A4 corrected-FK soft factor가 아니다.
 
 예측 위치를 다음과 같이 둔다.
 
@@ -1091,7 +1091,7 @@ $$
 (\mathbf{T}^{W}_{B})^{-1}\mathbf{T}^{W}_{cube}.
 $$
 
-이때 calibration RGB camera, controller FK, A4 FK factor, A5의 $\boldsymbol{\Delta}_{train}$은 GT 생성에 사용하면 안 된다. 각 방법의 calibration artifact와 blind prediction을 GT 공개 전에 고정한 뒤 같은 pose ID끼리 다음 오차를 paired 비교한다.
+이때 calibration RGB camera, controller FK, A4 corrected-FK soft factor, A5의 $\boldsymbol{\Delta}_{train}$은 GT 생성에 사용하면 안 된다. 각 방법의 calibration artifact와 blind prediction을 GT 공개 전에 고정한 뒤 같은 pose ID끼리 다음 오차를 paired 비교한다.
 
 $$
 e_t=1000\left\|\mathbf{t}(\widehat{\mathbf{T}}^B_{cube})-
@@ -1107,23 +1107,23 @@ $$
 
 최종 내부 평가는 어떤 marker로 학습했는지와 무관하게 **heldout cube**만 본다. 따라서 Board heldout과 board/cube pooled overall은 최종 순위 지표에서 제거한다. 현재 artifact에서 A1의 heldout cube RMSE는 $3.6938\,\mathrm{px}$이고 A2는 $3.5960\,\mathrm{px}$다. 이 비교는 동일 관측·초기값·solver 조건에서 Unified Joint Optimization이 cube 재투영을 낮췄다는 내부 근거다. A0/B3는 calibration 단계에서는 board-only로 유지하되, train cube로 set별 evaluation cube pose만 맞춘 뒤 frozen camera/Hand--Eye transform으로 cube RMSE를 산출한다.
 
-Raw FK를 hard fixed한 A3는 heldout cube $6.7199\,\mathrm{px}$로 A2보다 나쁘다. 즉 현재 raw tool4/mechanical pose를 외부 정답처럼 고정하면 cube 영상 정합이 악화된다. Corrected-FK soft factor인 A4는 $3.5786\,\mathrm{px}$로 A2와 거의 같고, vision-aligned FK hard fixed인 A5는 $3.4180\,\mathrm{px}$로 현재 내부 cube 지표가 가장 낮다. 단, A4/B1/B2의 실측 FK covariance와 A5의 frozen artifact는 External GT 공개 전에 고정되어야 최종 후보로 인정된다.
+FK를 hard fixed한 A3는 heldout cube $6.7199\,\mathrm{px}$로 A2보다 나쁘다. 즉 현재 보정 전 tool4/mechanical pose를 외부 정답처럼 고정하면 cube 영상 정합이 악화된다. corrected-FK soft factor인 A4는 $3.5786\,\mathrm{px}$로 A2와 거의 같고, corrected-FK hard fixed (VISION-aligned)인 A5는 $3.4180\,\mathrm{px}$로 현재 내부 cube 지표가 가장 낮다. 단, A4/B1/B2의 실측 FK covariance와 A5의 frozen artifact는 External GT 공개 전에 고정되어야 최종 후보로 인정된다.
 
-최종 물리 주장은 다음주 Independent External GT의 cube TRE/rotation/P95/failure로만 결정한다. 현재 표현은 ``Session04 내부 cube-only 지표에서는 A5가 가장 낮고, A2/A4가 그 다음으로 안정적이며, raw-FK hard fixed A3는 악화된다''까지가 안전하다.
+최종 물리 주장은 다음주 Independent External GT의 cube TRE/rotation/P95/failure로만 결정한다. 현재 표현은 ``Session04 내부 cube-only 지표에서는 A5가 가장 낮고, A2/A4가 그 다음으로 안정적이며, FK hard fixed A3는 악화된다''까지가 안전하다.
 
 ### 18.5 논문 실험 결과 본문용 서술
 
-모든 비교행에는 동일한 frozen corner 관측, event-grouped/set-stratified split, camera intrinsic, target geometry, solver 설정 및 train-only shared initialization을 적용하였다. 최종 내부 평가는 항상 cube target으로 통일했다. Vision-only 조건에서 Sequential Frozen-Stage Optimization인 A1의 heldout cube RMSE는 $3.6938\,\mathrm{px}$였고, Unified Joint Optimization인 A2는 $3.5960\,\mathrm{px}$로 낮아졌다. 이는 Eye-in-Hand와 Eye-to-Hand 관측 사이의 양방향 feedback이 cube 재투영 일관성을 개선한다는 근거다.
+모든 비교행에는 동일한 frozen corner 관측, event-grouped/set-stratified split, camera intrinsic, target geometry, solver 설정 및 train-only shared initialization을 적용하였다. 최종 내부 평가는 항상 cube target으로 통일했다. VISION 조건에서 Sequential Frozen-Stage Optimization인 A1의 heldout cube RMSE는 $3.6938\,\mathrm{px}$였고, Unified Joint Optimization인 A2는 $3.5960\,\mathrm{px}$로 낮아졌다. 이는 Eye-in-Hand와 Eye-to-Hand 관측 사이의 양방향 feedback이 cube 재투영 일관성을 개선한다는 근거다.
 
-Raw FK cube pose를 hard fixed한 A3는 $6.7199\,\mathrm{px}$로 악화되어 raw FK를 그대로 정답으로 쓰면 안 됨을 보였다. Corrected-FK soft factor를 추가한 A4는 $3.5786\,\mathrm{px}$로 A2와 유사했고, vision-aligned FK hard fixed인 A5는 $3.4180\,\mathrm{px}$로 현재 내부 cube 지표가 가장 낮았다. 따라서 External GT 공개 전에 A5 방법과 artifact를 frozen하면 A5를 최종 후보로 채택할 수 있다. 실제 3D 공간 정합 우월성은 다음주 Independent External GT에서 cube TRE, rotation error, P95, failure rate로 확정한다.
+FK cube pose를 hard fixed한 A3는 $6.7199\,\mathrm{px}$로 악화되어 FK를 그대로 정답으로 쓰면 안 됨을 보였다. corrected-FK soft factor를 추가한 A4는 $3.5786\,\mathrm{px}$로 A2와 유사했고, corrected-FK hard fixed (VISION-aligned)인 A5는 $3.4180\,\mathrm{px}$로 현재 내부 cube 지표가 가장 낮았다. 따라서 External GT 공개 전에 A5 방법과 artifact를 frozen하면 A5를 최종 후보로 채택할 수 있다. 실제 3D 공간 정합 우월성은 다음주 Independent External GT에서 cube TRE, rotation error, P95, failure rate로 확정한다.
 
 ### 18.6 Paper-ready English Results paragraph
 
-All variants were evaluated using the same frozen corner observations, event-grouped and set-stratified split, camera intrinsics, target geometry, solver settings, and train-only shared initialization. The final internal endpoint is cube-only held-out reprojection. Board-only rows A0/B3 keep cube observations out of calibration and use train cube observations only to fit nuisance evaluation poses with camera and hand-eye transforms frozen. Under the vision-only condition, A1 (Sequential Frozen-Stage Optimization) achieved a held-out cube RMSE of $3.6938\,\mathrm{px}$, whereas A2 (Unified Joint Optimization) achieved $3.5960\,\mathrm{px}$. Hard-fixing the cube pose to raw FK in A3 degraded the cube endpoint to $6.7199\,\mathrm{px}$, indicating that raw FK should not be treated as ground truth. A4 (corrected-FK soft factor) achieved $3.5786\,\mathrm{px}$, and A5 (vision-aligned FK hard fixed) achieved the lowest current internal cube RMSE, $3.4180\,\mathrm{px}$. If A5 and its train-only alignment artifact are frozen before external-GT scoring, A5 is a valid final candidate. The physical ranking will be decided only by the forthcoming independent external cube-GT metrics.
+All variants were evaluated using the same frozen corner observations, event-grouped and set-stratified split, camera intrinsics, target geometry, solver settings, and train-only shared initialization. The final internal endpoint is cube-only held-out reprojection. Board-only rows A0/B3 keep cube observations out of calibration and use train cube observations only to fit nuisance evaluation poses with camera and hand-eye transforms frozen. Under the VISION condition, A1 (Sequential Frozen-Stage Optimization) achieved a held-out cube RMSE of $3.6938\,\mathrm{px}$, whereas A2 (Unified Joint Optimization) achieved $3.5960\,\mathrm{px}$. Hard-fixing the cube pose to FK in A3 degraded the cube endpoint to $6.7199\,\mathrm{px}$, indicating that FK should not be treated as ground truth. A4 (corrected-FK soft factor) achieved $3.5786\,\mathrm{px}$, and A5 (corrected-FK hard fixed (VISION-aligned)) achieved the lowest current internal cube RMSE, $3.4180\,\mathrm{px}$. If A5 and its train-only alignment artifact are frozen before external-GT scoring, A5 is a valid final candidate. The physical ranking will be decided only by the forthcoming independent external cube-GT metrics.
 
 ### 18.7 Paper-ready English Table 1 caption
 
-**Table 1. Quantitative comparison of the predefined calibration variants on Session04.** The final internal endpoint is held-out cube reprojection RMSE in native distorted-pixel coordinates; lower is better. The variants share the same frozen detection pool, event-grouped and set-stratified split, camera intrinsics, target geometry, solver settings, and train-only shared initialization, while the training target population, optimization structure, and FK/target-pose treatment vary as specified. Board held-out and board/cube pooled overall rankings are excluded from the final table. A0 and B3 are board-on-gripper-only calibration rows; their cube RMSE is computed by fitting only set-wise evaluation cube poses from train cube observations after camera and hand-eye transforms are frozen. A3 hard-fixes the cube pose to raw FK after the prescribed mechanical frame mapping. A4, B1, and B2 use corrected-FK soft factors; A5 hard-fixes the train-only vision-aligned FK pose. ``Convergence $3/3$'' reports solver termination across three initialization seeds and does not imply global optimality or physical accuracy. External cube GT is pending.
+**Table 1. Quantitative comparison of the predefined calibration variants on Session04.** The final internal endpoint is held-out cube reprojection RMSE in native distorted-pixel coordinates; lower is better. The variants share the same frozen detection pool, event-grouped and set-stratified split, camera intrinsics, target geometry, solver settings, and train-only shared initialization, while the training target population, optimization structure, and FK/target-pose treatment vary as specified. Board held-out and board/cube pooled overall rankings are excluded from the final table. A0 and B3 are board-on-gripper-only calibration rows; their cube RMSE is computed by fitting only set-wise evaluation cube poses from train cube observations after camera and hand-eye transforms are frozen. A3 hard-fixes the cube pose to FK after the prescribed mechanical frame mapping. A4, B1, and B2 use corrected-FK soft factors; A5 hard-fixes the train-only corrected-FK (VISION-aligned) pose. ``Convergence $3/3$'' reports solver termination across three initialization seeds and does not imply global optimality or physical accuracy. External cube GT is pending.
 
 ### 18.8 Paper-ready English column labels and table notes
 
@@ -1144,7 +1144,7 @@ All variants were evaluated using the same frozen corner observations, event-gro
 | Convergence | Conv. |
 | Data status | Status |
 
-**Paper-ready table note.** Values are computed on frozen observations. Train-cube and held-out evaluation use the same cube populations for every method; set-wise evaluation cube poses are fitted from train cube observations only after camera and hand-eye transforms are frozen. Train-cube RMSE is an in-sample fit diagnostic, and all-cube RMSE is a fit sanity check dominated by its 724/960 train corners. Cross-view transfer directly pools 36 frozen pairs (9 fixed-fixed and 27 fixed-gripper) over 904 destination-corner evaluations; 18 fixed-gripper pairs use train fixed anchors. Cam-common consistency uses the same pair discrepancies in mm/deg, so the two are correlated supplementary checks rather than independent evidence. $^{\ddagger}$ denotes raw-FK hard fixing, $^{\dagger}$ corrected-FK soft factors, and $^{\S}$ vision-aligned FK hard fixing. A5 is a valid final candidate only if the method and alignment artifact are frozen before external-GT scoring. External cube GT is pending.
+**Paper-ready table note.** Values are computed on frozen observations. Train-cube and held-out evaluation use the same cube populations for every method; set-wise evaluation cube poses are fitted from train cube observations only after camera and hand-eye transforms are frozen. Train-cube RMSE is an in-sample fit diagnostic, and all-cube RMSE is a fit sanity check dominated by its 724/960 train corners. Cross-view transfer directly pools 36 frozen pairs (9 fixed-fixed and 27 fixed-gripper) over 904 destination-corner evaluations; 18 fixed-gripper pairs use train fixed anchors. Cam-common consistency uses the same pair discrepancies in mm/deg, so the two are correlated supplementary checks rather than independent evidence. $^{\ddagger}$ denotes FK hard fixing, $^{\dagger}$ corrected-FK soft factors, and $^{\S}$ corrected-FK hard fixing (VISION-aligned). A5 is a valid final candidate only if the method and alignment artifact are frozen before external-GT scoring. External cube GT is pending.
 
 ### 18.9 Copy-ready LaTeX Table 1
 
@@ -1175,11 +1175,11 @@ Conv. & Status \\
 A0 (Baseline)             & Board-on-gripper & Sequential & Board pose estimated; cube eval only & 3.4489 & 3.5063 & 3.6768          & 7.1528 & 8.677/0.904 & Pending & 3/3 & Current data \\
 A1 (+Cube)                & Board + Cube     & Sequential & Cube pose estimated                  & 3.3414 & 3.4314 & 3.6938          & 7.1995 & 8.829/1.050 & Pending & 3/3 & Current data \\
 A2 (+Unified)             & Board + Cube     & Unified    & Cube pose estimated                  & 3.3525 & 3.4140 & 3.5960          & 6.1948 & 7.287/1.028 & Pending & 3/3 & Current data \\
-A3$^{\ddagger}$ (Raw-FK)  & Board + Cube     & Unified    & Raw-FK hard fixed                    & 4.2878 & 4.9967 & 6.7199          & 6.8268 & 8.338/2.089 & Pending & 3/3 & Current data \\
-A4$^{\dagger}$ (+FK)      & Board + Cube     & Unified    & Corrected-FK soft factor             & 3.3547 & 3.4111 & 3.5786          & 6.2061 & 7.308/1.015 & Pending & 3/3 & FK cov. pending \\
-A5$^{\S}$ (Aligned-FK)    & Board + Cube     & Unified    & Vision-aligned FK hard fixed         & 3.5312 & 3.5037 & \textbf{3.4180} & 5.6072 & 6.674/0.886 & Pending & 3/3 & Freeze before GT \\
-B1$^{\dagger}$ ($-$Unified) & Board + Cube   & Sequential & Corrected-FK soft factor             & 3.3450 & 3.4322 & 3.6870          & 7.1779 & 8.806/1.054 & Pending & 3/3 & FK cov. pending \\
-B2$^{\dagger}$ ($-$Board) & Cube only        & Unified    & Corrected-FK soft factor             & 3.0201 & 3.4308 & 4.4608          & 6.4557 & 7.429/1.049 & Pending & 3/3 & FK cov. pending \\
+A3$^{\ddagger}$ (FK)  & Board + Cube     & Unified    & FK hard fixed                    & 4.2878 & 4.9967 & 6.7199          & 6.8268 & 8.338/2.089 & Pending & 3/3 & Current data \\
+A4$^{\dagger}$ (corrected-FK) & Board + Cube  & Unified    & corrected-FK soft factor             & 3.3547 & 3.4111 & 3.5786          & 6.2061 & 7.308/1.015 & Pending & 3/3 & FK cov. pending \\
+A5$^{\S}$ (corrected-FK)    & Board + Cube     & Unified    & corrected-FK hard fixed (VISION-aligned)         & 3.5312 & 3.5037 & \textbf{3.4180} & 5.6072 & 6.674/0.886 & Pending & 3/3 & Freeze before GT \\
+B1$^{\dagger}$ ($-$Unified) & Board + Cube   & Sequential & corrected-FK soft factor             & 3.3450 & 3.4322 & 3.6870          & 7.1779 & 8.806/1.054 & Pending & 3/3 & FK cov. pending \\
+B2$^{\dagger}$ ($-$Board) & Cube only        & Unified    & corrected-FK soft factor             & 3.0201 & 3.4308 & 4.4608          & 6.4557 & 7.429/1.049 & Pending & 3/3 & FK cov. pending \\
 B3 ($-$Cube)              & Board-on-gripper & Unified    & Board pose estimated; cube eval only & 3.4489 & 3.5061 & 3.6763          & 7.1502 & 8.674/0.904 & Pending & 3/3 & Current data \\
 \bottomrule
 \end{tabular}%
@@ -1187,7 +1187,7 @@ B3 ($-$Cube)              & Board-on-gripper & Unified    & Board pose estimated
 \vspace{2pt}
 
 \parbox{\textwidth}{\footnotesize
-Train-cube and held-out evaluation are cube-only and use identical populations across methods. Train-cube RMSE is in-sample; all-cube RMSE pools 724 train and 236 held-out corners. Cross-view directly pools 36 pairs over 904 destination-corner evaluations; 18 fixed-gripper pairs use train fixed anchors. Cam-common uses the same pair discrepancies in mm/deg, so neither is independent physical accuracy. $^{\ddagger}$ raw-FK hard fixing; $^{\dagger}$ corrected-FK soft factor; $^{\S}$ vision-aligned FK hard fixing. External cube GT is pending and will decide the final physical ranking.}
+Train-cube and held-out evaluation are cube-only and use identical populations across methods. Train-cube RMSE is in-sample; all-cube RMSE pools 724 train and 236 held-out corners. Cross-view directly pools 36 pairs over 904 destination-corner evaluations; 18 fixed-gripper pairs use train fixed anchors. Cam-common uses the same pair discrepancies in mm/deg, so neither is independent physical accuracy. $^{\ddagger}$ FK hard fixing; $^{\dagger}$ corrected-FK soft factor; $^{\S}$ corrected-FK hard fixing (VISION-aligned). External cube GT is pending and will decide the final physical ranking.}
 \end{table*}
 ```
 
@@ -1259,7 +1259,7 @@ metrics = evaluate_without_refit(model, heldout)
 3. 변환행렬 $\mathbf{T}$가 회전 $\mathbf{R}$과 이동 $\mathbf{t}$를 포함한다고 설명한다.
 4. 고정 카메라 경로 $\mathbf{C}_i\mathbf{Z}_{i,s}$와 그리퍼 카메라 경로 $\mathbf{G}_e\mathbf{X}\mathbf{Z}_{g,e}$를 설명한다.
 5. 실제 solver는 pose 차이가 아니라 raw distorted-pixel corner 재투영오차를 최소화한다고 설명한다.
-6. cube pose를 자유롭게 둘지, raw/aligned FK에 hard-fixed할지, covariance factor로 연결할지가 네 FK 방식의 차이라고 설명한다.
+6. cube pose를 VISION 자유변수로 둘지, FK/corrected-FK에 hard-fixed할지, corrected-FK soft factor로 연결할지가 방법 간 차이라고 설명한다.
 7. 두 카메라 계열을 한 residual vector로 함께 풀면 Unified이고, EIH를 먼저 푼 뒤 동결하여 fixed camera만 풀면 Sequential이라고 설명한다.
 8. 실데이터의 FK 기반 평가는 절대 정답이 아니라 proxy라는 점을 마지막에 분명히 말한다.
 
@@ -1269,7 +1269,7 @@ metrics = evaluate_without_refit(model, heldout)
 
 ## 21. 최종 한 장 요약용 수식
 
-### 공통 vision 목적함수
+### 공통 VISION 목적함수
 
 ```latex
 \mathcal{E}_{\mathrm{vis}}
@@ -1285,10 +1285,10 @@ f_v^2\rho_{\mathrm{softL1}}
 
 ```latex
 \begin{array}{ll}
-\text{no-FK:} & \mathbf{O}_s\text{ is free},\\
-\text{raw-FK-fixed:} & \mathbf{O}_s=\mathbf{F}^{raw}_s\mathbf{M},\\
-\text{vision-aligned-FK-fixed:} & \mathbf{O}_s=\mathbf{F}^{raw}_s\boldsymbol{\Delta}_{train},\\
-\text{corrected-FK factor:} & \mathbf{O}_s\text{ is free and }\mathcal{E}_{\mathrm{FK}}\text{ is added}.
+\text{VISION:} & \mathbf{O}_s\text{ is free},\\
+\text{FK hard fixed:} & \mathbf{O}_s=\mathbf{F}^{\mathrm{FK}}_s\mathbf{M},\\
+\text{corrected-FK hard fixed (VISION-aligned):} & \mathbf{O}_s=\mathbf{F}^{\mathrm{FK}}_s\boldsymbol{\Delta}_{train},\\
+\text{corrected-FK soft factor:} & \mathbf{O}_s\text{ is free and }\mathcal{E}_{\mathrm{FK}}\text{ is added}.
 \end{array}
 ```
 
@@ -1341,15 +1341,15 @@ f_{\mathrm{FK}}^2\rho_{\mathrm{Huber}}
 
 ### 질문: 목적함수 안의 항들은 모두 행렬인가?
 
-pose 변수는 $4\times4$ 변환행렬이지만 visual residual은 각 코너의 $u,v$ 픽셀 차이다. corrected-FK factor만 상대 pose를 회전 3개와 이동 3개의 6차원 벡터로 바꾼 뒤 covariance whitening한다.
+pose 변수는 $4\times4$ 변환행렬이지만 visual residual은 각 코너의 $u,v$ 픽셀 차이다. corrected-FK soft factor만 상대 pose를 회전 3개와 이동 3개의 6차원 벡터로 바꾼 뒤 covariance whitening한다.
 
-### 질문: no-FK(vision)는 로봇 FK를 전혀 쓰지 않는가?
+### 질문: VISION는 로봇 FK를 전혀 쓰지 않는가?
 
 큐브 FK prior $\mathbf{F}_s$는 쓰지 않는다. 하지만 움직이는 그리퍼 카메라를 베이스에 연결하기 위한 촬영 순간 그리퍼 자세 $\mathbf{G}_e$는 사용한다.
 
 ### 질문: corrected-FK는 soft anchor인가?
 
-그렇다. 정확히는 train-only 정렬 FK를 중심으로 한 covariance-whitened robust pose factor다. cube pose는 자유변수로 남으며 hard gate나 pose 교체는 없다.
+그렇다. 정확히는 train-only corrected-FK를 중심으로 한 covariance-whitened robust pose factor다. cube pose는 자유변수로 남으며 hard gate나 pose 교체는 없다.
 
 ### 질문: Sequential과 legacy Independent는 같은 방법인가?
 
