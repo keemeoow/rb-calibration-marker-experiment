@@ -1,31 +1,48 @@
-# Zeus 캘리브레이션 방식 비교 (2026-09-09 촬영 데이터)
+# Zeus 캘리브레이션 방식 비교 (2026-09-09 재촬영 데이터)
 
 > late_table1(CP_result/session04, UR3)과 같은 취지로, Zeus 데이터에 대해
 > "통합(unified) vs 독립(independent) x FK 처리 방식"을 비교한 결과다.
 > table1.py의 정식 held-out split/공유 baseline 절차 그대로는 아니고(train-pooled
 > + leave-one-out으로 근사). 코드: `fit_calibration_methods.py`,
-> `eval_heldout_and_consistency.py`.
+> `eval_heldout_and_consistency.py`, `gt_pick_test.py`/`gt_compare_fits.py`(외부 GT).
+>
+> **2026-09-09 오후 session1/session3를 재촬영**하고 그 데이터로 전부 다시
+> 계산했다 (`pass1_grasp_offset_replayed.json`도 재fit). 이 문서의 숫자는 전부
+> 재촬영 데이터 기준이다.
 
-**"독립"의 정의**: 고정캠 그룹(session1+session2-고정캠)과 그리퍼 그룹
-(session2-그리퍼캠+session3)을 **서로 정보 교환 전혀 없이** 완전히 따로
-캘리브레이션한다 — 공통 큐브(session2)가 아예 없었다고 가정했을 때 원래
-이렇게 각자 로봇 FK로 base 좌표계에 연결해서 캘리브레이션했을 방식 그대로.
-session2는 캘리브레이션에 전혀 안 쓰이고, 다 끝난 뒤 "두 그룹이 우연히
-같이 본 session2 큐브에 대해 서로 계산이 얼마나 일치하는가"를 사후
-합의(consensus)로만 확인한다. (참고: table1.py의 공식
+**"독립"의 정의**: 고정캠 그룹(session1 + session2-고정캠 + session3-고정캠)과
+그리퍼 그룹(session2-그리퍼캠 + session3-그리퍼캠)을 **서로 정보 교환 전혀
+없이** 완전히 따로 캘리브레이션한다 — 각자 로봇 FK로 base 좌표계에 연결해서
+캘리브레이션했을 방식 그대로. session2 큐브는 **양쪽 그룹 다 학습에 쓰되,
+큐브 pose 변수를 서로 공유하지 않는다**(고정캠 그룹은 자기 큐브 pose 변수를,
+그리퍼 그룹은 별개의 자기 큐브 pose 변수를 각자 추정). 다 끝난 뒤 "두 그룹이
+같은 session2 큐브에 대해 각자 추정한 pose가 서로 얼마나 일치하는가"를 사후
+합의(consensus)로 확인한다. (참고: table1.py의 공식
 sequential_frozen_stage(A1, 그리퍼가 먼저 정하고 고정캠이 일방적으로 맞춤)는
 이 정의와 안 맞아서 제거했다 — "서로 정보 교환 없음"이 아니라 한쪽이 다른
 쪽에 일방적으로 맞추는 비대칭 구조이기 때문.)
 
-## 데이터 풀 (모든 방식 공통, 159개 관측치)
+## Table 1 전체 결과 (late_table1/Session04와 같은 컬럼 구조)
+
+> ALL Cube RMSE는 late_table1엔 있지만 Zeus 쪽엔 아직 안 만든 지표라 N/A. External GT는 late_table1의 TRE와 같은 개념으로 xyz 3D 오차(mm)와 rz 오차(deg)를 씀(n=3, 아래 "결과 2" 참고).
+
+| 방법 | Calibration train target | Optimization | FK/target-pose 처리 | Train RMSE px | ALL Cube RMSE px | Heldout Cube RMSE px | Cross-view Cube px | Cam-common Cube mm/deg | External GT xyz TRE / rz (mm/deg, n=3) |
+|---|---|---|---|---:|---:|---:|---:|---:|---:|
+| 통합_no-fk | board+cube | unified_joint_optimization | cube pose=estimated | 0.7121 | N/A | 2.9557 | 3.9234 | 4.2250 / 1.0534 | 2.96 / 0.69 |
+| 통합_raw-fk | board+cube | unified_joint_optimization | cube pose=raw-FK-fixed | 0.8850 | N/A | **2.2087** | 4.2813 | 4.6416 / 1.1567 | **2.65** / 0.65 |
+| 독립_no-fk | board+cube (그룹 분리) | independent_parallel (핸드오프 없음) | cube pose=estimated | 0.68 / 0.65 | N/A | 3.8053 | **3.6668** | **3.9182** / 1.1376 | 3.08 / **0.63** |
+
+(독립의 Train은 고정캠/그리퍼캠 두 그룹을 완전히 따로 풀기 때문에 "고정캠값/그리퍼캠값"으로 표기. Heldout px/Cross-view px/Cam-common은 `eval_heldout_and_consistency.py`로 계산. Cross-view Cube px = late_table1과 같은 정의로, 한 카메라의 단일 이미지 PnP pose를 캘리브레이션된 extrinsics로 다른 카메라로 옮겨 재투영했을 때의 코너 px RMSE — 고정캠-고정캠 + 그리퍼캠-고정캠 쌍, 양방향, 세트당 4대 → 81쌍/162방향.)
+
+## 데이터 풀 (모든 방식 공통, 162개 관측치)
 
 | 소스 | 관측치 수 | 내용 |
 |---|---:|---|
-| session1 | 42 | 고정캠 3대 — 그리퍼로 쥔 큐브 (grasp+FK 모델) |
+| session1 | 45 | 고정캠 3대 — 그리퍼로 쥔 큐브 (grasp+FK 모델, 재촬영) |
 | session2-고정캠 | 42 | 고정캠 3대 — 바닥에 놓인 큐브 (세트별, 15곳) |
-| session2-그리퍼캠 | 15 | 그리퍼캠 — 같은 바닥 큐브를 파킹 자세에서 봄 (신규 발견) |
-| session3-고정캠 | 45 | 고정캠 3대 — 바닥 마커보드 (신규 발견: 15장씩 다 잘 봄, 코너 23~56개) |
-| session3-그리퍼캠 | 15 | 그리퍼캠 — 바닥 마커보드 (eye-in-hand) |
+| session2-그리퍼캠 | 15 | 그리퍼캠 — 같은 바닥 큐브를 파킹 자세에서 봄 |
+| session3-고정캠 | 45 | 고정캠 3대 — 바닥 마커보드 (재촬영) |
+| session3-그리퍼캠 | 15 | 그리퍼캠 — 바닥 마커보드 (eye-in-hand, 재촬영) |
 
 ## 3가지 방식 정의
 
@@ -33,37 +50,68 @@ sequential_frozen_stage(A1, 그리퍼가 먼저 정하고 고정캠이 일방적
 |---|---|---|
 | **통합_no-fk** | session2 세트별 큐브 pose = 자유 변수, 고정캠+그리퍼캠 관측치가 **같이** 그 변수를 결정 | 4개 소스 전부 하나의 최소제곱으로 동시에 품 |
 | **통합_raw-fk** | session2 큐브 pose = "명령한 place pose @ T_gripper_cube(session1 원값)"로 고정(상수) | 4개 소스 전부 하나의 최소제곱(단, 큐브가 상수라 사실상 고정캠/그리퍼캠 블록이 서로 안 엮임) |
-| **독립_no-fk** | 고정캠 그룹과 그리퍼 그룹을 **정보 교환 전혀 없이** 완전히 따로 풂. session2는 사후 합의 검증에만 사용 | 핸드오프 없음, 각자 로봇 FK로 base 좌표계에 독립적으로 연결 |
+| **독립_no-fk** | 고정캠 그룹과 그리퍼 그룹을 **정보 교환 전혀 없이** 완전히 따로 풂. session2 큐브 pose는 각 그룹이 **별개의 자유 변수**로 따로 추정(공유 안 함), 끝난 뒤 두 추정치를 사후 합의로 비교 | 핸드오프 없음, 각자 로봇 FK로 base 좌표계에 독립적으로 연결 |
+
+학습 목적함수는 전부 픽셀 재투영 오차(`solve_corner_reprojection`)다.
 
 `raw-fk`는 no_fk에서만 통합/독립 구분이 의미가 있다 — 큐브 위치를 상수로 고정하면 고정캠/그리퍼캠 블록이 항상 수학적으로 분리되어(block-separable) 통합과 독립이 완전히 같은 답을 내므로, 독립_raw-fk는 안 만들었다.
 
 **주의**: `통합_raw-fk`는 table1.py의 A3("raw-FK-fixed", 비전 개입 0인 순수 기계적 상수)와 이름만 같고 실제로는 다른 조건이다 — Zeus엔 그런 독립 측정 상수가 없어서 session1 비전 fit값(T_gripper_cube)을 앵커로 쓴다. 그래서 이 열은 "C3(FK 처리 방식) 검증"이 아니라 "우리만의 FK-고정 변형"으로만 해석해야 한다.
 
-## 결과
+## 결과 1 — 내부 지표 (train / held-out / cross-camera)
 
-Train RMSE는 학습에 쓴 데이터로 재는 것이고, held-out RMSE는 **정답을 그
-세트를 본 카메라들 자신으로 삼각측량하지 않고, "그 세트에서 로봇이 실제로
-명령받아 간 FK 위치 @ session1의 T_gripper_cube"로 계산한, 비전과 완전히
-무관한 값**을 정답으로 써서 잰 것이다(카메라들의 공통 편향까지 잡아낼 수
-있는 더 엄격한 기준).
+Train RMSE는 학습에 쓴 데이터로 재는 것이고, held-out은 **정답을 그 세트를
+본 카메라들 자신으로 삼각측량하지 않고, "그 세트에서 로봇이 실제로 명령받아
+간 FK 위치 @ session1의 T_gripper_cube"로 계산한, 비전과 완전히 무관한 값**을
+정답으로 써서 잰 것이다. Cross-cam은 같은 세트를 본 카메라들이 각자 독립적으로
+계산한 큐브 pose끼리의 pairwise 차이 평균.
 
-| 방식 | Train RMSE (px) | Held-out (px, FK 기준) | Held-out (mm / deg, FK 기준) | Cross-cam (mm/deg) | 비고 |
-|---|---:|---:|---:|---:|---|
-| 통합_raw-fk | 1.05 | **2.82** | 1.64 / 0.57 | 3.57 / 1.12 | A3 아님 (위 주의 참고) |
-| **통합_no-fk** | **0.76** | 3.55 | **1.54 / 0.58** | **3.49 / 1.01** | |
-| 독립_no-fk | 고정캠 0.74 / 그리퍼 0.66 | 4.43 | 2.19 / 0.63 | 3.80 / 0.99 | 큐브 사후합의: 평균 3.29mm/0.96°, 최대 5.77mm/2.42°. 보드 사후합의: 2.73mm/0.34° |
+| 방식 | Train RMSE (px) | Held-out (px) | Held-out (mm / deg) | Cross-view (px) | Cross-cam (mm / deg) | 비고 |
+|---|---:|---:|---:|---:|---:|---|
+| 통합_raw-fk | 0.89 | **2.21** | **2.39 / 0.51** | 4.28 | 4.64 / 1.16 | A3 아님 (위 주의 참고) |
+| **통합_no-fk** | **0.71** | 2.96 | 2.90 / 0.51 | 3.92 | 4.23 / 1.05 | |
+| 독립_no-fk | 고정캠 0.68 / 그리퍼 0.65 | 3.81 | 3.18 / 0.49 | **3.67** | **3.92** / 1.14 | 큐브 사후합의: 평균 2.89mm/1.15°, 최대 6.78mm/2.35°. 보드 사후합의: 2.24mm/0.26° |
 
-## 핵심 결론
+- held-out을 px로 보면 raw-fk가 제일 좋게 나오는데, 이건 "더 정확해서"가 아니라 "raw-fk 자체가 학습할 때부터 큐브 위치=FK로 못박아놓고 카메라를 맞췄기 때문"이다 — 검증 기준(FK 기반 GT)이 학습 목표(FK 앵커)와 같은 수식이라 유리한 게 당연. 절대적 정확도 우위로 해석하면 안 된다.
+- 통합_no-fk가 독립_no-fk보다 held-out mm에서 낫다(2.90 vs 3.18mm). 통합이 고정캠·그리퍼캠 정보를 실제로 공유해서 쓰는 이점.
+- Cross-view px와 Cross-cam mm/deg는 둘 다 "카메라들끼리 서로 동의하는 정도"라, 모든 카메라가 같은 방향으로 틀린 공통 편향은 원리적으로 못 잡는다(pairwise 뺄셈/전달에서 소거됨). 그래서 이 두 값은 held-out과 순위가 반대로 나온다(독립이 제일 좋음) — 모순이 아니라, 독립은 카메라들끼리 잘 맞춰졌지만 새 placement 예측(held-out)은 통합이 더 낫다는 뜻. Cross-view px가 Cross-cam mm/deg와 같은 순위인 건 같은 정보를 픽셀/3D 두 단위로 본 것이라 당연.
 
-1. **FK 기준 held-out을 픽셀로 보면 raw-fk가 제일 좋게 나오는데, 이건 "더 정확해서"가 아니라 "raw-fk 자체가 학습할 때부터 큐브 위치=FK로 못박아놓고 카메라를 맞췄기 때문"이다.** 검증 기준(FK)이 학습 목표(FK)와 같으니 유리한 게 당연 — 절대적 정확도 우위로 해석하면 안 된다.
-2. **같은 held-out을 실제 mm로 바꿔서 보면 통합_no-fk가 가장 정확하다(1.54mm)**, raw-fk(1.64mm)보다도 낫다. 픽셀 공간의 큰 격차(2.82 vs 3.55px)가 실제 3D 위치 오차로는 그렇게까지 안 벌어진다 — 카메라 거리/각도에 따라 같은 픽셀 오차가 다른 mm 오차로 바뀌기 때문에, **픽셀 RMSE만으로 "이 방법이 더 정확하다"고 결론 내리면 안 된다는 걸 보여주는 사례**.
-3. **보드 데이터를 추가하니 통합과 독립의 mm 격차가 오히려 더 벌어졌다** — 이전(고정캠이 보드를 안 쓸 때)엔 통합_no-fk 2.03mm vs 독립_no-fk 2.18mm(7% 차이)였는데, 지금은 통합_no-fk 1.54mm vs 독립_no-fk 2.19mm(42% 차이)다. **공유 가능한 정보(보드)가 늘어날수록, 그걸 실제로 공유해서 쓰는 통합의 이점이 더 커진다**는 걸 보여준다 — 독립은 고정캠 자체 train RMSE는 좋아졌지만(1.12→0.74px), held-out 정확도는 오히려 살짝 나빠졌다(2.18→2.19mm). 아마 고정캠 그룹이 보드+큐브 두 타깃을 동시에 맞추려다 보니 학습 데이터엔 더 잘 맞아도 새 placement에 대한 일반화는 개선 안 된 것으로 보인다.
-4. **독립엔 이제 두 종류의 사후 합의가 있다**: session2 큐브 기준(평균 3.29mm/0.96°)과 session3 보드 기준(2.73mm/0.34°). 보드 쪽이 회전은 훨씬 더 잘 맞는데(0.34° vs 0.96°), 보드가 정지된 평면 타깃이라 자세 추정이 더 안정적이기 때문으로 보인다.
-5. **결국 "무엇이 실제로 더 정확한가"는 FK도 카메라도 아닌 완전히 제3의 기준(실측 외부 GT, 눈금 측정)으로만 가릴 수 있다** — 지금 그 실험(`gt_pick_test.py`/`gt_compare_fits.py`)이 진행 중인 이유다.
+## 결과 2 — 외부 GT 실험 (3 트라이얼, `gt_compare_fits.py`)
 
-## 데이터 사용률 실험 (30%/50%/70%) — ⚠️ 구버전 데이터(114개, 보드 추가 전) 기준, 재실행 필요
+GT 큐브를 바닥에 놓고, 그리퍼를 open/close 반복하며 **물리적으로**(카메라
+화면이 아니라 손가락이 닫히면서 큐브가 자기 중심에 오게) 큐브 중심에 맞춘 뒤
+읽은 flange TCP pose를 "정답"으로 쓴다 — 비전과 완전히 독립된 실측값. 3개
+방식이 같은 사진에서 검출한 큐브 pose와 비교:
+- **x, y**: 그리퍼가 이미 큐브 중심에 물리적으로 맞아 있으므로 offset 없이 직접 비교.
+- **z**: offset 적용(`검출 z − (GT flange z − T_gripper_cube z)`; 그리퍼가
+  거의 수직으로 잡는 자세라 이 뺄셈이 곧 SE(3) 변환과 동일).
+- **rz**: offset 없이 직접 비교(T_gripper_cube 회전엔 ~180° 뒤집힘 컨벤션이
+  섞여있어서 그대로 곱하면 오히려 왜곡됨).
 
-session1(42)+session3(15, 그리퍼만)는 항상 전부 포함하고, session2의 15개 placement 중 학습에 쓰는 개수만 30%/50%/70%로 줄여서(나머지는 held-out), 매 비율마다 서로 다른 랜덤 조합으로 8번씩 반복 평균. 코드: `eval_data_efficiency.py`. **아래 표는 고정캠의 session3 보드 데이터를 추가하기 전(114개 관측치) 결과라 지금 파이프라인과 안 맞음 — 다시 돌려야 함.**
+방식별 평균(3 트라이얼, 절대값). xyz TRE = √(dx²+dy²+dz²)의 평균, late_table1의 TRE에 대응.
+
+| 방식 | \|dx\| | \|dy\| | \|dz\| | **xyz TRE (mm)** | \|drz\| (deg) |
+|---|---:|---:|---:|---:|---:|
+| 통합_raw-fk | 0.65 | 2.01 | **0.94** | **2.65** | 0.65 |
+| 통합_no-fk | 0.82 | 2.15 | 1.24 | 2.96 | 0.69 |
+| 독립_no-fk | 0.68 | 2.10 | 1.65 | 3.08 | **0.63** |
+
+트라이얼별 상세:
+
+| 방식 | 실험 | dx | dy | dz | drz |
+|---|---:|---:|---:|---:|---:|
+| 통합_no-fk | 1 / 2 / 3 | +1.58 / -0.31 / +0.56 | -0.23 / +0.79 / +5.43 | -1.50 / -0.43 / -1.78 | +0.93 / +0.85 / +0.29 |
+| 통합_raw-fk | 1 / 2 / 3 | +0.69 / -1.15 / -0.10 | -0.56 / +0.49 / +4.97 | -1.23 / -0.17 / -1.42 | +0.87 / +0.80 / +0.28 |
+| 독립_no-fk | 1 / 2 / 3 | +1.57 / -0.26 / +0.20 | -0.54 / +0.54 / +5.24 | -1.89 / -0.81 / -2.24 | +0.86 / +0.79 / +0.24 |
+
+- xyz TRE·z는 통합_raw-fk가 제일 좋고(2.65mm / 0.94mm), rz는 독립_no-fk가 제일 좋다(0.63°) — 지표마다 승자가 달라서, **n=3인 지금은 어느 방식이 확실히 최고라고 결론 내릴 수 없다**. 세 방식 차이(xyz TRE 0.4mm, rz 0.06°)가 트라이얼 간 편차보다 작다.
+- 3개 방식 다 xyz TRE 2.7~3.1mm, rz<0.7°.
+- **실험 3에서만 3개 방식 전부 dy가 +5.0~+5.4mm로 튄다** (실험 1·2는 1mm 안쪽). 방식과 무관하게 똑같이 튀는 걸로 봐서 그 트라이얼의 GT 자체(정렬 또는 큐브 놓인 상태)에 y방향 편차가 있었을 가능성이 높고, 이게 xyz TRE 평균을 지배하고 있다 — 실험 3을 빼면 xyz TRE는 1~2mm대로 내려온다. 트라이얼을 더 늘려서 확인 필요.
+- 이 외부 GT는 내부 지표(held-out, cross-cam)가 원리적으로 못 잡는 "모든 카메라 공통 편향"까지 포함한 값이라, 최종 물리 순위는 이 지표로만 판정해야 한다.
+
+## 데이터 사용률 실험 (30%/50%/70%) — ⚠️ 구버전 데이터(114개, 재촬영 전) 기준, 재실행 필요
+
+session1+session3는 항상 전부 포함하고, session2의 15개 placement 중 학습에 쓰는 개수만 30%/50%/70%로 줄여서(나머지는 held-out), 매 비율마다 서로 다른 랜덤 조합으로 8번씩 반복 평균. 코드: `eval_data_efficiency.py`. **아래 표는 이번 재촬영(session1/3, 162개 관측치) 이전 데이터라 지금 파이프라인과 안 맞음 — 다시 돌려야 함.**
 
 | 데이터 비율 (학습 세트 수) | 통합_no-fk (mm) | 통합_raw-fk (mm) | 독립_no-fk (mm) |
 |---|---:|---:|---:|
@@ -74,8 +122,10 @@ session1(42)+session3(15, 그리퍼만)는 항상 전부 포함하고, session2�
 ## 아직 안 된 것 / 한계
 
 - **C2(큐브 vs board-only)**: 검증 안 함. Zeus는 처음부터 큐브+보드를 같이 썼음.
-- **C3(FK 처리)**: raw-fk/no-fk 2개만 있고, corrected-FK(A4)·vision-aligned-FK(A5, UR3에서 제일 좋았던 방법)는 없음. 그리고 있는 raw-fk도 진짜 A3가 아님(위 주의 참고).
-- **C4(외부 GT)**: `gt_pick_test.py`/`gt_compare_fits.py`로 진행 중. 통계적으로 엄밀한 수준(TRE/회전/P95/실패율 집계, 사전등록)은 아직 아님. 또한 GT 큐브 자체의 물리 치수(config vs 실물)가 아직 미해결 — 실측 후 재검증 필요.
-- **late_table1의 나머지 지표**: ALL Cube RMSE(train+heldout 합쳐서 한 번에 재투영), Cross-view pixel transfer RMSE(포즈를 다른 카메라로 옮겼을 때 픽셀 오차)는 아직 안 만듦.
-- **T_gripper_cube 적용 방식**: `gt_pick_test.py`는 이제 T_gripper_cube 전체(x,y,z,rz,ry,rx)를 반영하도록 고쳤지만, `session2_pick_and_place.py`는 아직 예전 방식(z/ry/rx 고정값 + 큐브 원점 x,y)을 씀 — 필요하면 같이 고쳐야 함.
+- **C3(FK 처리)**: raw-fk/no-fk 2개만 있고, corrected-FK(A4)·vision-aligned-FK(A5, UR3에서 제일 좋았던 방법)는 없음. 있는 raw-fk도 진짜 A3가 아님(위 주의 참고).
+- **C4(외부 GT)**: `gt_pick_test.py`/`gt_compare_fits.py`로 3트라이얼 진행(위 "결과 2"). 통계적으로 엄밀한 수준(P95/실패율 집계, 사전등록, n≥10 이상)은 아직 아님 — 특히 실험 3의 dy +5mm 이상치가 xyz TRE 평균을 지배하고 있어 트라이얼 추가가 필요. GT 큐브 자체의 물리 치수(config vs 실물)도 아직 완전히 재검증은 안 됨.
+- **데이터 사용률 실험**: 재촬영 전 데이터 기준이라 재실행 필요(위 "데이터 사용률 실험" 섹션).
+- **late_table1의 나머지 지표**: ALL Cube RMSE(train+heldout 합쳐서 한 번에 재투영)는 아직 안 만듦. Cross-view pixel transfer RMSE는 이번에 추가함(`cross_view_pixel_transfer`) — 단, late_table1은 held-out 세트에서 재는데 여기선 Cam-common과 같은 방식으로 전체 데이터 fit에서 잼(train-pooled).
+- **T_gripper_cube 적용 방식**: `gt_pick_test.py`/`gt_compare_fits.py`는 T_gripper_cube 전체(x,y,z,rz,ry,rx)를 반영하도록 고쳤지만, `session2_pick_and_place.py`는 아직 예전 방식(z/ry/rx 고정값 + 큐브 원점 x,y)을 씀 — 필요하면 같이 고쳐야 함.
 - held-out/cross-camera는 table1.py의 정식 split 절차가 아니라 leave-one-out으로 근사한 것 (train-pooled, held-out 완전 분리 아님).
+- mm-공간 학습(`fit_calibration_methods_mm.py`)은 별도 실험으로 돌려봤으나(no-fk/독립에서 px 학습보다 held-out이 나빴음) 이 표에서는 제외 — 학습은 px 재투영으로 통일.

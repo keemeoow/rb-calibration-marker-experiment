@@ -20,15 +20,16 @@
              @ T_gripper_cube" FK값으로 고정(정적 상수, 최적화 중 안 바뀜).
 
   통합(unified)     -- 위 4개 소스를 전부 하나의 최소제곱에 넣어 한 번에 푼다.
-  독립(independent) -- 고정캠 그룹(session1+session2-고정캠)과 그리퍼 그룹
-                       (session2-그리퍼캠+session3)을 정보 교환 전혀 없이
-                       완전히 따로 푼다(solve_parallel_fixed/gripper). 어느
-                       쪽도 다른 쪽 값을 넘겨받지 않는다 -- 공통 큐브(session2)
-                       가 아예 없었다고 가정했을 때 원래 이렇게 각자 캘리브레이션
-                       했을 방식 그대로. session2는 캘리브레이션에 전혀 안 쓰이고,
-                       다 끝난 뒤 "두 그룹이 우연히 같이 본 session2 큐브에 대해
-                       서로 계산이 얼마나 일치하는가"를 사후 합의(consensus_check)
-                       로만 확인한다 -- 결과를 바꾸지 않는 순수 진단 지표.
+  독립(independent) -- 고정캠 그룹(session1+session2-고정캠+session3-고정캠)과
+                       그리퍼 그룹(session2-그리퍼캠+session3-그리퍼캠)을 정보
+                       교환 전혀 없이 완전히 따로 푼다(solve_parallel_fixed/
+                       gripper). 어느 쪽도 다른 쪽 값을 넘겨받지 않는다.
+                       session2 큐브는 양쪽 다 학습에 쓰되 큐브 pose 변수를
+                       공유하지 않는다(각 그룹이 별개의 자유 변수로 따로 추정).
+                       다 끝난 뒤 "두 그룹이 같은 session2 큐브에 대해 각자
+                       추정한 pose가 얼마나 일치하는가"를 사후 합의
+                       (consensus_check)로 확인한다 -- 결과를 바꾸지 않는
+                       순수 진단 지표.
 
 raw-fk는 no_fk에서만 통합/독립 구분이 의미가 있다 -- 큐브 위치를 상수로
 고정하면 고정캠/그리퍼캠 블록이 항상 수학적으로 분리되어(block-separable)
@@ -387,15 +388,13 @@ def main():
                           "n_corners": diag["n_residuals"] // 2, "n_observations": n_obs}
         export_fit_json(fit_out_dir / f"fit_{label}.json", state.grasps[0], state.cams, state.gtc)
 
-    # 진짜 독립: 공통 큐브(session2)가 아예 없었다고 가정하고, 고정캠 그룹과
-    # 그리퍼 그룹을 서로 정보 교환 없이 완전히 따로 캘리브레이션한다
-    # (고정캠은 session1 grasp+FK로, 그리퍼는 session3 board eye-in-hand+FK로 --
-    # 둘 다 "공통 큐브 없이도" 원래 이렇게 각자 로봇 FK에 연결해서 캘리브레이션
-    # 했을 방식 그대로). session2는 캘리브레이션에 전혀 안 쓰고, 다 끝난 뒤
-    # "두 그룹이 우연히 같이 본 session2 큐브들에 대해 서로 계산이 얼마나
-    # 일치하는가"를 사후 검증(합의)으로만 쓴다 -- 옵션1, 결과를 바꾸지 않는
-    # 순수 진단 지표.
-    label2 = "독립_no-fk (진짜 독립, session2는 사후검증만)"
+    # 진짜 독립: 고정캠 그룹과 그리퍼 그룹을 서로 정보 교환 없이 완전히 따로
+    # 캘리브레이션한다 (고정캠은 session1 grasp+FK로, 그리퍼는 session3 board
+    # eye-in-hand+FK로 각자 로봇 FK에 연결). session2 큐브는 양쪽 다 학습에
+    # 쓰되 큐브 pose 변수를 공유하지 않는다 -- 각 그룹이 별개의 자유 변수로
+    # 따로 추정하고, 다 끝난 뒤 그 두 추정치가 얼마나 일치하는가를 사후
+    # 검증(합의)으로 본다. 결과를 바꾸지 않는 순수 진단 지표.
+    label2 = "독립_no-fk (진짜 독립, 큐브 pose 비공유)"
     state_fixed, diag_fixed, obs_fixed = solve_parallel_fixed(data)
     state_gripper, diag_gripper, obs_gripper = solve_parallel_gripper(data, gtc_init, board_init)
     export_fit_json(fit_out_dir / "fit_독립_no-fk.json", state_fixed.grasps[0], state_fixed.cams, state_gripper.gtc)

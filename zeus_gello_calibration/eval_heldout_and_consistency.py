@@ -157,6 +157,52 @@ def cross_camera_consistency(obs_all_s2, cams, gtc, robot_T_all, K_map, D_map, g
             float(np.mean(rot_deg)) if rot_deg else float("nan"), n_pairs)
 
 
+def cross_view_pixel_transfer(obs_all_s2, cams, gtc, robot_T_all, K_map, D_map, gripper_id):
+    """late_table1의 "Cross-view Cube px"(cross_view_cube_pixel_transfer_rmse_px)와
+    같은 정의: 같은 세트를 본 두 카메라 A, B에 대해, A 이미지 한 장만으로 PnP한
+    큐브 pose를 캘리브레이션된 extrinsics로 B 카메라 좌표계로 옮겨서
+    (inv(T_base_camB) @ T_base_camA @ T_camA_cube) B 이미지에 재투영하고, B가
+    실제로 검출한 코너와의 픽셀 오차를 잰다. A->B, B->A 양방향, 고정캠-고정캠
+    쌍과 그리퍼캠-고정캠 쌍을 한 지표에 같이 모아서(late_table1과 동일하게
+    pooled) 성분별(dx,dy 펴서) RMSE. 그리퍼캠의 T_base_cam은 robot_T[event] @ gtc.
+
+    Cam-common(mm/deg)이 "두 카메라의 3D pose 추정치 차이"라면, 이건 "한쪽
+    pose를 다른 쪽 이미지로 가져갔을 때 픽셀이 얼마나 어긋나는가"라 카메라 간
+    상대 extrinsics를 더 직접적으로 본다. 둘 다 카메라 공통 편향은 못 잡는다."""
+    by_set = {}
+    for o in obs_all_s2:
+        if o.set_idx is None:
+            continue
+        by_set.setdefault(int(o.set_idx), []).append(o)
+
+    def base_cam_pose(o):
+        c = int(o.cam)
+        if c == gripper_id:
+            if gtc is None or int(o.event) not in robot_T_all:
+                return None
+            return robot_T_all[int(o.event)] @ gtc
+        return cams.get(c)
+
+    sq_all, n_directions, n_pairs = [], 0, 0
+    for s, obs_list in by_set.items():
+        entries = []
+        for o in obs_list:
+            T_base_cam = base_cam_pose(o)
+            T_cam_cube = solve_observed_pose(o, K_map, D_map)
+            if T_base_cam is None or T_cam_cube is None:
+                continue
+            entries.append((o, T_base_cam, T_base_cam @ T_cam_cube))
+        for i in range(len(entries)):
+            for j in range(i + 1, len(entries)):
+                n_pairs += 1
+                for (src, _, T_base_cube_src), (dst, T_base_cam_dst, _) in ((entries[i], entries[j]), (entries[j], entries[i])):
+                    c = int(dst.cam)
+                    pred = project_points(inv_T(T_base_cam_dst) @ T_base_cube_src, dst.object_points, K_map[c], D_map[c])
+                    sq_all.extend(np.square(pred - np.asarray(dst.image_points).reshape(-1, 2)).reshape(-1).tolist())
+                    n_directions += 1
+    return (float(np.sqrt(np.mean(sq_all))) if sq_all else float("nan")), n_pairs, n_directions
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--session1-dir", default=str(SESSION1_DIR_DEFAULT))
@@ -197,6 +243,8 @@ def main():
         cams_full, gtc_full = fit_frozen(method, data, fk_mode, gtc_init, board_init)
         trans_mm, rot_deg, n_pairs = cross_camera_consistency(
             obs_all_s2, cams_full, gtc_full, robot_T_all, K_map, D_map, GRIPPER_LOCAL_ID)
+        xview_px, xview_pairs, xview_dirs = cross_view_pixel_transfer(
+            obs_all_s2, cams_full, gtc_full, robot_T_all, K_map, D_map, GRIPPER_LOCAL_ID)
 
         results[label] = {
             "heldout_cube_rmse_px": heldout_rmse,
@@ -208,16 +256,20 @@ def main():
             "cross_camera_translation_mm": trans_mm,
             "cross_camera_rotation_deg": rot_deg,
             "n_camera_pairs": n_pairs,
+            "cross_view_cube_pixel_transfer_rmse_px": xview_px,
+            "cross_view_n_pairs": xview_pairs,
+            "cross_view_n_directions": xview_dirs,
             "per_set_heldout_rmse_px": per_set,
             "per_set_heldout_mm_deg": per_set_mm_deg,
         }
 
     print(f"\n{'condition':>16} {'heldout_px':>11} {'heldout_mm':>11} {'heldout_deg':>12} "
-          f"{'cross_cam_mm':>13} {'cross_cam_deg':>14}")
+          f"{'cross_view_px':>14} {'cross_cam_mm':>13} {'cross_cam_deg':>14}")
     for name in ("통합_raw-fk", "통합_no-fk", "독립_no-fk"):
         r = results[name]
         print(f"{name:>16} {r['heldout_cube_rmse_px']:>11.4f} "
               f"{r['heldout_translation_mean_mm']:>11.2f} {r['heldout_rotation_mean_deg']:>12.2f} "
+              f"{r['cross_view_cube_pixel_transfer_rmse_px']:>14.4f} "
               f"{r['cross_camera_translation_mm']:>13.4f} {r['cross_camera_rotation_deg']:>14.4f}")
 
     Path(args.out).write_text(json.dumps({"results": results}, indent=2))
