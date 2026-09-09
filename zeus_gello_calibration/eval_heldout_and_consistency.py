@@ -66,6 +66,47 @@ def camera_cube_estimate(obs, cams, gtc, robot_T, K_map, D_map, gripper_id):
     return cams[c] @ T_cam_cube
 
 
+def joint_cube_estimate(obs_list, cams, gtc, robot_T, K_map, D_map, gripper_id, init=None):
+    """held-out 세트의 큐브 pose를 여러 카메라의 코너를 **한 번에** 써서 삼각측량
+    (frozen 카메라, 큐브 6-DoF만 변수, canonical soft_l1 2px). 단일 이미지 PnP
+    4개를 robust 평균내는 것보다 노이즈가 작은 추정기 -- 모든 방식에 똑같이
+    적용되므로 비교 조건이 아니라 평가 정밀도 문제다."""
+    from scipy.optimize import least_squares
+    from calibration_pipeline.fk_factor import robustify_elementwise
+    from calibration_pipeline.reprojection import retract, SE3Scaling
+    views = []
+    for o in obs_list:
+        c = int(o.cam)
+        if c == gripper_id:
+            if gtc is None or int(o.event) not in robot_T:
+                continue
+            T_bc = robot_T[int(o.event)] @ gtc
+        else:
+            if cams is None or c not in cams:
+                continue
+            T_bc = cams[c]
+        views.append((inv_T(T_bc), np.asarray(o.object_points, dtype=np.float64),
+                      np.asarray(o.image_points, dtype=np.float64).reshape(-1, 2), K_map[c], D_map[c]))
+    if not views:
+        return None
+    if init is None:
+        cands = [camera_cube_estimate(o, cams, gtc, robot_T, K_map, D_map, gripper_id) for o in obs_list]
+        cands = [c for c in cands if c is not None]
+        if not cands:
+            return None
+        init = cands[0] if len(cands) == 1 else cp.robust_se3_average(cands, None)[0]
+    scaling = SE3Scaling()
+
+    def resid(x):
+        T = retract(init, x, scaling)
+        out = []
+        for T_cb, obj, img, K, D in views:
+            out.extend(robustify_elementwise((project_points(T_cb @ T, obj, K, D) - img).reshape(-1), "soft_l1", 2.0))
+        return np.asarray(out)
+    sol = least_squares(resid, np.zeros(6), method="trf", loss="linear", x_scale="jac", xtol=1e-10, ftol=1e-10, gtol=1e-10)
+    return retract(init, sol.x, scaling)
+
+
 def fit_frozen(method, data_fold, fk_mode, gtc_init, board_init):
     """(cams, gtc) 프리즈된 값 반환 -- 통합/진짜독립 공통 인터페이스.
     진짜독립은 no_fk(estimated)에서만 존재한다."""
@@ -88,6 +129,7 @@ def evaluate_heldout(method, data, fk_mode, gtc_init, board_init, robot_T_all, K
     per_set_mm_deg = {}
     xview_sq, xview_pairs, xview_dirs = [], 0, 0
     camcom_mm, camcom_deg = [], []
+    per_set_joint, per_set_frozen = {}, {}
     obs_all_s2 = data["obs_s2_fixed"] + data["obs_s2_gripper"]
     grasp_init = data["grasp_init"]
     for s in set_ids:
@@ -136,6 +178,13 @@ def evaluate_heldout(method, data, fk_mode, gtc_init, board_init, robot_T_all, K
             T_vision = cands[0] if len(cands) == 1 else cp.robust_se3_average(cands, None)[0]
             d_mm, d_deg = pose_delta(T_vision, T_gt)
             per_set_mm_deg[s] = {"translation_mm": d_mm, "rotation_deg": d_deg}
+            # 다중 뷰 공동 삼각측량 (노이즈 더 작은 추정기)
+            T_joint = joint_cube_estimate(heldout_obs, cams, gtc, robot_T_all, K_map, D_map, GRIPPER_LOCAL_ID, init=T_vision)
+            if T_joint is not None:
+                j_mm, j_deg = pose_delta(T_joint, T_gt)
+                per_set_joint[s] = {"translation_mm": j_mm, "rotation_deg": j_deg}
+        per_set_frozen[s] = {"cams": {int(k): np.asarray(v).tolist() for k, v in cams.items()},
+                             "gtc": None if gtc is None else np.asarray(gtc).tolist()}
 
         # held-out 세트에 대해서만 카메라 간 일치도 (이 fold의 frozen 카메라로)
         sq, n_p, n_d = _cross_view_squared(heldout_obs, cams, gtc, robot_T_all, K_map, D_map, GRIPPER_LOCAL_ID)
@@ -153,6 +202,10 @@ def evaluate_heldout(method, data, fk_mode, gtc_init, board_init, robot_T_all, K
         "cam_common_translation_mm": float(np.mean(camcom_mm)) if camcom_mm else float("nan"),
         "cam_common_rotation_deg": float(np.mean(camcom_deg)) if camcom_deg else float("nan"),
         "cam_common_n_pairs": len(camcom_mm),
+        "per_set_mm_deg_joint": per_set_joint,
+        "heldout_joint_translation_mean_mm": float(np.mean([v["translation_mm"] for v in per_set_joint.values()])) if per_set_joint else float("nan"),
+        "heldout_joint_rotation_mean_deg": float(np.mean([v["rotation_deg"] for v in per_set_joint.values()])) if per_set_joint else float("nan"),
+        "per_set_frozen": per_set_frozen,
     }
     return rmse_px(all_errs), per_set, per_set_mm_deg, heldout_cross
 
@@ -309,12 +362,13 @@ def main():
               f"{r['heldout_translation_mean_mm']:>11.2f} {r['heldout_rotation_mean_deg']:>12.2f} "
               f"{r['cross_view_cube_pixel_transfer_rmse_px']:>14.4f} "
               f"{r['cross_camera_translation_mm']:>13.4f} {r['cross_camera_rotation_deg']:>14.4f}")
-    print(f"\n[held-out: 빠진 세트에 대해서만 잰 카메라 간 일치도, 15 fold pooled]")
-    print(f"{'condition':>16} {'xview_px':>10} {'xview_pairs':>12} {'camcom_mm':>10} {'camcom_deg':>11} {'camcom_pairs':>13}")
+    print(f"\n[held-out: 빠진 세트에 대해서만 잰 카메라 간 일치도, 15 fold pooled / joint = 다중뷰 공동 삼각측량 held-out]")
+    print(f"{'condition':>16} {'xview_px':>10} {'xview_pairs':>12} {'camcom_mm':>10} {'camcom_deg':>11} {'camcom_pairs':>13} {'joint_mm':>9} {'joint_deg':>10}")
     for name in ("통합_raw-fk", "통합_no-fk", "독립_no-fk"):
         h = results[name]["heldout_cross"]
         print(f"{name:>16} {h['cross_view_cube_pixel_transfer_rmse_px']:>10.4f} {h['cross_view_n_pairs']:>12d} "
-              f"{h['cam_common_translation_mm']:>10.4f} {h['cam_common_rotation_deg']:>11.4f} {h['cam_common_n_pairs']:>13d}")
+              f"{h['cam_common_translation_mm']:>10.4f} {h['cam_common_rotation_deg']:>11.4f} {h['cam_common_n_pairs']:>13d} "
+              f"{h['heldout_joint_translation_mean_mm']:>9.3f} {h['heldout_joint_rotation_mean_deg']:>10.3f}")
 
     Path(args.out).write_text(json.dumps({"results": results}, indent=2))
     print(f"\nwrote {args.out}")

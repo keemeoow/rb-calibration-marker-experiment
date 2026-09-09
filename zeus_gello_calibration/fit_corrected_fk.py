@@ -360,7 +360,9 @@ def evaluate_variant(variant, data, gtc_init, board_init, robot_T_all, K_map, D_
         mm_list = [v["translation_mm"] for v in per_mm.values()]
         dg_list = [v["rotation_deg"] for v in per_mm.values()]
         out.update(heldout_px=h_px, heldout_mm=float(np.mean(mm_list)), heldout_deg=float(np.mean(dg_list)),
-                   heldout_mm_max=float(np.max(mm_list)), heldout_cross=h_cross, per_set_mm=per_mm)
+                   heldout_mm_max=float(np.max(mm_list)), heldout_cross=h_cross, per_set_mm=per_mm,
+                   heldout_mm_joint=h_cross.get("heldout_joint_translation_mean_mm", float("nan")),
+                   heldout_deg_joint=h_cross.get("heldout_joint_rotation_mean_deg", float("nan")))
     return st, out
 
 
@@ -411,13 +413,14 @@ def main():
         print(line + f"  ({out['elapsed_s']:.0f}s)")
         Path(args.out).write_text(json.dumps(results, indent=2, default=lambda o: str(o)))
 
-    print(f"\n{'variant':>10} {'train_px':>9} {'ho_px':>7} {'ho_mm':>7} {'ho_deg':>7} {'ho_max':>7} {'xview':>7} {'camcom_mm':>10} {'camcom_deg':>11}")
+    print(f"\n{'variant':>10} {'train_px':>9} {'ho_px':>7} {'ho_mm':>7} {'ho_deg':>7} {'ho_max':>7} {'ho_joint':>8} {'xview':>7} {'camcom_mm':>10} {'camcom_deg':>11}")
     for v, r in results.items():
         if args.skip_heldout:
-            print(f"{v:>10} {r['train_px']:>9.4f} {'-':>7} {'-':>7} {'-':>7} {'-':>7} {r['cross_view_px']:>7.3f} {r['cam_common_mm']:>10.3f} {r['cam_common_deg']:>11.3f}")
+            print(f"{v:>10} {r['train_px']:>9.4f} {'-':>7} {'-':>7} {'-':>7} {'-':>7} {'-':>8} {r['cross_view_px']:>7.3f} {r['cam_common_mm']:>10.3f} {r['cam_common_deg']:>11.3f}")
         else:
             print(f"{v:>10} {r['train_px']:>9.4f} {r['heldout_px']:>7.3f} {r['heldout_mm']:>7.3f} {r['heldout_deg']:>7.3f} "
-                  f"{r['heldout_mm_max']:>7.2f} {r['cross_view_px']:>7.3f} {r['cam_common_mm']:>10.3f} {r['cam_common_deg']:>11.3f}")
+                  f"{r['heldout_mm_max']:>7.2f} {r.get('heldout_mm_joint', float('nan')):>8.3f} {r['cross_view_px']:>7.3f} "
+                  f"{r['cam_common_mm']:>10.3f} {r['cam_common_deg']:>11.3f}")
     print(f"\nwrote {args.out}")
 
 
