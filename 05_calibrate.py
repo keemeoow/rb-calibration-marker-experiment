@@ -78,7 +78,7 @@ A3는 큐브 자세를 컨트롤러 FK로, A5는 train 영상으로 정렬한 FK
 ------------------
 입력: 04단계의 동결된 관측 manifest, intrinsics, 촬영 meta, 로봇 FK.
 처리: 위 1~5.
-출력: table1_methods.json, shared_train_only_baseline.json,
+출력: ABLATION_TEST_table1_methods.json, shared_train_only_baseline.json,
       shared_board_free_fk_cube.json (모두 해시로 출처 고정).
 
 구현 위치

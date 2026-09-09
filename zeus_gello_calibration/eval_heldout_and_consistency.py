@@ -4,7 +4,7 @@
 raw-fk/no-fk 3가지 방식(통합_no-fk, 통합_raw-fk, 독립_no-fk)에 대해
 (1) session2 세트 leave-one-out held-out
 reprojection RMSE, (2) 카메라 간 큐브 pose 일치도(cross-camera consistency,
-mm/deg)를 계산한다. late_table1(CP_result/session04)의 "Heldout Cube RMSE"/
+mm/deg)를 계산한다. late_table1(ABLATION_TEST_result/session04)의 "Heldout Cube RMSE"/
 "Cross-view Cube px"/"Cam-common Cube mm/deg" 지표를 Zeus 데이터로 재현한 것.
 
 Held-out: session2의 15개 세트를 하나씩 빼고(session1+session3는 항상 포함)

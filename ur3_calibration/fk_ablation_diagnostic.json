@@ -1,5 +1,5 @@
 {
-  "warning": "NOT table1.py's frozen held-out Table 1 metric -- train-pooled, no held-out split (blocked; see fit_grasp_offset.py docstring). Comparable to each other, not to any table1_methods.json row.",
+  "warning": "NOT table1.py's frozen held-out Table 1 metric -- train-pooled, no held-out split (blocked; see fit_grasp_offset.py docstring). Comparable to each other, not to any ABLATION_TEST_table1_methods.json row.",
   "results": {
     "no_fk": {
       "train_reprojection_rmse_px": 1.1712764190318963,

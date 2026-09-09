@@ -25,8 +25,8 @@ DEFAULT_MANIFEST = (
     ROOT / "data/session04/calib_out/capture_filter/"
     "Step2b_observation_manifest.json"
 )
-DEFAULT_TABLE1 = ROOT / "CP_result/session04/calib_result_table1/table1_methods.json"
-DEFAULT_OUT_DIR = ROOT / "CP_result/session04/external_baseline_package"
+DEFAULT_TABLE1 = ROOT / "ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json"
+DEFAULT_OUT_DIR = ROOT / "ABLATION_TEST_result/session04/external_baseline_package"
 
 
 def sha256_file(path: Path) -> str:

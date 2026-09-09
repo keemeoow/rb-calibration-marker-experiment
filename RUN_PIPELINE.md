@@ -65,13 +65,13 @@ python3 05_calibrate.py \
   --split_seed 20260731 \
   --num_inits 3 \
   --observation-manifest data/session04/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/session04/calib_result_table1
+  --out_dir ABLATION_TEST_result/session04/ABLATION_TEST_table1
 
 # 06 — 05 결과만으로 요약 CSV·전체 calibration 행렬 출력
 python3 06_make_report.py \
   --root_folder data/session04/calib_train \
-  --table1 CP_result/session04/calib_result_table1/table1_methods.json \
-  --out_dir CP_result/session04/calib_result_table1
+  --table1 ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
+  --out_dir ABLATION_TEST_result/session04/ABLATION_TEST_table1
 ```
 
 ## 단계별 입력 · 과정 · 결과
@@ -82,8 +82,8 @@ python3 06_make_report.py \
 | 02 `calibrate_intrinsics` | 01 결과, ChArUco board | 다양한 위치의 view로 OpenCV color intrinsic calibration을 수행한다 | 갱신된 `cam*.npz`, `factory_backup/`, `charuco_capture/` |
 | 03 `capture` (현재 legacy) | 02 결과, board/cube, 카메라, robot FK | `A_placement/B_eyetohand` block에서 동기화 및 marker quality gate를 통과한 event를 저장한다 | `data/sessionNN/calib_train/meta.json`, RGB/depth 이미지 |
 | 04 `filter_observations` | 03 세션, 고정 K/D | 모든 RGB를 다시 검출하고 관측 정책을 적용해 native-pixel corner와 원본 SHA-256을 고정한다 | `Step2b_observation_manifest.json`, QA CSV, overlay, `CAPTURE_FILTER.md` |
-| 05 `calibrate` | 04 manifest, K/D, `meta.json`, robot FK | event 단위 train/held-out 분리, 공통 초기화, 9개 조건 fit, `frame-prune → refit → rollback`, held-out 평가 | `table1_methods.json`, 두 shared artifact |
-| 06 `make_report` | 05의 `table1_methods.json` | 재최적화 없이 수렴·오차·prune 결정과 모든 행렬을 정리한다 | `calibration_summary.csv`, `calibration_matrices.json` |
+| 05 `calibrate` | 04 manifest, K/D, `meta.json`, robot FK | event 단위 train/held-out 분리, 공통 초기화, 9개 조건 fit, `frame-prune → refit → rollback`, held-out 평가 | `ABLATION_TEST_table1_methods.json`, 두 shared artifact |
+| 06 `make_report` | 05의 `ABLATION_TEST_table1_methods.json` | 재최적화 없이 수렴·오차·prune 결정과 모든 행렬을 정리한다 | `calibration_summary.csv`, `calibration_matrices.json` |
 
 ## 단계별 원리와 구현 위치
 
@@ -317,7 +317,7 @@ python3 03_capture.py \
 | 04 | board/cube PnP pose | 검출 품질과 positive-depth 확인을 위한 임시 solvePnP | 최종 calibration 행렬로 전달하지 않음 |
 | 05 공통 초기화 | `shared_reference_state`, `row_reference_states` | train 관측만 사용한 PnP/robust pose 초기화 | `shared_train_only_baseline.json`; optimizer 시작점 |
 | 05 FK 정렬 | `T_gripper_cam`, `T_fk_cube_center_to_tag_object`, `raw_fk_pose_by_set`, `aligned_fk_pose_by_set` | train-only board-free FK–cube alignment | `shared_board_free_fk_cube.json`; A4/A5/B1/B2 입력 |
-| 05 각 행·seed 종료 | `T_base_Ci`, `T_gripper_cam`, `T_base_board`, `T_base_cube_by_set` | raw-corner reprojection fit 후 prune/refit 결과가 개선되면 채택, 아니면 첫 fit으로 rollback | `table1_methods.json → rows.<행>.runs[*].transforms`; **최종값** |
+| 05 각 행·seed 종료 | `T_base_Ci`, `T_gripper_cam`, `T_base_board`, `T_base_cube_by_set` | raw-corner reprojection fit 후 prune/refit 결과가 개선되면 채택, 아니면 첫 fit으로 rollback | `ABLATION_TEST_table1_methods.json → rows.<행>.runs[*].transforms`; **최종값** |
 | 06 | 새 행렬 없음 | 05의 최종값을 CSV와 독립 JSON으로 복사·요약 | `calibration_matrices.json`에 9행×3 seed 전체 보존 |
 
 최종 배포 대상은 `T_base_Ci = T^B_Ci`와 `T_gripper_cam = T^G_C`다.
@@ -328,7 +328,7 @@ camera calibration 배포 파일과 구분한다. 대표 행렬은 held-out 점�
 ## 05 결과를 읽는 정확한 위치
 
 ```text
-table1_methods.json
+ABLATION_TEST_table1_methods.json
 └── rows
     └── A0 ... A5, B1 ... B3
         └── runs[seed 0, 1, 2]
@@ -379,10 +379,10 @@ stored results`로 중단된다.
 
 ## 현재 Session04 결과 위치
 
-- 모든 행·seed의 정확한 행렬: `CP_result/session04/calib_result_table1/calibration_matrices.json`
-- 행별 수렴·오차·prune 요약: `CP_result/session04/calib_result_table1/calibration_summary.csv`
-- 계산 원본: `CP_result/session04/calib_result_table1/table1_methods.json`
-- 최종 비교실험표와 평가지표: `CP_result/session04/calib_result_table1/TABLE1_RESULTS.md`
+- 모든 행·seed의 정확한 행렬: `ABLATION_TEST_result/session04/ABLATION_TEST_table1/calibration_matrices.json`
+- 행별 수렴·오차·prune 요약: `ABLATION_TEST_result/session04/ABLATION_TEST_table1/calibration_summary.csv`
+- 계산 원본: `ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json`
+- 최종 ABLATION_TEST와 평가지표: `ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md`
 
 Session04 현재 결과는 9개 행×3개 seed 모두 수렴했다. 최종 표의 Train Cube RMSE와
 heldout은 `cube_evaluation_reprojection`의 cube-only 값으로 통일했으며,

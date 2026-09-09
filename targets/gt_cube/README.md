@@ -10,7 +10,7 @@ GT 검증 실험 전용의 **별도 물체**다. 메인 큐브(`calibration_pipe
 | [`cube_config.json`](cube_config.json) | 마커 모델. 파이프라인이 읽는 유일한 파일 |
 | [`cube_solid.json`](cube_solid.json) | 물리 형상(mm 박스 5개). 작도 전용, 캘리브레이션 미사용 |
 
-도면은 [`CP_result/gt_cube/`](../../CP_result/gt_cube/) 에 있다.
+도면은 [`ABLATION_TEST_result/gt_cube/`](../../ABLATION_TEST_result/gt_cube/) 에 있다.
 
 ## 형상
 
@@ -50,7 +50,7 @@ python tools/visualize_cube_model.py \
   --cube-config targets/gt_cube/cube_config.json \
   --solid targets/gt_cube/cube_solid.json \
   --title "GT validation cube  |  59(X) x 87(Y) x 104(Z) mm" \
-  --output-dir CP_result/gt_cube
+  --output-dir ABLATION_TEST_result/gt_cube
 ```
 
 ## 사용 전 확인이 필요한 것
@@ -62,6 +62,6 @@ python tools/visualize_cube_model.py \
    유도하도록 먼저 고쳐야 한다.
 2. **`face_roll_deg`는 메인 큐브 값을 복사한 것이고 아직 검증되지 않았다.** 태그를 실제로
    어떻게 붙였는지에 대한 값이므로 이 큐브에서 face-roll self-calibration을 다시 돌려야 한다.
-   그 전에 `CP_result/gt_cube/cube_model_net.png` 전개도로 실물과 눈으로 대조할 것.
+   그 전에 `ABLATION_TEST_result/gt_cube/cube_model_net.png` 전개도로 실물과 눈으로 대조할 것.
 3. **마커 ID가 메인 큐브와 완전히 같다.** 두 큐브가 한 장면에 동시에 들어오면 디텍터가
    구분하지 못한다. 동시 촬영 계획이 있으면 ID를 분리해야 한다.

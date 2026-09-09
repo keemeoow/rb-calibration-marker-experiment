@@ -410,7 +410,7 @@ def parse_args(argv=None):
                         help="Default: <session>/calib_out from --root_folder.")
     parser.add_argument("--include_sets", default="5-12")
     parser.add_argument("--out_dir", default=None,
-                        help="Default: CP_result/<session>/marker_system_end_to_end.")
+                        help="Default: ABLATION_TEST_result/<session>/marker_system_end_to_end.")
     parser.add_argument("--test_fraction", type=float, default=0.2)
     parser.add_argument("--split_seed", type=int, default=DEFAULT_SPLIT_SEED)
     parser.add_argument("--min_train_eih_cube_events", type=int, default=3)

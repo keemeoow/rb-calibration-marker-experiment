@@ -1,6 +1,6 @@
 # Zeus 캘리브레이션 방식 비교 (2026-09-09 촬영 데이터)
 
-> late_table1(CP_result/session04, UR3)과 같은 취지로, Zeus 데이터에 대해
+> late_table1(ABLATION_TEST_result/session04, UR3)과 같은 취지로, Zeus 데이터에 대해
 > "통합(unified) vs 독립(independent) x FK 처리 방식"을 비교한 결과다.
 > table1.py의 정식 held-out split/공유 baseline 절차 그대로는 아니고(train-pooled
 > + leave-one-out으로 근사). 코드: `fit_calibration_methods.py`,

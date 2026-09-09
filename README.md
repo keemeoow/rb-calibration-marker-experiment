@@ -4,8 +4,8 @@
 
 ## 바로가기
 
-- [논문 스토리라인 기준 문서](RESEARCH_STORYLINE.md)
-- [Session04 canonical 결과 인덱스](CP_result/README.md)
+- [논문 스토리라인 기준 문서](RESEARCH.md)
+- [Session04 canonical 결과 인덱스](ABLATION_TEST_result/README.md)
 - [Session04 Board–Cube systematic error 진단](data/session04/calib_out/verify/board_cube_relative_pose/BOARD_CUBE_RELATIVE_POSE.md)
 - [문서 지도](#문서-지도)
 - [1. 가장 짧은 실행 순서](#1-가장-짧은-실행-순서)
@@ -32,10 +32,10 @@
 | 기능 | 기준 문서 | 관리 원칙 |
 | --- | --- | --- |
 | 실행·데이터·코드 계약 | `README.md` | 사람이 편집하는 저장소 진입점 |
-| 논문 기여도·스토리라인 | `RESEARCH_STORYLINE.md` | 초기 기여도와 실제 데이터 기반 수정 사항을 함께 관리하는 최상위 서사 기준 |
+| 논문 기여도·스토리라인 | `RESEARCH.md` | 초기 기여도와 실제 데이터 기반 수정 사항을 함께 관리하는 최상위 서사 기준 |
 | 수식·방법·논문 서술 | `CALIBRATION_EXPLANATION_LATEX.md` | 사람이 편집하는 이론 및 paper-ready 문서 |
-| Session04 결과 | `CP_result/README.md` | 결과 인덱스; `TABLE1_RESULTS.md`와 `TABLE1_INTERACTIVE.html`은 생성기로 갱신 |
-| 추가 진단 실험 | `ADDITIONAL_EXPERIMENTS_SUMMARY.md` | outlier, corner, FK, OpenCV, point-cloud 실험을 한 표로 정리 |
+| Session04 결과 | `ABLATION_TEST_result/README.md` | 결과 인덱스; `ABLATION_TEST_TABLE1_RESULTS.md`와 `ABLATION_TEST_TABLE1_INTERACTIVE.html`은 생성기로 갱신 |
+| 추가 진단 실험 | `ADD_EXPERIMENTS_SUMMARY.md` | outlier, corner, FK, OpenCV, point-cloud 실험을 한 표로 정리 |
 | Simulation | `Simulation/README.md` | 실행 진입점; backend 통합 계획은 `Simulation/MIGRATION_PLAN.md`, 결과는 `SIM_RESULTS.md`와 `results/` |
 | Capture·검출 검증 | `data/session04/calib_out/capture_filter/CAPTURE_FILTER.md` 및 `data/session04/calib_out/verify/` | 데이터와 함께 보존하는 생성·검증 보고서; Board–Cube 계통오차 기준 문서는 `board_cube_relative_pose/BOARD_CUBE_RELATIVE_POSE.md` |
 
@@ -85,7 +85,7 @@ python3 05_calibrate.py \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/sessionNN/calib_result_table1
+  --out_dir ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1
 ```
 
 Shared Train-only Baseline만 확인하려면 05번에 `--baseline_only`를 추가한다. 전체 Table 1 실행에도 같은 baseline 코드가 포함되므로 보통은 05번을 한 번만 실행하면 된다.
@@ -197,7 +197,7 @@ Session04 영상과 corner-ID topology에는 가로 checker square가 11개이�
 ChArUco corner column이 10개다. 275 mm가 흰 여백을 제외한 checker pattern의
 전체 폭이므로 `275/11=25 mm`, 즉 `square_length_m=0.025`와 일치한다.
 `--align-board-metric-scale`은 실측값이 아닌 데이터 기반 추정값을 사용하는
-**별도 진단 전용 옵션**이다. 공식 `CP_result/sessionNN` 실행에는 넣지 않으며,
+**별도 진단 전용 옵션**이다. 공식 `ABLATION_TEST_result/sessionNN` 실행에는 넣지 않으며,
 canonical Markdown/HTML 생성기도 scale 정렬 결과를 거부한다. 실물 치수를 측정하고
 사용자가 명시적으로 승인하기 전에는 config나 공식 결과에 반영하지 않는다.
 
@@ -496,7 +496,7 @@ python3 tools/compare_markers.py \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/sessionNN/marker_system_end_to_end
+  --out_dir ABLATION_TEST_result/sessionNN/marker_system_end_to_end
 ```
 
 | 시스템 | 초기화에 허용되는 marker | 최종 목적함수 marker | 최종 자유변수 |
@@ -521,8 +521,8 @@ python3 tools/evaluate_cross_target.py \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --table1_result CP_result/sessionNN/calib_result_table1/table1_methods.json \
-  --out_dir CP_result/sessionNN/cross_target_evaluation
+  --table1_result ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
+  --out_dir ABLATION_TEST_result/sessionNN/cross_target_evaluation
 ```
 
 현재 cross-target artifact는 board/cube 값을 모두 보존할 수 있지만, 자동 생성되는
@@ -605,7 +605,7 @@ Board heldout, board/cube pooled overall, 별도 camera-scope 순위표는 최�
 
 ## 13. 현재 session04 결과와 비교별 해석
 
-Canonical 결과 인덱스는 [CP_result/README.md](CP_result/README.md), 상세 자동 생성 보고서는 [CP_result/session04/calib_result_table1/TABLE1_RESULTS.md](CP_result/session04/calib_result_table1/TABLE1_RESULTS.md)다. 결과 문서는 A0~A5, B1~B3 한 벌만 사용하며, heldout과 External GT 평가는 항상 cube target으로 통일한다.
+Canonical 결과 인덱스는 [ABLATION_TEST_result/README.md](ABLATION_TEST_result/README.md), 상세 자동 생성 보고서는 [ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md](ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md)다. 결과 문서는 A0~A5, B1~B3 한 벌만 사용하며, heldout과 External GT 평가는 항상 cube target으로 통일한다.
 
 핵심 요약은 다음과 같다.
 
@@ -621,26 +621,26 @@ Canonical 결과 인덱스는 [CP_result/README.md](CP_result/README.md), 상세
 ### 14.1 Table 1 원시 출력
 
 ```text
-CP_result/sessionNN/calib_result_table1/
+ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1/
 ├── shared_train_only_baseline.json
 ├── shared_board_free_fk_cube.json
-├── table1_methods.json
-├── table1_results.csv
-└── TABLE1_RESULTS.md
+├── ABLATION_TEST_table1_methods.json
+├── ABLATION_TEST_table1_results.csv
+└── ABLATION_TEST_TABLE1_RESULTS.md
 ```
 
 - `shared_train_only_baseline.json`: Split (분할), Solver (최적화기), Observation Loader (관측 로더), Shared/Row-specific Initial State (동일/행별 초기 상태), Meta/Intrinsics/Implementation (메타/내부 파라미터/구현 파일) 및 Train/Held-out Observation Population SHA-256
 - `shared_board_free_fk_cube.json`: board/held-out 미사용 FK–cube alignment provenance
-- `table1_methods.json`: 각 행·seed의 transforms, train/test px, path metrics, solver/Jacobian diagnostics
-- `table1_results.csv`: 논문/HTML용 요약 숫자의 canonical table
-- `TABLE1_RESULTS.md`: 교수님 피드백, 결과표, 지표 해석 문서
+- `ABLATION_TEST_table1_methods.json`: 각 행·seed의 transforms, train/test px, path metrics, solver/Jacobian diagnostics
+- `ABLATION_TEST_table1_results.csv`: 논문/HTML용 요약 숫자의 canonical table
+- `ABLATION_TEST_TABLE1_RESULTS.md`: 교수님 피드백, 결과표, 지표 해석 문서
 
-기본 실행은 3개 Initial States (초기값)를 사용한다. Seed 0 (시드 0)은 Shared Baseline (동일 초기값) 그대로이고, 나머지 seed는 각 자유 transform에 결정론적인 5 mm/1° Perturbation (교란)을 준다. `table1_methods.json`에는 각 run의 원값을 보존하고, CSV/표에는 Converged Runs (수렴 실행 수)와 Metric Mean (지표 평균)을 요약한다. 따라서 한 번의 우연한 초기값에서 얻은 숫자만 보고하지 않는다.
+기본 실행은 3개 Initial States (초기값)를 사용한다. Seed 0 (시드 0)은 Shared Baseline (동일 초기값) 그대로이고, 나머지 seed는 각 자유 transform에 결정론적인 5 mm/1° Perturbation (교란)을 준다. `ABLATION_TEST_table1_methods.json`에는 각 run의 원값을 보존하고, CSV/표에는 Converged Runs (수렴 실행 수)와 Metric Mean (지표 평균)을 요약한다. 따라서 한 번의 우연한 초기값에서 얻은 숫자만 보고하지 않는다.
 
 ### 14.2 보조 평가 출력
 
 ```text
-CP_result/sessionNN/
+ABLATION_TEST_result/sessionNN/
 ├── cross_target_evaluation/
 │   ├── cross_target_evaluation.json
 │   └── cross_target_evaluation.csv
@@ -665,13 +665,13 @@ CP_result/sessionNN/
 ### 14.3 시각화 동기화
 
 ```text
-table1_methods.json ─┐
+ABLATION_TEST_table1_methods.json ─┐
 cross_target CSV ────┼─> tools/sync_table1_canonical_data.py
 marker-system CSV ───┘             │
-                                   ├─> table1_results.csv
-                                   └─> TABLE1_INTERACTIVE.html
+                                   ├─> ABLATION_TEST_table1_results.csv
+                                   └─> ABLATION_TEST_TABLE1_INTERACTIVE.html
 
-table1_results.csv + 2 evaluation CSV + HTML + MD
+ABLATION_TEST_table1_results.csv + 2 evaluation CSV + HTML + MD
         └─> tools/verify_table1_visual_sync.py
 ```
 
@@ -717,7 +717,7 @@ python3 05_calibrate.py \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/sessionNN/calib_result_table1 \
+  --out_dir ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1 \
   --baseline_only
 
 # A0~A5/B1~B3 최종 9행 실행
@@ -728,13 +728,13 @@ python3 05_calibrate.py \
   --split_seed 20260731 \
   --num_inits 3 \
   --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/sessionNN/calib_result_table1
+  --out_dir ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1
 
 # 상세 calibration 결과와 모든 행렬 출력
 python3 06_make_report.py \
   --root_folder data/sessionNN/calib_train \
-  --table1 CP_result/sessionNN/calib_result_table1/table1_methods.json \
-  --out_dir CP_result/sessionNN/calib_result_table1
+  --table1 ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
+  --out_dir ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1
 
 # 선택 평가: 저장된 모든 방법의 외부-GT 전 board/cube 내부 평가
 python3 tools/evaluate_cross_target.py \
@@ -743,8 +743,8 @@ python3 tools/evaluate_cross_target.py \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --table1_result CP_result/sessionNN/calib_result_table1/table1_methods.json \
-  --out_dir CP_result/sessionNN/cross_target_evaluation
+  --table1_result ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
+  --out_dir ABLATION_TEST_result/sessionNN/cross_target_evaluation
 
 # 선택 평가: marker modality별 end-to-end 비교
 python3 tools/compare_markers.py \
@@ -753,7 +753,7 @@ python3 tools/compare_markers.py \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/sessionNN/marker_system_end_to_end
+  --out_dir ABLATION_TEST_result/sessionNN/marker_system_end_to_end
 
 # 선택 평가: OpenCV PnP 독립 VISION relative-pose 기준선
 python3 tools/opencv_baseline.py \
@@ -762,12 +762,12 @@ python3 tools/opencv_baseline.py \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/sessionNN/opencv_relative_baseline
+  --out_dir ABLATION_TEST_result/sessionNN/opencv_relative_baseline
 
 # 독립 robot task trial 수집 후 success/contact-error 평가
 python3 -m calibration_pipeline.task_trial \
   --manifest protocol_templates/robot_task_trial_manifest_<날짜>.json \
-  --output_dir CP_result/sessionNN/robot_task_trial
+  --output_dir ABLATION_TEST_result/sessionNN/robot_task_trial
 
 # Outlier soft-weighting 대조: 같은 관측을 linear loss로 재실행
 python3 05_calibrate.py \
@@ -778,7 +778,7 @@ python3 05_calibrate.py \
   --num_inits 3 \
   --loss linear \
   --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/sessionNN/outlier_ablation/linear_table1
+  --out_dir ABLATION_TEST_result/sessionNN/outlier_ablation/linear_table1
 python3 tools/evaluate_cross_target.py \
   --root_folder data/sessionNN/calib_train \
   --intrinsics_dir intrinsics \
@@ -786,8 +786,8 @@ python3 tools/evaluate_cross_target.py \
   --split_seed 20260731 \
   --loss linear \
   --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --table1_result CP_result/sessionNN/outlier_ablation/linear_table1/table1_methods.json \
-  --out_dir CP_result/sessionNN/outlier_ablation/linear_cross_target
+  --table1_result ABLATION_TEST_result/sessionNN/outlier_ablation/linear_table1/ABLATION_TEST_table1_methods.json \
+  --out_dir ABLATION_TEST_result/sessionNN/outlier_ablation/linear_cross_target
 python3 tools/summarize_outlier_ablation.py
 
 # Hard rejection 민감도: strict 관측 정책으로 재보정 후 동일 held-out 비교
@@ -799,7 +799,7 @@ python3 05_calibrate.py \
   --num_inits 3 \
   --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
   --observation-filter-policy strict \
-  --out_dir CP_result/sessionNN/outlier_ablation/strict_table1
+  --out_dir ABLATION_TEST_result/sessionNN/outlier_ablation/strict_table1
 python3 tools/summarize_hard_rejection_ablation.py
 
 # 선택 확장 평가의 기존 통합 Markdown/HTML 재생성 및 동기화 검증
@@ -812,15 +812,15 @@ python3 tools/verify_camera_scope_evaluation.py
 
 현재 canonical session04 결과는 다음에서 확인한다.
 
-- [Session04 결과 인덱스](CP_result/README.md)
-- [모든 행·seed의 calibration 행렬 JSON](CP_result/session04/calib_result_table1/calibration_matrices.json)
-- [Table 1 결과 및 평가 계약](CP_result/session04/calib_result_table1/TABLE1_RESULTS.md)
-- [추가 진단 실험 단일 요약표](ADDITIONAL_EXPERIMENTS_SUMMARY.md)
-- [Interactive 결과](CP_result/session04/calib_result_table1/TABLE1_INTERACTIVE.html)
-- [OpenCV VISION reference baseline](CP_result/session04/opencv_relative_baseline/OPENCV_RELATIVE_BASELINE.md)
-- [Soft-L1 vs linear outlier loss 대조](CP_result/session04/outlier_ablation/OUTLIER_LOSS_ABLATION.md)
-- [Standard vs strict hard-rejection 민감도](CP_result/session04/outlier_ablation/HARD_REJECTION_ABLATION.md)
-- [Corner refinement와 weighting 대조](CP_result/session04/corner_weighting_ablation/CORNER_WEIGHTING_ABLATION.md)
+- [Session04 결과 인덱스](ABLATION_TEST_result/README.md)
+- [모든 행·seed의 calibration 행렬 JSON](ABLATION_TEST_result/session04/ABLATION_TEST_table1/calibration_matrices.json)
+- [Table 1 결과 및 평가 계약](ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md)
+- [추가 진단 실험 단일 요약표](ADD_EXPERIMENTS_SUMMARY.md)
+- [Interactive 결과](ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_INTERACTIVE.html)
+- [OpenCV VISION reference baseline](ABLATION_TEST_result/session04/opencv_relative_baseline/OPENCV_RELATIVE_BASELINE.md)
+- [Soft-L1 vs linear outlier loss 대조](ABLATION_TEST_result/session04/outlier_ablation/OUTLIER_LOSS_ABLATION.md)
+- [Standard vs strict hard-rejection 민감도](ABLATION_TEST_result/session04/outlier_ablation/HARD_REJECTION_ABLATION.md)
+- [Corner refinement와 weighting 대조](ABLATION_TEST_result/session04/corner_weighting_ablation/CORNER_WEIGHTING_ABLATION.md)
 - [순차/통합 및 corrected-FK soft factor 수식 상세](CALIBRATION_EXPLANATION_LATEX.md)
 - [Simulation backend migration 계획](Simulation/MIGRATION_PLAN.md)
 

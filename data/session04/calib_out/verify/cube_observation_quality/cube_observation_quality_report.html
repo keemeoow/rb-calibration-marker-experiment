@@ -1,0 +1,2944 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Session04 Cube Observation Quality</title>
+  <style>
+    :root { color-scheme: light dark; --bg:#f5f7fa; --surface:#fff; --text:#18212b;
+      --muted:#657180; --border:#d8dee7; --core:#16854b; --core-bg:#e7f7ee;
+      --single:#a35c00; --single-bg:#fff2d9; --planar:#7048a8; --planar-bg:#f1eafb;
+      --none:#687280; --none-bg:#edf0f3; --selected:#f1fbf5; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#101419; --surface:#171c22;
+      --text:#eef2f6; --muted:#a7b0bb; --border:#343c46; --core:#62d394;
+      --core-bg:#173b29; --single:#ffc56d; --single-bg:#483418; --planar:#c5a0f4;
+      --planar-bg:#38294d; --none:#bdc5cf; --none-bg:#2a3037; --selected:#162a20; } }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; }
+    main { max-width:1500px; margin:auto; padding:28px; }
+    h1 { margin:0 0 5px; font-size:26px; }
+    .subtitle { color:var(--muted); margin-bottom:22px; }
+    .stats { display:grid; grid-template-columns:repeat(6,minmax(120px,1fr)); gap:10px; margin-bottom:18px; }
+    .stat { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:13px 15px; }
+    .stat strong { display:block; font-size:22px; } .stat span { color:var(--muted); font-size:12px; }
+    .contract { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 15px; margin-bottom:14px; }
+    code { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; }
+    .toolbar { position:sticky; top:0; z-index:5; display:flex; flex-wrap:wrap; gap:8px; background:color-mix(in srgb,var(--bg) 92%,transparent); padding:10px 0; backdrop-filter:blur(7px); }
+    input,select,button { border:1px solid var(--border); background:var(--surface); color:var(--text); border-radius:7px; padding:8px 10px; font:inherit; }
+    input { min-width:220px; } button { cursor:pointer; }
+    details.event { background:var(--surface); border:1px solid var(--border); border-radius:9px; margin:8px 0; overflow:hidden; }
+    summary { cursor:pointer; display:flex; align-items:center; flex-wrap:wrap; gap:10px; padding:12px 14px; list-style:none; }
+    summary::-webkit-details-marker { display:none; } summary::before { content:'›'; font-size:21px; color:var(--muted); transition:.15s; }
+    details[open] summary::before { transform:rotate(90deg); }
+    .event-title { font-size:16px; font-weight:700; min-width:72px; } .set-label,.summary-text { color:var(--muted); }
+    .badge { display:inline-block; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:700; white-space:nowrap; }
+    .badge.core { color:var(--core); background:var(--core-bg); } .badge.single { color:var(--single); background:var(--single-bg); }
+    .badge.planar { color:var(--planar); background:var(--planar-bg); } .badge.none { color:var(--none); background:var(--none-bg); }
+    .detail-wrap { overflow:auto; border-top:1px solid var(--border); }
+    table { width:100%; border-collapse:collapse; min-width:970px; } th,td { padding:9px 12px; text-align:left; border-bottom:1px solid var(--border); white-space:nowrap; }
+    th { color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:.04em; } tr.selected { background:var(--selected); }
+    td small { display:block; color:var(--muted); } .hidden { display:none !important; }
+    .legend { color:var(--muted); margin:10px 0 4px; }
+    @media (max-width:900px) { main { padding:16px; } .stats { grid-template-columns:repeat(2,1fr); } .summary-text { display:none; } }
+  </style>
+</head>
+<body><main>
+  <h1>Session04 Cube Observation Quality</h1>
+  <div class="subtitle">판정 단위: event × camera · policy: <strong>core_multiface</strong> · gripped events 제외</div>
+  <section class="stats">
+    <div class="stat"><strong>78</strong><span>전체 events</span></div>
+    <div class="stat"><strong>60</strong><span>core 관측 보유 events</span></div>
+    <div class="stat"><strong>99</strong><span>선택된 core 관측</span></div>
+    <div class="stat"><strong>108</strong><span>legacy 관측</span></div>
+    <div class="stat"><strong>9</strong><span>single-marker</span></div>
+    <div class="stat"><strong>1.066px</strong><span>PnP RMSE median</span></div>
+  </section>
+  <div class="contract"><strong>Core 조건</strong> &nbsp;
+    <code>face ≥ 2 · non-coplanar face ≥ 2 · non-planar · positive-depth candidate ≥ 1</code>
+  </div>
+  <div class="toolbar">
+    <input id="event-search" type="search" placeholder="Event 번호 검색 (예: 12)">
+    <select id="category-filter" aria-label="품질 필터">
+      <option value="all">모든 event</option><option value="core">Core event</option>
+      <option value="single">Single-marker only</option><option value="planar">Planar multi-tag only</option>
+      <option value="none">유효 관측 없음</option>
+    </select>
+    <button id="expand-all" type="button">모두 펼치기</button>
+    <button id="collapse-all" type="button">모두 접기</button>
+    <span id="visible-count" class="summary-text"></span>
+  </div>
+  <div class="legend">Positive / all은 모든 3D corner가 카메라 앞쪽(z&gt;0)에 놓이는 PnP 후보 수 / 전체 후보 수입니다.</div>
+  <section id="events">
+          <details class="event" data-category="core" data-event="0">
+            <summary>
+              <span class="event-title">Event 00</span>
+              <span class="set-label">set 0</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 0, 1, 2, 3</span>
+              <span class="summary-text">IDs: 0, 1, 2, 3, 4, 5</span>
+              <span class="summary-text">faces: +X, +Y, +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam0</strong></td>
+                  <td>0, 1, 2, 5</td>
+                  <td>+X, +Z, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>2.031 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam1</strong></td>
+                  <td>0, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.110 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 2</td>
+                  <td>+X, +Z</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>2.397 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam3</strong></td>
+                  <td>2, 3</td>
+                  <td>+X, +Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.647 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="single" data-event="1">
+            <summary>
+              <span class="event-title">Event 01</span>
+              <span class="set-label">set 0</span>
+              <span class="badge single">SINGLE</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: 1</span>
+              <span class="summary-text">faces: +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>1</td>
+                  <td>+Z</td>
+                  <td>1 face / 0 non-coplanar / planar</td>
+                  <td>0.291 px</td>
+                  <td>2 / 2</td>
+                  <td><span class="badge single">single marker</span></td>
+                  <td>noncore_single_marker</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="2">
+            <summary>
+              <span class="event-title">Event 02</span>
+              <span class="set-label">set 0</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 1, 3</span>
+              <span class="summary-text">faces: +Y, +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>1, 3</td>
+                  <td>+Y, +Z</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.126 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="none" data-event="3">
+            <summary>
+              <span class="event-title">Event 03</span>
+              <span class="set-label">set 0</span>
+              <span class="badge none">NO OBS</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: —</span>
+              <span class="summary-text">faces: —</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>0 faces / 0 non-coplanar</td>
+                  <td>—</td>
+                  <td>0 / 0</td>
+                  <td><span class="badge none">none</span></td>
+                  <td>pnp_not_accepted</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="single" data-event="4">
+            <summary>
+              <span class="event-title">Event 04</span>
+              <span class="set-label">set 0</span>
+              <span class="badge single">SINGLE</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: 3</span>
+              <span class="summary-text">faces: +Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>3</td>
+                  <td>+Y</td>
+                  <td>1 face / 0 non-coplanar / planar</td>
+                  <td>0.349 px</td>
+                  <td>2 / 2</td>
+                  <td><span class="badge single">single marker</span></td>
+                  <td>noncore_single_marker</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="single" data-event="5">
+            <summary>
+              <span class="event-title">Event 05</span>
+              <span class="set-label">set 0</span>
+              <span class="badge single">SINGLE</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: 3</span>
+              <span class="summary-text">faces: +Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>3</td>
+                  <td>+Y</td>
+                  <td>1 face / 0 non-coplanar / planar</td>
+                  <td>0.356 px</td>
+                  <td>2 / 2</td>
+                  <td><span class="badge single">single marker</span></td>
+                  <td>noncore_single_marker</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="6">
+            <summary>
+              <span class="event-title">Event 06</span>
+              <span class="set-label">set 1</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 0, 1, 2, 3</span>
+              <span class="summary-text">IDs: 0, 1, 2, 3, 4, 5</span>
+              <span class="summary-text">faces: +X, +Y, +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam0</strong></td>
+                  <td>0, 1, 5</td>
+                  <td>+Z, -Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.892 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam1</strong></td>
+                  <td>1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>0.928 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 5</td>
+                  <td>+Z, -Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.884 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam3</strong></td>
+                  <td>2, 3</td>
+                  <td>+X, +Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.646 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="single" data-event="7">
+            <summary>
+              <span class="event-title">Event 07</span>
+              <span class="set-label">set 1</span>
+              <span class="badge single">SINGLE</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: 3</span>
+              <span class="summary-text">faces: +Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>3</td>
+                  <td>+Y</td>
+                  <td>1 face / 0 non-coplanar / planar</td>
+                  <td>0.099 px</td>
+                  <td>2 / 2</td>
+                  <td><span class="badge single">single marker</span></td>
+                  <td>noncore_single_marker</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="8">
+            <summary>
+              <span class="event-title">Event 08</span>
+              <span class="set-label">set 1</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 3, 4</span>
+              <span class="summary-text">faces: +Y, +Z, -X</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>2.366 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="9">
+            <summary>
+              <span class="event-title">Event 09</span>
+              <span class="set-label">set 1</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 1, 3</span>
+              <span class="summary-text">faces: +Y, +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>1, 3</td>
+                  <td>+Y, +Z</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.670 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="single" data-event="10">
+            <summary>
+              <span class="event-title">Event 10</span>
+              <span class="set-label">set 1</span>
+              <span class="badge single">SINGLE</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: 3</span>
+              <span class="summary-text">faces: +Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>3</td>
+                  <td>+Y</td>
+                  <td>1 face / 0 non-coplanar / planar</td>
+                  <td>0.125 px</td>
+                  <td>2 / 2</td>
+                  <td><span class="badge single">single marker</span></td>
+                  <td>noncore_single_marker</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="none" data-event="11">
+            <summary>
+              <span class="event-title">Event 11</span>
+              <span class="set-label">set 1</span>
+              <span class="badge none">NO OBS</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: —</span>
+              <span class="summary-text">faces: —</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>5.418 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td>pnp_not_accepted</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="12">
+            <summary>
+              <span class="event-title">Event 12</span>
+              <span class="set-label">set 2</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 0, 1, 2, 3</span>
+              <span class="summary-text">IDs: 0, 1, 2, 3, 4, 5</span>
+              <span class="summary-text">faces: +X, +Y, +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam0</strong></td>
+                  <td>0, 1, 2</td>
+                  <td>+X, +Z</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.817 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam1</strong></td>
+                  <td>4, 5</td>
+                  <td>-X, -Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.800 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 2, 5</td>
+                  <td>+X, +Z, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.483 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam3</strong></td>
+                  <td>3, 4</td>
+                  <td>+Y, -X</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.960 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="13">
+            <summary>
+              <span class="event-title">Event 13</span>
+              <span class="set-label">set 2</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 1, 4, 5</span>
+              <span class="summary-text">faces: +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>1, 4, 5</td>
+                  <td>+Z, -X, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.697 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="none" data-event="14">
+            <summary>
+              <span class="event-title">Event 14</span>
+              <span class="set-label">set 2</span>
+              <span class="badge none">NO OBS</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: —</span>
+              <span class="summary-text">faces: —</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>0 faces / 0 non-coplanar</td>
+                  <td>—</td>
+                  <td>0 / 0</td>
+                  <td><span class="badge none">none</span></td>
+                  <td>pnp_not_accepted</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="none" data-event="15">
+            <summary>
+              <span class="event-title">Event 15</span>
+              <span class="set-label">set 2</span>
+              <span class="badge none">NO OBS</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: —</span>
+              <span class="summary-text">faces: —</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 5</td>
+                  <td>+Z, -Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>17.185 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td>pnp_not_accepted</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="16">
+            <summary>
+              <span class="event-title">Event 16</span>
+              <span class="set-label">set 2</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 4, 5</span>
+              <span class="summary-text">faces: +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 4, 5</td>
+                  <td>+Z, -X, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.300 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="none" data-event="17">
+            <summary>
+              <span class="event-title">Event 17</span>
+              <span class="set-label">set 2</span>
+              <span class="badge none">NO OBS</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: —</span>
+              <span class="summary-text">faces: —</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>0 faces / 0 non-coplanar</td>
+                  <td>—</td>
+                  <td>0 / 0</td>
+                  <td><span class="badge none">none</span></td>
+                  <td>pnp_not_accepted</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="18">
+            <summary>
+              <span class="event-title">Event 18</span>
+              <span class="set-label">set 3</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 0, 1, 2, 3</span>
+              <span class="summary-text">IDs: 0, 1, 2, 3, 4, 5</span>
+              <span class="summary-text">faces: +X, +Y, +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam0</strong></td>
+                  <td>0, 1, 4, 5</td>
+                  <td>+Z, -X, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.346 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam1</strong></td>
+                  <td>3, 4</td>
+                  <td>+Y, -X</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.496 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 4, 5</td>
+                  <td>+Z, -X, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.663 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam3</strong></td>
+                  <td>2, 3</td>
+                  <td>+X, +Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.580 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="single" data-event="19">
+            <summary>
+              <span class="event-title">Event 19</span>
+              <span class="set-label">set 3</span>
+              <span class="badge single">SINGLE</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: 0</span>
+              <span class="summary-text">faces: +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0</td>
+                  <td>+Z</td>
+                  <td>1 face / 0 non-coplanar / planar</td>
+                  <td>0.465 px</td>
+                  <td>2 / 2</td>
+                  <td><span class="badge single">single marker</span></td>
+                  <td>noncore_single_marker</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="none" data-event="20">
+            <summary>
+              <span class="event-title">Event 20</span>
+              <span class="set-label">set 3</span>
+              <span class="badge none">NO OBS</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: —</span>
+              <span class="summary-text">faces: —</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>0 faces / 0 non-coplanar</td>
+                  <td>—</td>
+                  <td>0 / 0</td>
+                  <td><span class="badge none">none</span></td>
+                  <td>pnp_not_accepted</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="single" data-event="21">
+            <summary>
+              <span class="event-title">Event 21</span>
+              <span class="set-label">set 3</span>
+              <span class="badge single">SINGLE</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: 4</span>
+              <span class="summary-text">faces: -X</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>4</td>
+                  <td>-X</td>
+                  <td>1 face / 0 non-coplanar / planar</td>
+                  <td>1.372 px</td>
+                  <td>2 / 2</td>
+                  <td><span class="badge single">single marker</span></td>
+                  <td>noncore_single_marker</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="22">
+            <summary>
+              <span class="event-title">Event 22</span>
+              <span class="set-label">set 3</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 1, 3</span>
+              <span class="summary-text">faces: +Y, +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>1, 3</td>
+                  <td>+Y, +Z</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.830 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="none" data-event="23">
+            <summary>
+              <span class="event-title">Event 23</span>
+              <span class="set-label">set 3</span>
+              <span class="badge none">NO OBS</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: —</span>
+              <span class="summary-text">faces: —</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>0 faces / 0 non-coplanar</td>
+                  <td>—</td>
+                  <td>0 / 0</td>
+                  <td><span class="badge none">none</span></td>
+                  <td>pnp_not_accepted</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="24">
+            <summary>
+              <span class="event-title">Event 24</span>
+              <span class="set-label">set 4</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 0, 1, 2, 3</span>
+              <span class="summary-text">IDs: 0, 1, 2, 3, 4, 5</span>
+              <span class="summary-text">faces: +X, +Y, +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam0</strong></td>
+                  <td>0, 1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>0.954 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam1</strong></td>
+                  <td>2, 3</td>
+                  <td>+X, +Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.754 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>0.935 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam3</strong></td>
+                  <td>0, 2, 5</td>
+                  <td>+X, +Z, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.960 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="25">
+            <summary>
+              <span class="event-title">Event 25</span>
+              <span class="set-label">set 4</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 2, 3</span>
+              <span class="summary-text">faces: +X, +Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>2, 3</td>
+                  <td>+X, +Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.725 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="26">
+            <summary>
+              <span class="event-title">Event 26</span>
+              <span class="set-label">set 4</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 4</span>
+              <span class="summary-text">faces: +Z, -X</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 4</td>
+                  <td>+Z, -X</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.371 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="27">
+            <summary>
+              <span class="event-title">Event 27</span>
+              <span class="set-label">set 4</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 2, 3</span>
+              <span class="summary-text">faces: +X, +Y, +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 2, 3</td>
+                  <td>+X, +Y, +Z</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>2.447 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="none" data-event="28">
+            <summary>
+              <span class="event-title">Event 28</span>
+              <span class="set-label">set 4</span>
+              <span class="badge none">NO OBS</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: —</span>
+              <span class="summary-text">faces: —</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>0 faces / 0 non-coplanar</td>
+                  <td>—</td>
+                  <td>0 / 0</td>
+                  <td><span class="badge none">none</span></td>
+                  <td>pnp_not_accepted</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="29">
+            <summary>
+              <span class="event-title">Event 29</span>
+              <span class="set-label">set 4</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 3, 4</span>
+              <span class="summary-text">faces: +Y, -X</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>3, 4</td>
+                  <td>+Y, -X</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.900 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="30">
+            <summary>
+              <span class="event-title">Event 30</span>
+              <span class="set-label">set 5</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 0, 1, 2, 3</span>
+              <span class="summary-text">IDs: 0, 1, 2, 3, 4, 5</span>
+              <span class="summary-text">faces: +X, +Y, +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam0</strong></td>
+                  <td>1, 2, 3</td>
+                  <td>+X, +Y, +Z</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.132 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam1</strong></td>
+                  <td>2, 5</td>
+                  <td>+X, -Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.040 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>2, 3</td>
+                  <td>+X, +Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.880 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam3</strong></td>
+                  <td>0, 1, 4, 5</td>
+                  <td>+Z, -X, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.414 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="31">
+            <summary>
+              <span class="event-title">Event 31</span>
+              <span class="set-label">set 5</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 2, 5</span>
+              <span class="summary-text">faces: +X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>2, 5</td>
+                  <td>+X, -Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.083 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="32">
+            <summary>
+              <span class="event-title">Event 32</span>
+              <span class="set-label">set 5</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 3</span>
+              <span class="summary-text">faces: +Y, +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 3</td>
+                  <td>+Y, +Z</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.664 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="33">
+            <summary>
+              <span class="event-title">Event 33</span>
+              <span class="set-label">set 5</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 2, 5</span>
+              <span class="summary-text">faces: +X, +Z, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 2, 5</td>
+                  <td>+X, +Z, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.151 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="none" data-event="34">
+            <summary>
+              <span class="event-title">Event 34</span>
+              <span class="set-label">set 5</span>
+              <span class="badge none">NO OBS</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: —</span>
+              <span class="summary-text">faces: —</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>—</td>
+                  <td>—</td>
+                  <td>0 faces / 0 non-coplanar</td>
+                  <td>—</td>
+                  <td>0 / 0</td>
+                  <td><span class="badge none">none</span></td>
+                  <td>pnp_not_accepted</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="35">
+            <summary>
+              <span class="event-title">Event 35</span>
+              <span class="set-label">set 5</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 3</span>
+              <span class="summary-text">faces: +Y, +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 3</td>
+                  <td>+Y, +Z</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.973 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="36">
+            <summary>
+              <span class="event-title">Event 36</span>
+              <span class="set-label">set 6</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 0, 1, 2, 3</span>
+              <span class="summary-text">IDs: 0, 1, 2, 3, 4, 5</span>
+              <span class="summary-text">faces: +X, +Y, +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam0</strong></td>
+                  <td>4, 5</td>
+                  <td>-X, -Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.425 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam1</strong></td>
+                  <td>1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.074 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 4</td>
+                  <td>+Z, -X</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.892 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam3</strong></td>
+                  <td>0, 1, 2, 5</td>
+                  <td>+X, +Z, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.024 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="37">
+            <summary>
+              <span class="event-title">Event 37</span>
+              <span class="set-label">set 6</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 3, 4</span>
+              <span class="summary-text">faces: +Y, +Z, -X</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>0.874 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="38">
+            <summary>
+              <span class="event-title">Event 38</span>
+              <span class="set-label">set 6</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 4, 5</span>
+              <span class="summary-text">faces: +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 4, 5</td>
+                  <td>+Z, -X, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>2.264 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="39">
+            <summary>
+              <span class="event-title">Event 39</span>
+              <span class="set-label">set 6</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 1, 3, 4</span>
+              <span class="summary-text">faces: +Y, +Z, -X</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>0.823 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="single" data-event="40">
+            <summary>
+              <span class="event-title">Event 40</span>
+              <span class="set-label">set 6</span>
+              <span class="badge single">SINGLE</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: 3</span>
+              <span class="summary-text">faces: +Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>3</td>
+                  <td>+Y</td>
+                  <td>1 face / 0 non-coplanar / planar</td>
+                  <td>1.084 px</td>
+                  <td>2 / 2</td>
+                  <td><span class="badge single">single marker</span></td>
+                  <td>noncore_single_marker</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="41">
+            <summary>
+              <span class="event-title">Event 41</span>
+              <span class="set-label">set 6</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 4, 5</span>
+              <span class="summary-text">faces: +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 4, 5</td>
+                  <td>+Z, -X, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.167 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="42">
+            <summary>
+              <span class="event-title">Event 42</span>
+              <span class="set-label">set 7</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 0, 1, 2, 3</span>
+              <span class="summary-text">IDs: 0, 1, 2, 3, 4, 5</span>
+              <span class="summary-text">faces: +X, +Y, +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam0</strong></td>
+                  <td>3, 4</td>
+                  <td>+Y, -X</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.678 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam1</strong></td>
+                  <td>2, 3</td>
+                  <td>+X, +Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.632 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>1, 3</td>
+                  <td>+Y, +Z</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.654 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam3</strong></td>
+                  <td>0, 4, 5</td>
+                  <td>+Z, -X, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.332 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="43">
+            <summary>
+              <span class="event-title">Event 43</span>
+              <span class="set-label">set 7</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 2, 3</span>
+              <span class="summary-text">faces: +X, +Y, +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 2, 3</td>
+                  <td>+X, +Y, +Z</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.486 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="44">
+            <summary>
+              <span class="event-title">Event 44</span>
+              <span class="set-label">set 7</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 3, 4</span>
+              <span class="summary-text">faces: +Y, +Z, -X</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.537 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="45">
+            <summary>
+              <span class="event-title">Event 45</span>
+              <span class="set-label">set 7</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 2</span>
+              <span class="summary-text">faces: +X, +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 2</td>
+                  <td>+X, +Z</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.264 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="46">
+            <summary>
+              <span class="event-title">Event 46</span>
+              <span class="set-label">set 7</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 3, 4</span>
+              <span class="summary-text">faces: +Y, +Z, -X</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>0.989 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="47">
+            <summary>
+              <span class="event-title">Event 47</span>
+              <span class="set-label">set 7</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 3</span>
+              <span class="summary-text">faces: +Y, +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 3</td>
+                  <td>+Y, +Z</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.440 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="48">
+            <summary>
+              <span class="event-title">Event 48</span>
+              <span class="set-label">set 8</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 0, 1, 2, 3</span>
+              <span class="summary-text">IDs: 0, 1, 3, 4, 5</span>
+              <span class="summary-text">faces: +Y, +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam0</strong></td>
+                  <td>1, 4, 5</td>
+                  <td>+Z, -X, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>0.903 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam1</strong></td>
+                  <td>0, 1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.014 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 4, 5</td>
+                  <td>+Z, -X, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>0.935 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam3</strong></td>
+                  <td>0, 5</td>
+                  <td>+Z, -Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.906 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="49">
+            <summary>
+              <span class="event-title">Event 49</span>
+              <span class="set-label">set 8</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 5</span>
+              <span class="summary-text">faces: +Z, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 5</td>
+                  <td>+Z, -Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.216 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="50">
+            <summary>
+              <span class="event-title">Event 50</span>
+              <span class="set-label">set 8</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 4</span>
+              <span class="summary-text">faces: +Z, -X</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 4</td>
+                  <td>+Z, -X</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.055 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="51">
+            <summary>
+              <span class="event-title">Event 51</span>
+              <span class="set-label">set 8</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 4, 5</span>
+              <span class="summary-text">faces: +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 4, 5</td>
+                  <td>+Z, -X, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.096 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="52">
+            <summary>
+              <span class="event-title">Event 52</span>
+              <span class="set-label">set 8</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 4, 5</span>
+              <span class="summary-text">faces: +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 4, 5</td>
+                  <td>+Z, -X, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.054 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="53">
+            <summary>
+              <span class="event-title">Event 53</span>
+              <span class="set-label">set 8</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 4, 5</span>
+              <span class="summary-text">faces: +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 4, 5</td>
+                  <td>+Z, -X, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.095 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="54">
+            <summary>
+              <span class="event-title">Event 54</span>
+              <span class="set-label">set 9</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 0, 1, 2, 3</span>
+              <span class="summary-text">IDs: 0, 1, 2, 3, 4, 5</span>
+              <span class="summary-text">faces: +X, +Y, +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam0</strong></td>
+                  <td>1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>0.790 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam1</strong></td>
+                  <td>0, 1, 2, 3</td>
+                  <td>+X, +Y, +Z</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.158 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>0.891 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam3</strong></td>
+                  <td>4, 5</td>
+                  <td>-X, -Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.279 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="55">
+            <summary>
+              <span class="event-title">Event 55</span>
+              <span class="set-label">set 9</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 4</span>
+              <span class="summary-text">faces: +Z, -X</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 4</td>
+                  <td>+Z, -X</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.537 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="56">
+            <summary>
+              <span class="event-title">Event 56</span>
+              <span class="set-label">set 9</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 3</span>
+              <span class="summary-text">faces: +Y, +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 3</td>
+                  <td>+Y, +Z</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.094 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="57">
+            <summary>
+              <span class="event-title">Event 57</span>
+              <span class="set-label">set 9</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 3, 4</span>
+              <span class="summary-text">faces: +Y, +Z, -X</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.428 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="58">
+            <summary>
+              <span class="event-title">Event 58</span>
+              <span class="set-label">set 9</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 3, 4</span>
+              <span class="summary-text">faces: +Y, +Z, -X</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.303 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="59">
+            <summary>
+              <span class="event-title">Event 59</span>
+              <span class="set-label">set 9</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 3</span>
+              <span class="summary-text">faces: +Y, +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 3</td>
+                  <td>+Y, +Z</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.673 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="60">
+            <summary>
+              <span class="event-title">Event 60</span>
+              <span class="set-label">set 10</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 0, 1, 2, 3</span>
+              <span class="summary-text">IDs: 0, 1, 2, 3, 4, 5</span>
+              <span class="summary-text">faces: +X, +Y, +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam0</strong></td>
+                  <td>2, 3</td>
+                  <td>+X, +Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.746 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam1</strong></td>
+                  <td>0, 1, 2, 5</td>
+                  <td>+X, +Z, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.241 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 2, 3</td>
+                  <td>+X, +Y, +Z</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.026 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam3</strong></td>
+                  <td>0, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>0.814 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="61">
+            <summary>
+              <span class="event-title">Event 61</span>
+              <span class="set-label">set 10</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 3, 4</span>
+              <span class="summary-text">faces: +Y, +Z, -X</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.246 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="62">
+            <summary>
+              <span class="event-title">Event 62</span>
+              <span class="set-label">set 10</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 2, 3</span>
+              <span class="summary-text">faces: +X, +Y, +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 2, 3</td>
+                  <td>+X, +Y, +Z</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.647 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="63">
+            <summary>
+              <span class="event-title">Event 63</span>
+              <span class="set-label">set 10</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 4</span>
+              <span class="summary-text">faces: +Z, -X</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 4</td>
+                  <td>+Z, -X</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.956 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="64">
+            <summary>
+              <span class="event-title">Event 64</span>
+              <span class="set-label">set 10</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 1, 3</span>
+              <span class="summary-text">faces: +Y, +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>1, 3</td>
+                  <td>+Y, +Z</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.721 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="65">
+            <summary>
+              <span class="event-title">Event 65</span>
+              <span class="set-label">set 10</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 3</span>
+              <span class="summary-text">faces: +Y, +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 3</td>
+                  <td>+Y, +Z</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.744 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="66">
+            <summary>
+              <span class="event-title">Event 66</span>
+              <span class="set-label">set 11</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 0, 1, 2, 3</span>
+              <span class="summary-text">IDs: 0, 1, 2, 3, 4, 5</span>
+              <span class="summary-text">faces: +X, +Y, +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam0</strong></td>
+                  <td>1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.058 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam1</strong></td>
+                  <td>0, 1, 2, 5</td>
+                  <td>+X, +Z, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.269 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 3</td>
+                  <td>+Y, +Z</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.615 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam3</strong></td>
+                  <td>4, 5</td>
+                  <td>-X, -Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>2.128 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="67">
+            <summary>
+              <span class="event-title">Event 67</span>
+              <span class="set-label">set 11</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 4</span>
+              <span class="summary-text">faces: +Z, -X</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 4</td>
+                  <td>+Z, -X</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.890 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="68">
+            <summary>
+              <span class="event-title">Event 68</span>
+              <span class="set-label">set 11</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 4, 5</span>
+              <span class="summary-text">faces: +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 4, 5</td>
+                  <td>+Z, -X, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.639 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="single" data-event="69">
+            <summary>
+              <span class="event-title">Event 69</span>
+              <span class="set-label">set 11</span>
+              <span class="badge single">SINGLE</span>
+              <span class="summary-text">core cams: —</span>
+              <span class="summary-text">IDs: 4</span>
+              <span class="summary-text">faces: -X</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>4</td>
+                  <td>-X</td>
+                  <td>1 face / 0 non-coplanar / planar</td>
+                  <td>0.104 px</td>
+                  <td>2 / 2</td>
+                  <td><span class="badge single">single marker</span></td>
+                  <td>noncore_single_marker</td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="70">
+            <summary>
+              <span class="event-title">Event 70</span>
+              <span class="set-label">set 11</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 3, 4</span>
+              <span class="summary-text">faces: +Y, +Z, -X</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 3, 4</td>
+                  <td>+Y, +Z, -X</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.412 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="71">
+            <summary>
+              <span class="event-title">Event 71</span>
+              <span class="set-label">set 11</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 1, 3</span>
+              <span class="summary-text">faces: +Y, +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>1, 3</td>
+                  <td>+Y, +Z</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.102 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="72">
+            <summary>
+              <span class="event-title">Event 72</span>
+              <span class="set-label">set 12</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 0, 1, 2, 3</span>
+              <span class="summary-text">IDs: 0, 1, 2, 3, 4, 5</span>
+              <span class="summary-text">faces: +X, +Y, +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam0</strong></td>
+                  <td>0, 1, 4, 5</td>
+                  <td>+Z, -X, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.053 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam1</strong></td>
+                  <td>0, 1, 2, 3</td>
+                  <td>+X, +Y, +Z</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>0.986 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 4</td>
+                  <td>+Z, -X</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.493 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            
+                <tr class="selected">
+                  <td><strong>cam3</strong></td>
+                  <td>2, 5</td>
+                  <td>+X, -Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>0.943 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="73">
+            <summary>
+              <span class="event-title">Event 73</span>
+              <span class="set-label">set 12</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 5</span>
+              <span class="summary-text">faces: +Z, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 5</td>
+                  <td>+Z, -Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.253 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="74">
+            <summary>
+              <span class="event-title">Event 74</span>
+              <span class="set-label">set 12</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 2, 3</span>
+              <span class="summary-text">faces: +X, +Y, +Z</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 2, 3</td>
+                  <td>+X, +Y, +Z</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.525 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="75">
+            <summary>
+              <span class="event-title">Event 75</span>
+              <span class="set-label">set 12</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 5</span>
+              <span class="summary-text">faces: +Z, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 5</td>
+                  <td>+Z, -Y</td>
+                  <td>2 faces / 2 non-coplanar / non-planar</td>
+                  <td>1.201 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="76">
+            <summary>
+              <span class="event-title">Event 76</span>
+              <span class="set-label">set 12</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 2, 5</span>
+              <span class="summary-text">faces: +X, +Z, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 2, 5</td>
+                  <td>+X, +Z, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>1.214 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        
+          <details class="event" data-category="core" data-event="77">
+            <summary>
+              <span class="event-title">Event 77</span>
+              <span class="set-label">set 12</span>
+              <span class="badge core">CORE</span>
+              <span class="summary-text">core cams: 2</span>
+              <span class="summary-text">IDs: 0, 1, 4, 5</span>
+              <span class="summary-text">faces: +Z, -X, -Y</span>
+            </summary>
+            <div class="detail-wrap">
+              <table>
+                <thead><tr>
+                  <th>Camera</th><th>Marker IDs</th><th>Faces</th><th>3D support</th>
+                  <th>PnP RMSE</th><th>Positive / all</th><th>Quality tier</th><th>Calibration</th>
+                </tr></thead>
+                <tbody>
+                <tr class="selected">
+                  <td><strong>cam2</strong> <small>gripper</small></td>
+                  <td>0, 1, 4, 5</td>
+                  <td>+Z, -X, -Y</td>
+                  <td>3 faces / 3 non-coplanar / non-planar</td>
+                  <td>2.847 px</td>
+                  <td>1 / 1</td>
+                  <td><span class="badge core">nonplanar multiface</span></td>
+                  <td><span class="badge core">selected</span></td>
+                </tr>
+            </tbody>
+              </table>
+            </div>
+          </details>
+        </section>
+</main>
+<script>
+(() => {
+  const events = [...document.querySelectorAll('details.event')];
+  const search = document.getElementById('event-search');
+  const filter = document.getElementById('category-filter');
+  const count = document.getElementById('visible-count');
+  function apply() {
+    const query = search.value.trim(); const category = filter.value; let visible = 0;
+    for (const event of events) {
+      const numericQuery = Number(query);
+      const matchesQuery = !query || (
+        Number.isInteger(numericQuery) && Number(event.dataset.event) === numericQuery
+      );
+      const matchesCategory = category === 'all' || event.dataset.category === category;
+      event.classList.toggle('hidden', !(matchesQuery && matchesCategory));
+      if (matchesQuery && matchesCategory) visible += 1;
+    }
+    count.textContent = `${visible} events 표시`;
+  }
+  search.addEventListener('input', apply); filter.addEventListener('change', apply);
+  document.getElementById('expand-all').addEventListener('click', () => events.filter(e => !e.classList.contains('hidden')).forEach(e => e.open = true));
+  document.getElementById('collapse-all').addEventListener('click', () => events.forEach(e => e.open = false));
+  apply();
+})();
+</script></body></html>

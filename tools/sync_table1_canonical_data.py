@@ -1131,7 +1131,7 @@ def _markdown(rows: list[dict], marker: dict, detailed: bool,
         "",
         _internal_only_claim_envelope(),
         "",
-        "## Final Comparison Table (최종 비교실험표)",
+        "## Final Comparison Table (최종 ABLATION_TEST)",
         "",
         _experiment_design_table(rows),
         "",
@@ -1373,7 +1373,7 @@ main{{max-width:1180px;margin:auto;padding:32px 20px 72px}} h1{{font-size:30px;m
 {_html_data_warnings(data_warnings or {})}
 <section class="panel note"><h2>Final Protocol Lock (최종 단일 기준)</h2>
 <p>A0/B3는 calibration 단계에서는 board-only로 유지합니다. Cube 평가지표는 모든 row에서 train cube 관측으로 set별 evaluation pose만 맞춘 뒤, calibration 결과를 frozen한 상태로 계산합니다.</p></section>
-<section class="panel"><h2>Final Comparison Table (최종 비교실험표)</h2>
+<section class="panel"><h2>Final Comparison Table (최종 ABLATION_TEST)</h2>
 <div class="table-wrap"><table>
 <thead><tr><th>Method</th><th>Label</th><th>Calibration train target</th><th>Optimization</th><th>FK / target-pose 처리</th><th>Train Cube RMSE px</th><th>ALL Cube RMSE px</th><th>Heldout Cube RMSE px</th><th>Cross-view Cube px</th><th>Cam-common Cube mm/deg</th><th>External GT TRE/Rot/P95/Fail</th><th>Convergence</th><th>Data status</th></tr></thead>
 <tbody>{''.join(method_rows)}</tbody></table></div></section>
@@ -1400,20 +1400,20 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Regenerate current CSV/Markdown/HTML evaluation artifacts")
     parser.add_argument(
-        "--table1", default="CP_result/session04/calib_result_table1/table1_methods.json")
+        "--table1", default="ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
     parser.add_argument(
         "--cross", default=(
-            "CP_result/session04/cross_target_evaluation/"
+            "ABLATION_TEST_result/session04/cross_target_evaluation/"
             "cross_target_evaluation.json"))
     parser.add_argument(
         "--marker", default=(
-            "CP_result/session04/marker_system_end_to_end/"
+            "ABLATION_TEST_result/session04/marker_system_end_to_end/"
             "marker_system_end_to_end.json"))
     parser.add_argument(
-        "--late_dir", default="CP_result/session04/calib_result_table1")
+        "--late_dir", default="ABLATION_TEST_result/session04/ABLATION_TEST_table1")
     parser.add_argument(
         "--html",
-        default="CP_result/session04/calib_result_table1/TABLE1_INTERACTIVE.html")
+        default="ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_INTERACTIVE.html")
     return parser.parse_args()
 
 
@@ -1449,8 +1449,8 @@ def main() -> None:
     data_warnings = _data_warnings(table1, cross)
     late_dir = Path(args.late_dir)
     late_dir.mkdir(parents=True, exist_ok=True)
-    _write_csv(late_dir / "table1_results.csv", rows)
-    (late_dir / "TABLE1_RESULTS.md").write_text(
+    _write_csv(late_dir / "ABLATION_TEST_table1_results.csv", rows)
+    (late_dir / "ABLATION_TEST_TABLE1_RESULTS.md").write_text(
         _markdown(
             rows, marker, detailed=True, data_warnings=data_warnings,
             session_label=session_label))

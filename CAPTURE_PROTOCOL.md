@@ -5,7 +5,7 @@
 비적용 대상: 기존 `data/session04` legacy 촬영
 
 이 문서는 최종 비교실험 `A0~A5`, `B1~B3`에 공통으로 사용할 촬영 계약이다.
-연구 주장과 최종 판정 원칙은 [RESEARCH_STORYLINE.md](RESEARCH_STORYLINE.md)를 따른다.
+연구 주장과 최종 판정 원칙은 [RESEARCH.md](RESEARCH.md)를 따른다.
 
 ## 1. 핵심 계약
 

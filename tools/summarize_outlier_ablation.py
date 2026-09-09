@@ -141,21 +141,21 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--soft_table",
-        default="CP_result/session04/calib_result_table1/table1_methods.json")
+        default="ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
     parser.add_argument(
         "--linear_table",
-        default=("CP_result/session04/outlier_ablation/linear_table1/"
-                 "table1_methods.json"))
+        default=("ABLATION_TEST_result/session04/outlier_ablation/linear_table1/"
+                 "ABLATION_TEST_table1_methods.json"))
     parser.add_argument(
         "--soft_cross",
-        default=("CP_result/session04/cross_target_evaluation/"
+        default=("ABLATION_TEST_result/session04/cross_target_evaluation/"
                  "cross_target_evaluation.json"))
     parser.add_argument(
         "--linear_cross",
-        default=("CP_result/session04/outlier_ablation/linear_cross_target/"
+        default=("ABLATION_TEST_result/session04/outlier_ablation/linear_cross_target/"
                  "cross_target_evaluation.json"))
     parser.add_argument(
-        "--out_dir", default="CP_result/session04/outlier_ablation")
+        "--out_dir", default="ABLATION_TEST_result/session04/outlier_ablation")
     return parser.parse_args()
 
 

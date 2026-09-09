@@ -402,7 +402,7 @@ def parse_args(argv=None):
         description="Paired peg-in-hole/grasp robot task-trial evaluation")
     parser.add_argument("--manifest", required=True)
     parser.add_argument(
-        "--output_dir", default="CP_result/shared/robot_task_trial")
+        "--output_dir", default="ABLATION_TEST_result/shared/robot_task_trial")
     return parser.parse_args(argv)
 
 

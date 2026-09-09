@@ -14,7 +14,7 @@
 
 **cam0 는 쓰지 않는다.** 단독 오차가 16.8 mm 로 cam1(4.7)·cam3(4.4)의 네 배다.
 자세한 근거는 `data/session02/calib_final_use/calibration_for_use.json` 과
-`CP_result/final_fk_mode_fit/FINAL_CHOICE.md` 에 있다.
+`ABLATION_TEST_result/final_fk_mode_fit/FINAL_CHOICE.md` 에 있다.
 """
 from __future__ import annotations
 

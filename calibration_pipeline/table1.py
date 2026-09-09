@@ -1880,7 +1880,7 @@ def write_outputs(result: dict, out_dir: str) -> None:
     """
     validate_result_evaluation_contract(result)
     os.makedirs(out_dir, exist_ok=True)
-    with open(os.path.join(out_dir, "table1_methods.json"), "w") as handle:
+    with open(os.path.join(out_dir, "ABLATION_TEST_table1_methods.json"), "w") as handle:
         json.dump(_jsonable(result), handle, indent=2)
 
 
@@ -1913,7 +1913,7 @@ def parse_args(argv=None):
                         help="Default: <session>/calib_out from --root_folder.")
     parser.add_argument(
         "--out_dir",
-        help=("Output directory. Default: CP_result/<sessionNN>/calib_result_table1 "
+        help=("Output directory. Default: ABLATION_TEST_result/<sessionNN>/ABLATION_TEST_table1 "
               "inferred from --root_folder."),
     )
     parser.add_argument(
@@ -2260,7 +2260,7 @@ def main(argv=None, force_baseline_only: bool = False) -> None:
             "initialization_dispersion": transform_dispersion(runs),
         }
         write_outputs(result, args.out_dir)
-    print(f"[SAVE] {args.out_dir}/table1_methods.json")
+    print(f"[SAVE] {args.out_dir}/ABLATION_TEST_table1_methods.json")
 
 
 if __name__ == "__main__":

@@ -242,7 +242,7 @@ def parse_args(argv=None) -> argparse.Namespace:
         dest="align_board_metric_scale", action="store_true")
     parser.add_argument(
         "--out_dir", default=None,
-        help="Default: CP_result/<session>/opencv_relative_baseline.")
+        help="Default: ABLATION_TEST_result/<session>/opencv_relative_baseline.")
     args = parser.parse_args(argv)
     return apply_session_defaults(args, {'out_dir': 'opencv_relative_dir',
          'observation_manifest': 'observation_manifest'})

@@ -58,7 +58,7 @@ from tools.make_calibration_result_presentation import (  # noqa: E402
 )
 
 OUT_PDF = ROOT / "캘리브레이션_8-3_피드백_해결_시각화_발표자료.pdf"
-OUT_PNG_DIR = ROOT / "CP_result/session04/feedback_resolution_slides"
+OUT_PNG_DIR = ROOT / "ABLATION_TEST_result/session04/feedback_resolution_slides"
 STEP2B_OVERLAY = ROOT / "data/session04/calib_out/capture_filter/Step2b_review_overlay.jpg"
 REDETECTION_OVERLAY = (
     ROOT / "data/session04/calib_out/verify/cube_observation_quality/"
@@ -73,11 +73,11 @@ BOARD_CUBE_OVERLAY = (
     "camera1_camera3_board_cube_overlay.png"
 )
 ROBOT_BASE_POINTCLOUD = (
-    ROOT / "CP_result/session04/robot_base_pointcloud/"
+    ROOT / "ABLATION_TEST_result/session04/robot_base_pointcloud/"
     "robot_base_pointcloud_A2_event0054.png"
 )
 ROBOT_BASE_POINTCLOUD_JSON = (
-    ROOT / "CP_result/session04/robot_base_pointcloud/"
+    ROOT / "ABLATION_TEST_result/session04/robot_base_pointcloud/"
     "robot_base_pointcloud_diagnostic.json"
 )
 

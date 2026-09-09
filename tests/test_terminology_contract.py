@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-FINAL_REPORT_DIR = ROOT / "CP_result/session04/calib_result_table1"
+FINAL_REPORT_DIR = ROOT / "ABLATION_TEST_result/session04/ABLATION_TEST_table1"
 
 # Serialized enum values such as ``raw-FK-fixed`` remain compatibility-only
 # identifiers. They must never leak into reader-facing reports or documents.
@@ -22,9 +22,9 @@ FORBIDDEN_PUBLIC_TERMS = re.compile(
 def _public_documents() -> list[Path]:
     documents = sorted(ROOT.rglob("*.md"))
     documents.extend([
-        FINAL_REPORT_DIR / "table1_results.csv",
+        FINAL_REPORT_DIR / "ABLATION_TEST_table1_results.csv",
         FINAL_REPORT_DIR / "calibration_summary.csv",
-        FINAL_REPORT_DIR / "TABLE1_INTERACTIVE.html",
+        FINAL_REPORT_DIR / "ABLATION_TEST_TABLE1_INTERACTIVE.html",
     ])
     return documents
 
@@ -44,7 +44,7 @@ def test_public_documents_use_canonical_fk_terminology():
 
 
 def test_final_report_exposes_the_three_canonical_method_families():
-    report = (FINAL_REPORT_DIR / "TABLE1_RESULTS.md").read_text(
+    report = (FINAL_REPORT_DIR / "ABLATION_TEST_TABLE1_RESULTS.md").read_text(
         encoding="utf-8")
     assert "VISION (cube pose free)" in report
     assert "A3 (FK hard fixed)" in report

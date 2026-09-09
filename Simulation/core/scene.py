@@ -28,7 +28,7 @@ from .project import observe, DEFAULT_K, REAL_CAM_INTR
 _CUBE = CubeTarget()
 _BOARD = BoardTarget()
 
-# 실측 카메라 배치 (CP_result/C1 에서 추출, 높이 ~0.2m 거의 수평 하향 10°)
+# 실측 카메라 배치 (ABLATION_TEST_result/C1 에서 추출, 높이 ~0.2m 거의 수평 하향 10°)
 _REAL = np.load(os.path.join(os.path.dirname(__file__), "real_setup", "real_cameras.npz"))
 _LAYOUT_PATH = os.path.join(os.path.dirname(__file__), "real_setup",
                             "real_layout_session02.npz")

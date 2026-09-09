@@ -25,7 +25,7 @@ import calibration_pipeline.table1 as table1  # noqa: E402
 
 
 DEFAULT_SCALES = (0.25, 0.5, 1.0, 2.0, 4.0)
-DEFAULT_OUT_DIR = ROOT / "CP_result/session04/fk_factor_sensitivity"
+DEFAULT_OUT_DIR = ROOT / "ABLATION_TEST_result/session04/fk_factor_sensitivity"
 
 
 def _mean(values: Iterable[float | None]) -> float | None:
@@ -127,7 +127,7 @@ def _run_one(args: argparse.Namespace, scale: float) -> dict:
         table1.SIGMA_FK_MM = original_mm
         table1.SIGMA_FK_DEG = original_deg
 
-    json_path = Path(args.out_dir) / f"scale_{scale:g}x" / "table1_methods.json"
+    json_path = Path(args.out_dir) / f"scale_{scale:g}x" / "ABLATION_TEST_table1_methods.json"
     payload = json.loads(json_path.read_text())
     payload["_source_json"] = str(json_path)
     return payload
@@ -263,7 +263,7 @@ def main() -> None:
     scales = [float(raw) for raw in args.scales.split(",") if raw.strip()]
     if not scales or any(scale <= 0.0 for scale in scales):
         raise ValueError("all scales must be positive")
-    baseline = _baseline_a2(ROOT / "CP_result/session04/calib_result_table1/table1_methods.json")
+    baseline = _baseline_a2(ROOT / "ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
     rows = []
     for scale in scales:
         print(f"[SCALE] {scale:g}x", flush=True)

@@ -36,7 +36,7 @@ def fmt(value, digits=4):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--result-dir",
-                        default="CP_result/session04/outlier_ablation/hard_threshold_sensitivity")
+                        default="ABLATION_TEST_result/session04/outlier_ablation/hard_threshold_sensitivity")
     parser.add_argument("--noise-floor-px", type=float, default=0.0)
     args = parser.parse_args()
 

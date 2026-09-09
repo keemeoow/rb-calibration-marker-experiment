@@ -188,7 +188,7 @@ def main():
         "warning": (
             "NOT table1.py's frozen held-out Table 1 metric -- train-pooled, "
             "no held-out split (blocked; see fit_grasp_offset.py docstring). "
-            "Comparable to each other, not to any table1_methods.json row."),
+            "Comparable to each other, not to any ABLATION_TEST_table1_methods.json row."),
         "results": results,
         "delta_train_translation_mm": (
             np.asarray(artifact["T_fk_cube_center_to_tag_object"])[:3, 3] * 1000).tolist(),

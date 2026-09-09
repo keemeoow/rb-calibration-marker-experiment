@@ -4,7 +4,7 @@
 성격
 ----
 이 단계는 **아무것도 새로 추정하지 않는다.** 최적화도, 재적합도, held-out 점수에
-따른 선택도 없다. 05단계가 남긴 table1_methods.json을 읽어 그대로 옮겨 적고
+따른 선택도 없다. 05단계가 남긴 ABLATION_TEST_table1_methods.json을 읽어 그대로 옮겨 적고
 집계만 한다. 보고 단계에서 값이 바뀔 여지를 없애려고 일부러 이렇게 분리했다.
 
 대표 seed는 `--representative_seed`(기본 0)로 **고정**되며, held-out 성적이 가장
@@ -42,14 +42,14 @@
 
 입력 / 처리 / 출력
 ------------------
-입력: 05단계가 만든 table1_methods.json.
+입력: 05단계가 만든 ABLATION_TEST_table1_methods.json.
 처리: 수렴/frame-prune 결정 요약, 대표 seed의 최종 변환행렬 복사.
 출력: 같은 디렉터리에 calibration_summary.csv, calibration_matrices.json.
 
 구현 위치
 ---------
     calibration_pipeline/report.py
-      main() / parse_args()   - 경로 기본값 해석 (CP_result/<session>/calib_result_table1)
+      main() / parse_args()   - 경로 기본값 해석 (ABLATION_TEST_result/<session>/ABLATION_TEST_table1)
       write_report()          - 검증 -> 행 요약 -> CSV/JSON 기록
       _validate()             - 위 "무결성 검사"
       _row_summary()          - 행 하나의 수렴·prune·지표 요약
@@ -67,7 +67,7 @@
 
 사람이 읽는 비교표는 여기서 만들지 않는다
 ------------------------------------------
-TABLE1_RESULTS.md 는 tools/sync_table1_canonical_data.py 가 같은 JSON에서
+ABLATION_TEST_TABLE1_RESULTS.md 는 tools/sync_table1_canonical_data.py 가 같은 JSON에서
 생성한다. 결과 원천을 하나로 두려고 러너·리포트·문서 생성을 분리해 놓은 것이다.
 """
 

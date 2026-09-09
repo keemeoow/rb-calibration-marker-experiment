@@ -9,10 +9,10 @@ __pycache__/
 SOTA_Simulation/outputs/
 
 # Superseded diagnostic outputs; canonical results live in the non-smoke folders.
-CP_result/*_smoke/
-CP_result/convergence_study_*/
-CP_result/sensitivity_7row_one_seed/
-CP_result/sensitivity_7row_resolution_seed33_recheck/
+ABLATION_TEST_result/*_smoke/
+ABLATION_TEST_result/convergence_study_*/
+ABLATION_TEST_result/sensitivity_7row_one_seed/
+ABLATION_TEST_result/sensitivity_7row_resolution_seed33_recheck/
 
 # Local rollback/duplicate captures already recoverable from Git.
 data/session/meta.pre_depth_backup.json

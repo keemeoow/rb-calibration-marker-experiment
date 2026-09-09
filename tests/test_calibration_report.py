@@ -9,7 +9,7 @@ from calibration_pipeline.report import METHOD_ORDER, write_report
 
 ROOT = Path(__file__).resolve().parents[1]
 SESSION04_TABLE1 = (
-    ROOT / "CP_result/session04/calib_result_table1/table1_methods.json")
+    ROOT / "ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
 
 
 def test_report_contains_every_final_calibration_matrix(tmp_path):

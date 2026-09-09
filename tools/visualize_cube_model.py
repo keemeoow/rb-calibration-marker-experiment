@@ -584,7 +584,7 @@ def main() -> None:
                         help="JSON describing the physical solid (mm boxes); "
                              "default is the body + protrusion implied by config.py")
     parser.add_argument("--title", default=None, help="override the figure title")
-    parser.add_argument("--output-dir", default="CP_result/cube_model")
+    parser.add_argument("--output-dir", default="ABLATION_TEST_result/cube_model")
     args = parser.parse_args()
 
     cfg, source = resolve_cfg(args)

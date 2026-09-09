@@ -366,17 +366,17 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--standard_table",
-        default="CP_result/session04/calib_result_table1/table1_methods.json")
+        default="ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
     parser.add_argument(
         "--strict_table",
-        default=("CP_result/session04/outlier_ablation/strict_table1/"
-                 "table1_methods.json"))
+        default=("ABLATION_TEST_result/session04/outlier_ablation/strict_table1/"
+                 "ABLATION_TEST_table1_methods.json"))
     parser.add_argument(
         "--manifest",
         default=("data/session04/calib_out/capture_filter/"
                  "Step2b_observation_manifest.json"))
     parser.add_argument(
-        "--out_dir", default="CP_result/session04/outlier_ablation")
+        "--out_dir", default="ABLATION_TEST_result/session04/outlier_ablation")
     return parser.parse_args()
 
 
