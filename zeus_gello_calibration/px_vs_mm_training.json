@@ -1,0 +1,48 @@
+{
+  "\ud1b5\ud569_no-fk": {
+    "px": {
+      "train_rmse_px": 0.7120959315859613,
+      "train_rmse_mm": 3.3040223081896585,
+      "train_rmse_deg": 0.8745490259740205
+    },
+    "mm": {
+      "train_rmse_px": 1.4235006108832367,
+      "train_rmse_mm": 2.9236304357452845,
+      "train_rmse_deg": 0.8150406658419266
+    }
+  },
+  "\ud1b5\ud569_raw-fk": {
+    "px": {
+      "train_rmse_px": 0.8850156325273155,
+      "train_rmse_mm": 3.73710175876167,
+      "train_rmse_deg": 0.9218010401155315
+    },
+    "mm": {
+      "train_rmse_px": 1.5244324180842679,
+      "train_rmse_mm": 3.250752132634209,
+      "train_rmse_deg": 0.8754883461187655
+    }
+  },
+  "\ub3c5\ub9bd_no-fk": {
+    "fixed_px": {
+      "train_rmse_px": 0.6810439814471084,
+      "train_rmse_mm": 2.6867441463742248,
+      "train_rmse_deg": 0.5465395449386294
+    },
+    "gripper_px": {
+      "train_rmse_px": 0.6532448035402034,
+      "train_rmse_mm": 4.237477180167215,
+      "train_rmse_deg": 1.4696913772529985
+    },
+    "fixed_mm": {
+      "train_rmse_px": 1.4017620810319216,
+      "train_rmse_mm": 2.210740019615203,
+      "train_rmse_deg": 0.4480628272867473
+    },
+    "gripper_mm": {
+      "train_rmse_px": 1.6369237666185823,
+      "train_rmse_mm": 3.835124593560901,
+      "train_rmse_deg": 1.4550786010810592
+    }
+  }
+}

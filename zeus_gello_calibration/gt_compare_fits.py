@@ -93,11 +93,19 @@ def detect_cube_pose_all(frames, K_map, D_map, T_base_cam, T_gripper_cam, T_base
     return T_base_cube, report
 
 
+# 학습 목적함수(px 재투영 vs mm pose 오차)별로 3가지 방식 x 2 = 6개.
+# px는 fit_calibration_methods.py가, mm은 fit_calibration_methods_mm.py가 각각
+# fit_<조건>[_mm].json으로 저장해둔다. "독립_raw-fk"는 큐브 위치가 상수라 통합과
+# 수학적으로 완전히 같은 답을 내서(block-separable) 따로 안 만든다 -- 예전엔
+# 여기 들어있었는데 지금 "독립"의 정의(핸드오프 없는 완전 독립)와 안 맞는 옛날
+# 파일이라 제거했다.
 DEFAULT_FITS = [
-    ("통합_no-fk", REPO_ROOT / "zeus_gello_calibration" / "fit_통합_no-fk.json"),
-    ("독립_no-fk", REPO_ROOT / "zeus_gello_calibration" / "fit_독립_no-fk.json"),
-    ("통합_raw-fk", REPO_ROOT / "zeus_gello_calibration" / "fit_통합_raw-fk.json"),
-    ("독립_raw-fk", REPO_ROOT / "zeus_gello_calibration" / "fit_독립_raw-fk.json"),
+    ("통합_no-fk_px", REPO_ROOT / "zeus_gello_calibration" / "fit_통합_no-fk.json"),
+    ("통합_no-fk_mm", REPO_ROOT / "zeus_gello_calibration" / "fit_통합_no-fk_mm.json"),
+    ("통합_raw-fk_px", REPO_ROOT / "zeus_gello_calibration" / "fit_통합_raw-fk.json"),
+    ("통합_raw-fk_mm", REPO_ROOT / "zeus_gello_calibration" / "fit_통합_raw-fk_mm.json"),
+    ("독립_no-fk_px", REPO_ROOT / "zeus_gello_calibration" / "fit_독립_no-fk.json"),
+    ("독립_no-fk_mm", REPO_ROOT / "zeus_gello_calibration" / "fit_독립_no-fk_mm.json"),
 ]
 
 

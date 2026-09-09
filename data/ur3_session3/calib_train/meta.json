@@ -1,0 +1,1012 @@
+{
+  "root_folder": "/home/sstone/rb-calibration-marker-experiment/data/ur3_session3/calib_train",
+  "session_allocation": null,
+  "gripper_cam_idx": 1,
+  "n_fixed_cams": 3,
+  "n_gripper_cams": 1,
+  "cam_indices": [
+    0,
+    1,
+    2,
+    3
+  ],
+  "charuco_board_config_source": "config_py:CharucoBoardConfig",
+  "charuco_board_config": {
+    "squares_x": 11,
+    "squares_y": 7,
+    "square_length_m": 0.025,
+    "marker_length_m": 0.018,
+    "dictionary_name": "DICT_4X4_250",
+    "marker_id_start": 5
+  },
+  "cube_config_source": "config_py:CubeConfig",
+  "capture_config": {
+    "schema_version": "capture_config_v1",
+    "charuco_board_config": {
+      "squares_x": 11,
+      "squares_y": 7,
+      "square_length_m": 0.025,
+      "marker_length_m": 0.018,
+      "dictionary_name": "DICT_4X4_250",
+      "marker_id_start": 5
+    },
+    "intrinsics_dir": "/home/sstone/rb-calibration-marker-experiment/ur3_calibration/intrinsics",
+    "width": 1280,
+    "height": 720,
+    "fps": 15,
+    "save_depth": false,
+    "capture_gate": {
+      "schema_version": "capture_gate_profiles_v1",
+      "profiles": {
+        "A_placement": {
+          "expected_cube_gripped": false
+        },
+        "B_eyetohand": {
+          "expected_cube_gripped": true
+        }
+      }
+    }
+  },
+  "captures": [
+    {
+      "event_id": 0,
+      "capture_index": 0,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 0,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_matrix_4x4": [
+        [
+          -0.5632571960902463,
+          0.8201605144141124,
+          -0.10038954949860142,
+          -0.22912127025208853
+        ],
+        [
+          0.8165301758617298,
+          0.5338758523053723,
+          -0.21967031258780678,
+          -0.12074236327580612
+        ],
+        [
+          -0.1265693602724063,
+          -0.20570198083924884,
+          -0.9703952246992166,
+          0.4932176179864389
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "cams": {
+        "0": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam0/rgb_00000.png",
+          "charuco_detect_n": 54
+        },
+        "1": {
+          "saved": true,
+          "is_gripper": true,
+          "rgb_path": "cam1/rgb_00000.png",
+          "charuco_detect_n": 57
+        },
+        "2": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam2/rgb_00000.png",
+          "charuco_detect_n": 50
+        },
+        "3": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam3/rgb_00000.png",
+          "charuco_detect_n": 60
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/ur3_calibration/data/session3_wrist_motion_gripper_cam/capture/000"
+    },
+    {
+      "event_id": 1,
+      "capture_index": 1,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 0,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_matrix_4x4": [
+        [
+          -0.8434656816072148,
+          0.5314377167342729,
+          -0.07835558169740664,
+          -0.20506256108431412
+        ],
+        [
+          0.5316005742505202,
+          0.8047987256418421,
+          -0.2640072738804434,
+          -0.12600244604016103
+        ],
+        [
+          -0.07724295053526459,
+          -0.26433494743890584,
+          -0.9613327010744392,
+          0.49729812795797695
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "cams": {
+        "0": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam0/rgb_00001.png",
+          "charuco_detect_n": 50
+        },
+        "1": {
+          "saved": true,
+          "is_gripper": true,
+          "rgb_path": "cam1/rgb_00001.png",
+          "charuco_detect_n": 60
+        },
+        "2": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam2/rgb_00001.png",
+          "charuco_detect_n": 44
+        },
+        "3": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam3/rgb_00001.png",
+          "charuco_detect_n": 60
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/ur3_calibration/data/session3_wrist_motion_gripper_cam/capture/001"
+    },
+    {
+      "event_id": 2,
+      "capture_index": 2,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 0,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_matrix_4x4": [
+        [
+          -0.8456128055111322,
+          0.4726982898252799,
+          -0.24798247912271504,
+          -0.23135142703223457
+        ],
+        [
+          0.49650816931458036,
+          0.8670990928858221,
+          -0.040234325152388735,
+          -0.10150855073589587
+        ],
+        [
+          0.19600668600707516,
+          -0.15714798730126894,
+          -0.9679286591106205,
+          0.5002439797236923
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "cams": {
+        "0": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam0/rgb_00002.png",
+          "charuco_detect_n": 50
+        },
+        "1": {
+          "saved": true,
+          "is_gripper": true,
+          "rgb_path": "cam1/rgb_00002.png",
+          "charuco_detect_n": 60
+        },
+        "2": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam2/rgb_00002.png",
+          "charuco_detect_n": 46
+        },
+        "3": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam3/rgb_00002.png",
+          "charuco_detect_n": 58
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/ur3_calibration/data/session3_wrist_motion_gripper_cam/capture/002"
+    },
+    {
+      "event_id": 3,
+      "capture_index": 3,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 0,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_matrix_4x4": [
+        [
+          -0.7431194198753914,
+          0.27491225421576737,
+          -0.6100793229458501,
+          -0.0022895067898470456
+        ],
+        [
+          0.2406276688027085,
+          0.960508492896269,
+          0.13972029230112423,
+          -0.2727791361293498
+        ],
+        [
+          0.6243971915460829,
+          -0.042973102705563114,
+          -0.7799240088836998,
+          0.41400003477478475
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "cams": {
+        "0": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam0/rgb_00003.png",
+          "charuco_detect_n": 50
+        },
+        "1": {
+          "saved": true,
+          "is_gripper": true,
+          "rgb_path": "cam1/rgb_00003.png",
+          "charuco_detect_n": 60
+        },
+        "2": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam2/rgb_00003.png",
+          "charuco_detect_n": 42
+        },
+        "3": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam3/rgb_00003.png",
+          "charuco_detect_n": 60
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/ur3_calibration/data/session3_wrist_motion_gripper_cam/capture/003"
+    },
+    {
+      "event_id": 4,
+      "capture_index": 4,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 0,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_matrix_4x4": [
+        [
+          -0.6627102186524846,
+          0.6003508140304471,
+          -0.44765395808208275,
+          -0.06299075538223359
+        ],
+        [
+          0.6618926207308747,
+          0.7491861096444062,
+          0.02486627712170919,
+          -0.237217658061766
+        ],
+        [
+          0.35030461703436055,
+          -0.2798197155470978,
+          -0.8938610641903756,
+          0.38729228847456704
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "cams": {
+        "0": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam0/rgb_00004.png",
+          "charuco_detect_n": 50
+        },
+        "1": {
+          "saved": true,
+          "is_gripper": true,
+          "rgb_path": "cam1/rgb_00004.png",
+          "charuco_detect_n": 57
+        },
+        "2": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam2/rgb_00004.png",
+          "charuco_detect_n": 49
+        },
+        "3": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam3/rgb_00004.png",
+          "charuco_detect_n": 60
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/ur3_calibration/data/session3_wrist_motion_gripper_cam/capture/004"
+    },
+    {
+      "event_id": 5,
+      "capture_index": 5,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 0,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_matrix_4x4": [
+        [
+          -0.8802805419909725,
+          0.464132648057751,
+          0.09842282458342526,
+          -0.2641994428081608
+        ],
+        [
+          0.4335627291249421,
+          0.8711645564044175,
+          -0.23042498904942293,
+          -0.18034511616906
+        ],
+        [
+          -0.19269023666447638,
+          -0.16016616581411464,
+          -0.9680998254429105,
+          0.45118075831409366
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "cams": {
+        "0": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam0/rgb_00005.png",
+          "charuco_detect_n": 48
+        },
+        "1": {
+          "saved": true,
+          "is_gripper": true,
+          "rgb_path": "cam1/rgb_00005.png",
+          "charuco_detect_n": 58
+        },
+        "2": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam2/rgb_00005.png",
+          "charuco_detect_n": 45
+        },
+        "3": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam3/rgb_00005.png",
+          "charuco_detect_n": 60
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/ur3_calibration/data/session3_wrist_motion_gripper_cam/capture/005"
+    },
+    {
+      "event_id": 6,
+      "capture_index": 6,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 0,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_matrix_4x4": [
+        [
+          -0.9094168486703293,
+          0.28915462609790876,
+          -0.29891570310156973,
+          -0.14600875742533448
+        ],
+        [
+          0.29915196174974423,
+          0.954119266190864,
+          0.012826911736143386,
+          -0.1737585450698455
+        ],
+        [
+          0.28891019216325126,
+          -0.07775620933138269,
+          -0.9541933099611457,
+          0.5349407236840775
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "cams": {
+        "0": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam0/rgb_00006.png",
+          "charuco_detect_n": 50
+        },
+        "1": {
+          "saved": true,
+          "is_gripper": true,
+          "rgb_path": "cam1/rgb_00006.png",
+          "charuco_detect_n": 60
+        },
+        "2": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam2/rgb_00006.png",
+          "charuco_detect_n": 50
+        },
+        "3": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam3/rgb_00006.png",
+          "charuco_detect_n": 60
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/ur3_calibration/data/session3_wrist_motion_gripper_cam/capture/006"
+    },
+    {
+      "event_id": 7,
+      "capture_index": 7,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 0,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_matrix_4x4": [
+        [
+          -0.987378786134679,
+          -0.15363869803284755,
+          -0.03844844805683395,
+          -0.16552849615967752
+        ],
+        [
+          -0.1508811047243019,
+          0.9863096543780376,
+          -0.06654440560895976,
+          -0.16045223197928501
+        ],
+        [
+          0.04814587135343813,
+          -0.05990339011647837,
+          -0.9970424057803011,
+          0.5050077077724362
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "cams": {
+        "0": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam0/rgb_00007.png",
+          "charuco_detect_n": 54
+        },
+        "1": {
+          "saved": true,
+          "is_gripper": true,
+          "rgb_path": "cam1/rgb_00007.png",
+          "charuco_detect_n": 60
+        },
+        "2": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam2/rgb_00007.png",
+          "charuco_detect_n": 41
+        },
+        "3": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam3/rgb_00007.png",
+          "charuco_detect_n": 60
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/ur3_calibration/data/session3_wrist_motion_gripper_cam/capture/007"
+    },
+    {
+      "event_id": 8,
+      "capture_index": 8,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 0,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_matrix_4x4": [
+        [
+          -0.8285733467657893,
+          0.4990979871389022,
+          -0.2537073279651864,
+          -0.18253969037057363
+        ],
+        [
+          0.49704597934998307,
+          0.8643021204840727,
+          0.076987914238216,
+          -0.18695057726709147
+        ],
+        [
+          0.2577042945729748,
+          -0.062314073535847246,
+          -0.9642123483953179,
+          0.49971521136893077
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "cams": {
+        "0": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam0/rgb_00008.png",
+          "charuco_detect_n": 51
+        },
+        "1": {
+          "saved": true,
+          "is_gripper": true,
+          "rgb_path": "cam1/rgb_00008.png",
+          "charuco_detect_n": 60
+        },
+        "2": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam2/rgb_00008.png",
+          "charuco_detect_n": 43
+        },
+        "3": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam3/rgb_00008.png",
+          "charuco_detect_n": 60
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/ur3_calibration/data/session3_wrist_motion_gripper_cam/capture/008"
+    },
+    {
+      "event_id": 9,
+      "capture_index": 9,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 0,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_matrix_4x4": [
+        [
+          -0.877226993506043,
+          0.3551053028001101,
+          -0.3230681441856986,
+          -0.12280402008822565
+        ],
+        [
+          0.42050484137660493,
+          0.8930342469558625,
+          -0.16020459463702189,
+          -0.14131737783706955
+        ],
+        [
+          0.23162141576975478,
+          -0.2763875136239303,
+          -0.9327172465809757,
+          0.536382461945119
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "cams": {
+        "0": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam0/rgb_00009.png",
+          "charuco_detect_n": 50
+        },
+        "1": {
+          "saved": true,
+          "is_gripper": true,
+          "rgb_path": "cam1/rgb_00009.png",
+          "charuco_detect_n": 60
+        },
+        "2": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam2/rgb_00009.png",
+          "charuco_detect_n": 43
+        },
+        "3": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam3/rgb_00009.png",
+          "charuco_detect_n": 60
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/ur3_calibration/data/session3_wrist_motion_gripper_cam/capture/009"
+    },
+    {
+      "event_id": 10,
+      "capture_index": 10,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 0,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_matrix_4x4": [
+        [
+          -0.9827231202731729,
+          -0.17390367704980977,
+          -0.0633465073158275,
+          -0.28533339174380923
+        ],
+        [
+          -0.14863508814376067,
+          0.9454840424115786,
+          -0.2897715239935708,
+          -0.03490606501170766
+        ],
+        [
+          0.11028544533643239,
+          -0.2753496625267871,
+          -0.954997216694022,
+          0.462922327032009
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "cams": {
+        "0": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam0/rgb_00010.png",
+          "charuco_detect_n": 54
+        },
+        "1": {
+          "saved": true,
+          "is_gripper": true,
+          "rgb_path": "cam1/rgb_00010.png",
+          "charuco_detect_n": 60
+        },
+        "2": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam2/rgb_00010.png",
+          "charuco_detect_n": 44
+        },
+        "3": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam3/rgb_00010.png",
+          "charuco_detect_n": 60
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/ur3_calibration/data/session3_wrist_motion_gripper_cam/capture/010"
+    },
+    {
+      "event_id": 11,
+      "capture_index": 11,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 0,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_matrix_4x4": [
+        [
+          -0.9966801461925491,
+          0.06246393998533181,
+          -0.05222013392464802,
+          -0.2636079544472371
+        ],
+        [
+          0.06942343416336108,
+          0.9870966804747391,
+          -0.14429320907345725,
+          -0.18069046305339595
+        ],
+        [
+          0.042533198499111004,
+          -0.1474394777434451,
+          -0.9881561250268985,
+          0.4455839791629531
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "cams": {
+        "0": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam0/rgb_00011.png",
+          "charuco_detect_n": 56
+        },
+        "1": {
+          "saved": true,
+          "is_gripper": true,
+          "rgb_path": "cam1/rgb_00011.png",
+          "charuco_detect_n": 60
+        },
+        "2": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam2/rgb_00011.png",
+          "charuco_detect_n": 48
+        },
+        "3": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam3/rgb_00011.png",
+          "charuco_detect_n": 60
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/ur3_calibration/data/session3_wrist_motion_gripper_cam/capture/011"
+    },
+    {
+      "event_id": 12,
+      "capture_index": 12,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 0,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_matrix_4x4": [
+        [
+          -0.6831518838609794,
+          0.7291578172671338,
+          -0.04040273623684597,
+          -0.21290145542710479
+        ],
+        [
+          0.7064288118980881,
+          0.6458080642357003,
+          -0.2896381844446505,
+          -0.10694005637415799
+        ],
+        [
+          -0.18509953348793384,
+          -0.22640852829866373,
+          -0.9562830862334555,
+          0.48759481668228005
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "cams": {
+        "0": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam0/rgb_00012.png",
+          "charuco_detect_n": 54
+        },
+        "1": {
+          "saved": true,
+          "is_gripper": true,
+          "rgb_path": "cam1/rgb_00012.png",
+          "charuco_detect_n": 60
+        },
+        "2": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam2/rgb_00012.png",
+          "charuco_detect_n": 49
+        },
+        "3": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam3/rgb_00012.png",
+          "charuco_detect_n": 56
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/ur3_calibration/data/session3_wrist_motion_gripper_cam/capture/012"
+    },
+    {
+      "event_id": 13,
+      "capture_index": 13,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 0,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_matrix_4x4": [
+        [
+          -0.6554112971097431,
+          0.7485893176999656,
+          -0.10025001270036484,
+          -0.23239574605127056
+        ],
+        [
+          0.6999864271884819,
+          0.5522118847344969,
+          -0.45285873747768,
+          -0.03105151277788757
+        ],
+        [
+          -0.28364596484495874,
+          -0.36698238075345535,
+          -0.885928269581515,
+          0.34854584025711455
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "cams": {
+        "0": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam0/rgb_00013.png",
+          "charuco_detect_n": 54
+        },
+        "1": {
+          "saved": true,
+          "is_gripper": true,
+          "rgb_path": "cam1/rgb_00013.png",
+          "charuco_detect_n": 57
+        },
+        "2": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam2/rgb_00013.png",
+          "charuco_detect_n": 44
+        },
+        "3": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam3/rgb_00013.png",
+          "charuco_detect_n": 60
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/ur3_calibration/data/session3_wrist_motion_gripper_cam/capture/013"
+    },
+    {
+      "event_id": 14,
+      "capture_index": 14,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 0,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_matrix_4x4": [
+        [
+          0.6409012473079689,
+          0.7239229139394153,
+          -0.25530610230183537,
+          -0.158363977399844
+        ],
+        [
+          0.6839256920529228,
+          -0.6895337804386958,
+          -0.2383040356012689,
+          -0.21562322032533282
+        ],
+        [
+          -0.34855593374524574,
+          -0.021881049046741166,
+          -0.9370325398531225,
+          0.47961300367615006
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "cams": {
+        "0": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam0/rgb_00014.png",
+          "charuco_detect_n": 51
+        },
+        "1": {
+          "saved": true,
+          "is_gripper": true,
+          "rgb_path": "cam1/rgb_00014.png",
+          "charuco_detect_n": 57
+        },
+        "2": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam2/rgb_00014.png",
+          "charuco_detect_n": 43
+        },
+        "3": {
+          "saved": true,
+          "is_gripper": false,
+          "rgb_path": "cam3/rgb_00014.png",
+          "charuco_detect_n": 60
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/ur3_calibration/data/session3_wrist_motion_gripper_cam/capture/014"
+    }
+  ]
+}
