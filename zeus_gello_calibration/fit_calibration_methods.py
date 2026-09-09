@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """zeus_gello_calibration/fit_calibration_methods.py -- 통합/독립 x raw-fk/no-fk
-4가지 방식을 "같은 데이터, 다른 solve 전략"으로 비교한다.
+3가지 방식을 "같은 데이터, 다른 solve 전략"으로 비교한다.
 
 *** 핵심 원칙: 통합이든 독립이든 캘리브레이션에 쓰는 데이터의 총량은 완전히
 같아야 한다. 차이는 그 데이터를 하나로 묶어서 푸느냐(통합) vs 두 그룹으로
-나눠서 따로 푸느냐(독립)뿐이다. ***
+나눠서 완전히 따로 푸느냐(독립)뿐이다. ***
 
 데이터 풀 (통합/독립 공통, 총 4가지 소스):
   session1        -- 고정캠 3대가 그리퍼로 쥔 큐브를 봄 (grasp+FK 모델)
@@ -20,18 +20,25 @@
              @ T_gripper_cube" FK값으로 고정(정적 상수, 최적화 중 안 바뀜).
 
   통합(unified)     -- 위 4개 소스를 전부 하나의 최소제곱에 넣어 한 번에 푼다.
-  독립(independent) -- 두 그룹으로 쪼개서 각자 최소제곱을 돌리고 서로의
-                       residual에 관여하지 않는다:
-                         그룹A(고정캠): session1 + session2-고정캠
-                         그룹B(그리퍼캠): session2-그리퍼캠 + session3-그리퍼캠
-                       raw-fk에서 그룹B가 필요한 T_gripper_cube는 그룹A를 먼저
-                       풀어서 나온 값을 (다시 최적화하지 않고) 상수로 넘겨받는다
-                       -- 이건 "독립적으로 각자 풀고, 이미 풀린 값을 순차적으로
-                       재사용"이라 여전히 독립이다(residual을 동시에 최적화하지
-                       않으므로).
+  독립(independent) -- 고정캠 그룹(session1+session2-고정캠)과 그리퍼 그룹
+                       (session2-그리퍼캠+session3)을 정보 교환 전혀 없이
+                       완전히 따로 푼다(solve_parallel_fixed/gripper). 어느
+                       쪽도 다른 쪽 값을 넘겨받지 않는다 -- 공통 큐브(session2)
+                       가 아예 없었다고 가정했을 때 원래 이렇게 각자 캘리브레이션
+                       했을 방식 그대로. session2는 캘리브레이션에 전혀 안 쓰이고,
+                       다 끝난 뒤 "두 그룹이 우연히 같이 본 session2 큐브에 대해
+                       서로 계산이 얼마나 일치하는가"를 사후 합의(consensus_check)
+                       로만 확인한다 -- 결과를 바꾸지 않는 순수 진단 지표.
 
-table1.py의 정식 held-out 지표 아님 (train-pooled). no_fk/raw-fk x 통합/독립
-네 조건끼리 비교하는 용도.
+raw-fk는 no_fk에서만 통합/독립 구분이 의미가 있다 -- 큐브 위치를 상수로
+고정하면 고정캠/그리퍼캠 블록이 항상 수학적으로 분리되어(block-separable)
+통합과 독립이 완전히 같은 답을 내므로, 독립_raw-fk는 따로 안 만든다.
+
+table1.py의 정식 held-out 지표 아님 (train-pooled). 세 조건(통합_no-fk,
+통합_raw-fk, 독립_no-fk)끼리 비교하는 용도. table1.py의 공식
+sequential_frozen_stage(A1) 알고리즘 자체는 더 이상 여기 없다 -- 그건
+"독립"의 정의가 아니라고 판단해서(한쪽이 다른 쪽에 일방적으로 맞추는 구조라
+"서로 정보 교환 없음"이라는 독립의 정의와 다름) 제거했다.
 
 사용법:
   python fit_calibration_methods.py
@@ -231,64 +238,9 @@ def solve_unified(data, fk_mode, gtc_init, board_init):
     return final_state, diag, len(observations)
 
 
-# --------------------------------------------------------------- 독립(sequential_frozen_stage)
-#
-# table1.py의 공식 sequential_frozen_stage(A0/A1/B1이 쓰는 것)를 그대로 옮긴 것.
-# 이전 버전은 "고정캠 먼저 풀고 그리퍼로 넘김" 순서였는데, 이건 공식 알고리즘과
-# 방향이 반대였다(실제 조사로 확인: table1.py:716-737, solve_stage 두 번 호출,
-# stage1=eih(그리퍼)만 먼저 풀고 얼린 뒤 stage2=e2h(고정캠)만 그 위에서 풂,
-# feedback_from_e2h_to_eih_variables=False로 역방향 피드백 없음이 명시돼 있음).
-#
-# stage1(그리퍼, eih): T_gripper_cam, T_base_board, T_base_cube_by_set 자유
-#   -- session2-그리퍼캠 + session3만 씀.
-# freeze: stage1 결과(gtc, board, cube_by_set)를 상수로 고정.
-# stage2(고정캠, e2h): T_base_Ci만 자유 -- session2-고정캠(+ zeus 전용 확장으로
-#   session1의 grasp+FK도 여기 e2h 쪽에 자연스럽게 포함, T_gripper_cube_by_grasp도
-#   같이 품; table1.py 원본엔 grasp 개념이 아예 없어서 이 부분만 Zeus 데이터
-#   구조에 맞춘 확장이고, stage 경계(1->2 단방향, 얼린 것 안 바뀜)는 원본 그대로).
-#
-# 공식 설계상 sequential은 no_fk(estimated) 조건에서만 존재한다(A1 vs A2가
-# "unified vs sequential" 비교; raw-fk는 A3/A5처럼 항상 unified로만 존재하고
-# sequential+raw-fk 조합 자체가 table1.py에 없음) -- 그래서 이 함수엔 fk_mode
-# 분기가 없다.
-def solve_sequential(data, gtc_init, board_init):
-    K_map, D_map = data["K_map"], data["D_map"]
-    set_ids = sorted(data["items_by_index"])
-
-    # --- stage1: eih(그리퍼)만 ---
-    obs_s2g = data["obs_s2_gripper"]
-    robot_T_stage1 = {**data["robot_T_s2_gripper"], **data["robot_T_s3"]}
-    cube_init_s1 = init_cube_poses(obs_s2g, K_map, D_map, {}, gtc_init, robot_T_stage1, GRIPPER_LOCAL_ID, set_ids)
-    obs_stage1 = ([o for o in obs_s2g if o.set_idx is not None and int(o.set_idx) in cube_init_s1]
-                  + data["obs_s3"])
-    state1 = PoseState(cams={}, gtc=gtc_init.copy(), board=board_init.copy(),
-                       cubes=dict(cube_init_s1), grasps={})
-    keys1 = variable_keys(["T_gripper_cam", "T_base_board", "T_base_cube_by_set"], state1)
-    final1, diag1 = solve_corner_reprojection(
-        observations=obs_stage1, variable_keys_=keys1, reference_state=state1,
-        robot_T=robot_T_stage1, K_map=K_map, D_map=D_map,
-        gripper_cam_idx=GRIPPER_LOCAL_ID, options=SolverOptions(),
-    )
-
-    # --- stage2: e2h(고정캠)만, stage1 결과는 얼려서 상수로 사용 ---
-    cam_init, grasp_init = data["cam_init"], data["grasp_init"]
-    obs_s2f = data["obs_s2_fixed"]
-    obs_stage2 = (data["obs_s1"]
-                  + [o for o in obs_s2f if o.set_idx is not None and int(o.set_idx) in final1.cubes])
-    state2 = PoseState(cams=dict(cam_init), gtc=final1.gtc.copy(), board=final1.board.copy(),
-                       cubes={s: T.copy() for s, T in final1.cubes.items()}, grasps={0: grasp_init.copy()})
-    keys2 = variable_keys(["T_base_Ci", "T_gripper_cube_by_grasp"], state2)  # gtc/board/cube는 얼려서 키에서 제외
-    final2, diag2 = solve_corner_reprojection(
-        observations=obs_stage2, variable_keys_=keys2, reference_state=state2,
-        robot_T=data["robot_T_s1"], K_map=K_map, D_map=D_map,
-        gripper_cam_idx=-999, options=SolverOptions(),
-    )
-    return final1, diag1, final2, diag2, obs_stage1, obs_stage2
-
-
 # --------------------------------------------------------- 독립(parallel, 최종 합의)
 #
-# sequential(위)과는 다른 방식 -- 사용자가 의도한 원래 "독립" 개념: 고정캠
+# "독립"의 정의: 고정캠
 # 그룹과 그리퍼 그룹이 서로 residual을 전혀 공유하지 않고 **완전히 따로**
 # 풀고(한쪽이 다른 쪽에 값을 넘겨주는 handoff가 아예 없음), 맨 마지막에
 # 두 그룹이 같은 session2 세트에 대해 각자 계산한 큐브 pose를 서로 비교해서
@@ -405,24 +357,6 @@ def main():
                           "n_corners": diag["n_residuals"] // 2, "n_observations": n_obs}
         export_fit_json(fit_out_dir / f"fit_{label}.json", state.grasps[0], state.cams, state.gtc)
 
-    # sequential_frozen_stage(table1.py A1의 공식 알고리즘)는 no_fk(estimated)
-    # 조건에서만 존재한다 -- raw-fk+sequential 조합은 table1.py에 없어서 안 만듦.
-    label = "sequential_no-fk (독립, table1.py A1 방식)"
-    final1, diag1, final2, diag2, obs_stage1, obs_stage2 = solve_sequential(data, gtc_init, board_init)
-    export_fit_json(fit_out_dir / "fit_sequential_no-fk.json", final2.grasps[0], final2.cams, final1.gtc)
-    errs_1 = per_corner_errors(final1, obs_stage1,
-                               {**data["robot_T_s2_gripper"], **data["robot_T_s3"]},
-                               K_map, D_map, GRIPPER_LOCAL_ID)
-    errs_2 = per_corner_errors(final2, obs_stage2, data["robot_T_s1"], K_map, D_map, -999)
-    results[label] = {
-        "success": bool(diag1["success"] and diag2["success"]),
-        "rmse_px": rmse_px(errs_1 + errs_2),
-        "n_corners": (len(errs_1) + len(errs_2)) // 2,
-        "n_observations": len(obs_stage1) + len(obs_stage2),
-        "stage1_gripper_rmse_px": rmse_px(errs_1),
-        "stage2_fixed_cams_rmse_px": rmse_px(errs_2),
-    }
-
     # 진짜 독립: 공통 큐브(session2)가 아예 없었다고 가정하고, 고정캠 그룹과
     # 그리퍼 그룹을 서로 정보 교환 없이 완전히 따로 캘리브레이션한다
     # (고정캠은 session1 grasp+FK로, 그리퍼는 session3 board eye-in-hand+FK로 --
@@ -456,12 +390,9 @@ def main():
 
     total_n = len(data["obs_s1"]) + len(data["obs_s2_fixed"]) + len(data["obs_s2_gripper"]) + len(data["obs_s3"])
     print(f"{'condition':>34} {'rmse_px':>10} {'n_corners':>10} {'n_obs':>7}   detail")
-    for name in ("통합_raw-fk", "통합_no-fk", label):
+    for name in ("통합_raw-fk", "통합_no-fk"):
         r = results[name]
-        detail = ""
-        if "stage1_gripper_rmse_px" in r:
-            detail = f"stage1(그리퍼) {r['stage1_gripper_rmse_px']:.4f} / stage2(고정캠) {r['stage2_fixed_cams_rmse_px']:.4f}"
-        print(f"{name:>34} {r['rmse_px']:>10.4f} {r['n_corners']:>10d} {r['n_observations']:>7d}   {detail}")
+        print(f"{name:>34} {r['rmse_px']:>10.4f} {r['n_corners']:>10d} {r['n_observations']:>7d}   ")
     r2 = results[label2]
     print(f"{label2:>34} {'고정캠:'+format(r2['fixed_group_rmse_px'],'.4f'):>10} {'-':>10} "
           f"{r2['n_observations']:>7d}   그리퍼:{r2['gripper_group_rmse_px']:.4f}")
@@ -475,8 +406,6 @@ def main():
 
     out = {
         "warning": ("train-pooled, held-out 분리 없음 -- table1.py 정식 지표 아님. "
-                    "'sequential_no-fk'는 table1.py의 sequential_frozen_stage(A1) 알고리즘을 "
-                    "그대로 재현(stage1=그리퍼만, freeze, stage2=고정캠만). "
                     "'통합_raw-fk'는 이름만 raw-fk고 A3의 정의(비전 개입 0)를 만족하지 않음 -- "
                     "session1에서 비전으로 fit한 T_gripper_cube를 앵커로 쓰기 때문."),
         "total_observations": total_n,

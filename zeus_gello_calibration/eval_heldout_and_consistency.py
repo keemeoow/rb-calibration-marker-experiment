@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """zeus_gello_calibration/eval_heldout_and_consistency.py -- 통합/독립 x
-raw-fk/no-fk 4가지 방식에 대해 (1) session2 세트 leave-one-out held-out
+raw-fk/no-fk 3가지 방식(통합_no-fk, 통합_raw-fk, 독립_no-fk)에 대해
+(1) session2 세트 leave-one-out held-out
 reprojection RMSE, (2) 카메라 간 큐브 pose 일치도(cross-camera consistency,
 mm/deg)를 계산한다. late_table1(CP_result/session04)의 "Heldout Cube RMSE"/
 "Cross-view Cube px"/"Cam-common Cube mm/deg" 지표를 Zeus 데이터로 재현한 것.
@@ -46,7 +47,7 @@ from calibration_pipeline.table1 import estimate_board_handeye_initial  # noqa: 
 
 from fit_calibration_methods import (  # noqa: E402
     GRIPPER_LOCAL_ID, SESSION1_DIR_DEFAULT, SESSION3_DIR_DEFAULT, fk_anchor_cubes, load_all_data,
-    rmse_px, solve_parallel_fixed, solve_parallel_gripper, solve_sequential, solve_unified,
+    rmse_px, solve_parallel_fixed, solve_parallel_gripper, solve_unified,
 )
 from session2_pick_and_place import SESSION2_DIR_DEFAULT  # noqa: E402
 
@@ -66,14 +67,11 @@ def camera_cube_estimate(obs, cams, gtc, robot_T, K_map, D_map, gripper_id):
 
 
 def fit_frozen(method, data_fold, fk_mode, gtc_init, board_init):
-    """(cams, gtc) 프리즈된 값 반환 -- 통합/sequential/진짜독립 공통 인터페이스.
-    sequential(table1.py A1 방식)과 진짜독립은 no_fk(estimated)에서만 존재한다."""
+    """(cams, gtc) 프리즈된 값 반환 -- 통합/진짜독립 공통 인터페이스.
+    진짜독립은 no_fk(estimated)에서만 존재한다."""
     if method == "통합":
         state, _, _ = solve_unified(data_fold, fk_mode, gtc_init, board_init)
         return state.cams, state.gtc
-    if method == "sequential":
-        final1, _, final2, _, _, _ = solve_sequential(data_fold, gtc_init, board_init)
-        return final2.cams, final1.gtc
     # method == "독립_true": 고정캠/그리퍼 그룹을 완전히 따로 (핸드오프 없음)
     state_fixed, _, _ = solve_parallel_fixed(data_fold)
     state_gripper, _, _ = solve_parallel_gripper(data_fold, gtc_init, board_init)
@@ -175,11 +173,8 @@ def main():
         data["obs_s3"], data["robot_T_s3"], K_map, D_map, GRIPPER_LOCAL_ID)
 
     results = {}
-    # sequential(table1.py A1 방식)은 no_fk에서만 존재 -- raw-fk+sequential
-    # 조합은 table1.py에 없어서 안 만듦 (fit_calibration_methods.py 참고).
     for method, fk_mode, label in (
         ("통합", "no_fk", "통합_no-fk"), ("통합", "fixed_fk", "통합_raw-fk"),
-        ("sequential", "no_fk", "sequential_no-fk"),
         ("독립_true", "no_fk", "독립_no-fk"),
     ):
         print(f"[{label}] leave-one-out held-out 계산 중 ({len(set_ids)}개 세트)...")
@@ -200,7 +195,7 @@ def main():
         }
 
     print(f"\n{'condition':>16} {'heldout_rmse_px':>16} {'cross_cam_mm':>13} {'cross_cam_deg':>14} {'n_pairs':>8}")
-    for name in ("통합_raw-fk", "통합_no-fk", "sequential_no-fk", "독립_no-fk"):
+    for name in ("통합_raw-fk", "통합_no-fk", "독립_no-fk"):
         r = results[name]
         print(f"{name:>16} {r['heldout_cube_rmse_px']:>16.4f} {r['cross_camera_translation_mm']:>13.4f} "
               f"{r['cross_camera_rotation_deg']:>14.4f} {r['n_camera_pairs']:>8d}")
