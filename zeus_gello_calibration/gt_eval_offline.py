@@ -61,6 +61,7 @@ def main():
     ap.add_argument("--fits", nargs="+", required=True, help="fit JSON 경로/glob (zeus_gello_calibration 기준)")
     ap.add_argument("--trial", action="append", default=[], help="<capture_folder>:<x,y,z,rz,ry,rx GT flange pose>")
     ap.add_argument("--list", action="store_true", help="폴더별 검출 xy만 출력 (트라이얼 식별용)")
+    ap.add_argument("--per-camera", action="store_true", help="카메라별(단일 PnP) 오차를 따로 출력")
     ap.add_argument("--zeus-intrinsics-dir", default=str(REPO_ROOT / "intrinsics"))
     ap.add_argument("--ur3-intrinsics-dir", default=str(REPO_ROOT / "ur3_calibration" / "intrinsics"))
     ap.add_argument("--device-map", default=str(REPO_ROOT / "intrinsics" / "device_map.json"))
@@ -106,6 +107,53 @@ def main():
         trials.append((folder, [float(v) for v in pose.split(",")]))
     if not trials:
         ap.error("--trial 최소 1개 필요 (또는 --list)")
+
+    if args.per_camera:
+        from calibration_pipeline.apriltag_cube import rodrigues_to_Rt
+        from fit_grasp_offset import LOCAL_CAM_IDS
+        per_cam = {}
+        print(f"{'fit':>14} | {'camera':>13} | {'trial':>16} | {'dx':>6} {'dy':>6} {'dz':>6} {'drz':>6} | {'xyz':>6}")
+        for label, (T_gripper_cube, T_base_cam, T_gripper_cam) in fits.items():
+            tgc_z = float(np.asarray(T_gripper_cube)[2, 3] * 1000.0)
+            for cam_label in LABELS:
+                rows = []
+                for folder, gt in trials:
+                    frames, T_bg = load_capture(CAPTURE_ROOT / folder)
+                    img = frames.get(cam_label, (None, None))[0]
+                    if img is None:
+                        continue
+                    lid = LOCAL_CAM_IDS[cam_label]
+                    ok, rvec, tvec, used, _ = cube_target.solve_pnp_cube(
+                        img, K_map[lid], D_map[lid], reproj_thr_mean_px=args.reproj_thr_px, return_reproj=True)
+                    if not ok:
+                        print(f"{label:>14} | {cam_label:>13} | {folder:>16} | 검출 실패 (markers={used})")
+                        continue
+                    T_cam_cube = rodrigues_to_Rt(rvec, tvec)
+                    if cam_label == "gripper":
+                        if T_gripper_cam is None:
+                            continue
+                        T = T_bg @ T_gripper_cam @ T_cam_cube
+                    else:
+                        if lid not in T_base_cam:
+                            continue
+                        T = T_base_cam[lid] @ T_cam_cube
+                    e = T_to_pose6(T)
+                    dx, dy = e[0] - gt[0], e[1] - gt[1]
+                    dz = e[2] - (gt[2] - tgc_z)
+                    drz = ((e[3] - gt[3]) + 180.0) % 360.0 - 180.0
+                    xyz = float(np.sqrt(dx * dx + dy * dy + dz * dz))
+                    rows.append({"trial": folder, "dx": dx, "dy": dy, "dz": dz, "drz": drz, "xyz": xyz})
+                    print(f"{label:>14} | {cam_label:>13} | {folder:>16} | {dx:>6.2f} {dy:>6.2f} {dz:>6.2f} {drz:>6.2f} | {xyz:>6.2f}")
+                if rows:
+                    per_cam[(label, cam_label)] = rows
+        print(f"\n{'fit':>14} | {'camera':>13} | {'|dx|':>6} {'|dy|':>6} {'|dz|':>6} {'xyz TRE':>8} {'|drz|':>6} | n")
+        for (label, cam_label), rows in per_cam.items():
+            a = {k: float(np.mean([abs(r[k]) for r in rows])) for k in ("dx", "dy", "dz", "drz")}
+            xyz = float(np.mean([r["xyz"] for r in rows]))
+            print(f"{label:>14} | {cam_label:>13} | {a['dx']:>6.2f} {a['dy']:>6.2f} {a['dz']:>6.2f} {xyz:>8.2f} {a['drz']:>6.2f} | {len(rows)}")
+        Path(args.out).with_name(Path(args.out).stem + "_per_camera.json").write_text(
+            json.dumps({f"{l}/{c}": r for (l, c), r in per_cam.items()}, indent=2))
+        return
 
     results = {}
     print(f"{'fit':>22} | {'trial':>16} | {'dx':>6} {'dy':>6} {'dz':>6} {'drz':>6} | {'xyz':>6}")
