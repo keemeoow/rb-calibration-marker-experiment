@@ -8,7 +8,6 @@ computation happen on the CLIENT (robot/backends/zeus_client.py). The server
 only:
     - reports the robot's current values          (get_state)
     - moves the robot where the client says       (movel / movej)
-    - toggles queued/streaming motion mode        (stream_start / stream_stop)
     - actuates the gripper                        (grip)
     - stops                                       (stop)
 Consequently this file should almost never need editing: no home pose, no
@@ -28,39 +27,12 @@ Joints = 6 values in DEG.
         overlap>0 blends this move into the next one instead of decelerating to
         a full stop — used by the jog tool for continuous motion. Default 0
         keeps the exact point-to-point behaviour generated programs rely on.
-        BY DEFAULT (no stream_start active) this call is synchronous: it does
-        not return until the i611 SDK has finished the motion (see
-        server/c1.py's verify_robot_still(), which depends on that).
-  {"op":"movej","joints":[...],"jnt_speed":<deg/s or i611 units>,
-                 "overlap":<mm, optional>,"acc":<s, optional>} -> {"ok":true}
-        Same overlap semantics and same default-synchronous behaviour as movel.
-  {"op":"stream_start"}                          -> {"ok":true}
-        Turns on the i611 SDK's program-prefetch queue (rb.asyncm(1)). While
-        active, movel/movej calls return as soon as the motion is *queued*
-        (i.e. roughly once the previous queued motion enters its overlap/blend
-        region), not once the robot physically stops — this is the SDK's
-        actual non-blocking primitive (see i611_MCS.py's asyncm()/join()
-        docstrings). Use this instead of blasting movej at a fixed rate: pair
-        it with overlap>0 so consecutive movej calls blend instead of each
-        decelerating to a full stop. The queue depth/backpressure behaviour is
-        not documented beyond "prefetches the next motion" — treat it as
-        roughly one motion of lookahead, not an unbounded buffer.
-  {"op":"stream_stop"}                           -> {"ok":true}
-        Waits for the queued motion(s) to finish (rb.join()) and turns
-        prefetch back off (rb.asyncm(2)), restoring the default synchronous
-        behaviour movel/movej/other clients rely on. Always call this before
-        disconnecting/exiting a streaming session — leaving asyncm(1) on
-        would silently change behaviour for the next client (e.g. run.py).
+  {"op":"movej","joints":[...],"jnt_speed":<deg/s or i611 units>} -> {"ok":true}
   {"op":"grip","state":"open"|"close","timeout_s":3.0}
                                                  -> {"ok":true,"reached":true|false}
         NOTE reached=false on CLOSE means the fingers stalled on an object,
         i.e. something is held. The client interprets it; the server only reports.
   {"op":"stop"}                                  -> {"ok":true}
-        Calls motion_skip() to halt in place. NOT verified against a queued
-        (stream_start) motion — its interaction with the asyncm(1) prefetch
-        queue is untested (i611_extend.py, which defines motion_skip, isn't
-        available to read locally). Test an emergency stop at very low speed
-        before trusting it during a streaming session.
   {"op":"bye"}   close this connection
   {"op":"quit"}  shut the server down
 
@@ -137,7 +109,7 @@ def handle(rb, req):
         speed = min(float(req.get("lin_speed", 60.0)), MAX_LIN_SPEED)
         overlap = max(0.0, min(float(req.get("overlap", 0.0)), MAX_OVERLAP))
         acc = max(0.05, min(float(req.get("acc", DEFAULT_ACC)), 2.0))
-        pose_speed = min(float(req.get("pose_speed", 20.0)), 50.0)  
+        pose_speed = min(float(req.get("pose_speed", 20.0)), 50.0)
         rb.motionparam(MotionParam(lin_speed=speed, jnt_speed=MAX_JNT_SPEED,
                                    pose_speed=50, overlap=overlap,
                                    acctime=acc, dacctime=acc))
@@ -147,21 +119,10 @@ def handle(rb, req):
     if op == "movej":
         j = req["joints"]
         speed = min(float(req.get("jnt_speed", 10.0)), MAX_JNT_SPEED)
-        overlap = max(0.0, min(float(req.get("overlap", 0.0)), MAX_OVERLAP))
-        acc = max(0.05, min(float(req.get("acc", DEFAULT_ACC)), 2.0))
         rb.motionparam(MotionParam(lin_speed=MAX_LIN_SPEED, jnt_speed=speed,
-                                   pose_speed=50, overlap=overlap,
-                                   acctime=acc, dacctime=acc))
+                                   pose_speed=50, overlap=0,
+                                   acctime=DEFAULT_ACC, dacctime=DEFAULT_ACC))
         rb.move(Joint(j[0], j[1], j[2], j[3], j[4], j[5]))
-        return {"ok": True}
-
-    if op == "stream_start":
-        rb.asyncm(1)
-        return {"ok": True}
-
-    if op == "stream_stop":
-        rb.join()
-        rb.asyncm(2)
         return {"ok": True}
 
     if op == "grip":
@@ -189,8 +150,8 @@ def main():
     IOinit()
     rb.override(80)
     print "robot ready"
-    
-    rb.settool(1,0.0,0.0,97.5, 0.0,0.0,0.0)
+
+    rb.settool(1,0.0,0.0,0.0, 0.0,0.0,0.0)
     rb.changetool(1)
 
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -231,19 +192,6 @@ def main():
             except socket.error as e:
                 print "socket error: %s" % e
             finally:
-                # A client (e.g. a GELLO streaming session) can vanish mid-
-                # session without ever sending stream_stop - leave the robot
-                # stopped and back in synchronous mode so the next client
-                # (or a human on the pendant) doesn't inherit a dangling
-                # asyncm(1) queue.
-                try:
-                    rb.motion_skip()
-                except Exception:
-                    pass
-                try:
-                    rb.asyncm(2)
-                except Exception:
-                    pass
                 conn.close()
                 print "client disconnected"
     except KeyboardInterrupt:

@@ -56,8 +56,11 @@ ur3_test/control/gello_ur3_real_teleop.py 와 같은 "joint twin" 미러링 방�
 --control-mode (2026-09-04 실기 테스트 결과로 추가):
   실측 결과 GELLO ID1~6 <-> ZEUS 관절 인덱스는 항등(순서 그대로)이 맞고,
   1~3번(어깨/팔꿈치)은 2번만 부호가 반대였다(--joint-sign 기본값에 이미 반영).
-  반면 4~6번(손목)은 GELLO와 ZEUS의 관절 축 배치 자체가 달라서 조인트
-  미러링으로 방향을 맞다고 검증할 방법이 없었다. 그래서:
+  4~6번(손목)은 GELLO와 ZEUS의 관절 축 배치 자체가 달라서 조인트 미러링으로
+  방향이 온전히 맞는지 검증할 방법이 없었다. 2026-09-10에 4,5번 부호을 반대로
+  해봤지만 그걸로는 안 맞아서(부호가 아니라 순서 자체가 다른 것으로 추정) 다시
+  원복했고, 지금은 --joint-map으로 4~6번의 GELLO ID 대응 순서를 재조정
+  중이다 - 손목은 아직 확정 안 됨. 그래서:
     - joint(기본): 여전히 6축 전부 조인트 미러링 (movej) - 손목 방향은 안 맞을
       수 있음을 알고 쓸 것.
     - position: 4~6번(손목) 입력을 아예 버리고, 1~3번 delta로 GELLO의 표준
@@ -232,13 +235,15 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--position-scale", type=float, default=1.0,
                         help="GELLO FK 위치 delta(mm)에 곱하는 배율 - GELLO 링크 길이가 "
                              "표준 UR3 DH 추정치와 달라 스케일이 안 맞으면 조정")
-    parser.add_argument("--joint-map", default="0,1,2,3,4,5",
-                        help="GELLO ID1~6 -> ZEUS joint index 매핑 (실기 확인: 항등이 맞음 - "
-                             "2026-09-04 로그로 6축 전부 검증됨)")
-    parser.add_argument("--joint-sign", default="1,-1,1,1,1,1",
-                        help="팔 관절 6축 방향 부호, 쉼표구분 6개 (실기 확인: 2번만 반대 - "
-                             "2026-09-04 확인. joint 모드에서만 쓰임; position 모드도 1~3번 "
-                             "입력엔 이 부호가 그대로 적용됨)")
+    parser.add_argument("--joint-map", default="0,1,2,4,3,5",
+                        help="GELLO ID1~6 -> ZEUS joint index 매핑. 1~3번(어깨/팔꿈치)은 "
+                             "실기 확인된 항등(2026-09-04). 4~6번(손목)은 4,5번을 맞바꿈 "
+                             "(4,5,6 -> 5,4,6)으로 시도 중 - 미검증, 저속/dry-run으로 꼭 확인할 것")
+    parser.add_argument("--joint-sign", default="1,-1,1,1,-1,1",
+                        help="팔 관절 6축 방향 부호, 쉼표구분 6개 (실기 확인: 2번, 5번 반대 - "
+                             "2026-09-04/2026-09-10 확인. --joint-map으로 4,5번 순서도 "
+                             "같이 재조정 중. joint 모드에서만 쓰임; position "
+                             "모드도 1~3번 입력엔 이 부호가 그대로 적용됨)")
     parser.add_argument("--grip-sign", type=float, default=-1.0)
     parser.add_argument("--grip-ticks-to-full", type=float, default=570.0,
                         help="GELLO 그리퍼 모터가 이만큼 틱 움직이면 완전히 닫힘 취급")
@@ -332,7 +337,22 @@ def gello_reader_worker(state: SharedState, args: argparse.Namespace) -> None:
     try:
         while not state.shutdown.is_set():
             loop_start = time.monotonic()
-            positions = read_all_positions(group_read)
+            try:
+                positions = read_all_positions(group_read)
+            except Exception as exc:  # noqa: BLE001
+                # USB/케이블 순간 글리치(예: SerialException "device disconnected
+                # or multiple access") 하나 때문에 리더 스레드 전체가 죽어서
+                # GELLO 인식이 완전히 멈추는 걸 방지 - 그냥 이번 틱을 "read
+                # fail"로 취급하고 다음 틱에 재시도한다. 계속 실패하면 아래
+                # 카운터가 계속 늘어나는 걸로 알 수 있다.
+                positions = {}
+                n_read_fail += 1
+                if loop_start - last_fail_print > 1.0:
+                    print(f"[leader] read error ({type(exc).__name__}: {exc}), "
+                          f"retrying (total={n_read_fail})")
+                    last_fail_print = loop_start
+                time.sleep(max(0.0, GELLO_POLL_DT - (time.monotonic() - loop_start)))
+                continue
 
             with state.lock:
                 enabled = state.enabled
