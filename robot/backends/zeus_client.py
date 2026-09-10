@@ -145,7 +145,8 @@ class ZeusClient:
         return np.asarray(self.get_state()["pose"], dtype=float)
 
     def get_T_base_tool(self) -> np.ndarray:
-        """Current TCP pose (tool-1, see zeus_server.py's settool(1,...,97.5,...)) as 4x4."""
+        """Current TCP pose (tool-1, see zeus_server.py's settool(1,...,0.0,...) -
+        offset is intentionally always zero) as 4x4."""
         return pose6_to_T(self.get_pose6())
 
     def movel(self, pose6: Sequence[float], lin_speed: float = 60.0,
