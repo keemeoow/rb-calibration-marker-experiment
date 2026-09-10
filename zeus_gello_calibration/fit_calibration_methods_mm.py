@@ -192,7 +192,7 @@ def select_unified_observations(data, fk_mode, gtc_init):
     obs_s2 = data["obs_s2_fixed"] + data["obs_s2_gripper"]
     set_ids = sorted(data["items_by_index"])
     robot_T = {**data["robot_T_s1"], **data["robot_T_s2_gripper"], **data["robot_T_s3"]}
-    observations = data["obs_s1"] + obs_s2 + data["obs_s3"]
+    observations = data["obs_s1"] + obs_s2 + data.get("obs_s2_board", []) + data["obs_s3"]
 
     if fk_mode == "no_fk":
         cubes = init_cube_poses(obs_s2, K_map, D_map, cam_init, gtc_init, robot_T, GRIPPER_LOCAL_ID, set_ids)

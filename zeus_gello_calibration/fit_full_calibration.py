@@ -87,7 +87,8 @@ CHARUCO_BOARD_CONFIG = {
 
 
 def build_synthetic_meta_board(session3_dir: Path, capture_subdir: str, capture_indices,
-                               charuco_target: CharucoTarget) -> dict:
+                               charuco_target: CharucoTarget,
+                               event_offset: int = SESSION3_EVENT_OFFSET) -> dict:
     """그리퍼캠뿐 아니라 고정캠 3대도 session3 보드를 본다(실측 확인: 15/15
     검출, 코너 23~56개) -- 그래서 4대 전부 meta에 넣는다. 예전엔 그리퍼캠만
     넣어서 고정캠의 보드 관측치를 통째로 빠뜨리고 있었다."""
@@ -108,7 +109,7 @@ def build_synthetic_meta_board(session3_dir: Path, capture_subdir: str, capture_
             rel = f"{capture_subdir}/{folder}/cam_{label}.png"
             cams[str(local_id)] = {"saved": True, "rgb_path": rel, "charuco_detect_n": n_corners}
         captures.append({
-            "event_id": SESSION3_EVENT_OFFSET + int(idx),
+            "event_id": int(event_offset) + int(idx),
             "cams": cams,
         })
     return {"captures": captures, "charuco_board_config": CHARUCO_BOARD_CONFIG}

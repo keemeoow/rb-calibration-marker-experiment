@@ -252,7 +252,7 @@ def _base_setup(data, gtc_init, board_init):
     robot_T = {**data["robot_T_s1"], **data["robot_T_s2_gripper"], **data["robot_T_s3"]}
     anchors = fk_anchor_cubes(data["items_by_index"], grasp_init)
     cubes_vis = init_cube_poses(obs_s2, K_map, D_map, cam_init, gtc_init, robot_T, GRIPPER_LOCAL_ID, set_ids)
-    observations = data["obs_s1"] + obs_s2 + data["obs_s3"]
+    observations = data["obs_s1"] + obs_s2 + data.get("obs_s2_board", []) + data["obs_s3"]
     observations = [o for o in observations if o.set_idx is None or int(o.set_idx) in anchors or o.grasp_idx is not None]
     return dict(cam_init=cam_init, grasp_init=grasp_init, K_map=K_map, D_map=D_map, set_ids=set_ids,
                 robot_T=robot_T, anchors=anchors, cubes_vis=cubes_vis, observations=observations,

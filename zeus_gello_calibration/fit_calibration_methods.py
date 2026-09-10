@@ -201,16 +201,32 @@ def load_all_data(args):
     obs_s3_gripper = [o for o in obs_s3_all if int(o.cam) == GRIPPER_LOCAL_ID]
     print(f"session3 고정캠 보드 관측치: {len(obs_s3_fixed)}개 (신규 -- 예전엔 빠뜨렸음)")
 
+    # session2 사진에도 같은 보드가 그대로 바닥에 있다 (실측: 고정캠 8~60코너,
+    # 그리퍼캠 14/15장 39~60코너). 그리고 session2/session3 사이에 보드가 안
+    # 움직였다(같은 고정캠으로 본 base 좌표 차이 0.25~0.42mm) -- 그래서 session3와
+    # 같은 T_base_board 변수를 공유한다. 예전엔 session2에서 큐브만 뽑고 보드는
+    # 통째로 버리고 있었다. event id는 session2 것(SESSION2_EVENT_OFFSET+idx)이라
+    # 그리퍼캠 보드 관측은 robot_T_s2_gripper(촬영 순간 pose)와 연결된다.
+    meta_s2_board = build_synthetic_meta_board(session2_dir, args.session2_capture_subdir, s2_idx,
+                                               charuco_target, event_offset=SESSION2_EVENT_OFFSET)
+    obs_s2_board = load_board_pixel_observations(
+        str(session2_dir), meta_s2_board, all_cam_ids, gripper_cam_idx=GRIPPER_LOCAL_ID, image_scale=1.0)
+    obs_s2_board_fixed = [o for o in obs_s2_board if int(o.cam) in cam_init]
+    obs_s2_board_gripper = [o for o in obs_s2_board if int(o.cam) == GRIPPER_LOCAL_ID]
+    print(f"session2 보드 관측치: 고정캠 {len(obs_s2_board_fixed)}개 / 그리퍼캠 {len(obs_s2_board_gripper)}개 (신규 -- 예전엔 빠뜨렸음)")
+
     print(f"session1 {len(obs_s1)}개 / session2-고정캠 {len(obs_s2_fixed)}개 / "
-          f"session2-그리퍼캠 {len(obs_s2_gripper)}개 / "
+          f"session2-그리퍼캠 {len(obs_s2_gripper)}개 / session2-보드 {len(obs_s2_board)}개 / "
           f"session3-고정캠 {len(obs_s3_fixed)}개 / session3-그리퍼캠 {len(obs_s3_gripper)}개")
-    total = len(obs_s1) + len(obs_s2_fixed) + len(obs_s2_gripper) + len(obs_s3_fixed) + len(obs_s3_gripper)
+    total = (len(obs_s1) + len(obs_s2_fixed) + len(obs_s2_gripper) + len(obs_s2_board)
+             + len(obs_s3_fixed) + len(obs_s3_gripper))
     print(f"총 관측치: {total}개 (통합/독립 공통, 같은 양)\n")
 
     return dict(
         cam_init=cam_init, grasp_init=grasp_init, K_map=K_map, D_map=D_map,
         obs_s1=obs_s1, robot_T_s1=robot_T_s1,
         obs_s2_fixed=obs_s2_fixed, obs_s2_gripper=obs_s2_gripper, robot_T_s2_gripper=robot_T_s2_gripper,
+        obs_s2_board=obs_s2_board, obs_s2_board_fixed=obs_s2_board_fixed, obs_s2_board_gripper=obs_s2_board_gripper,
         obs_s3=obs_s3_all, obs_s3_fixed=obs_s3_fixed, obs_s3_gripper=obs_s3_gripper, robot_T_s3=robot_T_s3,
         items_by_index=items_by_index,
     )
@@ -223,7 +239,7 @@ def solve_unified(data, fk_mode, gtc_init, board_init):
     obs_s2 = data["obs_s2_fixed"] + data["obs_s2_gripper"]
     set_ids = sorted(data["items_by_index"])
     robot_T = {**data["robot_T_s1"], **data["robot_T_s2_gripper"], **data["robot_T_s3"]}
-    observations = data["obs_s1"] + obs_s2 + data["obs_s3"]
+    observations = data["obs_s1"] + obs_s2 + data.get("obs_s2_board", []) + data["obs_s3"]
 
     if fk_mode == "no_fk":
         cubes = init_cube_poses(obs_s2, K_map, D_map, cam_init, gtc_init, robot_T, GRIPPER_LOCAL_ID, set_ids)
@@ -286,7 +302,7 @@ def solve_parallel_fixed(data):
     board_init_fixed = init_board_pose(obs_s3f, K_map, D_map, cam_init)
     observations = (data["obs_s1"]
                     + [o for o in obs_s2 if o.set_idx is not None and int(o.set_idx) in cubes]
-                    + obs_s3f)
+                    + data.get("obs_s2_board_fixed", []) + obs_s3f)
     state = PoseState(cams=dict(cam_init), gtc=np.eye(4), board=board_init_fixed,
                       cubes=dict(cubes), grasps={0: grasp_init.copy()})
     keys = variable_keys(["T_base_Ci", "T_base_cube_by_set", "T_gripper_cube_by_grasp", "T_base_board"], state)
@@ -307,7 +323,7 @@ def solve_parallel_gripper(data, gtc_init, board_init):
     robot_T = {**data["robot_T_s2_gripper"], **data["robot_T_s3"]}
     cubes = init_cube_poses(obs_s2g, K_map, D_map, {}, gtc_init, robot_T, GRIPPER_LOCAL_ID, set_ids)
     observations = ([o for o in obs_s2g if o.set_idx is not None and int(o.set_idx) in cubes]
-                    + obs_s3g)
+                    + data.get("obs_s2_board_gripper", []) + obs_s3g)
     state = PoseState(cams={}, gtc=gtc_init.copy(), board=board_init.copy(), cubes=dict(cubes), grasps={})
     keys = variable_keys(["T_gripper_cam", "T_base_board", "T_base_cube_by_set"], state)
     final_state, diag = solve_corner_reprojection(
@@ -420,7 +436,7 @@ def main():
     }
 
     total_n = (len(data["obs_s1"]) + len(data["obs_s2_fixed"]) + len(data["obs_s2_gripper"])
-              + len(data["obs_s3_fixed"]) + len(data["obs_s3_gripper"]))
+              + len(data.get("obs_s2_board", [])) + len(data["obs_s3_fixed"]) + len(data["obs_s3_gripper"]))
     print(f"{'condition':>34} {'rmse_px':>10} {'n_corners':>10} {'n_obs':>7}   detail")
     for name in ("통합_raw-fk", "통합_no-fk"):
         r = results[name]
