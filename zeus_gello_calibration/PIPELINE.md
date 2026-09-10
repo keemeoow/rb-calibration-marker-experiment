@@ -1,5 +1,10 @@
 # Zeus GELLO 캘리브레이션 데이터셋 수집 + 외부 GT 검증 실행 가이드
 
+> **촬영 데이터 루트:** 앞으로 생성하는 원본 영상, depth, robot state, 재촬영본,
+> External GT 기록은 모두 `zeus_gello_calibration/data/` 아래에만 저장한다.
+> 촬영 스크립트는 이 경로 밖의 `--out-root`, `--data_root`, `--root_folder`,
+> `--log`를 오류로 거부한다.
+
 ## 0. 사전 준비
 
 - 큐브를 테이블 중앙에서 치우기 (session1 재파지 전 그리퍼가 지나갈 자리 확보)
@@ -26,7 +31,7 @@ python zeus_gello_calibration/capture_session.py --session 3
 - 로봇 움직임은 **사람(GELLO)**이 함 -- 이 스크립트는 로봇 서버에 읽기 전용으로
   붙어서 `get_state()`만 폴링, 움직임 명령은 전혀 안 보냄.
 - SPACE를 누른 순간의 pose/joints(`robot.json`) + 카메라 4대 사진을
-  `data/session{N}_.../capture/<idx:03d>/`에 저장.
+  `zeus_gello_calibration/data/session{N}_.../capture/<idx:03d>/`에 저장.
 - 새로운 자세를 자유롭게 만들어낼 수 있는 유일한 단계 (세 세션 다 최초엔 이걸로 찍음).
 - `--num-poses`(기본 15)만큼 반복, `q`/ESC로 조기 종료, `--reset`으로 처음부터.
 - **한계**: SPACE 누르는 순간에도 사람 손이 미세하게 움직이고 있을 수 있어서,
@@ -112,10 +117,11 @@ python zeus_gello_calibration/fit_calibration_methods_mm.py    # mm 학습, 3개
    ```
    42.97, 0.12, -105.91, -14.90, -59.33, -104.72
    ```
-5. 촬영 + 6가지 방식(통합/독립 × no-fk/raw-fk × px/mm) 결과 비교:
+5. 촬영 + 여섯 calibration fit 결과 비교:
    ```bash
-   python zeus_gello_calibration/gt_compare_fits.py
-   ```
+    python zeus_gello_calibration/gt_compare_fits.py
+    ```
+   촬영본은 `zeus_gello_calibration/data/gt_compare_captures/`에 저장한다.
 6. **다음 트라이얼 준비**: step 3에서 기록한 joint 좌표로 이동 → 5cm 내려가서 그리퍼 **close**(큐브 집기) → 5cm 올라오기 → 다음 촬영 위치로 이동 → 5cm 내려가서 큐브 내려놓기 → **step 3부터 반복**.
 
 ## 안전 수칙

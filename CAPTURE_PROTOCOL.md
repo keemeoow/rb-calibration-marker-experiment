@@ -4,6 +4,9 @@
 적용 대상: 새 composite-target calibration session  
 비적용 대상: 기존 `data/session04` legacy 촬영
 
+새 촬영의 유일한 데이터 루트는 `zeus_gello_calibration/data/`다. 기존
+`data/session04`는 과거 결과 재현과 진단에만 읽기 전용으로 사용한다.
+
 이 문서는 최종 비교실험 `A0~A5`, `B1~B3`에 공통으로 사용할 촬영 계약이다.
 연구 주장과 최종 판정 원칙은 [RESEARCH.md](RESEARCH.md)를 따른다.
 
@@ -313,7 +316,7 @@ PC에서는 frozen plan을 넘겨 새 session을 자동 생성한다.
 
 ```bash
 python3 03_capture.py \
-  --data_root data \
+  --data_root zeus_gello_calibration/data \
   --intrinsics_dir intrinsics \
   --waypoints_file capture_plans/composite_rig_45.json \
   --use_robot --manual_robot \

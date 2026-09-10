@@ -66,7 +66,7 @@ python3 02_calibrate_intrinsics.py \
 
 # 2. cube/board 영상, depth, robot FK 동시 캡처
 python3 03_capture.py \
-  --data_root data \
+  --data_root zeus_gello_calibration/data \
   --intrinsics_dir intrinsics \
   --use_robot \
   --robot_ip 192.168.0.23 \
@@ -75,16 +75,16 @@ python3 03_capture.py \
 
 # 2b. board/cube geometry와 native-pixel corner를 SHA-256 manifest로 고정
 python3 04_filter_observations.py \
-  --session-root data/sessionNN/calib_train \
+  --session-root zeus_gello_calibration/data/sessionNN/calib_train \
   --intrinsics-dir intrinsics
 
 # 3. A/B 비교실험 실행
 python3 05_calibrate.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
   --out_dir ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1
 ```
 
@@ -145,7 +145,7 @@ $$
 비교실험의 필수 입력은 다음과 같다.
 
 ```text
-data/sessionNN/calib_train/
+zeus_gello_calibration/data/sessionNN/calib_train/
 ├── meta.json
 ├── pose_convention_manifest.json  # 기록 frame이 섞인 세션만 필요
 └── ... RGB/depth images
@@ -492,10 +492,10 @@ B2/B3는 all-marker shared initializer에서 시작한 뒤 residual과 변수를
 
 ```bash
 python3 tools/compare_markers.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
   --out_dir ABLATION_TEST_result/sessionNN/marker_system_end_to_end
 ```
 
@@ -517,10 +517,10 @@ ablation 관측으로는 사용하지만, 최종 heldout 또는 External GT rank
 
 ```bash
 python3 tools/evaluate_cross_target.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
   --table1_result ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
   --out_dir ABLATION_TEST_result/sessionNN/cross_target_evaluation
 ```
@@ -712,56 +712,56 @@ Markdown/HTML은 새 JSON/CSV만 입력으로 사용해 다시 생성한다. 이
 ```bash
 # 선택: Shared Baseline (동일 초기값)만 먼저 생성
 python3 05_calibrate.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
   --out_dir ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1 \
   --baseline_only
 
 # A0~A5/B1~B3 최종 9행 실행
 python3 05_calibrate.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --num_inits 3 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
   --out_dir ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1
 
 # 상세 calibration 결과와 모든 행렬 출력
 python3 06_make_report.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
   --table1 ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
   --out_dir ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1
 
 # 선택 평가: 저장된 모든 방법의 외부-GT 전 board/cube 내부 평가
 python3 tools/evaluate_cross_target.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
   --table1_result ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
   --out_dir ABLATION_TEST_result/sessionNN/cross_target_evaluation
 
 # 선택 평가: marker modality별 end-to-end 비교
 python3 tools/compare_markers.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
   --out_dir ABLATION_TEST_result/sessionNN/marker_system_end_to_end
 
 # 선택 평가: OpenCV PnP 독립 VISION relative-pose 기준선
 python3 tools/opencv_baseline.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
   --out_dir ABLATION_TEST_result/sessionNN/opencv_relative_baseline
 
 # 독립 robot task trial 수집 후 success/contact-error 평가
@@ -771,33 +771,33 @@ python3 -m calibration_pipeline.task_trial \
 
 # Outlier soft-weighting 대조: 같은 관측을 linear loss로 재실행
 python3 05_calibrate.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --num_inits 3 \
   --loss linear \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
   --out_dir ABLATION_TEST_result/sessionNN/outlier_ablation/linear_table1
 python3 tools/evaluate_cross_target.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --loss linear \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
   --table1_result ABLATION_TEST_result/sessionNN/outlier_ablation/linear_table1/ABLATION_TEST_table1_methods.json \
   --out_dir ABLATION_TEST_result/sessionNN/outlier_ablation/linear_cross_target
 python3 tools/summarize_outlier_ablation.py
 
 # Hard rejection 민감도: strict 관측 정책으로 재보정 후 동일 held-out 비교
 python3 05_calibrate.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --num_inits 3 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
   --observation-filter-policy strict \
   --out_dir ABLATION_TEST_result/sessionNN/outlier_ablation/strict_table1
 python3 tools/summarize_hard_rejection_ablation.py

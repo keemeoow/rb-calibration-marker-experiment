@@ -42,6 +42,10 @@ from capture_session import (  # noqa: E402
 from fit_grasp_offset import LOCAL_CAM_IDS, load_intrinsics_by_label  # noqa: E402
 from gt_pick_test import GT_CUBE_CONFIG_PATH, FIXED_LABELS, load_fit  # noqa: E402
 from session2_pick_and_place import ROBOT_TIMEOUT_DEFAULT  # noqa: E402
+from zeus_gello_calibration.paths import (  # noqa: E402
+    ZEUS_DATA_ROOT,
+    require_zeus_data_path,
+)
 
 def detect_cube_pose_all(frames, K_map, D_map, T_base_cam, T_gripper_cam, T_base_gripper_now,
                          cube_target, reproj_thr_mean_px):
@@ -118,11 +122,19 @@ def main():
     ap.add_argument("--reproj-thr-px", type=float, default=10.0)
     ap.add_argument("--no-cam-reset", action="store_true")
     ap.add_argument("--no-preview", action="store_true")
-    ap.add_argument("--out-root", default=str(REPO_ROOT / "zeus_gello_calibration" / "gt_compare_captures"))
+    ap.add_argument(
+        "--out-root",
+        default=str(ZEUS_DATA_ROOT / "gt_compare_captures"),
+        help=f"GT capture output (must stay inside {ZEUS_DATA_ROOT})",
+    )
     ap.add_argument("--robot-ip", default=ROBOT_IP_DEFAULT)
     ap.add_argument("--robot-port", type=int, default=ROBOT_PORT_DEFAULT)
     ap.add_argument("--robot-timeout", type=float, default=ROBOT_TIMEOUT_DEFAULT)
     args = ap.parse_args()
+    try:
+        out_root = require_zeus_data_path(args.out_root, label="--out-root")
+    except ValueError as exc:
+        ap.error(str(exc))
 
     cube_cfg, src = load_cube_config_from_json_file(args.gt_cube_config)
     if cube_cfg is None:
@@ -148,7 +160,7 @@ def main():
         frames = grab_frames(cams, used_labels)
         robot_state = read_robot_state(rb, {"note": "gt_compare_fits: 로봇 이동 없음, 현재 자세 그대로 읽음"})
         T_base_gripper_now = pose6_to_T(robot_state["pose"])
-        out_dir = Path(args.out_root) / time.strftime("%Y%m%d_%H%M%S")
+        out_dir = out_root / time.strftime("%Y%m%d_%H%M%S")
         write_capture(frames, out_dir, robot_state)
     finally:
         rb.close()

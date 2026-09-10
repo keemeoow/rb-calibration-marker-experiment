@@ -27,7 +27,7 @@ gc
 
 << 최종 45-event 촬영 >>
 python3 03_capture.py \
-    --data_root data --intrinsics_dir intrinsics \
+    --data_root zeus_gello_calibration/data --intrinsics_dir intrinsics \
     --waypoints_file capture_plans/composite_rig_45.json \
     --use_robot --manual_robot \
     --robot_ip 192.168.0.23 --robot_port 12348 \
@@ -87,6 +87,7 @@ from capture_pipeline.waypoint_safety import (
     validate_safe_joint_config,
     validate_waypoint_semantics,
 )
+from zeus_gello_calibration.paths import ZEUS_DATA_ROOT, require_zeus_data_path
 
 
 def ensure_dir(p: str) -> str:
@@ -752,13 +753,15 @@ def main():
         default=None,
         help=(
             "Explicit capture folder for a deliberate resume/legacy run. "
-            "Omit this option for the default automatic data/sessionNN/calib_train allocation."
+            "It must be inside zeus_gello_calibration/data. Omit this option "
+            "for automatic sessionNN/calib_train allocation."
         ),
     )
     parser.add_argument(
         "--data_root",
-        default="data",
-        help="Parent for automatic sessionNN allocation when --root_folder is omitted (default: data)",
+        default=str(ZEUS_DATA_ROOT),
+        help=("Parent for automatic sessionNN allocation when --root_folder is omitted; "
+              f"must stay inside {ZEUS_DATA_ROOT}"),
     )
     parser.add_argument(
         "--waypoints_file",
@@ -929,6 +932,13 @@ def main():
     parser.add_argument("--no_start_gate", action="store_true", help=argparse.SUPPRESS)
 
     args = parser.parse_args()
+    try:
+        args.data_root = str(require_zeus_data_path(args.data_root, label="--data_root"))
+        if args.root_folder is not None:
+            args.root_folder = str(require_zeus_data_path(
+                args.root_folder, label="--root_folder"))
+    except ValueError as exc:
+        parser.error(str(exc))
 
     try:
         from capture_pipeline.camera import RealSenseCamera

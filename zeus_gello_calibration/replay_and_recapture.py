@@ -64,6 +64,10 @@ from capture_session import (  # noqa: E402
     grab_frames, write_capture, read_robot_state,
     ROBOT_IP_DEFAULT, ROBOT_PORT_DEFAULT, DEVICE_MAP_DEFAULT,
 )
+from zeus_gello_calibration.paths import (  # noqa: E402
+    ZEUS_DATA_ROOT,
+    require_zeus_data_path,
+)
 
 JNT_SPEED_DEFAULT = 10.0   # GELLO 텔레옵과 동일한 "실기 테스트로 정한" 기본값
 OVERLAP_DEFAULT = 0.0      # 블렌딩 없이 매번 완전히 멈춰야 정확한 정지 후 촬영이 됨
@@ -108,7 +112,11 @@ def main():
     ap.add_argument("--robot-port", type=int, default=ROBOT_PORT_DEFAULT)
     ap.add_argument("--robot-timeout", type=float, default=ROBOT_TIMEOUT_DEFAULT)
     ap.add_argument("--device-map", default=str(DEVICE_MAP_DEFAULT))
-    ap.add_argument("--out-root", default=str(Path(__file__).resolve().parent / "data"))
+    ap.add_argument(
+        "--out-root",
+        default=str(ZEUS_DATA_ROOT),
+        help=f"Zeus capture data root (must stay inside {ZEUS_DATA_ROOT})",
+    )
     ap.add_argument("--jnt-speed", type=float, default=JNT_SPEED_DEFAULT)
     ap.add_argument("--overlap", type=float, default=OVERLAP_DEFAULT)
     ap.add_argument("--overwrite", action="store_true",
@@ -140,7 +148,11 @@ def main():
             return
 
     info = SESSIONS[args.session]
-    session_dir = Path(args.out_root) / f"session{args.session}_{info['name']}"
+    try:
+        data_root = require_zeus_data_path(args.out_root, label="--out-root")
+    except ValueError as exc:
+        ap.error(str(exc))
+    session_dir = data_root / f"session{args.session}_{info['name']}"
     capture_root = session_dir / "capture"
     out_root = capture_root if args.overwrite else session_dir / "capture_replayed"
 

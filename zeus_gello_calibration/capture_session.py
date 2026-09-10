@@ -34,8 +34,17 @@ import cv2
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from capture_pipeline.camera import RealSenseCamera  # noqa: E402
+try:  # Hardware SDK is optional when importing helpers or collecting tests.
+    from capture_pipeline.camera import RealSenseCamera  # noqa: E402
+except ModuleNotFoundError as exc:  # pragma: no cover - depends on capture host
+    if exc.name != "pyrealsense2":
+        raise
+    RealSenseCamera = None
 from robot.backends.zeus_client import ZeusClient  # noqa: E402
+from zeus_gello_calibration.paths import (  # noqa: E402
+    ZEUS_DATA_ROOT,
+    require_zeus_data_path,
+)
 
 ROBOT_IP_DEFAULT = "192.168.0.23"
 ROBOT_PORT_DEFAULT = 12350
@@ -79,6 +88,10 @@ def load_camera_labels(device_map_path: Path) -> dict:
 
 
 def connect_cameras(labels: dict, no_reset: bool = False):
+    if RealSenseCamera is None:
+        raise RuntimeError(
+            "pyrealsense2 is required for camera capture; run on the RealSense host"
+        )
     if not no_reset:
         RealSenseCamera.reset_all_devices()
     devices = RealSenseCamera.list_devices()
@@ -191,6 +204,7 @@ def grab_frames(cams: dict, labels: dict) -> dict:
 def write_capture(frames: dict, out_dir: Path, robot_state: dict) -> None:
     """실제 디스크 쓰기 -- 느릴 수 있는 부분이라 백그라운드 스레드에서 돌려서
     메인 루프(미리보기 갱신)가 멈추지 않게 한다."""
+    out_dir = require_zeus_data_path(out_dir, label="capture output")
     out_dir.mkdir(parents=True, exist_ok=True)
     saved = []
     for label, (color, depth) in frames.items():
@@ -225,7 +239,11 @@ def main():
     ap.add_argument("--robot-ip", default=ROBOT_IP_DEFAULT)
     ap.add_argument("--robot-port", type=int, default=ROBOT_PORT_DEFAULT)
     ap.add_argument("--device-map", default=str(DEVICE_MAP_DEFAULT))
-    ap.add_argument("--out-root", default=str(Path(__file__).resolve().parent / "data"))
+    ap.add_argument(
+        "--out-root",
+        default=str(ZEUS_DATA_ROOT),
+        help=f"Zeus capture data root (must stay inside {ZEUS_DATA_ROOT})",
+    )
     ap.add_argument("--num-poses", type=int, default=15, help="목표 촬영 개수 (기본 15)")
     ap.add_argument("--reset", action="store_true", help="기존 세션 폴더 있어도 처음부터(0번)")
     ap.add_argument("--no-cam-reset", action="store_true", help="카메라 시작 전 하드웨어 리셋 생략")
@@ -233,7 +251,11 @@ def main():
     args = ap.parse_args()
 
     info = SESSIONS[args.session]
-    session_dir = Path(args.out_root) / f"session{args.session}_{info['name']}"
+    try:
+        data_root = require_zeus_data_path(args.out_root, label="--out-root")
+    except ValueError as exc:
+        ap.error(str(exc))
+    session_dir = data_root / f"session{args.session}_{info['name']}"
     capture_root = session_dir / "capture"
 
     start_index = 0

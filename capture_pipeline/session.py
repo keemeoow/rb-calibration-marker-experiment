@@ -8,6 +8,8 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from zeus_gello_calibration.paths import ZEUS_DATA_ROOT, require_zeus_data_path
+
 
 SESSION_PREFIX = "session"
 SESSION_DIGITS = 2
@@ -48,14 +50,14 @@ def _existing_indices(data_root: str) -> list[int]:
     return indices
 
 
-def allocate_next_capture_session(data_root: str = "data") -> CaptureSession:
+def allocate_next_capture_session(data_root: str = str(ZEUS_DATA_ROOT)) -> CaptureSession:
     """Atomically reserve ``sessionNN`` and create its calibration capture root.
 
     Numbering always advances from the largest existing numbered session.  A
     directory is never reused, even if it is empty, so an interrupted or
     partially captured session cannot be overwritten silently.
     """
-    data_root = os.path.abspath(os.path.expanduser(data_root))
+    data_root = str(require_zeus_data_path(data_root, label="capture data root"))
     os.makedirs(data_root, exist_ok=True)
     next_index = max(_existing_indices(data_root), default=0) + 1
 

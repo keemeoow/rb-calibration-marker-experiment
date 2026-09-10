@@ -64,6 +64,10 @@ from session2_pick_and_place import (  # noqa: E402
     APPROACH_MM_DEFAULT, MOVE_LIN_SPEED,
     DESCEND_LIN_SPEED, GRIP_TIMEOUT_S, SETTLE_S, ROBOT_TIMEOUT_DEFAULT, approach_of,
 )
+from zeus_gello_calibration.paths import (  # noqa: E402
+    ZEUS_DATA_ROOT,
+    require_zeus_data_path,
+)
 
 GT_CUBE_CONFIG_PATH = REPO_ROOT / "targets" / "gt_cube" / "cube_config.json"
 FIT_JSON_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "pass1_grasp_offset_replayed.json"
@@ -165,11 +169,19 @@ def main():
     ap.add_argument("--move-speed", type=float, default=MOVE_LIN_SPEED)
     ap.add_argument("--descend-speed", type=float, default=DESCEND_LIN_SPEED)
     ap.add_argument("--trials", type=int, default=1, help="반복 횟수 -- 매 트라이얼마다 큐브를 새로 놓고 진행")
-    ap.add_argument("--log", default=str(REPO_ROOT / "zeus_gello_calibration" / "gt_pick_test_log.json"))
+    ap.add_argument(
+        "--log",
+        default=str(ZEUS_DATA_ROOT / "external_gt" / "gt_pick_test_log.json"),
+        help=f"External GT trial log (must stay inside {ZEUS_DATA_ROOT})",
+    )
     ap.add_argument("--execute", action="store_true", help="실제로 검출+이동 (없으면 검출만 하고 이동 안 함)")
     ap.add_argument("--no-cam-reset", action="store_true")
     ap.add_argument("--no-preview", action="store_true")
     args = ap.parse_args()
+    try:
+        log_path = require_zeus_data_path(args.log, label="--log")
+    except ValueError as exc:
+        ap.error(str(exc))
 
     cube_cfg, src = load_cube_config_from_json_file(args.gt_cube_config)
     if cube_cfg is None:
@@ -270,7 +282,7 @@ def main():
             view.stop()
         stop_cameras(cams)
 
-    log_path = Path(args.log)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
     existing = []
     if log_path.exists():
         try:

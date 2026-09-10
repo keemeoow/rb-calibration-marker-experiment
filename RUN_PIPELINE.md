@@ -16,6 +16,9 @@ Cross-target·marker-system·OpenCV baseline은 calibration 완료에 필요하�
 최종 비교실험의 촬영 기준은 [CAPTURE_PROTOCOL.md](CAPTURE_PROTOCOL.md) 한 문서로
 고정한다.
 
+새 촬영 데이터는 모두 `zeus_gello_calibration/data/` 아래에 저장한다. 기존
+`data/session04`는 legacy 결과 재현과 진단 입력으로만 유지한다.
+
 | 구분 | 상태 | 사용 범위 |
 | --- | --- | --- |
 | 기존 `03_capture.py` | legacy 구현 | 기존 `data/session04` 재현 및 진단 |
@@ -45,7 +48,7 @@ python3 02_calibrate_intrinsics.py \
 
 # 03 — Legacy RGB-D + robot FK 촬영; 최종 45-event 촬영에는 사용 금지
 python3 03_capture.py \
-  --data_root data \
+  --data_root zeus_gello_calibration/data \
   --intrinsics_dir intrinsics \
   --use_robot \
   --robot_ip 192.168.0.23 \
@@ -80,7 +83,7 @@ python3 06_make_report.py \
 | --- | --- | --- | --- |
 | 01 `export_intrinsics` | 연결된 RealSense, 스트림 설정 | serial 순으로 camera ID를 고정하고 factory intrinsic/extrinsic 및 depth scale을 읽는다 | `intrinsics/device_map.json`, `depth_scales.json`, `cam*.npz` |
 | 02 `calibrate_intrinsics` | 01 결과, ChArUco board | 다양한 위치의 view로 OpenCV color intrinsic calibration을 수행한다 | 갱신된 `cam*.npz`, `factory_backup/`, `charuco_capture/` |
-| 03 `capture` (현재 legacy) | 02 결과, board/cube, 카메라, robot FK | `A_placement/B_eyetohand` block에서 동기화 및 marker quality gate를 통과한 event를 저장한다 | `data/sessionNN/calib_train/meta.json`, RGB/depth 이미지 |
+| 03 `capture` (현재 legacy) | 02 결과, board/cube, 카메라, robot FK | `A_placement/B_eyetohand` block에서 동기화 및 marker quality gate를 통과한 event를 저장한다 | `zeus_gello_calibration/data/sessionNN/calib_train/meta.json`, RGB/depth 이미지 |
 | 04 `filter_observations` | 03 세션, 고정 K/D | 모든 RGB를 다시 검출하고 관측 정책을 적용해 native-pixel corner와 원본 SHA-256을 고정한다 | `Step2b_observation_manifest.json`, QA CSV, overlay, `CAPTURE_FILTER.md` |
 | 05 `calibrate` | 04 manifest, K/D, `meta.json`, robot FK | event 단위 train/held-out 분리, 공통 초기화, 9개 조건 fit, `frame-prune → refit → rollback`, held-out 평가 | `ABLATION_TEST_table1_methods.json`, 두 shared artifact |
 | 06 `make_report` | 05의 `ABLATION_TEST_table1_methods.json` | 재최적화 없이 수렴·오차·prune 결정과 모든 행렬을 정리한다 | `calibration_summary.csv`, `calibration_matrices.json` |
@@ -280,7 +283,7 @@ plan을 사용한 PC 명령은 다음과 같다.
 
 ```bash
 python3 03_capture.py \
-  --data_root data \
+  --data_root zeus_gello_calibration/data \
   --intrinsics_dir intrinsics \
   --waypoints_file capture_plans/composite_rig_45.json \
   --use_robot --manual_robot \
