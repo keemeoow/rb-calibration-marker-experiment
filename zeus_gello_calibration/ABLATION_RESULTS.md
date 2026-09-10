@@ -32,6 +32,12 @@ sequential_frozen_stage(A1, 그리퍼가 먼저 정하고 고정캠이 일방적
 | 통합_raw-fk | board+cube | unified_joint_optimization | cube pose=raw-FK-fixed | 0.7707 | N/A | **2.2907** | 4.1042 | 4.4201 / 1.0675 | **2.77** / 0.69 |
 | 독립_no-fk | board+cube (그룹 분리) | independent_parallel (핸드오프 없음) | cube pose=estimated | 0.61 / 0.55 | N/A | 3.8432 | **3.7037** | **3.9423** / 1.0798 | 3.20 / **0.66** |
 
+| 통합_no-fk **cube-only** | cube only (board 전부 제외, session3 미사용) | unified_joint_optimization | cube pose=estimated | 0.9832 | N/A | 3.3627 | 3.8476 | 4.1516 / 0.9583 | 2.68 / 0.62 |
+| 통합_raw-fk **cube-only** | cube only | unified_joint_optimization | cube pose=raw-FK-fixed | 1.2963 | N/A | **2.1210** | 5.4363 | 5.9870 / 1.0247 | **2.57** / 0.65 |
+| 독립_no-fk cube-only | cube only | independent_parallel | — | N/A | N/A | N/A | N/A | N/A | N/A |
+
+**cube-only(late_table1 B2 "−board" 대응)**: 보드 관측을 전부 빼면(관측치 220 → 102) 통합_no-fk는 train 0.63→0.98px, held-out px 3.09→3.36, joint 1.76→2.11mm로 전반적으로 나빠지고, 통합_raw-fk는 held-out px가 2.29→2.12로 좋아 보이지만 cross-view 4.10→5.44px / cam-common 4.42→5.99mm로 **카메라 간 일치도가 크게 무너진다**(큐브 FK 앵커에 카메라를 맞추는 걸 보드가 더 이상 견제해주지 않아서). **독립 cube-only는 정의 불가**: 그리퍼 그룹 관측이 파킹 자세 1개에서 찍은 큐브 15장뿐이고 큐브 pose가 자유 변수라 T_gripper_cam이 식별되지 않는다(보드가 그 역할). 결론: 보드는 통합에서 "있으면 좋은" 게 아니라 그리퍼캠 회전 식별과 raw-fk의 카메라 왜곡 억제에 필요하다. cube-only의 gtc 초기값은 session2 큐브만으로(`init_gtc_from_cubes`) 구했다.
+
 (데이터 풀 220개 기준. 직전 162개(session2 보드 미포함) 값: 통합_no-fk 0.7121 / 2.9557 / 3.9234 / 4.2250·1.0534, 통합_raw-fk 0.8850 / 2.2087 / 4.2813 / 4.6416·1.1567, 독립 0.68·0.65 / 3.8053 / 3.6668 / 3.9182·1.1376 — 보드 추가로 train·cross-view·cam-common은 전부 개선, held-out px는 소폭 악화.)
 
 (독립의 Train은 고정캠/그리퍼캠 두 그룹을 완전히 따로 풀기 때문에 "고정캠값/그리퍼캠값"으로 표기. Heldout px/Cross-view px/Cam-common은 `eval_heldout_and_consistency.py`로 계산. Cross-view Cube px = late_table1과 같은 정의로, 한 카메라의 단일 이미지 PnP pose를 캘리브레이션된 extrinsics로 다른 카메라로 옮겨 재투영했을 때의 코너 px RMSE — 고정캠-고정캠 + 그리퍼캠-고정캠 쌍, 양방향, 세트당 4대 → 81쌍/162방향.)
@@ -43,6 +49,16 @@ Cross-view px / Cam-common을 **held-out 방식**(각 fold에서 빠진 세트�
 | 통합_no-fk | 3.8695 | 3.8852 | 4.1569 / 0.9986 | 4.1713 / 1.0012 | 1.764 / 0.511 |
 | 통합_raw-fk | 4.1042 | 4.0937 | 4.4201 / 1.0675 | 4.4026 / 1.0719 | **0.945** / 0.538 |
 | 독립_no-fk | 3.7037 | **3.7161** | 3.9423 / 1.0798 | **3.9523** / 1.0811 | 2.354 / **0.460** |
+
+**Train 재투영 오차의 여러 통계** (같은 fit, 코너별 유클리드 오차 |e| 기준; Table 1의 "Train RMSE px"는 dx,dy 성분을 각각 표본으로 본 RMS라 |e|의 RMS보다 √2배 작다):
+
+| 방법 | mean \|e\| | RMS \|e\| | RMS(성분) = Table 1 | median | P95 |
+|---|---:|---:|---:|---:|---:|
+| 통합_no-fk | 0.697 | 0.891 | 0.630 | 0.563 | 1.81 |
+| 통합_raw-fk | 0.816 | 1.090 | 0.771 | 0.644 | 2.10 |
+| 독립_no-fk 고정캠 / 그리퍼 | 0.676 / 0.611 | 0.869 / 0.776 | 0.615 / 0.548 | 0.535 / 0.459 | 1.78 / 1.60 |
+| 통합_no-fk cube-only | 1.163 | 1.390 | 0.983 | 0.987 | 2.59 |
+| 통합_raw-fk cube-only | 1.550 | 1.833 | 1.296 | 1.339 | 3.30 |
 
 `joint` 열은 held-out 큐브를 4대 코너로 한 번에 삼각측량(`joint_cube_estimate`)한 held-out — 단일 PnP 4개 평균(위 표 Held-out mm 2.4~3.1)보다 노이즈가 작아 방식 차이가 훨씬 선명하게 갈린다(결과 3 참고).
 

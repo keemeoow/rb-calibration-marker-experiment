@@ -232,6 +232,39 @@ def load_all_data(args):
     )
 
 
+# ------------------------------------------------------------- cube-only (보드 제외)
+def strip_board_data(data):
+    """보드 관측(session3 전체 + session2 보드)을 전부 뺀 데이터 -- late_table1 B2
+    (-board, cube only)에 대응. session3는 아예 안 쓰는 조건."""
+    d = dict(data)
+    for k in ("obs_s3", "obs_s3_fixed", "obs_s3_gripper", "obs_s2_board", "obs_s2_board_fixed", "obs_s2_board_gripper"):
+        d[k] = []
+    return d
+
+
+def init_gtc_from_cubes(data):
+    """보드 없이 T_gripper_cam 초기값: 고정캠으로 초기화한 세트별 큐브 pose(base)와
+    그리퍼캠 단일 이미지 PnP(T_cam_cube), 촬영 순간 FK로
+    gtc = inv(robot_T) @ T_base_cube @ inv(T_cam_cube) 후보들을 robust 평균."""
+    cam_init, K_map, D_map = data["cam_init"], data["K_map"], data["D_map"]
+    set_ids = sorted(data["items_by_index"])
+    cubes_fixed = init_cube_poses(data["obs_s2_fixed"], K_map, D_map, cam_init, np.eye(4), {}, -999, set_ids)
+    robot_T = data["robot_T_s2_gripper"]
+    cands = []
+    for o in data["obs_s2_gripper"]:
+        s = int(o.set_idx) if o.set_idx is not None else None
+        if s not in cubes_fixed or int(o.event) not in robot_T:
+            continue
+        T_cam_cube = solve_observed_pose(o, K_map, D_map)
+        if T_cam_cube is None:
+            continue
+        cands.append(inv_T(robot_T[int(o.event)]) @ cubes_fixed[s] @ inv_T(T_cam_cube))
+    if not cands:
+        raise RuntimeError("cube-only gtc 초기화 실패: 그리퍼캠 큐브 관측이 없음")
+    T, diag = cp.robust_se3_average(cands, None)
+    return T, diag
+
+
 # ------------------------------------------------------------------ 통합(unified)
 def solve_unified(data, fk_mode, gtc_init, board_init):
     cam_init, grasp_init = data["cam_init"], data["grasp_init"]
@@ -240,6 +273,7 @@ def solve_unified(data, fk_mode, gtc_init, board_init):
     set_ids = sorted(data["items_by_index"])
     robot_T = {**data["robot_T_s1"], **data["robot_T_s2_gripper"], **data["robot_T_s3"]}
     observations = data["obs_s1"] + obs_s2 + data.get("obs_s2_board", []) + data["obs_s3"]
+    has_board = any(o.marker == "board" for o in observations)
 
     if fk_mode == "no_fk":
         cubes = init_cube_poses(obs_s2, K_map, D_map, cam_init, gtc_init, robot_T, GRIPPER_LOCAL_ID, set_ids)
@@ -250,9 +284,11 @@ def solve_unified(data, fk_mode, gtc_init, board_init):
     observations = [o for o in observations
                     if o.set_idx is None or int(o.set_idx) in cubes or o.grasp_idx is not None]
 
-    state = PoseState(cams=dict(cam_init), gtc=gtc_init.copy(), board=board_init.copy(),
+    state = PoseState(cams=dict(cam_init), gtc=gtc_init.copy(),
+                      board=(board_init.copy() if (has_board and board_init is not None) else None),
                       cubes=dict(cubes), grasps={0: grasp_init.copy()})
-    keys = variable_keys(["T_base_Ci", "T_gripper_cam", "T_base_board"] + cube_key + ["T_gripper_cube_by_grasp"], state)
+    keys = variable_keys(["T_base_Ci", "T_gripper_cam"] + (["T_base_board"] if has_board else [])
+                         + cube_key + ["T_gripper_cube_by_grasp"], state)
     final_state, diag = solve_corner_reprojection(
         observations=observations, variable_keys_=keys, reference_state=state,
         robot_T=robot_T, K_map=K_map, D_map=D_map,
@@ -299,13 +335,15 @@ def solve_parallel_fixed(data):
     obs_s3f = data["obs_s3_fixed"]
     set_ids = sorted(data["items_by_index"])
     cubes = init_cube_poses(obs_s2, K_map, D_map, cam_init, np.eye(4), {}, -999, set_ids)
-    board_init_fixed = init_board_pose(obs_s3f, K_map, D_map, cam_init)
+    board_obs = data.get("obs_s2_board_fixed", []) + obs_s3f
+    board_init_fixed = init_board_pose(board_obs, K_map, D_map, cam_init) if board_obs else None
     observations = (data["obs_s1"]
                     + [o for o in obs_s2 if o.set_idx is not None and int(o.set_idx) in cubes]
-                    + data.get("obs_s2_board_fixed", []) + obs_s3f)
+                    + board_obs)
     state = PoseState(cams=dict(cam_init), gtc=np.eye(4), board=board_init_fixed,
                       cubes=dict(cubes), grasps={0: grasp_init.copy()})
-    keys = variable_keys(["T_base_Ci", "T_base_cube_by_set", "T_gripper_cube_by_grasp", "T_base_board"], state)
+    keys = variable_keys(["T_base_Ci", "T_base_cube_by_set", "T_gripper_cube_by_grasp"]
+                         + (["T_base_board"] if board_obs else []), state)
     final_state, diag = solve_corner_reprojection(
         observations=observations, variable_keys_=keys, reference_state=state,
         robot_T={**data["robot_T_s1"], **data["robot_T_s3"]}, K_map=K_map, D_map=D_map,
@@ -371,6 +409,38 @@ def per_corner_errors(state, observations, robot_T, K_map, D_map, gripper_id):
     return errs
 
 
+def main_cube_only(args, data):
+    """보드 없이(=session3 미사용, session2 보드 관측 제외) 큐브만으로 통합 2조건.
+    독립_no-fk는 이 조건에서 정의 불가: 그리퍼 그룹 관측이 파킹 자세 1개에서 찍은
+    큐브 15장뿐이고 큐브 pose가 자유 변수라, T_gripper_cam이 어떤 값이든 큐브
+    pose가 흡수해서 식별이 안 된다(보드가 그 역할을 하고 있었음). 통합은 큐브가
+    고정캠과 공유 변수라 식별된다."""
+    data = strip_board_data(data)
+    K_map, D_map = data["K_map"], data["D_map"]
+    gtc_init, diag = init_gtc_from_cubes(data)
+    print(f"[cube-only] T_gripper_cam 초기값 (session2 큐브만): t_mm={np.round(gtc_init[:3,3]*1000,2).tolist()} "
+          f"(n={diag['num_total']}, inlier={diag['num_inliers']}, std={diag['translation_std_mm']:.2f}mm)\n")
+    fit_out_dir = REPO_ROOT / "zeus_gello_calibration"
+    results = {}
+    for fk_mode, label in (("no_fk", "통합_no-fk_cubeonly"), ("fixed_fk", "통합_raw-fk_cubeonly")):
+        state, diag, n_obs = solve_unified(data, fk_mode, gtc_init, None)
+        results[label] = {"success": diag["success"], "rmse_px": diag["train_reprojection_rmse_px"],
+                          "n_corners": diag["n_residuals"] // 2, "n_observations": n_obs}
+        export_fit_json(fit_out_dir / f"fit_{label}.json", state.grasps[0], state.cams, state.gtc)
+    results["독립_no-fk_cubeonly"] = {"success": False, "reason": "gripper group not identifiable without board (cube poses free, single parking view)"}
+    total_n = len(data["obs_s1"]) + len(data["obs_s2_fixed"]) + len(data["obs_s2_gripper"])
+    print(f"{'condition':>24} {'rmse_px':>10} {'n_corners':>10} {'n_obs':>7}")
+    for name, r in results.items():
+        if "rmse_px" in r:
+            print(f"{name:>24} {r['rmse_px']:>10.4f} {r['n_corners']:>10d} {r['n_observations']:>7d}")
+        else:
+            print(f"{name:>24} {'N/A':>10}   ({r['reason']})")
+    print(f"\n(cube-only 데이터 풀 총 observation 수 = {total_n})")
+    out_path = Path(args.out).with_name(Path(args.out).stem + "_cubeonly.json")
+    out_path.write_text(json.dumps({"cube_only": True, "total_observations": total_n, "results": results}, indent=2, default=str))
+    print(f"wrote {out_path}")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--session1-dir", default=str(SESSION1_DIR_DEFAULT))
@@ -386,10 +456,15 @@ def main():
     ap.add_argument("--fixed-min-corners", type=int, default=8)
     ap.add_argument("--cube-observation-policy", default="legacy", choices=("legacy", "core_multiface"))
     ap.add_argument("--out", default=str(REPO_ROOT / "zeus_gello_calibration" / "calibration_methods_comparison.json"))
+    ap.add_argument("--cube-only", action="store_true",
+                    help="보드 관측 전부 제외(session3 미사용 + session2 보드 제외). late_table1 B2(-board) 대응")
     args = ap.parse_args()
 
     data = load_all_data(args)
     K_map, D_map = data["K_map"], data["D_map"]
+
+    if args.cube_only:
+        return main_cube_only(args, data)
 
     gtc_init, board_init, eih_diag = estimate_board_handeye_initial(
         data["obs_s3"], data["robot_T_s3"], K_map, D_map, GRIPPER_LOCAL_ID)

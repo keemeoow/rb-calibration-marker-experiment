@@ -307,6 +307,8 @@ def main():
     ap.add_argument("--fixed-min-corners", type=int, default=8)
     ap.add_argument("--cube-observation-policy", default="legacy", choices=("legacy", "core_multiface"))
     ap.add_argument("--out", default=str(REPO_ROOT / "zeus_gello_calibration" / "heldout_and_consistency.json"))
+    ap.add_argument("--cube-only", action="store_true",
+                    help="보드 관측 전부 제외(session3 미사용 + session2 보드 제외); 통합 2조건만 (독립은 식별 불가)")
     args = ap.parse_args()
 
     data = load_all_data(args)
@@ -315,14 +317,21 @@ def main():
     robot_T_all = {**data["robot_T_s1"], **data["robot_T_s2_gripper"], **data["robot_T_s3"]}
     obs_all_s2 = data["obs_s2_fixed"] + data["obs_s2_gripper"]
 
-    gtc_init, board_init, _eih_diag = estimate_board_handeye_initial(
-        data["obs_s3"], data["robot_T_s3"], K_map, D_map, GRIPPER_LOCAL_ID)
+    if args.cube_only:
+        from fit_calibration_methods import init_gtc_from_cubes, strip_board_data
+        data = strip_board_data(data)
+        gtc_init, _ = init_gtc_from_cubes(data)
+        board_init = None
+        conditions = (("통합", "no_fk", "통합_no-fk_cubeonly"), ("통합", "fixed_fk", "통합_raw-fk_cubeonly"))
+        args.out = str(Path(args.out).with_name(Path(args.out).stem + "_cubeonly.json"))
+    else:
+        gtc_init, board_init, _eih_diag = estimate_board_handeye_initial(
+            data["obs_s3"], data["robot_T_s3"], K_map, D_map, GRIPPER_LOCAL_ID)
+        conditions = (("통합", "no_fk", "통합_no-fk"), ("통합", "fixed_fk", "통합_raw-fk"),
+                      ("독립_true", "no_fk", "독립_no-fk"))
 
     results = {}
-    for method, fk_mode, label in (
-        ("통합", "no_fk", "통합_no-fk"), ("통합", "fixed_fk", "통합_raw-fk"),
-        ("독립_true", "no_fk", "독립_no-fk"),
-    ):
+    for method, fk_mode, label in conditions:
         print(f"[{label}] leave-one-out held-out 계산 중 ({len(set_ids)}개 세트)...")
         heldout_rmse, per_set, per_set_mm_deg, heldout_cross = evaluate_heldout(
             method, data, fk_mode, gtc_init, board_init, robot_T_all, K_map, D_map, set_ids)
@@ -356,7 +365,7 @@ def main():
     print(f"\n[train-pooled: 전체 데이터 fit에서 잰 카메라 간 일치도]")
     print(f"{'condition':>16} {'heldout_px':>11} {'heldout_mm':>11} {'heldout_deg':>12} "
           f"{'cross_view_px':>14} {'cross_cam_mm':>13} {'cross_cam_deg':>14}")
-    for name in ("통합_raw-fk", "통합_no-fk", "독립_no-fk"):
+    for name in results:
         r = results[name]
         print(f"{name:>16} {r['heldout_cube_rmse_px']:>11.4f} "
               f"{r['heldout_translation_mean_mm']:>11.2f} {r['heldout_rotation_mean_deg']:>12.2f} "
@@ -364,7 +373,7 @@ def main():
               f"{r['cross_camera_translation_mm']:>13.4f} {r['cross_camera_rotation_deg']:>14.4f}")
     print(f"\n[held-out: 빠진 세트에 대해서만 잰 카메라 간 일치도, 15 fold pooled / joint = 다중뷰 공동 삼각측량 held-out]")
     print(f"{'condition':>16} {'xview_px':>10} {'xview_pairs':>12} {'camcom_mm':>10} {'camcom_deg':>11} {'camcom_pairs':>13} {'joint_mm':>9} {'joint_deg':>10}")
-    for name in ("통합_raw-fk", "통합_no-fk", "독립_no-fk"):
+    for name in results:
         h = results[name]["heldout_cross"]
         print(f"{name:>16} {h['cross_view_cube_pixel_transfer_rmse_px']:>10.4f} {h['cross_view_n_pairs']:>12d} "
               f"{h['cam_common_translation_mm']:>10.4f} {h['cam_common_rotation_deg']:>11.4f} {h['cam_common_n_pairs']:>13d} "

@@ -1,0 +1,22 @@
+{
+  "cube_only": true,
+  "total_observations": 102,
+  "results": {
+    "\ud1b5\ud569_no-fk_cubeonly": {
+      "success": true,
+      "rmse_px": 0.9831619988873336,
+      "n_corners": 992,
+      "n_observations": 102
+    },
+    "\ud1b5\ud569_raw-fk_cubeonly": {
+      "success": true,
+      "rmse_px": 1.2963407461124452,
+      "n_corners": 992,
+      "n_observations": 102
+    },
+    "\ub3c5\ub9bd_no-fk_cubeonly": {
+      "success": false,
+      "reason": "gripper group not identifiable without board (cube poses free, single parking view)"
+    }
+  }
+}
