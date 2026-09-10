@@ -28,19 +28,23 @@ sequential_frozen_stage(A1, 그리퍼가 먼저 정하고 고정캠이 일방적
 
 | 방법 | Calibration train target | Optimization | FK/target-pose 처리 | Train RMSE px | ALL Cube RMSE px | Heldout Cube RMSE px | Cross-view Cube px | Cam-common Cube mm/deg | External GT xyz TRE / rz (mm/deg, n=3) |
 |---|---|---|---|---:|---:|---:|---:|---:|---:|
-| 통합_no-fk | board+cube | unified_joint_optimization | cube pose=estimated | 0.7121 | N/A | 2.9557 | 3.9234 | 4.2250 / 1.0534 | 2.96 / 0.69 |
-| 통합_raw-fk | board+cube | unified_joint_optimization | cube pose=raw-FK-fixed | 0.8850 | N/A | **2.2087** | 4.2813 | 4.6416 / 1.1567 | **2.65** / 0.65 |
-| 독립_no-fk | board+cube (그룹 분리) | independent_parallel (핸드오프 없음) | cube pose=estimated | 0.68 / 0.65 | N/A | 3.8053 | **3.6668** | **3.9182** / 1.1376 | 3.08 / **0.63** |
+| 통합_no-fk | board+cube | unified_joint_optimization | cube pose=estimated | 0.6299 | N/A | 3.0863 | 3.8695 | 4.1569 / 0.9986 | 3.18 / 0.72 |
+| 통합_raw-fk | board+cube | unified_joint_optimization | cube pose=raw-FK-fixed | 0.7707 | N/A | **2.2907** | 4.1042 | 4.4201 / 1.0675 | **2.77** / 0.69 |
+| 독립_no-fk | board+cube (그룹 분리) | independent_parallel (핸드오프 없음) | cube pose=estimated | 0.61 / 0.55 | N/A | 3.8432 | **3.7037** | **3.9423** / 1.0798 | 3.20 / **0.66** |
+
+(데이터 풀 220개 기준. 직전 162개(session2 보드 미포함) 값: 통합_no-fk 0.7121 / 2.9557 / 3.9234 / 4.2250·1.0534, 통합_raw-fk 0.8850 / 2.2087 / 4.2813 / 4.6416·1.1567, 독립 0.68·0.65 / 3.8053 / 3.6668 / 3.9182·1.1376 — 보드 추가로 train·cross-view·cam-common은 전부 개선, held-out px는 소폭 악화.)
 
 (독립의 Train은 고정캠/그리퍼캠 두 그룹을 완전히 따로 풀기 때문에 "고정캠값/그리퍼캠값"으로 표기. Heldout px/Cross-view px/Cam-common은 `eval_heldout_and_consistency.py`로 계산. Cross-view Cube px = late_table1과 같은 정의로, 한 카메라의 단일 이미지 PnP pose를 캘리브레이션된 extrinsics로 다른 카메라로 옮겨 재투영했을 때의 코너 px RMSE — 고정캠-고정캠 + 그리퍼캠-고정캠 쌍, 양방향, 세트당 4대 → 81쌍/162방향.)
 
 Cross-view px / Cam-common을 **held-out 방식**(각 fold에서 빠진 세트에 대해서만 재고 15 fold pooled, late_table1이 held-out 세트에서 재는 것과 같은 구조)으로도 계산했다. 위 표의 train-pooled 값과 거의 같다:
 
-| 방법 | Cross-view px (train-pooled) | Cross-view px (**held-out**) | Cam-common mm/deg (train-pooled) | Cam-common mm/deg (**held-out**) |
-|---|---:|---:|---:|---:|
-| 통합_no-fk | 3.9234 | 3.9473 | 4.2250 / 1.0534 | 4.2473 / 1.0570 |
-| 통합_raw-fk | 4.2813 | 4.2703 | 4.6416 / 1.1567 | 4.6214 / 1.1619 |
-| 독립_no-fk | 3.6668 | **3.6836** | 3.9182 / 1.1376 | **3.9319** / 1.1394 |
+| 방법 | Cross-view px (train-pooled) | Cross-view px (**held-out**) | Cam-common mm/deg (train-pooled) | Cam-common mm/deg (**held-out**) | Held-out mm/deg (**joint 삼각측량**) |
+|---|---:|---:|---:|---:|---:|
+| 통합_no-fk | 3.8695 | 3.8852 | 4.1569 / 0.9986 | 4.1713 / 1.0012 | 1.764 / 0.511 |
+| 통합_raw-fk | 4.1042 | 4.0937 | 4.4201 / 1.0675 | 4.4026 / 1.0719 | **0.945** / 0.538 |
+| 독립_no-fk | 3.7037 | **3.7161** | 3.9423 / 1.0798 | **3.9523** / 1.0811 | 2.354 / **0.460** |
+
+`joint` 열은 held-out 큐브를 4대 코너로 한 번에 삼각측량(`joint_cube_estimate`)한 held-out — 단일 PnP 4개 평균(위 표 Held-out mm 2.4~3.1)보다 노이즈가 작아 방식 차이가 훨씬 선명하게 갈린다(결과 3 참고).
 
 held-out으로 바꿔도 값이 0.03px / 0.03mm 안에서만 움직이고 순위는 그대로다. 이 두 지표는 "단일 이미지 PnP pose + 카메라 extrinsics"만 쓰는데, 15세트 중 1개를 빼고 다시 fit해도 extrinsics가 거의 안 바뀌기 때문 — 즉 이 지표들은 그 세트를 학습에 썼느냐와 거의 무관한 "카메라 배치 자체의 일치도"라는 뜻이고, held-out cube RMSE(그 세트가 빠지면 2.2→3.8px로 크게 움직임)와 성격이 다르다는 걸 다시 확인해준다.
 
@@ -59,15 +63,18 @@ held-out으로 바꿔도 값이 0.03px / 0.03mm 안에서만 움직이고 순위
 - 이유: 독립에서 고정캠 3대의 **상대 배치**는 고정캠들이 같이 본 것(session2 큐브, session3 보드, 둘 다 자유 변수)만으로 정해진다 — 순수 비전으로 맞춘 상대 기하. 통합은 그 큐브/보드 변수를 그리퍼캠과 **공유**하는데, 그리퍼캠의 base 좌표계 위치는 로봇 FK + hand-eye(`robot_T @ gtc`)를 거쳐 들어온다. FK 체인과 고정캠 비전 사이에 조금이라도 불일치가 있으면 그게 T_base_Ci에 타협으로 흡수되어 고정캠끼리의 상대 기하가 살짝 흐트러진다.
 - 그 "FK 체인에 묶이는 추가 정보"가 바로 통합이 held-out에서 이기는 이유(base 좌표계 안에서의 **절대** 위치가 더 정확해짐)다. 즉 **FK 결합이 셀수록 카메라끼리의 일치도는 내려가고 절대 정확도는 올라가는** 트레이드오프: 독립(그룹 간 결합 0) → 통합_no-fk(큐브/보드 공유로 결합) → 통합_raw-fk(큐브를 FK 앵커에 못박음, 결합 최대 → 고정캠-고정캠 5.00mm로 최악).
 
-## 데이터 풀 (모든 방식 공통, 162개 관측치)
+## 데이터 풀 (모든 방식 공통, 220개 관측치)
 
 | 소스 | 관측치 수 | 내용 |
 |---|---:|---|
 | session1 | 45 | 고정캠 3대 — 그리퍼로 쥔 큐브 (grasp+FK 모델, 재촬영) |
-| session2-고정캠 | 42 | 고정캠 3대 — 바닥에 놓인 큐브 (세트별, 15곳) |
-| session2-그리퍼캠 | 15 | 그리퍼캠 — 같은 바닥 큐브를 파킹 자세에서 봄 |
+| session2-고정캠 (큐브) | 42 | 고정캠 3대 — 바닥에 놓인 큐브 (세트별, 15곳) |
+| session2-그리퍼캠 (큐브) | 15 | 그리퍼캠 — 같은 바닥 큐브를 파킹 자세에서 봄 |
+| session2-보드 | 58 | 고정캠 3대(44) + 그리퍼캠(14) — session2 사진에 그대로 들어있던 바닥 마커보드 (신규: 예전엔 큐브만 뽑고 버렸음) |
 | session3-고정캠 | 45 | 고정캠 3대 — 바닥 마커보드 (재촬영) |
 | session3-그리퍼캠 | 15 | 그리퍼캠 — 바닥 마커보드 (eye-in-hand, 재촬영) |
+
+session2와 session3의 보드는 같은 자리다(같은 고정캠으로 본 base 좌표 차이 0.25~0.42mm / 0.05°) → 두 세션의 보드 관측이 **하나의 `T_base_board` 변수**를 공유한다.
 
 ## 3가지 방식 정의
 
@@ -93,9 +100,9 @@ Train RMSE는 학습에 쓴 데이터로 재는 것이고, held-out은 **정답�
 
 | 방식 | Train RMSE (px) | Held-out (px) | Held-out (mm / deg) | Cross-view (px) | Cross-cam (mm / deg) | 비고 |
 |---|---:|---:|---:|---:|---:|---|
-| 통합_raw-fk | 0.89 | **2.21** | **2.39 / 0.51** | 4.28 | 4.64 / 1.16 | A3 아님 (위 주의 참고) |
-| **통합_no-fk** | **0.71** | 2.96 | 2.90 / 0.51 | 3.92 | 4.23 / 1.05 | |
-| 독립_no-fk | 고정캠 0.68 / 그리퍼 0.65 | 3.81 | 3.18 / 0.49 | **3.67** | **3.92** / 1.14 | 큐브 사후합의: 평균 2.89mm/1.15°, 최대 6.78mm/2.35°. 보드 사후합의: 2.24mm/0.26° |
+| 통합_raw-fk | 0.77 | **2.29** | **2.39 / 0.49** | 4.10 | 4.42 / 1.07 | A3 아님 (위 주의 참고) |
+| **통합_no-fk** | **0.63** | 3.09 | 2.92 / 0.49 | 3.87 | 4.16 / 1.00 | |
+| 독립_no-fk | 고정캠 0.61 / 그리퍼 0.55 | 3.84 | 3.12 / 0.46 | **3.70** | **3.94** / 1.08 | 큐브 사후합의: 평균 2.88mm/1.01°, 최대 7.33mm/2.33°. 보드 사후합의: 2.01mm/0.20° |
 
 - held-out을 px로 보면 raw-fk가 제일 좋게 나오는데, 이건 "더 정확해서"가 아니라 "raw-fk 자체가 학습할 때부터 큐브 위치=FK로 못박아놓고 카메라를 맞췄기 때문"이다 — 검증 기준(FK 기반 GT)이 학습 목표(FK 앵커)와 같은 수식이라 유리한 게 당연. 절대적 정확도 우위로 해석하면 안 된다.
 - 통합_no-fk가 독립_no-fk보다 held-out mm에서 낫다(2.90 vs 3.18mm). 통합이 고정캠·그리퍼캠 정보를 실제로 공유해서 쓰는 이점.
