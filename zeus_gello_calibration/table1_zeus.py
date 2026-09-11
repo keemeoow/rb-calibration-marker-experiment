@@ -2,23 +2,26 @@
 # -*- coding: utf-8 -*-
 """zeus_gello_calibration/table1_zeus.py -- Zeus 데이터로 Table 1을 계산한다.
 
-핵심 차이: A3용 기계적 변환은 없고 A5용 corrected-FK는 있다
------------------------------------------------------------
+핵심 차이: A3는 nominal 기계값, A5는 P1 VISION corrected-FK를 쓴다
+----------------------------------------------------------------
 ``pass1_grasp_offset_replayed.json``의 ``T_gripper_cube``는 P1 Cube 영상과
-Robot FK를 함께 사용해 적합한 train VISION artifact다. 따라서
+Robot FK를 함께 사용해 적합한 train VISION artifact다. P1은 Cube를 한 번
+강체 파지한 채 공중에서 위치와 회전을 바꾼 16개 pose이며, 이 운동 다양성으로
+거리, 축 관계와 실제 장착 오차를 함께 식별한다. 따라서
 
     T^B_cube(s) = T^B_flange(place_s) · T^flange_cube,P1-VISION
 
-은 순수 기계적 FK인 A3가 아니라 corrected-FK를 hard fixed하는 A5에 해당한다.
-영상과 무관한 CAD/기구 측정 ``T^flange_cube,mechanical``은 현재 데이터에 없으므로
-A3는 숫자를 만들지 않고 Pending으로 남긴다.
+은 corrected-FK를 hard fixed하는 A5에 해당한다. A3는 영상값 대신 사용자 확정
+nominal 조립 가정인 flange-to-top datum 97.5mm와 Cube object origin-to-top plane
+62.5mm를 합친 160.0mm, 그리고 이상적인 Ry(180deg)를 hard fixed한다.
 
 수식이 달라지는 지점
 --------------------
 1. A4/B1/B2는 P1 VISION artifact를 corrected-FK soft factor 중심으로 사용한다.
 2. A5는 같은 corrected-FK pose를 hard fixed한다.
-3. A3는 영상과 무관한 기계적 변환이 추가되기 전까지 Pending이다.
+3. A3는 ``[0, 0, 160.0mm] + Ry(180deg)`` nominal 기계 변환을 hard fixed한다.
 4. External GT는 현재 비어 있으며 결과 JSON/Markdown에 Pending으로 기록한다.
+5. P1의 단일 파지 다중 회전 fit은 A5 학습에만 쓰며 A3 기계값으로 재사용하지 않는다.
 
 목적함수는 late_table1과 동일하다. 잔차는 corner 재투영 하나뿐이다.
 
@@ -72,6 +75,7 @@ from calibration_pipeline.reprojection import (  # noqa: E402
     solve_corner_reprojection, variable_keys,
 )
 from calibration_pipeline.apriltag_cube import inv_T  # noqa: E402
+from calibration_pipeline.config import TOP_MARKER_PLANE_Z_M  # noqa: E402
 from calibration_pipeline.table1 import estimate_board_handeye_initial  # noqa: E402
 
 # fit_calibration_methods 는 import 사슬로 capture_session -> pyrealsense2 를
@@ -92,6 +96,24 @@ GRIPPER = fcm.GRIPPER_LOCAL_ID
 # 아니므로 A4는 확정 근거가 아니라 민감도 점검으로만 읽는다.
 SIGMA_FK_MM, SIGMA_FK_DEG = 2.0, 0.30
 
+# A3 nominal FK.  tool1=0으로 저장된 pose는 T_base_flange다. 사용자가 확정한
+# 중앙 파지 조립 가정에 따라 flange-to-Cube-top datum 97.5mm와 Cube 모델의
+# origin-to-top plane 62.5mm를 합친다. 97.5mm는 물리 실측값이 아니라 nominal
+# hardware datum이므로 결과 provenance에서 measured=False로 명시한다.
+ZEUS_FLANGE_TO_CUBE_TOP_DATUM_MM = 97.5
+CUBE_ORIGIN_TO_TOP_PLANE_MM = TOP_MARKER_PLANE_Z_M * 1000.0
+MECHANICAL_FLANGE_CUBE_DISTANCE_MM = (
+    ZEUS_FLANGE_TO_CUBE_TOP_DATUM_MM + CUBE_ORIGIN_TO_TOP_PLANE_MM
+)
+
+
+def mechanical_flange_cube_transform():
+    """Nominal A3 T_flange_cube: centered translation and ideal Ry(180deg)."""
+    transform = np.eye(4, dtype=np.float64)
+    transform[:3, :3] = np.diag([-1.0, 1.0, -1.0])
+    transform[:3, 3] = [0.0, 0.0, MECHANICAL_FLANGE_CUBE_DISTANCE_MM / 1000.0]
+    return transform
+
 
 # ---------------------------------------------------------------- row 정의
 # targets : calibration에 넣는 표적.  cube를 빼면 그 row는 큐브를 평가에만 쓴다.
@@ -99,17 +121,14 @@ SIGMA_FK_MM, SIGMA_FK_DEG = 2.0, 0.30
 # fk      : "none"              큐브 자세 자유 (VISION)
 #           "corrected_fixed"   P1 VISION corrected-FK hard fixed
 #           "corrected_factor"  큐브 자유 + corrected-FK soft factor
-#           "mechanical_fixed"  기계적 변환 필요; 현재 데이터에서는 Pending
+#           "mechanical_fixed"  nominal 160mm + Ry(180deg) FK hard fixed
 ROWS = {
     "A0": dict(label="board-only, sequential VISION", targets=("board",), opt="seq", fk="none"),
     "A1": dict(label="+cube, sequential", targets=("board", "cube"), opt="seq", fk="none"),
     "A2": dict(label="+unified, VISION", targets=("board", "cube"), opt="uni", fk="none"),
     "A3": dict(
-        label="FK hard fixed (mechanical)", targets=("board", "cube"),
-        opt="uni", fk="mechanical_fixed", available=False,
-        pending_reason=(
-            "VISION-independent mechanical T_flange_cube is not recorded in the Zeus dataset"
-        ),
+        label="FK hard fixed (nominal 160mm)", targets=("board", "cube"),
+        opt="uni", fk="mechanical_fixed",
     ),
     "A4": dict(label="corrected-FK soft factor", targets=("board", "cube"), opt="uni", fk="corrected_factor"),
     "A5": dict(label="corrected-FK hard fixed (P1 VISION-aligned)", targets=("board", "cube"), opt="uni", fk="corrected_fixed"),
@@ -121,7 +140,7 @@ ROW_ORDER = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
 
 
 def fk_cube_poses(items_by_index, T_flange_cube):
-    """Apply the frozen P1 VISION corrected flange-to-cube transform."""
+    """Apply one frozen nominal or corrected flange-to-Cube transform."""
     return {int(s): fcm.pose6_to_T(item["target"]) @ T_flange_cube
             for s, item in items_by_index.items()}
 
@@ -152,7 +171,9 @@ def make_state(data, cubes, grasp_init, board_init, gtc_init):
 
 
 def grasp_variable_families(spec):
-    if "cube" not in spec["targets"] or spec["fk"] == "corrected_fixed":
+    if "cube" not in spec["targets"] or spec["fk"] in (
+        "mechanical_fixed", "corrected_fixed"
+    ):
         return []
     return ["T_gripper_cube_by_grasp"]
 
@@ -162,7 +183,12 @@ def fit_row(row, data, drop_set, robot_T, board_init, gtc_init):
     spec = ROWS[row]
     if not spec.get("available", True):
         raise ValueError(f"{row} is pending: {spec['pending_reason']}")
-    grasp_init = data["grasp_init"]
+    corrected_grasp = data["grasp_init"]
+    grasp_init = (
+        mechanical_flange_cube_transform()
+        if spec["fk"] == "mechanical_fixed"
+        else corrected_grasp
+    )
     cube_obs, board_obs = split_observations(data, spec["targets"], drop_set)
     K_map, D_map = data["K_map"], data["D_map"]
     options = SolverOptions()
@@ -170,7 +196,7 @@ def fit_row(row, data, drop_set, robot_T, board_init, gtc_init):
     # 큐브 자세의 출처
     if "cube" not in spec["targets"]:
         cubes, cube_key = {}, []
-    elif spec["fk"] == "corrected_fixed":
+    elif spec["fk"] in ("mechanical_fixed", "corrected_fixed"):
         cubes = fk_cube_poses(data["items_by_index"], grasp_init)
         cube_key = []                      # 자유도 없음 -- 하드 고정
     else:
@@ -195,7 +221,7 @@ def fit_row(row, data, drop_set, robot_T, board_init, gtc_init):
         keys = variable_keys(families, state)
         if spec["fk"] == "corrected_factor":
             cov = diagonal_covariance(SIGMA_FK_MM, SIGMA_FK_DEG)
-            targets_fk = fk_cube_poses(data["items_by_index"], grasp_init)
+            targets_fk = fk_cube_poses(data["items_by_index"], corrected_grasp)
             final, diag = solve_factorized_fk(
                 observations=observations, variable_keys_=keys, reference_state=state,
                 robot_T=robot_T, K_map=K_map, D_map=D_map, gripper_cam_idx=GRIPPER,
@@ -220,7 +246,7 @@ def fit_row(row, data, drop_set, robot_T, board_init, gtc_init):
             # B1: soft FK factor 는 큐브 자세가 자유변수인 stage1 에 건다.
             # stage2 는 큐브를 동결하므로 FK 항이 걸릴 자유도가 없다.
             cov = diagonal_covariance(SIGMA_FK_MM, SIGMA_FK_DEG)
-            targets_fk = fk_cube_poses(data["items_by_index"], grasp_init)
+            targets_fk = fk_cube_poses(data["items_by_index"], corrected_grasp)
             stage1, d1 = solve_factorized_fk(
                 observations=eih, variable_keys_=keys1, reference_state=state,
                 robot_T=robot_T, K_map=K_map, D_map=D_map, gripper_cam_idx=GRIPPER,
@@ -531,14 +557,78 @@ def empty_metric_summary():
     }
 
 
+def corrected_fk_training_contract(fit_json_path):
+    """Summarize the P1-only VISION fit that defines corrected-FK.
+
+    P1 uses one rigid grasp (grasp_id=0) observed over multiple airborne robot
+    poses.  It identifies one constant flange-to-Cube transform, including the
+    real mounting offset.  Because Cube images participate in that estimate,
+    the result belongs to corrected-FK and must never be reused as A3 FK.
+    """
+    fit_path = Path(fit_json_path)
+    fit = json.loads(fit_path.read_text(encoding="utf-8"))
+    transform = np.asarray(fit["T_gripper_cube"], dtype=np.float64)
+    if transform.shape != (4, 4):
+        raise ValueError(f"invalid T_gripper_cube shape in {fit_path}: {transform.shape}")
+
+    nominal_rotation = np.diag([-1.0, 1.0, -1.0])  # Ry(180 deg)
+    rotation_delta = nominal_rotation.T @ transform[:3, :3]
+    cosine = np.clip((np.trace(rotation_delta) - 1.0) / 2.0, -1.0, 1.0)
+    dispersion = fit.get("grasp_init_dispersion_across_cams", {})
+    solve = fit.get("solve_diagnostics", {})
+    return {
+        "role": "A5 corrected-FK training only; forbidden as A3 mechanical FK",
+        "source": str(fit_path.resolve()),
+        "collection": "one rigid Cube grasp, multiple airborne positions and rotations",
+        "robot_pose_frame": "T_base_flange from tool1=0",
+        "grasp_model": "one constant T_flange_cube (grasp_id=0); regrasp repeatability not measured",
+        "n_captures": int(fit.get("n_captures", 0)),
+        "translation_mm": (transform[:3, 3] * 1000.0).tolist(),
+        "nominal_axis_map": "Ry(180 deg): Cube +X=-flange +X, +Y=+Y, +Z=-Z",
+        "rotation_deviation_from_nominal_deg": float(np.degrees(np.arccos(cosine))),
+        "pnp_accepted_per_camera": fit.get("pnp_accepted_per_camera", {}),
+        "cross_camera_initial_translation_std_mm": dispersion.get("translation_std_mm"),
+        "cross_camera_initial_rotation_std_deg": dispersion.get("rotation_std_deg"),
+        "train_reprojection_rmse_px": solve.get("train_reprojection_rmse_px"),
+        "jacobian_rank_deficient": solve.get("jacobian_rank_deficient"),
+    }
+
+
+def mechanical_fk_contract():
+    transform = mechanical_flange_cube_transform()
+    return {
+        "role": "A3 FK hard fixed only",
+        "source": "nominal geometry: 97.5mm flange-to-top datum + CubeConfig top plane 62.5mm",
+        "measured": False,
+        "vision_used": False,
+        "centered_grasp_assumption": True,
+        "flange_to_cube_top_datum_mm": ZEUS_FLANGE_TO_CUBE_TOP_DATUM_MM,
+        "cube_origin_to_top_plane_mm": CUBE_ORIGIN_TO_TOP_PLANE_MM,
+        "translation_mm": (transform[:3, 3] * 1000.0).tolist(),
+        "rotation": "Ry(180 deg)",
+        "transform": transform.tolist(),
+    }
+
+
 def _format_metric(value):
     if value is None or not np.isfinite(value):
         return "Pending"
     return f"{float(value):.4f}"
 
 
+def _format_best_metric(value, best_value):
+    formatted = _format_metric(value)
+    if formatted == "Pending" or best_value is None:
+        return formatted
+    if np.isclose(float(value), best_value, rtol=0.0, atol=5e-5):
+        return f"**{formatted}**"
+    return formatted
+
+
 def write_markdown_report(result, output_path):
     rows = result["rows"]
+    mechanical_fk = result["mechanical_fk"]
+    corrected_fk = result["corrected_fk_training"]
     completed = [
         (row, body["summary"]["heldout_test_cross_view_cube_rmse_px"])
         for row, body in rows.items()
@@ -546,6 +636,24 @@ def write_markdown_report(result, output_path):
         and body["summary"]["heldout_test_cross_view_cube_rmse_px"] is not None
     ]
     ranking = sorted(completed, key=lambda item: item[1])
+    metric_keys = (
+        "all_cube_rmse_px",
+        "train_cube_rmse_px",
+        "heldout_test_cube_rmse_px",
+        "all_cross_view_cube_rmse_px",
+        "train_cross_view_cube_rmse_px",
+        "heldout_test_cross_view_cube_rmse_px",
+    )
+    best_metrics = {
+        key: min(
+            float(body["summary"][key])
+            for body in rows.values()
+            if body.get("status") == "complete"
+            and body["summary"].get(key) is not None
+            and np.isfinite(body["summary"][key])
+        )
+        for key in metric_keys
+    }
 
     def paired_cross_view_delta(left, right):
         left_folds = {int(fold["set"]): fold for fold in rows[left]["folds"]}
@@ -562,7 +670,10 @@ def write_markdown_report(result, output_path):
             "n": len(deltas),
         }
 
-    contrast_specs = (("A2", "A1"), ("A4", "A2"), ("A5", "A4"))
+    contrast_specs = (
+        ("A2", "A1"), ("A3", "A2"), ("A4", "A2"),
+        ("A4", "A3"), ("A5", "A3"), ("A5", "A4"),
+    )
     contrasts = [
         (f"{left} - {right}", paired_cross_view_delta(left, right))
         for left, right in contrast_specs
@@ -590,6 +701,18 @@ def write_markdown_report(result, output_path):
         "corrected_factor": "corrected-FK soft factor",
         "corrected_fixed": "corrected-FK hard fixed",
     }
+    compact_fk_labels = {
+        "none": "VISION",
+        "mechanical_fixed": "FK hard fixed",
+        "corrected_factor": "corrected-FK soft factor",
+        "corrected_fixed": "corrected-FK hard fixed",
+    }
+
+    def compact_row_label(row, condition):
+        targets = "+".join(name.capitalize() for name in condition["targets"])
+        optimization = "Unified" if condition["opt"] == "uni" else "Seq"
+        return f"{row}({targets}+{optimization}+{compact_fk_labels[condition['fk']]})"
+
     for row in ROW_ORDER:
         if row not in rows:
             continue
@@ -605,10 +728,49 @@ def write_markdown_report(result, output_path):
 
     lines.extend([
         "",
+        "### A3 FK nominal 기하",
+        "",
+        "A3는 Robot flange pose에 중앙 파지 nominal 기계 변환을 곱한다. "
+        "Cube VISION은 이 변환 생성에 사용하지 않는다.",
+        "",
+        "| 항목 | 값 |",
+        "| --- | --- |",
+        f"| flange-to-Cube top datum | {mechanical_fk['flange_to_cube_top_datum_mm']:.3f} mm |",
+        f"| Cube origin-to-top plane | {mechanical_fk['cube_origin_to_top_plane_mm']:.3f} mm |",
+        f"| nominal `T_flange_cube` translation | "
+        f"`{[round(value, 3) for value in mechanical_fk['translation_mm']]}` mm |",
+        f"| nominal rotation | `{mechanical_fk['rotation']}` |",
+        "| VISION 사용 | False |",
+        "| 물리 실측 완료 | False (nominal 조립 가정) |",
+        "",
+        "### A5 corrected-FK 학습 근거",
+        "",
+        "P1에서 Cube를 한 번 강체 파지한 채 공중에서 위치와 회전을 바꿔 "
+        "하나의 `T_flange_cube`를 추정했다. 이 값은 Cube VISION을 사용했으므로 "
+        "A5 학습에만 사용하며 A3의 기계적 FK로 재사용하지 않는다.",
+        "",
+        "| 항목 | 결과 |",
+        "| --- | --- |",
+        f"| P1 pose 수 | {corrected_fk['n_captures']} |",
+        f"| Robot pose frame | `{corrected_fk['robot_pose_frame']}` |",
+        f"| `T_flange_cube` translation mm | "
+        f"`{[round(value, 3) for value in corrected_fk['translation_mm']]}` |",
+        f"| 축 관계 | `{corrected_fk['nominal_axis_map']}` |",
+        f"| nominal 축 대비 회전 편차 | "
+        f"{corrected_fk['rotation_deviation_from_nominal_deg']:.3f} deg |",
+        f"| 카메라별 초기값 분산 | "
+        f"{corrected_fk['cross_camera_initial_translation_std_mm']:.3f} mm / "
+        f"{corrected_fk['cross_camera_initial_rotation_std_deg']:.3f} deg |",
+        f"| P1 train reprojection | {corrected_fk['train_reprojection_rmse_px']:.3f} px |",
+        f"| Jacobian rank deficient | {corrected_fk['jacobian_rank_deficient']} |",
+        "",
+        "이 촬영은 고정 장착 변환의 거리, 축 방향과 장착 오차를 식별한다. "
+        "다만 모든 pose가 `grasp_id=0`인 동일 파지이므로 재파지 반복성은 측정하지 않는다.",
+        "",
         "## 2. 최종 내부 결과",
         "",
-        "모든 pixel 값은 작을수록 좋다. 굵은 순위 결론은 External GT가 아니라 "
-        "내부 camera-consistency에만 해당한다.",
+        "모든 pixel 값은 작을수록 좋으며, 각 RMSE 열의 최솟값을 굵게 표시한다. "
+        "이 표시는 External GT 최종 순위가 아니라 내부 지표별 순위에 해당한다.",
         "",
         "| Row | ALL Cube px | Train Cube px | Held-out Test Cube px | ALL Cross-view px | Train Cross-view px | Held-out Test Cross-view px | External GT | Convergence |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | ---: |",
@@ -622,13 +784,14 @@ def write_markdown_report(result, output_path):
             f"{summary['n_converged']}/{summary['n_folds']}"
             if body.get("status") == "complete" else "Pending"
         )
+        row_label = compact_row_label(row, body["condition"])
         lines.append(
-            f"| {row} | {_format_metric(summary['all_cube_rmse_px'])} | "
-            f"{_format_metric(summary['train_cube_rmse_px'])} | "
-            f"{_format_metric(summary['heldout_test_cube_rmse_px'])} | "
-            f"{_format_metric(summary['all_cross_view_cube_rmse_px'])} | "
-            f"{_format_metric(summary['train_cross_view_cube_rmse_px'])} | "
-            f"{_format_metric(summary['heldout_test_cross_view_cube_rmse_px'])} | "
+            f"| {row_label} | {_format_best_metric(summary['all_cube_rmse_px'], best_metrics['all_cube_rmse_px'])} | "
+            f"{_format_best_metric(summary['train_cube_rmse_px'], best_metrics['train_cube_rmse_px'])} | "
+            f"{_format_best_metric(summary['heldout_test_cube_rmse_px'], best_metrics['heldout_test_cube_rmse_px'])} | "
+            f"{_format_best_metric(summary['all_cross_view_cube_rmse_px'], best_metrics['all_cross_view_cube_rmse_px'])} | "
+            f"{_format_best_metric(summary['train_cross_view_cube_rmse_px'], best_metrics['train_cross_view_cube_rmse_px'])} | "
+            f"{_format_best_metric(summary['heldout_test_cross_view_cube_rmse_px'], best_metrics['heldout_test_cross_view_cube_rmse_px'])} | "
             f"Pending | {convergence} |"
         )
 
@@ -653,10 +816,14 @@ def write_markdown_report(result, output_path):
         "",
     ])
     if ranking:
+        second = ranking[1] if len(ranking) > 1 else None
+        comparison = (
+            f", 2위 {second[0]}보다 {second[1] - ranking[0][1]:.4f} px 낮다"
+            if second is not None else ""
+        )
         lines.append(
             f"- 내부 주 지표의 최저값은 **{ranking[0][0]} "
-            f"({ranking[0][1]:.4f} px)**이지만, A2와의 차이는 0.0010 px라 "
-            "현재 데이터에서는 사실상 동률로 해석한다."
+            f"({ranking[0][1]:.4f} px)**이며{comparison}."
         )
         lines.append(
             "- 내부 Cross-view 최저값은 카메라 간 일관성을 뜻하며 실제 3D 절대 정확도 "
@@ -665,8 +832,9 @@ def write_markdown_report(result, output_path):
     lines.extend([
         "- Cube RMSE는 모든 row에 같은 P1 VISION corrected-FK reference를 사용하므로 "
         "corrected-FK 계열에 구조적으로 유리할 수 있다.",
-        "- A3는 영상과 독립적인 mechanical `T_flange_cube`가 없어 Pending이다. "
-        "현재 P1 fit을 A3로 부르면 A5와 정의가 중복된다.",
+        "- A3는 `[0, 0, 160.0] mm + Ry(180 deg)` nominal 기하를 사용하는 FK다. "
+        "97.5 mm datum은 아직 물리 실측되지 않았으므로 nominal baseline으로 해석한다.",
+        "- P1의 단일 파지 다중 회전 fit은 A5 전용이며 A3에 재사용하지 않는다.",
         "- A4/B1/B2의 2.0 mm, 0.30 deg covariance는 실측값이 아니므로 preflight 결과다.",
         "- A0와 B3는 stationary board에서 최적화 블록이 사실상 분리되어 수치가 "
         "거의 같다. 현재 데이터로는 board-only Unified 이점을 검증할 수 없다.",
@@ -684,7 +852,10 @@ def write_markdown_report(result, output_path):
     ])
     contrast_notes = {
         "A2 - A1": "Unified VISION이 Sequential VISION보다 낮음",
+        "A3 - A2": "nominal FK hard fixed와 Unified VISION 비교",
         "A4 - A2": "corrected-FK soft factor와 VISION이 사실상 동률",
+        "A4 - A3": "corrected-FK soft factor와 nominal FK hard fixed 비교",
+        "A5 - A3": "corrected-FK hard fixed와 nominal FK hard fixed 비교",
         "A5 - A4": "corrected-FK hard fixed가 soft factor보다 높음",
     }
     for label, contrast in contrasts:
@@ -747,6 +918,8 @@ def main():
         setattr(args, attribute, str(value))
 
     data = fcm.load_all_data(args)
+    mechanical_fk = mechanical_fk_contract()
+    corrected_fk = corrected_fk_training_contract(args.fit_json)
     robot_T = {**data["robot_T_s1"], **data["robot_T_s2_gripper"], **data["robot_T_s3"]}
     # fit_calibration_methods.main() 과 동일한 초기화: session3 보드만으로 hand-eye 초기값
     gtc_init, board_init, eih_diag = estimate_board_handeye_initial(
@@ -783,11 +956,11 @@ def main():
             "T_base_cube[s] = T_base_flange(place_s) @ "
             "T_flange_cube_from_P1_train_VISION"
         ),
+        "mechanical_fk": mechanical_fk,
+        "corrected_fk_training": corrected_fk,
         "T_flange_cube_corrected_source": args.fit_json,
         "T_flange_cube_translation_mm": (np.asarray(data["grasp_init"])[:3, 3] * 1000.0).tolist(),
-        "pending_rows": {
-            "A3": ROWS["A3"]["pending_reason"],
-        },
+        "pending_rows": {},
         "metric_contracts": {
             "all": (
                 "all placements를 한 번에 fit한 calibration으로 전체 session2 cube를 평가; "

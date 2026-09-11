@@ -103,6 +103,21 @@ python zeus_gello_calibration/fit_calibration_methods.py       # px 학습, 3개
 python zeus_gello_calibration/fit_calibration_methods_mm.py    # mm 학습, 3개 fit_*_mm.json
 ```
 
+### corrected-FK 학습 계약
+
+P1은 Cube를 한 번 강체 파지한 채 공중에서 위치와 회전을 바꾼 16개 pose다.
+`robot.json["pose"]`는 `tool1=0`에서 저장한 `T_base_flange`이며, P1 Cube
+VISION과 함께 하나의 고정 `T_flange_cube`를 식별한다. 현재 fit은 translation
+`[0.150, 0.740, 161.791] mm`, nominal `Ry(180 deg)` 대비 회전 편차 `0.832 deg`다.
+
+이 P1 fit은 거리, 축 관계와 실제 장착 오차를 포함하므로 A5 `corrected-FK hard
+fixed`에만 사용한다. A3 `FK hard fixed`는 중앙 파지 nominal 기하인
+`[0, 0, 160.0] mm + Ry(180 deg)`를 사용한다. 160.0 mm는 flange-to-Cube-top
+datum 97.5 mm와 Cube object origin-to-top plane 62.5 mm의 합이며 VISION을
+사용하지 않는다. P1 값을 A3에 복사하면 A3와 A5가 같은 방법이 되므로 금지한다.
+또한 P1은 동일한 `grasp_id=0`의 다중 회전이므로 고정 장착 변환은 식별하지만,
+Cube를 풀었다 다시 잡을 때의 재파지 반복성은 측정하지 않는다.
+
 ## 5. 최종 내부 평가지표 생성
 
 ```bash
@@ -125,10 +140,10 @@ Cross-view는 destination 관측을 source PnP에 사용하지 않는다.
 내부 방법 비교에서는 Held-out Test Cross-view를 우선하고, 최종 방법 순위는 External GT로
 결정한다. ALL과 Train은 fit 진단값이다.
 
-현재 Zeus 데이터에는 영상과 독립적인 mechanical `T_flange_cube`가 없으므로 A3는
-`Pending`이다. P1 영상으로 적합한 `T_flange_cube`는 A5의 corrected-FK hard fixed에
-사용한다. A3를 계산하려면 CAD/기구 측정으로 등록한 mechanical transform이 추가로
-필요하다.
+A3의 97.5 mm datum은 아직 CAD나 캘리퍼스로 재검증되지 않은 nominal 조립
+가정이므로 `FK nominal baseline`으로 해석한다. P1 영상으로 적합한
+`T_flange_cube`는 A5의 corrected-FK hard fixed에만 사용한다. 이후 97.5 mm를
+물리적으로 확인하면 수식은 유지하고 provenance의 `measured` 상태만 갱신한다.
 
 ## 6. 캘리브레이션 끝나고 외부 GT 실험
 

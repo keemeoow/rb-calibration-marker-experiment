@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pytest
 
@@ -92,14 +94,54 @@ def test_cube_reprojection_uses_component_wise_rmse() -> None:
     assert result["n_residual_components"] == 32
 
 
-def test_current_zeus_data_contract_enables_a5_and_leaves_a3_pending() -> None:
-    assert table1.ROWS["A3"]["available"] is False
+def test_current_zeus_data_contract_separates_a3_nominal_from_a5_corrected() -> None:
     assert table1.ROWS["A3"]["fk"] == "mechanical_fixed"
     assert table1.ROWS["A5"]["fk"] == "corrected_fixed"
+    assert table1.grasp_variable_families(table1.ROWS["A3"]) == []
     assert table1.grasp_variable_families(table1.ROWS["A5"]) == []
     assert table1.grasp_variable_families(table1.ROWS["A4"]) == [
         "T_gripper_cube_by_grasp"
     ]
+
+    mechanical = table1.mechanical_flange_cube_transform()
+    assert mechanical[:3, :3] == pytest.approx(np.diag([-1.0, 1.0, -1.0]))
+    assert mechanical[:3, 3] * 1000.0 == pytest.approx([0.0, 0.0, 160.0])
+
+    contract = table1.mechanical_fk_contract()
+    assert contract["role"] == "A3 FK hard fixed only"
+    assert contract["vision_used"] is False
+    assert contract["measured"] is False
+
+
+def test_corrected_fk_training_is_a5_only_and_reports_nominal_axis_delta(tmp_path) -> None:
+    fit_path = tmp_path / "fit.json"
+    fit_path.write_text(json.dumps({
+        "T_gripper_cube": np.array([
+            [-1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, -1.0, 0.162],
+            [0.0, 0.0, 0.0, 1.0],
+        ]).tolist(),
+        "n_captures": 16,
+        "pnp_accepted_per_camera": {"fixed1": 16},
+        "grasp_init_dispersion_across_cams": {
+            "translation_std_mm": 0.4,
+            "rotation_std_deg": 0.1,
+        },
+        "solve_diagnostics": {
+            "train_reprojection_rmse_px": 1.0,
+            "jacobian_rank_deficient": False,
+        },
+    }))
+
+    contract = table1.corrected_fk_training_contract(fit_path)
+
+    assert contract["role"].startswith("A5 corrected-FK training only")
+    assert contract["robot_pose_frame"] == "T_base_flange from tool1=0"
+    assert contract["n_captures"] == 16
+    assert contract["translation_mm"] == pytest.approx([0.0, 0.0, 162.0])
+    assert contract["rotation_deviation_from_nominal_deg"] == pytest.approx(0.0)
+    assert contract["grasp_model"].endswith("regrasp repeatability not measured")
 
 
 def test_external_gt_placeholder_is_empty_not_zero() -> None:
