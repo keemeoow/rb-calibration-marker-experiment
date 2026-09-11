@@ -32,7 +32,7 @@ SAFE_MODE_Z_LIFT = "z_lift_only"
 CAPTURE_PROTOCOL_KEY = "capture_protocol"
 PROTOCOL_PER_SET_AB = "per_set_AB"          # every set: B sweep + A placement
 PROTOCOL_A_SETS_B_STATION = "A_sets_plus_B_station"  # A-only sets, one terminal B station
-PROTOCOL_COMPOSITE_RIG_45 = "composite_rig_45_v1"
+PROTOCOL_COMPOSITE_RIG_45 = "composite_rig_45_v2"
 CAPTURE_PROTOCOLS = (
     PROTOCOL_PER_SET_AB,
     PROTOCOL_A_SETS_B_STATION,
@@ -60,8 +60,8 @@ def _validate_capture_joint_waypoint(wp, label):
 
 def _validate_composite_rig_45(data, waypoints):
     """Validate the preregistered 15/20/10 composite-rig capture plan."""
-    if data.get("schema_version") != "capture_pose_plan_v2":
-        raise ValueError("schema_version must be capture_pose_plan_v2")
+    if data.get("schema_version") != "capture_pose_plan_v3":
+        raise ValueError("schema_version must be capture_pose_plan_v3")
     if data.get("template_only") is not False:
         raise ValueError("template_only must be false after all taught poses are filled")
     if data.get(SAFE_MODE_KEY) == SAFE_MODE_Z_LIFT:
@@ -96,7 +96,7 @@ def _validate_composite_rig_45(data, waypoints):
         label = "placements[{}]".format(idx)
         if not isinstance(placement, dict):
             raise ValueError("{} must be an object".format(label))
-        expected_id = "S{:02d}".format(idx)
+        expected_id = "PLACEMENT_{:02d}".format(idx)
         placement_id = placement.get("placement_id")
         if placement_id != expected_id:
             raise ValueError(
@@ -145,10 +145,10 @@ def _validate_composite_rig_45(data, waypoints):
     for placement_idx in range(10):
         for view_idx in range(2):
             expected.append((
-                "P2_S{:02d}_V{}".format(placement_idx, view_idx),
+                "P2_PLACEMENT_{:02d}_VIEW_{}".format(placement_idx, view_idx),
                 PHASE_P2,
                 TARGET_RELEASED,
-                "S{:02d}".format(placement_idx),
+                "PLACEMENT_{:02d}".format(placement_idx),
                 view_idx,
             ))
     for idx in range(10):
@@ -156,7 +156,7 @@ def _validate_composite_rig_45(data, waypoints):
             "P3_{:02d}".format(idx),
             PHASE_P3,
             TARGET_STATIONARY,
-            "S09",
+            "PLACEMENT_09",
             idx,
         ))
 

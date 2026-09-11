@@ -42,6 +42,8 @@ def test_composite_protocol_accepts_exact_15_20_10_plan() -> None:
     assert sum(wp["phase"] == "P1_MOVING_RIG" for wp in plan["waypoints"]) == 15
     assert sum(wp["phase"] == "P2_PICK_PLACE" for wp in plan["waypoints"]) == 20
     assert sum(wp["phase"] == "P3_STATIONARY_RIG" for wp in plan["waypoints"]) == 10
+    assert plan["placements"][7]["placement_id"] == "PLACEMENT_07"
+    assert plan["waypoints"][29]["planned_event_id"] == "P2_PLACEMENT_07_VIEW_0"
 
 
 def test_composite_protocol_rejects_missing_event() -> None:

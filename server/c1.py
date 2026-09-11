@@ -906,7 +906,7 @@ def _run_auto_composite_45(rb, conn, data, speed, confirm=True):
     validate_waypoint_semantics(data)
     safe_cfg = validate_safe_joint_config(data)
     if safe_cfg is None:
-        raise ValueError('composite_rig_45_v1 requires explicit safe joint poses')
+        raise ValueError('composite_rig_45_v2 requires explicit safe joint poses')
     safe_empty = safe_cfg[SAFE_EMPTY_KEY]
     safe_gripped = safe_cfg[SAFE_GRIPPED_KEY]
     waypoints = data['waypoints']
@@ -968,7 +968,7 @@ def _run_auto_composite_45(rb, conn, data, speed, confirm=True):
 
     print '[Protocol45] P2: 10 placements x 2 released views'
     for placement_index in range(10):
-        placement_id = 'S{:02d}'.format(placement_index)
+        placement_id = 'PLACEMENT_{:02d}'.format(placement_index)
         placement = placements[placement_id]
         try:
             release_state = _release_composite_rig(
@@ -1045,7 +1045,7 @@ def _run_auto_composite_45(rb, conn, data, speed, confirm=True):
     ack = recv_json(conn)
     print '[Protocol45] PC lock response: {}'.format(ack)
     send_json(conn, {"command": "quit"})
-    print '[Protocol45] complete: success={} failed={} (rig remains at S09)'.format(
+    print '[Protocol45] complete: success={} failed={} (rig remains at PLACEMENT_09)'.format(
         success, failed)
 
 

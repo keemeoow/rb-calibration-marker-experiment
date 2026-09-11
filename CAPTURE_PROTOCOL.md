@@ -65,7 +65,7 @@ P2에서 release한 뒤에는 같은 `placement_id`의 두 event가 하나의 st
 | Phase | Planned event ID | 수 | Target 상태 | 필수 관측 | 목적 |
 | --- | --- | ---: | --- | --- | --- |
 | P1 Moving Rig | `P1_00`~`P1_14` | 15 | gripped | 모든 fixed camera + robot FK | `T_flange_rig`, 공간/회전 다양성 |
-| P2 Pick-and-Place | `P2_S00_V0`~`P2_S09_V1` | 20 | released, placement별 2 views | fixed + gripper camera + robot FK | 통합 calibration, placement discrepancy |
+| P2 Pick-and-Place | `P2_PLACEMENT_00_VIEW_0`~`P2_PLACEMENT_09_VIEW_1` | 20 | released, placement별 2 views | fixed + gripper camera + robot FK | 통합 calibration, placement discrepancy |
 | P3 Stationary Rig | `P3_00`~`P3_09` | 10 | stationary | fixed + gripper camera + robot FK | eye-in-hand excitation |
 | 합계 |  | **45** |  |  | 공통 calibration-train budget |
 
@@ -82,7 +82,7 @@ P2에서 release한 뒤에는 같은 `placement_id`의 두 event가 하나의 st
 
 ### 3.2 P2 Pick-and-Place: 10 placements x 2 views
 
-각 `placement_id = S00~S09`에 대해 아래 순서를 반복한다.
+각 `placement_id = PLACEMENT_00~PLACEMENT_09`에 대해 아래 순서를 반복한다.
 
 1. Rig를 grasp하고 사전 정의한 placement로 이동한다.
 2. Release 직전 `T_base_flange`와 grasp/release metadata를 저장한다. 이 기록은
@@ -279,7 +279,7 @@ python3 tools/create_capture_pose_plan.py \
 
 1. `safe_joints_empty`, `safe_joints_gripped`
 2. P1/P2/P3의 45개 `capture_joints`
-3. S00~S09의 `place_approach_joints`, `place_approach_tcp`, `place_tcp`
+3. PLACEMENT_00~PLACEMENT_09의 `place_approach_joints`, `place_approach_tcp`, `place_tcp`
 4. `target_rig_id`, `rig_geometry_file`, 실제 geometry file의 SHA-256
 
 `place_approach_tcp`는 `place_tcp`와 x/y·회전이 각각 2mm/2deg 이내로 같고 z가 최소

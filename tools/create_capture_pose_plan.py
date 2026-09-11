@@ -8,13 +8,13 @@ import json
 from pathlib import Path
 
 
-PROTOCOL = "composite_rig_45_v1"
+PROTOCOL = "composite_rig_45_v2"
 
 
 def build_template() -> dict:
     placements = [
         {
-            "placement_id": f"S{idx:02d}",
+            "placement_id": f"PLACEMENT_{idx:02d}",
             "place_approach_joints": None,
             "place_approach_tcp": None,
             "place_tcp": None,
@@ -39,11 +39,11 @@ def build_template() -> dict:
         capture_index += 1
 
     for placement_idx in range(10):
-        placement_id = f"S{placement_idx:02d}"
+        placement_id = f"PLACEMENT_{placement_idx:02d}"
         for view_idx in range(2):
             waypoints.append({
                 "capture_index": capture_index,
-                "planned_event_id": f"P2_{placement_id}_V{view_idx}",
+                "planned_event_id": f"P2_{placement_id}_VIEW_{view_idx}",
                 "phase": "P2_PICK_PLACE",
                 "target_state": "released",
                 "placement_id": placement_id,
@@ -60,7 +60,7 @@ def build_template() -> dict:
             "planned_event_id": f"P3_{idx:02d}",
             "phase": "P3_STATIONARY_RIG",
             "target_state": "stationary",
-            "placement_id": "S09",
+            "placement_id": "PLACEMENT_09",
             "view_index": idx,
             "capture_block": "A_placement",
             "cube_gripped": False,
@@ -69,7 +69,7 @@ def build_template() -> dict:
         capture_index += 1
 
     return {
-        "schema_version": "capture_pose_plan_v2",
+        "schema_version": "capture_pose_plan_v3",
         "capture_protocol": PROTOCOL,
         "template_only": True,
         "target_rig_id": "FILL_ME",

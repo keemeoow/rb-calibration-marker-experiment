@@ -103,7 +103,34 @@ python zeus_gello_calibration/fit_calibration_methods.py       # px 학습, 3개
 python zeus_gello_calibration/fit_calibration_methods_mm.py    # mm 학습, 3개 fit_*_mm.json
 ```
 
-## 5. 캘리브레이션 끝나고 외부 GT 실험
+## 5. 최종 내부 평가지표 생성
+
+```bash
+python zeus_gello_calibration/table1_zeus.py
+```
+
+`ABLATION_TEST_table1_zeus.json`과 `ABLATION_RESULTS.md`는 각 row에 다음 여섯
+pixel 지표를 저장한다. External GT 열은 독립 GT가 들어올 때까지 `Pending/null`이다.
+
+| 구분 | Cube reprojection | Cross-view cube pixel transfer |
+| --- | --- | --- |
+| ALL | 전체 placement를 한 번에 fit한 descriptive 결과 | 같은 full-data fit의 source-only 양방향 전달 |
+| Train | leave-one-placement-out fold의 train placement | 같은 train placement의 source-only 양방향 전달 |
+| Held-out Test | fold에서 제외한 한 placement | 제외 placement에서 A→B, B→A 전달 |
+
+모든 pixel 결과는 `sqrt(mean(dx^2, dy^2))`인 component-wise RMSE이며 placement를
+동일 가중한다. Cube reprojection은 현재 모든 row에 같은 P1 train-VISION
+`corrected-FK reference` pose를 쓰므로 corrected-FK 계열에 유리할 수 있다.
+Cross-view는 destination 관측을 source PnP에 사용하지 않는다.
+내부 방법 비교에서는 Held-out Test Cross-view를 우선하고, 최종 방법 순위는 External GT로
+결정한다. ALL과 Train은 fit 진단값이다.
+
+현재 Zeus 데이터에는 영상과 독립적인 mechanical `T_flange_cube`가 없으므로 A3는
+`Pending`이다. P1 영상으로 적합한 `T_flange_cube`는 A5의 corrected-FK hard fixed에
+사용한다. A3를 계산하려면 CAD/기구 측정으로 등록한 mechanical transform이 추가로
+필요하다.
+
+## 6. 캘리브레이션 끝나고 외부 GT 실험
 
 한 트라이얼당 아래 6단계를 반복한다 (GT 큐브를 매번 새 위치에 놓고).
 
@@ -119,10 +146,26 @@ python zeus_gello_calibration/fit_calibration_methods_mm.py    # mm 학습, 3개
    ```
 5. 촬영 + 여섯 calibration fit 결과 비교:
    ```bash
-    python zeus_gello_calibration/gt_compare_fits.py
-    ```
+   python zeus_gello_calibration/gt_compare_fits.py
+   ```
    촬영본은 `zeus_gello_calibration/data/gt_compare_captures/`에 저장한다.
 6. **다음 트라이얼 준비**: step 3에서 기록한 joint 좌표로 이동 → 5cm 내려가서 그리퍼 **close**(큐브 집기) → 5cm 올라오기 → 다음 촬영 위치로 이동 → 5cm 내려가서 큐브 내려놓기 → **step 3부터 반복**.
+
+`gt_compare_fits.py`는 방법별 예측 차이만 보여주며 External GT 점수를 만들지 않는다.
+External GT 결과에는 동일 `pose_id`의 독립 측정 `T_base_cube_GT`가 추가로 필요하다.
+Prediction을 GT 공개 전에 동결한 뒤 다음 evaluator를 실행한다.
+
+```bash
+python -m calibration_pipeline.external_gt \
+  --manifest protocol_templates/external_gt_eval_manifest_<date>.json
+```
+
+각 pose에서 `TRE = ||t_pred - t_GT||`를 mm로, rotation error는
+`R_GT^T R_pred`의 SO(3) geodesic angle을 degree로 계산한다. 전체 결과는 mean TRE,
+median TRE, P95 TRE, mean rotation error, failure rate와 방법 간 paired 비교로 출력한다.
+눈금이나 pick 접촉 오차만 측정하면 translation pilot은 가능하지만 rotation error는
+산출할 수 없다. mm와 deg를 모두 내려면 tracker, 측정용 arm 또는 사전 측정된 6-DoF
+kinematic nest가 필요하다.
 
 ## 안전 수칙
 

@@ -1,7 +1,7 @@
 """
 멀티카메라 캘리브레이션용 데이터셋을 캡처한다.
 
-최종 composite_rig_45_v1 파이프라인:
+최종 composite_rig_45_v2 파이프라인:
   1. 사전 검증된 pose plan을 PC에서 robot server로 보낸다.
   2. P1 15, P2 20, P3 10 planned event를 순서대로 동기 촬영한다.
   3. 모든 카메라 RGB-D와 robot/release state를 attempt 단위로 저장한다.
@@ -1095,11 +1095,11 @@ def main():
     if final_protocol_mode:
         if not (args.use_robot and args.manual_robot):
             raise RuntimeError(
-                "composite_rig_45_v1 requires --use_robot --manual_robot"
+                "composite_rig_45_v2 requires --use_robot --manual_robot"
             )
         if float(args.max_capture_span_ms) <= 0:
             raise RuntimeError(
-                "composite_rig_45_v1 requires a positive --max_capture_span_ms"
+                "composite_rig_45_v2 requires a positive --max_capture_span_ms"
             )
         rig_geometry_path = os.path.expanduser(waypoint_payload["rig_geometry_file"])
         if not os.path.isabs(rig_geometry_path):

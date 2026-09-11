@@ -69,19 +69,28 @@ calibration은 board-only로 유지하고, cube RMSE는 train cube로 set별 eva
 
 | 지표 | 역할 | 해석 |
 | --- | --- | --- |
-| External cube TRE / rotation / P95 / failure | 최종 주 지표 | Independent External GT와 blind prediction 비교 |
-| ALL Cube RMSE px | fit sanity check | train+heldout cube 전체 재투영 |
-| Train Cube RMSE px | train-split fit 진단 | 모든 row의 동일 train cube에서 계산하지만 in-sample pose fit이므로 순위 지표가 아님 |
-| Heldout Cube RMSE px | 내부 보조 지표 | 미사용 cube event 재투영 |
-| Cross-view pixel transfer RMSE px | 카메라 간 pixel 일관성 | 같은 36 frozen pair의 904 destination-corner를 직접 pooling; 일부 train fixed-anchor 포함 |
-| Cam-common Obj-Cam consistency mm/deg | 카메라 간 3D 일관성 | Cross-view와 같은 pair discrepancy의 mm/deg 표현이며 독립 증거는 아님 |
+| External cube TRE mm / Rotation Error deg / P95 TRE / failure | **최종 주 지표** | Independent External GT와 blind prediction을 같은 pose ID로 비교 |
+| ALL Cube RMSE px | full-data fit sanity check | 전체 placement로 한 번 fit한 뒤 같은 전체 cube를 재투영; 최종 순위에 사용하지 않음 |
+| Train Cube RMSE px | train-split 진단 | leave-one-placement-out 각 fold의 train cube에서 계산; in-sample이므로 순위 지표가 아님 |
+| Held-out Test Cube RMSE px | 내부 예측 보조 지표 | 해당 fold에서 제외한 cube placement를 frozen calibration으로 재투영 |
+| ALL Cross-view Cube RMSE px | full-data camera-consistency 진단 | 전체 placement fit에서 source-only 양방향 pixel transfer |
+| Train Cross-view Cube RMSE px | train camera-consistency 진단 | 각 fold의 train placement에서 source-only 양방향 pixel transfer |
+| Held-out Test Cross-view Cube RMSE px | **내부 주 비교 지표** | calibration에서 제외한 placement에서 destination 관측을 pose 계산에 쓰지 않고 평가 |
+
+세 Cube RMSE는 반드시 cube pose reference 출처를 함께 기록한다. 현재 Zeus pre-GT
+구현은 모든 row에 같은 `FK-reference`를 사용하므로 비교 계산은 동일하지만 FK 계열에
+구조적으로 유리하다. 따라서 이 값만으로 방법을 채택하지 않는다. Cross-view는 target
+GT가 필요 없지만 카메라들의 공통 systematic error를 검출하지 못한다.
+
+`ALL`은 `Train`과 `Held-out Test` 숫자를 단순 평균한 값이 아니다. 모든 placement를
+사용해 별도로 한 번 fit한 descriptive 결과다. 최종 순위는 External GT만 결정한다.
 
 제거한 지표:
 
 - Board heldout RMSE
 - board/cube pooled overall ranking
 - 별도 pair-type 순위표
-- set-equal/paired bootstrap을 최종 지표로 쓰는 구조
+- Cam-common Obj-Cam mm/deg를 독립된 최종 증거로 쓰는 구조
 
 ## 4. 현재 Session04 내부 관찰
 
