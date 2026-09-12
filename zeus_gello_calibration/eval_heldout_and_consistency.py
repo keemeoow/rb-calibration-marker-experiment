@@ -256,6 +256,7 @@ def _cross_view_squared(obs_list, cams, gtc, robot_T_all, K_map, D_map, gripper_
         return cams.get(c)
 
     sq_all, n_directions, n_pairs = [], 0, 0
+    euclid_all = []   # 코너별 |e| (평균 지표용)
     for s, group in by_set.items():
         entries = []
         for o in group:
@@ -270,9 +271,48 @@ def _cross_view_squared(obs_list, cams, gtc, robot_T_all, K_map, D_map, gripper_
                 for (src, _, T_base_cube_src), (dst, T_base_cam_dst, _) in ((entries[i], entries[j]), (entries[j], entries[i])):
                     c = int(dst.cam)
                     pred = project_points(inv_T(T_base_cam_dst) @ T_base_cube_src, dst.object_points, K_map[c], D_map[c])
-                    sq_all.extend(np.square(pred - np.asarray(dst.image_points).reshape(-1, 2)).reshape(-1).tolist())
+                    diff = pred - np.asarray(dst.image_points).reshape(-1, 2)
+                    sq_all.extend(np.square(diff).reshape(-1).tolist())
+                    euclid_all.extend(np.linalg.norm(diff, axis=1).tolist())
                     n_directions += 1
+    _cross_view_squared.last_euclid = euclid_all
     return sq_all, n_pairs, n_directions
+
+
+def cross_view_pixel_transfer_mean(obs_all_s2, cams, gtc, robot_T_all, K_map, D_map, gripper_id):
+    """Cross-view의 '평균' 버전: 옮겨 재투영한 코너별 유클리드 오차 |e|의 평균 (px)."""
+    _cross_view_squared(obs_all_s2, cams, gtc, robot_T_all, K_map, D_map, gripper_id)
+    e = np.asarray(_cross_view_squared.last_euclid)
+    return (float(np.mean(e)) if e.size else float("nan")), (float(np.percentile(e, 95)) if e.size else float("nan"))
+
+
+def corner_consistency_3d(obs_all_s2, cams, gtc, robot_T_all, K_map, D_map, gripper_id, cube_model):
+    """3D 코너 일관성 오차: 공통 시야 카메라 쌍(A, B)이 각자 추정한 큐브 pose로 큐브
+    코너 24개를 base 좌표계에 놓고, 대응 코너끼리의 3D 거리(mm)를 평균. Cam-common이
+    pose 차이(평행이동/회전 따로)라면 이건 둘을 코너 위치 하나로 합친 값."""
+    corners = np.vstack([cube_model.marker_corners_in_rig(m) for m in sorted(cube_model.cfg.id_to_face)])
+    corners_h = np.c_[corners, np.ones(len(corners))]
+    by_set = {}
+    for o in obs_all_s2:
+        if o.set_idx is not None:
+            by_set.setdefault(int(o.set_idx), []).append(o)
+    d_all, d_ff, d_gf = [], [], []
+    for s, group in by_set.items():
+        est = {}
+        for o in group:
+            T = camera_cube_estimate(o, cams, gtc, robot_T_all, K_map, D_map, gripper_id)
+            if T is not None:
+                est[int(o.cam)] = (T @ corners_h.T).T[:, :3] * 1000.0
+        ids = sorted(est)
+        for i in range(len(ids)):
+            for j in range(i + 1, len(ids)):
+                d = np.linalg.norm(est[ids[i]] - est[ids[j]], axis=1)
+                d_all.extend(d.tolist())
+                (d_gf if gripper_id in (ids[i], ids[j]) else d_ff).extend(d.tolist())
+    f = lambda v: float(np.mean(v)) if v else float("nan")
+    return {"mean_mm": f(d_all), "rms_mm": float(np.sqrt(np.mean(np.square(d_all)))) if d_all else float("nan"),
+            "p95_mm": float(np.percentile(d_all, 95)) if d_all else float("nan"),
+            "fixed_fixed_mean_mm": f(d_ff), "gripper_fixed_mean_mm": f(d_gf), "n_pairs": len(d_all) // max(1, len(corners))}
 
 
 def cross_view_pixel_transfer(obs_all_s2, cams, gtc, robot_T_all, K_map, D_map, gripper_id):
@@ -343,8 +383,17 @@ def main():
             obs_all_s2, cams_full, gtc_full, robot_T_all, K_map, D_map, GRIPPER_LOCAL_ID)
         xview_px, xview_pairs, xview_dirs = cross_view_pixel_transfer(
             obs_all_s2, cams_full, gtc_full, robot_T_all, K_map, D_map, GRIPPER_LOCAL_ID)
+        xview_mean_px, xview_p95_px = cross_view_pixel_transfer_mean(
+            obs_all_s2, cams_full, gtc_full, robot_T_all, K_map, D_map, GRIPPER_LOCAL_ID)
+        from calibration_pipeline.apriltag_cube import AprilTagCubeTarget
+        from calibration_pipeline.config import get_default_cube_config
+        corner3d = corner_consistency_3d(obs_all_s2, cams_full, gtc_full, robot_T_all, K_map, D_map,
+                                         GRIPPER_LOCAL_ID, AprilTagCubeTarget(get_default_cube_config()).model)
 
         results[label] = {
+            "cross_view_mean_px": xview_mean_px,
+            "cross_view_p95_px": xview_p95_px,
+            "corner_consistency_3d": corner3d,
             "heldout_cube_rmse_px": heldout_rmse,
             "n_heldout_sets": len(per_set),
             "heldout_translation_mean_mm": float(np.mean(heldout_mm)) if heldout_mm else float("nan"),
