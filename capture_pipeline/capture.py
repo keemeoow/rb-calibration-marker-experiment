@@ -1,17 +1,16 @@
 """
 멀티카메라 캘리브레이션용 데이터셋을 캡처한다.
 
-파이프라인:
-  1. 로봇이 큐브를 놓고 `set`을 실행하면 set 기준 pose를 저장한다.
-  2. 같은 set에서 그리퍼 카메라를 여러 자세로 이동시키며 촬영한다.
-  3. 각 이벤트에서 모든 카메라(그리퍼 + 고정)가 동시에 color/depth를 저장한다.
-  4. AprilTag cube / gripper ChArUco를 즉시 검출하고 pose 후보와 품질 지표를 meta.json에 기록한다.
-  5. `set_index`, robot pose, set_cube_center_6dof, capture gate 결과를 함께 저장한다.
+composite_rig_45_v2 파이프라인:
+  1. 사전 검증된 pose plan을 PC에서 robot server로 보낸다.
+  2. P1 15, P2 20, P3 10 planned event를 순서대로 동기 촬영한다.
+  3. 모든 카메라 RGB-D와 robot/release state를 attempt 단위로 저장한다.
+  4. Marker quality는 진단으로만 기록하고 transport/sync 실패만 같은 ID로 재시도한다.
 """
 
 """
 << 서버 >> 
-python c1.py
+python c1.py --auto pc --speed 30
 [set 0 z+100]
 gotoj 37.96, -9.45, -136.81, 0.25, -33.05, -117.92
 p z,-100
@@ -19,36 +18,30 @@ gc
 [자동화 촬영시] start
 [티칭시] rs(set) / rp(pose) -A / rg(grip) -B
 
-<< session 파일 번호 변경 필요 >>
+<< 최종 45-event 촬영 >>
 python3 03_capture.py \
-    --root_folder data/session02/calib_train \
-    --intrinsics_dir ./intrinsics --use_robot --manual_robot \
-    --robot_ip 192.168.0.23 --robot_port 12348 --show --save_depth \
-    --max_capture_span_ms 0 \
-    --min_cams_with_cube 0 --min_fixed_cams_with_cube 0 \
-    --a_min_fixed_multimarker_cams 0 \
-    --min_cube_pnp_ok_cams 0 --min_fixed_cube_pnp_ok_cams 0 \
-    --max_cube_pnp_reproj_mean_px 0 --min_depth_samples 0 \
-    --gripper_cube_min_markers 0 --min_gripper_charuco_corners 0 \
-    --allow_gripper_cube_pnp_fail --allow_gripper_depth_invalid \
-    --max_gripper_depth_plane_mean_mm 0 \
-    --b_min_fixed_cams_with_cube 0 --b_min_fixed_multimarker_cams 0 \
-    --b_min_fixed_cube_pnp_ok_cams 0 --b_min_fixed_depth_quality_cams 0 \
-    --b_max_fixed_depth_plane_mean_mm 0 \
-    --max_roi_clip_frac 0
+    --data_root zeus_gello_calibration/data \
+    --session_label zeus_composite_rig \
+    --intrinsics_dir intrinsics \
+    --waypoints_file capture_plans/composite_rig_45.json \
+    --use_robot --manual_robot \
+    --robot_ip 192.168.0.23 --robot_port 12348 \
+    --max_capture_span_ms 120 --show
 
 저장 파일:
   - meta.json               : 캡처별 상세 (robot pose, set_index, set_cube_center_6dof, cube/board quality)
-  - capture_waypoints.json  : 웨이포인트 (set_joints/tcp, place_joints, capture_joints)
+  - capture_waypoints.json  : frozen 45-event pose plan
+  - capture_protocol_manifest.json : planned event 완료/누락/attempt 수
 
 참고:
   - depth 저장은 기본 ON이다. 끄려면 `--no-save-depth`를 사용한다.
-  - downstream 05 calibration은 여기 저장된 set_cube_center_6dof와 depth 품질 지표를 prior/selection에 사용한다.
+  - 최종 protocol은 flange/release state와 frozen rig geometry를 사용한다.
 """
 
 import os
 import sys as _sys_top
 import json
+import hashlib
 import time
 import shutil
 import argparse
@@ -83,12 +76,118 @@ from calibration_pipeline.cube_config import (
     load_cube_config_from_meta,
 )
 from capture_pipeline.robot import euler_deg_to_matrix
-from capture_pipeline.waypoint_safety import validate_safe_joint_config, validate_waypoint_semantics
+from capture_pipeline.waypoint_safety import (
+    PHASE_P2,
+    PHASE_P3,
+    PROTOCOL_COMPOSITE_RIG_45,
+    validate_safe_joint_config,
+    validate_waypoint_semantics,
+)
+from capture_pipeline.paths import REPO_ROOT, require_data_path_inside
+
+ZEUS_CALIBRATION_ROOT = REPO_ROOT / "zeus_gello_calibration"
+
+
+def resolve_capture_roots(data_root, root_folder=None):
+    """Make the explicit CLI data root authoritative for this capture run."""
+    resolved_data = require_data_path_inside(
+        data_root, ZEUS_CALIBRATION_ROOT, label="--data_root")
+    resolved_root = None
+    if root_folder is not None:
+        resolved_root = require_data_path_inside(
+            root_folder, resolved_data, label="--root_folder")
+    return str(resolved_data), None if resolved_root is None else str(resolved_root)
 
 
 def ensure_dir(p: str) -> str:
     os.makedirs(p, exist_ok=True)
     return p
+
+
+def canonical_json_sha256(payload: dict) -> str:
+    encoded = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def file_sha256(path: str) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def load_and_validate_rig_geometry(path: str, expected_rig_id: str) -> dict:
+    with open(path, "r", encoding="utf-8") as handle:
+        payload = json.load(handle)
+    if payload.get("schema_version") != "composite_rig_geometry_v1":
+        raise ValueError("rig geometry schema_version must be composite_rig_geometry_v1")
+    if payload.get("template_only") is not False:
+        raise ValueError("rig geometry template_only must be false")
+    if payload.get("target_rig_id") != expected_rig_id:
+        raise ValueError(
+            "rig geometry target_rig_id does not match the waypoint plan"
+        )
+    if payload.get("translation_unit") != "meter":
+        raise ValueError("rig geometry translation_unit must be meter")
+    for field in ("T_rig_board", "T_rig_cube"):
+        matrix = np.asarray(payload.get(field), dtype=float)
+        if matrix.shape != (4, 4) or not np.all(np.isfinite(matrix)):
+            raise ValueError(f"{field} must be a finite 4x4 matrix")
+        if not np.allclose(matrix[3], [0.0, 0.0, 0.0, 1.0], atol=1e-9):
+            raise ValueError(f"{field} has an invalid homogeneous bottom row")
+        rotation = matrix[:3, :3]
+        if not np.allclose(rotation.T @ rotation, np.eye(3), atol=1e-4):
+            raise ValueError(f"{field} rotation is not orthonormal")
+        if not np.isclose(np.linalg.det(rotation), 1.0, atol=1e-4):
+            raise ValueError(f"{field} rotation determinant is not +1")
+    return payload
+
+
+def evaluate_transport_integrity(
+    frames: Dict[int, dict],
+    expected_camera_ids: List[int],
+    max_capture_span_ms: float,
+) -> dict:
+    """Marker-independent camera transport/sync decision for protocol retries."""
+    expected = sorted(int(ci) for ci in expected_camera_ids)
+    received = sorted(int(ci) for ci in frames)
+    missing_frames = sorted(set(expected) - set(received))
+    missing_timestamps = sorted(
+        ci for ci in received if frames[ci].get("ts_ms") is None
+    )
+    timestamps = [
+        float(frames[ci]["ts_ms"])
+        for ci in received
+        if frames[ci].get("ts_ms") is not None
+    ]
+    span_ms = max(timestamps) - min(timestamps) if len(timestamps) >= 2 else 0.0
+    reasons = []
+    if missing_frames:
+        reasons.append("missing camera frames: {}".format(missing_frames))
+    if missing_timestamps:
+        reasons.append("missing camera timestamps: {}".format(missing_timestamps))
+    if max_capture_span_ms > 0 and span_ms > max_capture_span_ms:
+        reasons.append(
+            "camera timestamp span {:.1f}ms > {:.1f}ms".format(
+                span_ms, max_capture_span_ms
+            )
+        )
+    return {
+        "schema_version": "capture_transport_integrity_v1",
+        "pass": not reasons,
+        "status": "PASS" if not reasons else "FAIL",
+        "reason": "transport/sync valid" if not reasons else "; ".join(reasons),
+        "reasons": reasons,
+        "expected_camera_ids": expected,
+        "received_camera_ids": received,
+        "missing_frame_camera_ids": missing_frames,
+        "missing_timestamp_camera_ids": missing_timestamps,
+        "capture_span_ms": float(span_ms),
+        "max_capture_span_ms": float(max_capture_span_ms),
+    }
 
 
 def annotate_image(bgr, cube, cam_idx, is_gripper, n_markers, ids, corners,
@@ -656,24 +755,37 @@ def estimate_per_marker_poses(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Place-and-Capture calibration: gripper camera + fixed cameras"
+        description=(
+            "Zeus composite_rig_45_v2 capture: synchronized RGB-D and robot state"
+        )
     )
     parser.add_argument(
         "--root_folder",
         default=None,
         help=(
-            "Explicit capture folder for a deliberate resume/legacy run. "
-            "Omit this option for the default automatic data/sessionNN/calib_train allocation."
+            "Explicit capture folder for a deliberate resume. "
+            "It must be inside the explicit --data_root. Omit this option "
+            "for automatic sessionNN/calib_train allocation."
         ),
     )
     parser.add_argument(
         "--data_root",
-        default="data",
-        help="Parent for automatic sessionNN allocation when --root_folder is omitted (default: data)",
+        required=True,
+        help=("Parent for automatic session allocation when --root_folder is omitted; "
+              f"must be inside {ZEUS_CALIBRATION_ROOT}"),
+    )
+    parser.add_argument(
+        "--session_label",
+        default=None,
+        help=("Short description folded into the new session folder name, e.g. "
+              "\"zeus wrist motion\" -> "
+              "<--data_root>/session11_zeus_wrist_motion_<MMDD>. "
+              "Required for a newly allocated session; omit only when "
+              "--root_folder deliberately resumes an existing session."),
     )
     parser.add_argument(
         "--waypoints_file",
-        default=None,
+        required=True,
         help=(
             "Validated waypoint JSON to copy into a newly allocated session as "
             "capture_waypoints.json before robot connection"
@@ -823,7 +935,7 @@ def main():
     parser.add_argument("--robot_ip", type=str, default="192.168.0.23")
     parser.add_argument("--robot_port", type=int, default=12348)
     parser.add_argument("--manual_robot", action="store_true",
-                        help="Manual robot mode: server sends capture commands interactively (use with robot_calb.py)")
+                        help="Required robot-server mode: server/c1.py sends final protocol commands")
     parser.add_argument("--preview_frac", type=float, default=0.6,
                         help="프리뷰 창이 차지할 화면 비율(0~1). 종횡비는 유지하고 "
                              "원본보다 키우지는 않는다. 기본 0.6 = 모니터의 60%%.")
@@ -840,6 +952,52 @@ def main():
     parser.add_argument("--no_start_gate", action="store_true", help=argparse.SUPPRESS)
 
     args = parser.parse_args()
+    try:
+        args.data_root, args.root_folder = resolve_capture_roots(
+            args.data_root, args.root_folder)
+    except ValueError as exc:
+        parser.error(str(exc))
+
+    waypoint_source = None
+    waypoint_payload = None
+    if args.waypoints_file:
+        waypoint_source = os.path.abspath(os.path.expanduser(args.waypoints_file))
+        try:
+            with open(waypoint_source, "r", encoding="utf-8") as waypoint_handle:
+                waypoint_payload = json.load(waypoint_handle)
+            validate_safe_joint_config(waypoint_payload)
+            validate_waypoint_semantics(waypoint_payload)
+        except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            parser.error(f"invalid --waypoints_file: {exc}")
+
+    if waypoint_payload is None:
+        parser.error(
+            "03_capture.py requires --waypoints_file with a validated "
+            f"{PROTOCOL_COMPOSITE_RIG_45} plan"
+        )
+    protocol = waypoint_payload.get("capture_protocol")
+    if protocol != PROTOCOL_COMPOSITE_RIG_45:
+        parser.error(
+            "03_capture.py accepts only capture_protocol="
+            f"{PROTOCOL_COMPOSITE_RIG_45!r}; received {protocol!r}"
+        )
+    if not (args.use_robot and args.manual_robot):
+        parser.error(
+            "03_capture.py requires --use_robot --manual_robot for the final protocol"
+        )
+    if args.root_folder is None and not str(args.session_label or "").strip():
+        parser.error(
+            "new capture requires --session_label so the generated "
+            "<--data_root>/sessionNN_<label>_<MMDD> folder "
+            "identifies the dataset"
+        )
+    if args.root_folder is not None and args.session_label is not None:
+        parser.error(
+            "--session_label cannot be combined with --root_folder; "
+            "the existing session folder already fixes the dataset name"
+        )
+    if float(args.max_capture_span_ms) <= 0:
+        parser.error("03_capture.py requires a positive --max_capture_span_ms")
 
     try:
         from capture_pipeline.camera import RealSenseCamera
@@ -849,15 +1007,6 @@ def main():
                 "[ERROR] pyrealsense2가 없습니다. RealSense Python 환경에서 "
                 "03번을 실행하세요.") from error
         raise
-
-    waypoint_source = None
-    waypoint_payload = None
-    if args.waypoints_file:
-        waypoint_source = os.path.abspath(os.path.expanduser(args.waypoints_file))
-        with open(waypoint_source, "r", encoding="utf-8") as waypoint_handle:
-            waypoint_payload = json.load(waypoint_handle)
-        validate_safe_joint_config(waypoint_payload)
-        validate_waypoint_semantics(waypoint_payload)
     intr_dir = args.intrinsics_dir
     print(f"[INFO] Depth capture/save: {'ON' if args.save_depth else 'OFF'}")
 
@@ -917,10 +1066,12 @@ def main():
     # 가 어긋나 PnP/ChArUco pose 가 조용히 부정확해진다(종횡비까지 다르면 화각도 다름).
     # color_w/color_h 를 읽어 (args.width,args.height)와 비교, 불일치 시 중단.
     res_mismatch = []
+    intrinsics_sha256_by_camera = {}
     for ci, _ in idx_serial_pairs:
         p = os.path.join(intr_dir, f"cam{ci}.npz")
         if not os.path.exists(p):
             continue
+        intrinsics_sha256_by_camera[str(ci)] = file_sha256(p)
         d = np.load(p, allow_pickle=True)
         if "color_w" in d and "color_h" in d:
             iw, ih = int(d["color_w"]), int(d["color_h"])
@@ -946,7 +1097,8 @@ def main():
     # This avoids consuming a session number for an invalid command/config.
     allocated_session = None
     if args.root_folder is None:
-        allocated_session = allocate_next_capture_session(args.data_root)
+        allocated_session = allocate_next_capture_session(
+            args.data_root, label=args.session_label)
         root = allocated_session.capture_root
         print(f"[SESSION] Allocated {allocated_session.session_id}: {allocated_session.session_root}")
         print(f"[SESSION] Calibration capture root: {root}")
@@ -973,6 +1125,66 @@ def main():
         if os.path.realpath(waypoint_source) != os.path.realpath(waypoint_destination):
             shutil.copyfile(waypoint_source, waypoint_destination)
         print(f"[SESSION] Validated waypoints: {waypoint_destination}")
+    elif os.path.exists(waypoints_path):
+        with open(waypoints_path, "r", encoding="utf-8") as waypoint_handle:
+            waypoint_payload = json.load(waypoint_handle)
+        validate_safe_joint_config(waypoint_payload)
+        validate_waypoint_semantics(waypoint_payload)
+        waypoint_source = os.path.abspath(waypoints_path)
+        print(f"[SESSION] Loaded existing waypoints: {waypoints_path}")
+
+    active_capture_protocol = (
+        None if waypoint_payload is None else waypoint_payload.get("capture_protocol")
+    )
+    final_protocol_mode = active_capture_protocol == PROTOCOL_COMPOSITE_RIG_45
+    waypoint_plan_sha256 = (
+        None if waypoint_payload is None else canonical_json_sha256(waypoint_payload)
+    )
+    rig_geometry_path = None
+    rig_geometry_sha256 = None
+    rig_geometry_payload = None
+    if final_protocol_mode:
+        if not (args.use_robot and args.manual_robot):
+            raise RuntimeError(
+                "composite_rig_45_v2 requires --use_robot --manual_robot"
+            )
+        if float(args.max_capture_span_ms) <= 0:
+            raise RuntimeError(
+                "composite_rig_45_v2 requires a positive --max_capture_span_ms"
+            )
+        rig_geometry_path = os.path.expanduser(waypoint_payload["rig_geometry_file"])
+        if not os.path.isabs(rig_geometry_path):
+            source_dir = os.path.dirname(waypoint_source or waypoints_path)
+            rig_geometry_path = os.path.join(source_dir, rig_geometry_path)
+        rig_geometry_path = os.path.abspath(rig_geometry_path)
+        if not os.path.isfile(rig_geometry_path):
+            raise RuntimeError(f"rig geometry file not found: {rig_geometry_path}")
+        rig_geometry_payload = load_and_validate_rig_geometry(
+            rig_geometry_path,
+            expected_rig_id=str(waypoint_payload["target_rig_id"]),
+        )
+        rig_geometry_sha256 = file_sha256(rig_geometry_path)
+        declared_rig_hash = str(waypoint_payload["rig_geometry_sha256"]).lower()
+        if rig_geometry_sha256.lower() != declared_rig_hash:
+            raise RuntimeError(
+                "rig geometry SHA-256 mismatch: "
+                f"declared={declared_rig_hash} actual={rig_geometry_sha256}"
+            )
+        frozen_geometry_path = os.path.join(
+            session_root, "composite_rig_geometry.json"
+        )
+        if os.path.exists(frozen_geometry_path):
+            frozen_hash = file_sha256(frozen_geometry_path)
+            if frozen_hash.lower() != rig_geometry_sha256.lower():
+                raise RuntimeError(
+                    "session already contains a different composite_rig_geometry.json"
+                )
+        elif os.path.realpath(rig_geometry_path) != os.path.realpath(frozen_geometry_path):
+            shutil.copyfile(rig_geometry_path, frozen_geometry_path)
+        rig_geometry_path = frozen_geometry_path
+        print(f"[PROTOCOL] {active_capture_protocol}: validated 45-event pose plan")
+        print(f"[PROTOCOL] pose plan sha256: {waypoint_plan_sha256}")
+        print(f"[PROTOCOL] rig geometry: {rig_geometry_path}")
 
     # ─── 카메라 시작 ───
     # 이전 실행이 비정상 종료(세그폴트 등)된 경우 디바이스가 비정상 상태로
@@ -1064,9 +1276,25 @@ def main():
     # ─── 메타 데이터 (기존 meta.json이 있으면 이어서 저장) ───
     meta_path = os.path.join(root, "meta.json")
     capture_config = {
-        "schema_version": "capture_config_v1",
+        "schema_version": (
+            "capture_config_v2" if final_protocol_mode else "capture_config_v1"
+        ),
+        "capture_protocol": active_capture_protocol,
+        "waypoint_plan_sha256": waypoint_plan_sha256,
+        "rig_geometry_path": rig_geometry_path,
+        "rig_geometry_sha256": rig_geometry_sha256,
+        "rig_geometry": rig_geometry_payload,
+        "marker_gate_role": (
+            "diagnostic_only" if final_protocol_mode else "capture_acceptance"
+        ),
+        "camera_storage_policy": (
+            "all_connected_cameras_every_attempt"
+            if final_protocol_mode
+            else "legacy_block_dependent"
+        ),
         "charuco_board_config": charuco_config_to_dict(charuco_cfg),
         "intrinsics_dir": os.path.abspath(intr_dir),
+        "intrinsics_sha256_by_camera": intrinsics_sha256_by_camera,
         "width": int(args.width),
         "height": int(args.height),
         "fps": int(args.fps),
@@ -1093,6 +1321,7 @@ def main():
             str(ci): cams[ci].color_photometry for ci, _ in idx_serial_pairs
         },
     }
+    capture_config_sha256 = canonical_json_sha256(capture_config)
     _unlocked = [ci for ci, _ in idx_serial_pairs
                  if not cams[ci].color_photometry.get("locked")]
     if _unlocked:
@@ -1155,6 +1384,10 @@ def main():
                 get_default_charuco_board_config_source()),
             "charuco_board_config": charuco_config_to_dict(charuco_cfg),
             "capture_config": capture_config,
+            "capture_config_sha256": capture_config_sha256,
+            "capture_protocol": active_capture_protocol,
+            "waypoint_plan_sha256": waypoint_plan_sha256,
+            "waypoint_plan": waypoint_payload,
             "captures": [],
         }
         event_id = 0
@@ -1176,12 +1409,24 @@ def main():
         get_default_charuco_board_config_source())
     meta["charuco_board_config"] = charuco_config_to_dict(charuco_cfg)
     meta["capture_config"] = capture_config
+    meta["capture_config_sha256"] = capture_config_sha256
+    meta["capture_protocol"] = active_capture_protocol
+    meta["waypoint_plan_sha256"] = waypoint_plan_sha256
+    if rig_geometry_payload is not None:
+        meta["rig_geometry"] = rig_geometry_payload
+    if waypoint_payload is not None:
+        meta["waypoint_plan"] = waypoint_payload
     if "cube_config" not in meta:
         meta["cube_config"] = cube_config_to_dict(cfg)
     else:
         meta["cube_config"] = cube_config_to_dict(cfg)
     quad_dir = ensure_dir(os.path.join(root, "marker_quads"))
     cam_order = sorted(ci for ci, _ in idx_serial_pairs)
+    protocol_waypoint_by_id = {
+        str(wp["planned_event_id"]): wp
+        for wp in ((waypoint_payload or {}).get("waypoints") or [])
+        if isinstance(wp, dict) and wp.get("planned_event_id") is not None
+    }
 
     def build_frame_record(
         ci: int,
@@ -1324,9 +1569,9 @@ def main():
             cv2.destroyAllWindows()
             return
 
-    print("\nControls:")
-    print("  SPACE : manual capture (if in manual mode)")
-    print("  ESC/q : quit\n")
+    print("\n[MODE] Final robot-server capture")
+    print("  server/c1.py controls all 45 planned events")
+    print("  ESC/q : abort\n")
 
     def do_capture(
         capture_gripper_pose_6dof: Optional[List[float]] = None,
@@ -1343,9 +1588,66 @@ def main():
         grasp_id: Optional[int] = None,
         force_save: bool = False,
         motion_safety: Optional[dict] = None,
+        protocol_version: Optional[str] = None,
+        planned_event_id: Optional[str] = None,
+        phase: Optional[str] = None,
+        target_state: Optional[str] = None,
+        placement_id: Optional[str] = None,
+        view_index: Optional[int] = None,
+        attempt_index: int = 0,
+        release_state: Optional[dict] = None,
+        planned_waypoint: Optional[dict] = None,
+        robot_state: Optional[dict] = None,
     ) -> Tuple[bool, dict]:
         """모든 카메라에서 마커별 포즈 추정과 함께 촬영."""
         nonlocal event_id
+        pc_command_receive_epoch_s = float(time.time())
+        pc_command_receive_monotonic_s = float(time.monotonic())
+
+        is_final_protocol = protocol_version == PROTOCOL_COMPOSITE_RIG_45
+        if is_final_protocol:
+            expected_waypoint = protocol_waypoint_by_id.get(str(planned_event_id))
+            if expected_waypoint is None:
+                raise RuntimeError(
+                    f"unknown planned_event_id from robot: {planned_event_id!r}"
+                )
+            expected_fields = {
+                "capture_index": capture_index,
+                "phase": phase,
+                "target_state": target_state,
+                "placement_id": placement_id,
+                "view_index": view_index,
+            }
+            for field_name, received_value in expected_fields.items():
+                if expected_waypoint.get(field_name) != received_value:
+                    raise RuntimeError(
+                        f"robot command mismatch for {planned_event_id}: "
+                        f"{field_name}={received_value!r}, "
+                        f"expected {expected_waypoint.get(field_name)!r}"
+                    )
+            if planned_waypoint != expected_waypoint:
+                raise RuntimeError(
+                    f"robot planned_waypoint differs from frozen plan for {planned_event_id}"
+                )
+            already_selected = next(
+                (
+                    cap
+                    for cap in meta.get("captures", [])
+                    if cap.get("planned_event_id") == planned_event_id
+                    and cap.get("selected_for_analysis") is True
+                ),
+                None,
+            )
+            if already_selected is not None:
+                print(
+                    f"[PROTOCOL] {planned_event_id} already captured as "
+                    f"event {already_selected.get('event_id')}"
+                )
+                return True, {
+                    "reason": "planned event already has a transport-valid attempt",
+                    "already_captured": True,
+                    "event_id": already_selected.get("event_id"),
+                }
 
         # 안정화 대기
         if args.settle_time > 0 and args.use_robot:
@@ -1422,7 +1724,12 @@ def main():
             cube_gripped=cube_gripped,
         )
         capture_span_ms = float(gate["capture_span_ms"])
-        if not gate["pass"]:
+        transport = evaluate_transport_integrity(
+            frames,
+            cam_order,
+            max_capture_span_ms=float(args.max_capture_span_ms),
+        )
+        if not gate["pass"] and not is_final_protocol:
             if force_save and args.allow_force_save:
                 # c+Enter 확인 시: 마커/게이트 실패여도 프레임을 무조건 저장한다.
                 # (gate 결과는 meta에 남고, 04는 저장 이미지에서 다시 검출한다.)
@@ -1432,6 +1739,11 @@ def main():
                     print("[WARN] robot requested force_save, but it is disabled without --allow_force_save")
                 print(f"[SKIP] {gate['reason']}")
                 return False, gate
+        if is_final_protocol and not gate["pass"]:
+            print(
+                f"[DIAGNOSTIC] marker quality failed for {planned_event_id}: "
+                f"{gate['reason']} (attempt is still stored)"
+            )
 
         # ─── 저장 ───
         fid = int(event_id)
@@ -1440,9 +1752,37 @@ def main():
             "capture_index": capture_index,
             "capture_span_ms": float(capture_span_ms),
             "capture_gate": gate,
+            "marker_quality_pass": bool(gate["pass"]),
+            "transport_integrity": transport,
             "force_saved": bool(not gate["pass"] and force_save and args.allow_force_save),
+            "pc_command_receive_epoch_s": pc_command_receive_epoch_s,
+            "pc_command_receive_monotonic_s": pc_command_receive_monotonic_s,
+            "pc_capture_record_epoch_s": float(time.time()),
             "cams": {},
         }
+
+        if is_final_protocol:
+            analysis_group_id = (
+                f"P2:{placement_id}" if phase == PHASE_P2
+                else "P3:STATIONARY_RIG" if phase == PHASE_P3
+                else f"P1:{planned_event_id}"
+            )
+            cap_rec.update({
+                "protocol_version": protocol_version,
+                "planned_event_id": str(planned_event_id),
+                "attempt_index": int(attempt_index),
+                "phase": str(phase),
+                "target_state": str(target_state),
+                "placement_id": placement_id,
+                "view_index": None if view_index is None else int(view_index),
+                "planned_waypoint": planned_waypoint,
+                "robot_state": robot_state,
+                "release_state": release_state,
+                "analysis_group_id": analysis_group_id,
+                "split_unit_id": (
+                    str(placement_id) if phase == PHASE_P2 else None
+                ),
+            })
 
         # 로봇 포즈 데이터
         # capture_pose = 이미지 촬영 시 현재 로봇 TCP
@@ -1501,23 +1841,35 @@ def main():
         # ─── 카메라별 저장 범위 (근거는 resolve_camera_storage 참조) ───
         is_placement = not bool(cube_gripped)
         sidx = None if set_index is None else int(set_index)
-        storage = resolve_camera_storage(
-            is_placement=is_placement,
-            set_index=sidx,
-            fixed_views_already_stored=fixed_cam_stored.get(sidx, 0),
-            a_fixed_cam_views_per_set=int(args.a_fixed_cam_views_per_set),
-            b_save_gripper_cam=bool(args.b_save_gripper_cam),
-        )
+        storage = None
+        if not is_final_protocol:
+            storage = resolve_camera_storage(
+                is_placement=is_placement,
+                set_index=sidx,
+                fixed_views_already_stored=fixed_cam_stored.get(sidx, 0),
+                a_fixed_cam_views_per_set=int(args.a_fixed_cam_views_per_set),
+                b_save_gripper_cam=bool(args.b_save_gripper_cam),
+            )
 
-        for ci in sorted(frames.keys()):
+        for ci in cam_order:
+            if ci not in frames:
+                cap_rec["cams"][str(ci)] = {
+                    "saved": False,
+                    "is_gripper": ci == gripper_cam_idx,
+                    "skip_reason": "camera_frame_missing",
+                    "transport_success": False,
+                }
+                continue
             fr = frames[ci]
             is_gripper_cam = (ci == gripper_cam_idx)
 
             # 저장하지 않는 카메라도 기록은 남긴다. 아래 소비자들이 모두
             # cams[ci]["saved"] 로 거르므로 (calibration_pipeline common/
             # observations, 05 calibration), 조용히 빠지지 않고 왜 없는지가 남는다.
-            if (is_gripper_cam and not storage.store_gripper) or \
-                    (not is_gripper_cam and not storage.store_fixed):
+            if storage is not None and (
+                (is_gripper_cam and not storage.store_gripper)
+                or (not is_gripper_cam and not storage.store_fixed)
+            ):
                 cap_rec["cams"][str(ci)] = {
                     "saved": False,
                     "is_gripper": is_gripper_cam,
@@ -1530,15 +1882,23 @@ def main():
                 continue
 
             rgb_rel = f"cam{ci}/rgb_{fid:05d}.jpg"
-            cv2.imwrite(os.path.join(root, rgb_rel), fr["color"])
+            rgb_write_ok = bool(cv2.imwrite(os.path.join(root, rgb_rel), fr["color"]))
 
             depth_rel = None
+            depth_write_ok = True
             if args.save_depth and fr["depth"] is not None:
                 depth_rel = f"cam{ci}/depth_{fid:05d}.png"
-                cv2.imwrite(os.path.join(root, depth_rel), fr["depth"])
+                depth_write_ok = bool(
+                    cv2.imwrite(os.path.join(root, depth_rel), fr["depth"])
+                )
+            elif args.save_depth:
+                depth_write_ok = False
 
             cam_rec = {
-                "saved": True,
+                "saved": bool(rgb_write_ok and depth_write_ok),
+                "transport_success": bool(rgb_write_ok and depth_write_ok),
+                "rgb_write_ok": rgb_write_ok,
+                "depth_write_ok": depth_write_ok,
                 "is_gripper": (ci == gripper_cam_idx),
                 "rgb_path": rgb_rel,
                 "depth_path": depth_rel,
@@ -1569,9 +1929,32 @@ def main():
 
             cap_rec["cams"][str(ci)] = cam_rec
 
+        if is_final_protocol:
+            write_failed_cams = sorted(
+                int(ci)
+                for ci, rec in cap_rec["cams"].items()
+                if not rec.get("transport_success", False)
+            )
+            if write_failed_cams:
+                transport["pass"] = False
+                transport["status"] = "FAIL"
+                transport["write_failed_camera_ids"] = write_failed_cams
+                transport["reasons"].append(
+                    "camera file write failed: {}".format(write_failed_cams)
+                )
+                transport["reason"] = "; ".join(transport["reasons"])
+            else:
+                transport["write_failed_camera_ids"] = []
+            cap_rec["attempt_status"] = (
+                "captured" if transport["pass"] else "transport_failed"
+            )
+            cap_rec["selected_for_analysis"] = bool(transport["pass"])
+            cap_rec["retry_allowed"] = not bool(transport["pass"])
+
         # 게이트를 통과해 실제로 디스크에 쓴 뒤에만 센다. 게이트 실패는 위에서
         # 이미 return 했으므로 여기 도달한 캡처만 그 set 의 몫을 채운다.
-        if is_placement and storage.store_fixed and sidx is not None:
+        if (not is_final_protocol and is_placement and storage is not None
+                and storage.store_fixed and sidx is not None):
             fixed_cam_stored[sidx] = fixed_cam_stored.get(sidx, 0) + 1
 
         meta["captures"].append(cap_rec)
@@ -1602,18 +1985,30 @@ def main():
                 npose = rec.get("charuco", {}).get("n_corners") if "charuco" in rec else None
                 ch_summary.append(f"cam{ci}({tag}):{ndet}cor" + (f"/pose{npose}" if npose else ""))
         charuco_txt = (" charuco[" + " ".join(ch_summary) + "]") if ch_summary else ""
-        print(f"[SAVE] event={fid} | {' '.join(cam_summary)} span={capture_span_ms:.1f}ms{charuco_txt}")
+        if is_final_protocol:
+            print(
+                f"[SAVE] event={fid} planned={planned_event_id} "
+                f"attempt={attempt_index} transport={transport['status']} "
+                f"marker={gate['status']} | {' '.join(cam_summary)} "
+                f"span={capture_span_ms:.1f}ms{charuco_txt}"
+            )
+        else:
+            print(f"[SAVE] event={fid} | {' '.join(cam_summary)} span={capture_span_ms:.1f}ms{charuco_txt}")
         event_id += 1
+        if is_final_protocol:
+            result = dict(gate)
+            result["transport_integrity"] = transport
+            result["event_id"] = fid
+            return bool(transport["pass"]), result
         return True, gate
 
     try:
         if args.use_robot and args.manual_robot:
-            # ─── 수동 로봇 모드 (robot_calb.py 서버 사용) ───
+            # ─── final robot-server mode ───
             # cv2는 main thread 전용. 소켓 recv는 백그라운드 스레드.
             # main thread가 recv에 블로킹되면 cv2 윈도우가 응답 없음 상태가 되므로
             # 분리한다.
-            print("[MODE] Manual Robot - waiting for server capture commands")
-            print("[INFO] Move robot on server side, press 'c' to capture\n")
+            print("[MODE] Waiting for final protocol commands from server/c1.py")
 
             import threading
 
@@ -1794,6 +2189,76 @@ def main():
                                 break
                             continue
 
+                        if cmd == "protocol_complete":
+                            protocol_name = msg.get("protocol_version")
+                            if protocol_name != PROTOCOL_COMPOSITE_RIG_45:
+                                response = {
+                                    "action": "protocol_complete",
+                                    "status": "error",
+                                    "reason": f"unknown protocol {protocol_name!r}",
+                                }
+                            else:
+                                expected_ids = list(protocol_waypoint_by_id)
+                                selected_ids = {
+                                    str(cap.get("planned_event_id"))
+                                    for cap in meta.get("captures", [])
+                                    if cap.get("selected_for_analysis") is True
+                                }
+                                missing_ids = [
+                                    event_name
+                                    for event_name in expected_ids
+                                    if event_name not in selected_ids
+                                ]
+                                attempt_counts = {
+                                    event_name: sum(
+                                        1
+                                        for cap in meta.get("captures", [])
+                                        if cap.get("planned_event_id") == event_name
+                                    )
+                                    for event_name in expected_ids
+                                }
+                                completion = {
+                                    "schema_version": "capture_protocol_manifest_v1",
+                                    "protocol_version": PROTOCOL_COMPOSITE_RIG_45,
+                                    "waypoint_plan_sha256": waypoint_plan_sha256,
+                                    "rig_geometry_sha256": rig_geometry_sha256,
+                                    "capture_config_sha256": capture_config_sha256,
+                                    "expected_event_count": len(expected_ids),
+                                    "selected_event_count": len(selected_ids),
+                                    "missing_planned_event_ids": missing_ids,
+                                    "attempt_counts": attempt_counts,
+                                    "server_report": {
+                                        "planned_events": msg.get("planned_events"),
+                                        "successful_events": msg.get("successful_events"),
+                                        "failed_events": msg.get("failed_events"),
+                                    },
+                                    "completed": not missing_ids and len(expected_ids) == 45,
+                                    "locked_at_epoch_s": float(time.time()),
+                                }
+                                completion_path = os.path.join(
+                                    root, "capture_protocol_manifest.json"
+                                )
+                                with open(completion_path, "w", encoding="utf-8") as handle:
+                                    json.dump(completion, handle, indent=2)
+                                    handle.write("\n")
+                                meta["protocol_completion"] = completion
+                                with open(meta_path, "w", encoding="utf-8") as handle:
+                                    json.dump(meta, handle, indent=2)
+                                    handle.write("\n")
+                                response = {
+                                    "action": "protocol_complete",
+                                    "status": "ok" if completion["completed"] else "incomplete",
+                                    "missing_planned_event_ids": missing_ids,
+                                    "manifest_path": "capture_protocol_manifest.json",
+                                }
+                            try:
+                                manual_sock.sendall(
+                                    (json.dumps(response) + "\n").encode("utf-8")
+                                )
+                            except OSError:
+                                break
+                            continue
+
                         if cmd == "capture":
                             capture_tcp = msg.get("capture_gripper_pose_6dof")
                             pose_idx = msg.get("capture_index", event_id)
@@ -1811,6 +2276,16 @@ def main():
                             m_motion_safety = msg.get("motion_safety")
                             m_pose_reference = msg.get("capture_pose_reference")
                             m_tool_offset = msg.get("capture_tool_offset_6dof")
+                            m_protocol = msg.get("protocol_version")
+                            m_planned_event_id = msg.get("planned_event_id")
+                            m_phase = msg.get("phase")
+                            m_target_state = msg.get("target_state")
+                            m_placement_id = msg.get("placement_id")
+                            m_view_index = msg.get("view_index")
+                            m_attempt_index = msg.get("attempt_index", 0)
+                            m_release_state = msg.get("release_state")
+                            m_planned_waypoint = msg.get("planned_waypoint")
+                            m_robot_state = msg.get("robot_state")
                             if m_pose_reference is not None:
                                 wp_tool_pose_reference = m_pose_reference
                             if m_tool_offset is not None:
@@ -1836,13 +2311,35 @@ def main():
                                 grasp_id=m_grasp,
                                 force_save=bool(m_force),
                                 motion_safety=m_motion_safety,
+                                protocol_version=m_protocol,
+                                planned_event_id=m_planned_event_id,
+                                phase=m_phase,
+                                target_state=m_target_state,
+                                placement_id=m_placement_id,
+                                view_index=m_view_index,
+                                attempt_index=m_attempt_index,
+                                release_state=m_release_state,
+                                planned_waypoint=m_planned_waypoint,
+                                robot_state=m_robot_state,
                             )
 
-                            status = "success" if saved else "skipped"
+                            if gate.get("already_captured"):
+                                status = "already_captured"
+                            elif saved:
+                                status = "success"
+                            elif m_protocol == PROTOCOL_COMPOSITE_RIG_45:
+                                status = "retryable"
+                            else:
+                                status = "skipped"
+                            response_reason = gate.get("reason")
+                            if gate.get("transport_integrity") is not None:
+                                response_reason = gate["transport_integrity"].get("reason")
                             resp = json.dumps({
                                 "action": "captured",
                                 "status": status,
-                                "reason": gate.get("reason"),
+                                "reason": response_reason,
+                                "event_id": gate.get("event_id"),
+                                "marker_quality_pass": gate.get("pass"),
                             })
                             try:
                                 manual_sock.sendall((resp + "\n").encode("utf-8"))
@@ -1863,6 +2360,20 @@ def main():
                                 "cube_center_6dof": msg.get("capture_cube_center_6dof"),
                                 "set_index": s_idx,
                             }
+                            if m_protocol is not None:
+                                wp_entry.update({
+                                    "protocol_version": m_protocol,
+                                    "planned_event_id": m_planned_event_id,
+                                    "attempt_index": m_attempt_index,
+                                    "phase": m_phase,
+                                    "target_state": m_target_state,
+                                    "placement_id": m_placement_id,
+                                    "view_index": m_view_index,
+                                    "robot_state": m_robot_state,
+                                    "release_state": m_release_state,
+                                    "planned_waypoint": m_planned_waypoint,
+                                    "capture_status": status,
+                                })
                             if m_pose_reference is not None:
                                 wp_entry["capture_pose_reference"] = m_pose_reference
                             if m_tool_offset is not None:
@@ -1952,6 +2463,8 @@ def main():
                         "set_joints": wp_set_joints,
                         "set_tcp": wp_set_tcp,
                         "set_cube_center": wp_set_cube_center,
+                        "capture_protocol": active_capture_protocol,
+                        "waypoint_plan_sha256": waypoint_plan_sha256,
                         "waypoints": wp_list,
                     }
                     if wp_tool_pose_reference is not None:
@@ -1963,61 +2476,7 @@ def main():
                         json.dump(wp_save, f, indent=2)
                     print(f"[INFO] Recorded waypoints saved: {wp_path} ({len(wp_list)} poses)")
 
-            print(f"\n[DONE] Manual robot capture complete. {event_id} captures saved.")
-
-        else:
-            # ─── Manual mode ───
-            print("[MODE] Manual capture (press SPACE)")
-            while True:
-                frames_view: Dict[int, dict] = {}
-                for ci, cam in cams.items():
-                    color, depth, ts_ms = cam.get_latest()
-                    if color is None:
-                        continue
-                    frames_view[ci] = build_frame_record(
-                        ci, color, depth, ts_ms,
-                        include_marker_poses=False,
-                        include_charuco_pose=False,
-                        log_pose_status=False,
-                    )
-
-                if args.show:
-                    gate = evaluate_capture_gate(
-                        frames_view,
-                        capture_gate_cfg,
-                        gripper_cam_idx=gripper_cam_idx,
-                    )
-                    gate_lines = build_capture_gate_lines(gate, gripper_cam_idx, frames_view)
-                    panel = np.zeros((28 * len(gate_lines) + 12, 1100, 3), dtype=np.uint8)
-                    for line_idx, gate_line in enumerate(gate_lines):
-                        color = (0, 255, 0) if (line_idx == 0 and gate["pass"]) else (
-                            (0, 0, 255) if line_idx == 0 else (255, 255, 255)
-                        )
-                        cv2.putText(panel, gate_line, (12, 28 + line_idx * 28),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.58, color, 2)
-                    cv2.imshow("Capture Gate", fit_to_screen(panel, float(args.preview_frac)))
-                    for ci in sorted(frames_view.keys()):
-                        img = frames_view[ci]["color"].copy()
-                        ids_np = frames_view[ci]["ids_np"]
-                        corners = frames_view[ci]["corners"]
-                        if ids_np is not None:
-                            try:
-                                draw_ids = ids_np.reshape(-1, 1) if getattr(ids_np, "ndim", 1) == 1 else ids_np
-                                cv2.aruco.drawDetectedMarkers(img, corners, draw_ids)
-                            except Exception:
-                                pass
-                        tag = "GRIP" if ci == gripper_cam_idx else "FIX"
-                        n = 0 if ids_np is None else len(ids_np)
-                        txt = f"cam{ci}({tag}) markers={n} ok={frames_view[ci]['ok']}"
-                        cv2.putText(img, txt, (10, 30),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                        cv2.imshow(f"cam{ci}", fit_to_screen(img, float(args.preview_frac) / 2.0))
-
-                key = cv2.waitKey(1) & 0xFF
-                if key == 27 or key == ord('q'):
-                    break
-                if key == 32:  # SPACE
-                    do_capture()
+            print(f"\n[DONE] Final robot capture complete. {event_id} captures saved.")
 
     finally:
         for cam in cams.values():
@@ -2026,7 +2485,3 @@ def main():
 
     print(f"\n[DONE] Total captures: {event_id}")
     print(f"  Meta saved: {meta_path}")
-
-
-if __name__ == "__main__":
-    main()

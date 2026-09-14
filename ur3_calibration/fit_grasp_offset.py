@@ -197,7 +197,7 @@ def load_robot_T(meta: dict) -> dict:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--root-folder", default=str(REPO_ROOT / "data" / "ur3_session12" / "calib_train"))
+    ap.add_argument("--root-folder", default=str(REPO_ROOT / "data" / "session10_ur3_handheld_floor_meta_0909" / "calib_train"))
     ap.add_argument("--intrinsics-dir", default=str(REPO_ROOT / "ur3_calibration" / "intrinsics"))
     ap.add_argument("--cube-observation-policy", default="legacy", choices=("legacy", "core_multiface"))
     ap.add_argument("--out", default=str(REPO_ROOT / "ur3_calibration" / "pass1_grasp_offset.json"))

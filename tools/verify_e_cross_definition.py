@@ -39,20 +39,21 @@ from calibration_pipeline.path_evaluation import (  # noqa: E402
 )
 from calibration_pipeline.reprojection import project_points  # noqa: E402
 from calibration_pipeline.evaluation import deserialize_state  # noqa: E402
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT  # noqa: E402
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root_folder", default="data/session04/calib_train")
+    parser.add_argument("--root_folder", default="data/session02_NOUSE_session04_0814/calib_train")
     parser.add_argument("--intrinsics_dir", default="intrinsics")
     parser.add_argument(
-        "--calib_dir", default="data/session04/calib_out")
+        "--calib_dir", default="data/session02_NOUSE_session04_0814/calib_out")
     parser.add_argument("--include_sets", default="0-12")
     parser.add_argument("--split_seed", type=int, default=DEFAULT_SPLIT_SEED)
     parser.add_argument("--min_train_eih_cube_events", type=int, default=3)
     parser.add_argument(
         "--observation-manifest", "--observation_manifest",
-        default=("data/session04/calib_out/capture_filter/"
+        default=("data/session02_NOUSE_session04_0814/calib_out/capture_filter/"
                  "Step2b_observation_manifest.json"))
     parser.add_argument(
         "--observation-filter-policy", "--observation_filter_policy",
@@ -62,10 +63,10 @@ def parse_args():
         action="store_true")
     parser.add_argument(
         "--table1_result",
-        default="CP_result/session04/late_table1/table1_methods.json")
+        default=f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
     parser.add_argument(
         "--evaluation_json",
-        default=("CP_result/session04/cross_target_evaluation/"
+        default=(f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/cross_target_evaluation/"
                  "cross_target_evaluation.json"))
     return parser.parse_args()
 
@@ -216,7 +217,8 @@ def main() -> None:
     print(
         "OK: e_cross is pairwise fixed-camera cube-pose consistency and "
         "pixel-transfer is bidirectional measurement-only reprojection; "
-        f"{checked_runs} runs, {checked_pairs} pairs, no FK/GT/gripper path")
+        f"{checked_runs} runs, {checked_pairs} pairs, VISION fixed-camera path; "
+        "no GT/gripper path")
 
 
 if __name__ == "__main__":

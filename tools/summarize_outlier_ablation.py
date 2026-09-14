@@ -8,6 +8,7 @@ import csv
 import json
 from pathlib import Path
 from statistics import fmean
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 
 METHODS = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
@@ -125,7 +126,7 @@ def write(rows: list[dict], populations: dict, output_dir: Path) -> None:
         "따라서 robust loss가 모든 조건을 일괄 개선한다고 주장할 수 없으며, "
         "방법별·표적별 결과를 함께 보고해야 한다.",
         "",
-        "A5는 train-vision-aligned FK를 hard-fixed한 최종 후보가 될 수 있다. "
+        "A5는 corrected-FK hard fixed (train-only VISION alignment) 최종 후보가 될 수 있다. "
         "단, 이 sensitivity 결과만으로 A5를 외부 물리 정확도 winner로 "
         "확정하지는 않으며, GT 공개 전에 방법과 alignment artifact를 frozen해야 한다.",
         "",
@@ -141,21 +142,21 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--soft_table",
-        default="CP_result/session04/late_table1/table1_methods.json")
+        default=f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
     parser.add_argument(
         "--linear_table",
-        default=("CP_result/session04/outlier_ablation/linear_table1/"
-                 "table1_methods.json"))
+        default=(f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/outlier_ablation/linear_table1/"
+                 "ABLATION_TEST_table1_methods.json"))
     parser.add_argument(
         "--soft_cross",
-        default=("CP_result/session04/cross_target_evaluation/"
+        default=(f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/cross_target_evaluation/"
                  "cross_target_evaluation.json"))
     parser.add_argument(
         "--linear_cross",
-        default=("CP_result/session04/outlier_ablation/linear_cross_target/"
+        default=(f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/outlier_ablation/linear_cross_target/"
                  "cross_target_evaluation.json"))
     parser.add_argument(
-        "--out_dir", default="CP_result/session04/outlier_ablation")
+        "--out_dir", default=f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/outlier_ablation")
     return parser.parse_args()
 
 

@@ -132,7 +132,7 @@ class CubeConfig:
 
     # In-plane rotation around each face normal, degrees. Validate physically.
     # Per-face in-plane roll (deg, about the face normal) of the printed marker vs
-    # the nominal face axes. Calibrated from data/session04 multi-face co-observations
+    # the nominal face axes. Calibrated from data/session02_NOUSE_session04_0814 multi-face co-observations
     # (self-calibration over roll in {0,90,180,270}): the physical cube's side tags
     # are mounted rotated by 90-degree steps. Applying these brought the inter-face
     # cube-pose rotation disagreement from median 90.72deg down to 2.20deg.

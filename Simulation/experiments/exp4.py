@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""실험 4: −FK — FK 안씀 + 통합 + 큐브/보드
+"""실험 4: VISION + 통합 + 큐브/보드
 
 core(통합 엔진)에서 EXP4 설정을 가져와 실행한다.
   python experiments/exp4.py --seeds 20

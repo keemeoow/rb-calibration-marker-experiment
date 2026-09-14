@@ -54,12 +54,18 @@ from capture_session import (  # noqa: E402
     grab_frames, write_capture, read_robot_state,
     ROBOT_IP_DEFAULT, ROBOT_PORT_DEFAULT, DEVICE_MAP_DEFAULT,
 )
+from zeus_gello_calibration.paths import (  # noqa: E402
+    SESSION2_DIR,
+    SESSION3_DIR,
+    ZEUS_DATA_ROOT,
+    require_zeus_data_path,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DATA_ROOT_DEFAULT = Path(__file__).resolve().parent / "data"
+DATA_ROOT_DEFAULT = ZEUS_DATA_ROOT
 
-SESSION2_DIR_DEFAULT = DATA_ROOT_DEFAULT / "session2_floor_board_dual_cam"
-SESSION3_DIR_DEFAULT = DATA_ROOT_DEFAULT / "session3_wrist_motion_gripper_cam"
+SESSION2_DIR_DEFAULT = SESSION2_DIR
+SESSION3_DIR_DEFAULT = SESSION3_DIR
 
 # 실측: "Pos, -292.02, 400.03, 178.75, -90.00, -0.00, 180.00" -- 여기서
 # z/ry/rx만 고정값으로 쓴다 (x,y는 session2 각 자세에서 그대로 가져오므로 안 씀).
@@ -280,6 +286,13 @@ def main():
     ap.add_argument("--no-preview", action="store_true")
     args = ap.parse_args()
 
+    try:
+        session2_dir = require_zeus_data_path(args.session2_dir, label="--session2-dir")
+        session3_dir = require_zeus_data_path(args.session3_dir, label="--session3-dir")
+        out_root = require_zeus_data_path(args.out_root, label="--out-root")
+    except ValueError as exc:
+        ap.error(str(exc))
+
     start_joints, start_pose, start_src = START_JOINTS, START_POSE, "고정 지정값 (START_JOINTS/START_POSE)"
 
     cam_pose_joints = CAM_POSE_JOINTS
@@ -293,10 +306,10 @@ def main():
             return
         # dry-run 미리보기 전용 근사치 (실제 실행 전에는 반드시 CAM_POSE_POSE를 채워야 함)
         _joints_unused, cam_pose, _src = load_latest_state(
-            Path(args.session3_dir), subdir_candidates=("capture",), index=0)
+            session3_dir, subdir_candidates=("capture",), index=0)
         cam_src = ("[미확정 -- session3 첫 캡처 pose로 근사, dry-run 미리보기 전용] "
                    "CAM_POSE_JOINTS는 반영됨, CAM_POSE_POSE는 아직 실측 필요")
-    items = compute_ordered_targets(Path(args.session2_dir))
+    items = compute_ordered_targets(session2_dir)
 
     print(f"고정값: z={Z_FIXED}mm  ry={RY_FIXED}deg  rx={RX_FIXED}deg  approach={args.approach_mm}mm")
     print(f"시작 자세 <- {start_src}")
@@ -333,7 +346,6 @@ def main():
         stop_cameras(cams)
         return
 
-    out_root = Path(args.out_root)
     try:
         execute_plan(steps, rb, cams, used_labels, out_root, view, args.no_step, args.skip_steps)
     finally:

@@ -27,6 +27,7 @@ from calibration_pipeline.runtime import (
 
 from calibration_pipeline import table1
 from calibration_pipeline.schema import (
+    canonicalize_relative_pose_reporting,
     DEFAULT_SPLIT_SEED,
     RELATIVE_POSE_REPORTING_CONTRACT,
 )
@@ -157,8 +158,9 @@ def validate_result_contract(result: Mapping) -> None:
                 "may_rank_methods_before_external_gt") is not False):
         raise ValueError(
             "fixed-to-fixed consistency was promoted above supplementary")
-    if protocol.get("relative_pose_reporting") != \
-            RELATIVE_POSE_REPORTING_CONTRACT:
+    relative_pose_reporting = canonicalize_relative_pose_reporting(
+        protocol.get("relative_pose_reporting", {}))
+    if relative_pose_reporting != RELATIVE_POSE_REPORTING_CONTRACT:
         raise ValueError("relative-pose reporting policy drift")
     gripper_to_fixed_protocol = protocol.get("gripper_to_fixed_evaluation", {})
     gripper_mask_sha256 = gripper_to_fixed_protocol.get(
@@ -242,10 +244,10 @@ def parse_args(argv=None):
     parser.add_argument("--f_scale_px", type=float, default=2.0)
     parser.add_argument(
         "--table1_result", default=None,
-        help="Default: CP_result/<session>/late_table1/table1_methods.json.")
+        help="Default: ABLATION_TEST_result_<MMDD>/<session>/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json.")
     parser.add_argument(
         "--out_dir", default=None,
-        help="Default: CP_result/<session>/cross_target_evaluation.")
+        help="Default: ABLATION_TEST_result_<MMDD>/<session>/cross_target_evaluation.")
     parser.add_argument(
         "--allow-relocated-session-root", "--allow_relocated_session_root",
         dest="allow_relocated_session_root", action="store_true",

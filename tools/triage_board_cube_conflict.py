@@ -31,7 +31,7 @@ from tools.verify_board_cube_relative_pose import (  # noqa: E402
 
 
 DEFAULT_OUT_DIR = (
-    ROOT / "data/session04/calib_out/verify/board_cube_relative_pose"
+    ROOT / "data/session02_NOUSE_session04_0814/calib_out/verify/board_cube_relative_pose"
 )
 
 
@@ -395,11 +395,11 @@ def _write_report(path: Path, payload: dict) -> None:
 
 def main(argv: Iterable[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--session-root", default="data/session04/calib_train")
+    parser.add_argument("--session-root", default="data/session02_NOUSE_session04_0814/calib_train")
     parser.add_argument("--intrinsics-dir", default="intrinsics")
     parser.add_argument(
         "--manifest",
-        default=("data/session04/calib_out/capture_filter/"
+        default=("data/session02_NOUSE_session04_0814/calib_out/capture_filter/"
                  "Step2b_observation_manifest.json"))
     parser.add_argument("--observation-filter-policy", default="standard")
     parser.add_argument("--split-seed", type=int, default=20260731)

@@ -8,6 +8,7 @@ import csv
 import json
 from pathlib import Path
 from statistics import fmean, pstdev
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 
 METHODS = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
@@ -346,7 +347,7 @@ def write_outputs(
         f"{summary['a2_minus_a4_standard_px']:+.4f} px, strict "
         f"{summary['a2_minus_a4_strict_px']:+.4f} px로 둘 다 사실상 동률이다. "
         "따라서 이 실험도 A4 우월성 주장의 근거가 아니다.",
-        "- A3 raw-FK-fixed는 두 정책 모두 A2/A4보다 높은 오차를 유지했다. "
+        "- A3 FK hard fixed는 두 정책 모두 A2/A4보다 높은 오차를 유지했다. "
         "즉 A3의 차이는 해당 두 경계 관측만으로 설명되지 않는다.",
         "- A5도 두 정책에서 낮은 내부 px를 유지한다. External GT 공개 전에 "
         "방법과 alignment artifact가 frozen이면 최종 후보지만, strict 민감도 "
@@ -366,17 +367,17 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--standard_table",
-        default="CP_result/session04/late_table1/table1_methods.json")
+        default=f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
     parser.add_argument(
         "--strict_table",
-        default=("CP_result/session04/outlier_ablation/strict_table1/"
-                 "table1_methods.json"))
+        default=(f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/outlier_ablation/strict_table1/"
+                 "ABLATION_TEST_table1_methods.json"))
     parser.add_argument(
         "--manifest",
-        default=("data/session04/calib_out/capture_filter/"
+        default=("data/session02_NOUSE_session04_0814/calib_out/capture_filter/"
                  "Step2b_observation_manifest.json"))
     parser.add_argument(
-        "--out_dir", default="CP_result/session04/outlier_ablation")
+        "--out_dir", default=f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/outlier_ablation")
     return parser.parse_args()
 
 

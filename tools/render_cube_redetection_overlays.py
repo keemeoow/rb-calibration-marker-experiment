@@ -46,15 +46,15 @@ def _draw_detections(image, detections, color, prefix):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--session-root", default="data/session04/calib_train")
+    parser.add_argument("--session-root", default="data/session02_NOUSE_session04_0814/calib_train")
     parser.add_argument(
         "--quality-json",
-        default=("data/session04/calib_out/verify/cube_observation_quality/"
+        default=("data/session02_NOUSE_session04_0814/calib_out/verify/cube_observation_quality/"
                  "cube_observation_quality.json"),
     )
     parser.add_argument(
         "--output",
-        default=("data/session04/calib_out/verify/cube_observation_quality/"
+        default=("data/session02_NOUSE_session04_0814/calib_out/verify/cube_observation_quality/"
                  "redetection_recovered_core_overlay.png"),
     )
     args = parser.parse_args()

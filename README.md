@@ -4,9 +4,9 @@
 
 ## 바로가기
 
-- [논문 스토리라인 기준 문서](RESEARCH_STORYLINE.md)
-- [Session04 canonical 결과 인덱스](CP_result/README.md)
-- [Session04 Board–Cube systematic error 진단](data/session04/calib_out/verify/board_cube_relative_pose/BOARD_CUBE_RELATIVE_POSE.md)
+- [논문 스토리라인 기준 문서](RESEARCH.md)
+- [Session04 canonical 결과 인덱스](ABLATION_TEST_result_0909/README.md)
+- [Session04 Board–Cube systematic error 진단](data/session02_NOUSE_session04_0814/calib_out/verify/board_cube_relative_pose/BOARD_CUBE_RELATIVE_POSE.md)
 - [문서 지도](#문서-지도)
 - [1. 가장 짧은 실행 순서](#1-가장-짧은-실행-순서)
 - [2. 시스템과 좌표계](#2-시스템과-좌표계)
@@ -32,12 +32,12 @@
 | 기능 | 기준 문서 | 관리 원칙 |
 | --- | --- | --- |
 | 실행·데이터·코드 계약 | `README.md` | 사람이 편집하는 저장소 진입점 |
-| 논문 기여도·스토리라인 | `RESEARCH_STORYLINE.md` | 초기 기여도와 실제 데이터 기반 수정 사항을 함께 관리하는 최상위 서사 기준 |
+| 논문 기여도·스토리라인 | `RESEARCH.md` | 초기 기여도와 실제 데이터 기반 수정 사항을 함께 관리하는 최상위 서사 기준 |
 | 수식·방법·논문 서술 | `CALIBRATION_EXPLANATION_LATEX.md` | 사람이 편집하는 이론 및 paper-ready 문서 |
-| Session04 결과 | `CP_result/README.md` | 결과 인덱스; `TABLE1_RESULTS.md`와 `TABLE1_INTERACTIVE.html`은 생성기로 갱신 |
-| 추가 진단 실험 | `ADDITIONAL_EXPERIMENTS_SUMMARY.md` | outlier, corner, FK, OpenCV, point-cloud 실험을 한 표로 정리 |
+| Session04 결과 | `ABLATION_TEST_result_0909/README.md` | 결과 인덱스; `ABLATION_TEST_TABLE1_RESULTS.md`와 `ABLATION_TEST_TABLE1_INTERACTIVE.html`은 생성기로 갱신 |
+| 추가 진단 실험 | `ADD_EXPERIMENTS_SUMMARY.md` | outlier, corner, FK, OpenCV, point-cloud 실험을 한 표로 정리 |
 | Simulation | `Simulation/README.md` | 실행 진입점; backend 통합 계획은 `Simulation/MIGRATION_PLAN.md`, 결과는 `SIM_RESULTS.md`와 `results/` |
-| Capture·검출 검증 | `data/session04/calib_out/capture_filter/CAPTURE_FILTER.md` 및 `data/session04/calib_out/verify/` | 데이터와 함께 보존하는 생성·검증 보고서; Board–Cube 계통오차 기준 문서는 `board_cube_relative_pose/BOARD_CUBE_RELATIVE_POSE.md` |
+| Capture·검출 검증 | `data/session02_NOUSE_session04_0814/calib_out/capture_filter/CAPTURE_FILTER.md` 및 `data/session02_NOUSE_session04_0814/calib_out/verify/` | 데이터와 함께 보존하는 생성·검증 보고서; Board–Cube 계통오차 기준 문서는 `board_cube_relative_pose/BOARD_CUBE_RELATIVE_POSE.md` |
 
 ## 1. 가장 짧은 실행 순서
 
@@ -45,11 +45,11 @@ Session04 내부 결과를 재생성하려면 다음을 순서대로 실행한�
 `--calib_dir`, `--out_dir`, `--observation-manifest` 등은 모두 `--root_folder`에서 유도된다.
 
 ```bash
-COMMON="--root_folder data/session04/calib_train --include_sets 0-12 \
+COMMON="--root_folder data/session02_NOUSE_session04_0814/calib_train --include_sets 0-12 \
   --min_train_eih_cube_events 3 --split_seed 20260731 --observation-filter-policy standard"
 
 python3 05_calibrate.py                 $COMMON --num_inits 3
-python3 06_make_report.py --root_folder data/session04/calib_train
+python3 06_make_report.py --root_folder data/session02_NOUSE_session04_0814/calib_train
 ```
 
 두 명령으로 calibration과 상세 결과/전체 행렬 출력이 끝난다. Cross-target,
@@ -64,28 +64,22 @@ python3 02_calibrate_intrinsics.py \
   --intr_dir intrinsics \
   --save_images
 
-# 2. cube/board 영상, depth, robot FK 동시 캡처
-python3 03_capture.py \
-  --data_root data \
-  --intrinsics_dir intrinsics \
-  --use_robot \
-  --robot_ip 192.168.0.23 \
-  --robot_port 12348 \
-  --show
+# 2. 촬영은 아래 단일 문서의 최종 45-event 명령을 그대로 사용
+# zeus_gello_calibration/PIPELINE.md
 
 # 2b. board/cube geometry와 native-pixel corner를 SHA-256 manifest로 고정
 python3 04_filter_observations.py \
-  --session-root data/sessionNN/calib_train \
+  --session-root data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics-dir intrinsics
 
 # 3. A/B 비교실험 실행
 python3 05_calibrate.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/sessionNN/late_table1
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/ABLATION_TEST_table1
 ```
 
 Shared Train-only Baseline만 확인하려면 05번에 `--baseline_only`를 추가한다. 전체 Table 1 실행에도 같은 baseline 코드가 포함되므로 보통은 05번을 한 번만 실행하면 된다.
@@ -97,15 +91,19 @@ Shared Train-only Baseline만 확인하려면 05번에 `--baseline_only`를 추�
 | $T^B_{C_i}$ | 고정카메라 $i$에서 robot base로의 외부 파라미터 | 조건에 따라 자유변수 |
 | $T^G_C$ | eye-in-hand 카메라 좌표에서 gripper 좌표로의 Hand–Eye transform | 조건에 따라 자유변수 |
 | $T^B_G(e)$ | event $e$의 robot FK가 제공한 base–gripper transform | 모든 조건에서 고정 입력 |
-| $T^B_{\mathrm{board}}$ | 작업공간에 고정된 ChArUco board pose | board 조건에서 자유변수 |
-| $T^B_{\mathrm{cube}}(s)$ | 배치 set $s$의 cube pose | vision 추정, raw/aligned FK 고정 또는 FK factor |
+| $T^B_{\mathrm{board}}$ | legacy Session04의 작업공간 고정 ChArUco board pose | board 조건에서 자유변수 |
+| $T^B_{\mathrm{cube}}(s)$ | 배치 set $s$의 cube pose | VISION 추정, FK hard fixed 또는 corrected-FK 방식 |
 | $(K_i,D_i)$ | 카메라 $i$의 intrinsic과 distortion | 사전 보정 후 항상 고정 |
 
 중요한 용어 규칙은 다음과 같다.
 
-- `vision` 또는 `no-FK`는 **robot FK 전체를 사용하지 않는다는 뜻이 아니다.** Eye-in-hand 카메라 pose $T^B_G(e)T^G_C$를 만들기 위해 robot FK는 모든 조건에서 사용한다.
-- `vision`, `raw-FK-fixed`, `vision-aligned-FK-fixed`, `corrected-FK factor`의 차이는 배치된 cube pose $T^B_{\mathrm{cube}}(s)$를 자유변수로 둘지, raw FK의 mechanical frame map 또는 train-vision-aligned FK에 고정할지, 또는 자유변수에 aligned-FK covariance-whitened factor를 연결할지의 차이다.
-- board는 robot에 부착된 물체가 아니므로 `FK-fixed board`라는 조건은 물리적으로 정의하지 않는다.
+- `VISION`은 **robot FK 전체를 사용하지 않는다는 뜻이 아니다.** Eye-in-hand 카메라 pose $T^B_G(e)T^G_C$를 만들기 위해 robot FK는 모든 조건에서 사용한다.
+- `VISION`, `FK hard fixed`, `corrected-FK soft factor`, `corrected-FK hard fixed (VISION-aligned)`의 차이는 배치된 cube pose $T^B_{\mathrm{cube}}(s)$를 자유변수로 둘지, controller FK에 고정할지, 또는 train-only corrected-FK를 soft factor나 hard fixed pose로 사용할지의 차이다.
+- 현재 Session04 loader/solver에서는 board가 robot에 부착되지 않은 legacy data이므로
+  `FK hard fixed board`를 사용하지 않는다. 최종 재촬영은 board와 cube를 하나의 강체 target
+  rig로 묶어 같은 45개 event에서 촬영하며, phase-aware
+  `T_base_rig(event)=T_base_flange(event)T_flange_rig` 모델을 구현한 뒤 사용한다.
+  촬영 계약은 [CALIBRATION_EXPERIMENT_VALIDATION.md](CALIBRATION_EXPERIMENT_VALIDATION.md)를 따른다.
 
 `T^B_G(e)`의 $G$는 한 실행 안에서 반드시 같은 물리 frame이어야 한다. 현재 session02는 event 0--89가 tool3(150 mm TCP), event 90--95가 flange로 기록되어 있어, [`pose_convention_manifest.json`](data/session02/calib_train/pose_convention_manifest.json)으로 모두 flange 기준으로 정규화한다. cube-center 기록도 같은 manifest에서 legacy tool4 177.5 mm를 실제 tool4 143.0 mm 기준으로 바꾼다. 적용식은 강체 좌표변환
 
@@ -141,7 +139,7 @@ $$
 비교실험의 필수 입력은 다음과 같다.
 
 ```text
-data/sessionNN/calib_train/
+data/session<NN>_<설명>_<MMDD>/calib_train/
 ├── meta.json
 ├── pose_convention_manifest.json  # 기록 frame이 섞인 세션만 필요
 └── ... RGB/depth images
@@ -149,6 +147,34 @@ data/sessionNN/calib_train/
 intrinsics/
 └── cam*.npz
 ```
+
+#### 폴더 이름 규칙 (예외 없음)
+
+촬영 데이터는 **어느 루트에서 찍든 그 루트의 `data/` 안에 순차로** 쌓이고,
+폴더 이름에는 예외 없이 촬영 날짜 `_MMDD` 가 붙는다. 결과는 전부 날짜가 박힌
+`ABLATION_TEST_result_<MMDD>/` 아래에 세션별로 들어간다.
+
+```text
+zeus_gello_calibration/data/session<NN>_<설명>_<MMDD>/   # 03_capture.py (composite rig)
+ur3_calibration/data/session<N>_<설명>_<MMDD>/           # UR3 리그 촬영 스크립트
+data/session<NN>_<설명>_<MMDD>/                          # 파이프라인 입력 데이터셋 (아카이브/변환본)
+ABLATION_TEST_result_<MMDD>/<세션명>/                    # 그 세션으로 낸 결과
+```
+
+세션 번호는 각 `data/` 안에서 순차로만 올라가고 재사용하지 않는다.
+
+같은 구성을 다른 날 다시 찍거나 다시 계산해도 이름만으로 구분되도록 날짜를 박는다.
+위치와 무관하게 전체 세션 목록은 [`data/INDEX.md`](data/INDEX.md) 에 모아 뒀다.
+
+경로를 새로 만드는 코드는 날짜를 직접 적지 말고 아래 단일 출처를 쓴다.
+
+| 대상 | 단일 출처 |
+|---|---|
+| 촬영 폴더 | [`capture_pipeline/paths.py`](capture_pipeline/paths.py) — `CAPTURE_DATA_ROOT`, `session_folder_name()`, `resolve_dated_dir()` |
+| 세션 할당 | [`capture_pipeline/session.py`](capture_pipeline/session.py) — `allocate_next_capture_session(label=...)` |
+| 결과 폴더 | [`calibration_pipeline/result_paths.py`](calibration_pipeline/result_paths.py) — `ABLATION_RESULT_ROOT` |
+
+`ABLATION_TEST_RESULT_ROOT` 환경변수를 주면 결과 루트를 특정 날짜로 고정할 수 있다.
 
 ### 3.3 04 촬영 후 관측 고정
 
@@ -161,11 +187,11 @@ RGB에서 ChArUco corner를 다시 검출한다.
 
 ```bash
 python3 04_filter_observations.py \
-  --session-root data/session04/calib_train \
+  --session-root data/session02_NOUSE_session04_0814/calib_train \
   --intrinsics-dir intrinsics
 ```
 
-기본 출력은 `data/session04/calib_out/capture_filter/`이다. 이 디렉터리의
+기본 출력은 `data/session02_NOUSE_session04_0814/calib_out/capture_filter/`이다. 이 디렉터리의
 `CAPTURE_FILTER.md`에 event별 선택/제외 이유와 재촬영 후보가 정리되고,
 `Step2b_review_overlay.jpg`에서 recovered/quarantine/rejected 관측을 확인할 수
 있다. `Step2b_observation_manifest.json`은 native-pixel 2D corner, 대응 3D corner,
@@ -180,7 +206,7 @@ Cube의 기본 AprilTag 검출은 `CORNER_REFINE_APRILTAG`를 사용한다. refi
 다음 옵션을 추가한다.
 
 ```bash
---observation-manifest data/session04/calib_out/capture_filter/Step2b_observation_manifest.json \
+--observation-manifest data/session02_NOUSE_session04_0814/calib_out/capture_filter/Step2b_observation_manifest.json \
 --observation-filter-policy standard
 ```
 
@@ -193,7 +219,7 @@ Session04 영상과 corner-ID topology에는 가로 checker square가 11개이�
 ChArUco corner column이 10개다. 275 mm가 흰 여백을 제외한 checker pattern의
 전체 폭이므로 `275/11=25 mm`, 즉 `square_length_m=0.025`와 일치한다.
 `--align-board-metric-scale`은 실측값이 아닌 데이터 기반 추정값을 사용하는
-**별도 진단 전용 옵션**이다. 공식 `CP_result/sessionNN` 실행에는 넣지 않으며,
+**별도 진단 전용 옵션**이다. 공식 `ABLATION_TEST_result_0909/sessionNN` 실행에는 넣지 않으며,
 canonical Markdown/HTML 생성기도 scale 정렬 결과를 거부한다. 실물 치수를 측정하고
 사용자가 명시적으로 승인하기 전에는 config나 공식 결과에 반영하지 않는다.
 
@@ -410,14 +436,14 @@ $$
 | ID | 입력 marker | 최적화 | Cube pose 처리 | 자유변수 | 핵심 출력/질문 |
 | --- | --- | --- | --- | --- | --- |
 | A0 | board | 순차 `seq` | cube 없음 | 1단계 $T^G_C,T^B_{\mathrm{board}}$, 2단계 $T^B_{C_i}$ | board-only optimization baseline |
-| A1 | board+cube | 순차 `seq` | vision 자유변수 | 1단계 $T^G_C,T^B_{\mathrm{board}},T^B_{\mathrm{cube}}(s)$, 2단계 $T^B_{C_i}$ | 같은 순차법에서 cube residual 추가 효과 |
-| A2 | board+cube | 통합 `U` | vision 자유변수 | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}},T^B_{\mathrm{cube}}(s)$ | vision-only 통합 효과 |
-| A3 | board+cube | 통합 `U` | raw FK + mechanical frame map으로 hard fixed | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}}$ | 영상 정렬 없는 raw FK hard constraint 효과 |
-| A4 | board+cube | 통합 `U` | covariance-whitened soft FK factor | A2와 같음 | vision과 FK 불확실성을 함께 쓰는 효과 |
-| A5 | board+cube | 통합 `U` | train-only vision-aligned FK로 hard fixed | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}}$ | GT 전 frozen 시 최종 후보 |
-| B1 | board+cube | 순차 `seq` | A4와 동일 soft FK factor | 1단계 Hand–Eye/board/cube, 2단계 camera별 | 같은 FK factor에서 통합 효과 검증 |
-| B2 | cube | 통합 `U` | A4와 동일 soft FK factor | $T^B_{C_i},T^G_C,T^B_{\mathrm{cube}}(s)$ | 같은 FK factor에서 board residual 제거 효과 |
-| B3 | board | 통합 `U` | cube 없음 | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}}$ | vision 통합 조건에서 cube residual 제거 효과 |
+| A1 | board+cube | 순차 `seq` | VISION 자유변수 | 1단계 $T^G_C,T^B_{\mathrm{board}},T^B_{\mathrm{cube}}(s)$, 2단계 $T^B_{C_i}$ | 같은 순차법에서 cube residual 추가 효과 |
+| A2 | board+cube | 통합 `U` | VISION 자유변수 | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}},T^B_{\mathrm{cube}}(s)$ | VISION 통합 효과 |
+| A3 | board+cube | 통합 `U` | FK + mechanical frame map으로 hard fixed | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}}$ | 영상 정렬 없는 FK hard constraint 효과 |
+| A4 | board+cube | 통합 `U` | covariance-whitened corrected-FK soft factor | A2와 같음 | vision과 FK 불확실성을 함께 쓰는 효과 |
+| A5 | board+cube | 통합 `U` | corrected-FK hard fixed (train-only VISION alignment) | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}}$ | GT 전 frozen 시 최종 후보 |
+| B1 | board+cube | 순차 `seq` | A4와 동일 corrected-FK soft factor | 1단계 Hand–Eye/board/cube, 2단계 camera별 | 같은 corrected-FK soft factor에서 통합 효과 검증 |
+| B2 | cube | 통합 `U` | A4와 동일 corrected-FK soft factor | $T^B_{C_i},T^G_C,T^B_{\mathrm{cube}}(s)$ | 같은 corrected-FK soft factor에서 board residual 제거 효과 |
+| B3 | board | 통합 `U` | cube 없음 | $T^B_{C_i},T^G_C,T^B_{\mathrm{board}}$ | VISION 통합 조건에서 cube residual 제거 효과 |
 
 ### 8.1 A0 — Board·순차 baseline
 
@@ -425,7 +451,7 @@ $$
 - 초기화: board PnP → 여러 Hand–Eye 후보 → robust SE(3) 선택
 - 최적화: eih board로 Hand–Eye/board를 푼 후 고정, e2h board로 고정카메라만 계산
 - 출력: board 기반 camera/Hand–Eye transform, train/test board px
-- 제한: 현재 기존 Session04 artifact에서는 cube row-local 값이 N/A일 수 있다. 최종 capture에서는 board-on-gripper A0/B3도 같은 cube heldout list로 평가한다.
+- cube 평가: calibration은 board-only로 유지하되, train cube로 set별 evaluation pose만 맞춘 뒤 frozen camera/Hand–Eye로 ALL/Heldout Cube RMSE를 계산한다.
 
 ### 8.2 A1 — Cube 추가·순차
 
@@ -434,23 +460,23 @@ $$
 - 최적화: eih 단계에서 board와 set별 cube pose까지 추정한 뒤 고정카메라 단계로 진행
 - 비교 목적: A0 대비 최적화 목적함수에 cube residual을 추가한 효과
 
-### 8.3 A2 — Vision-only 통합
+### 8.3 A2 — VISION 통합
 
 - 입력: A1과 동일
 - 최적화: eih/e2h, 고정카메라, Hand–Eye, board/cube pose를 하나의 raw-corner 문제에서 동시 계산
 - 비교 목적: A1 대비 관측 종류나 FK 처리는 그대로 두고 통합 feedback만 추가한 효과
 
-### 8.4 A3 — raw-FK-fixed 통합
+### 8.4 A3 — FK hard fixed 통합
 
 - 입력: A2 입력 + raw set-cube-center FK + 사전 등록한 $R_y(180^\circ)$ mechanical frame map
 - 최적화: cube pose는 변수 목록에서 제거하여 완전히 고정하고 나머지만 통합 최적화
-- 비교 목적: A2 대비 cube pose를 vision으로 추정하는 대신 FK 상수로 두는 효과
+- 비교 목적: A2 대비 cube pose를 VISION으로 추정하는 대신 FK 상수로 두는 효과
 - 주의: FK가 실제로 정확하지 않다면 hard constraint가 결과를 편향시킬 수 있으므로 실측 FK 검증이 필요
 
-### 8.5 A4 — Corrected-FK factor 통합
+### 8.5 A4 — corrected-FK soft factor 통합
 
-- 입력: A2 입력 + aligned FK target + set별 6×6 FK covariance
-- 최적화: cube pose는 자유변수로 유지하면서 visual residual에 FK factor를 추가
+- 입력: A2 입력 + corrected-FK target + set별 6×6 FK covariance
+- 최적화: cube pose는 자유변수로 유지하면서 visual residual에 corrected-FK soft factor를 추가
 
 $$
 \mathbf r_{\mathrm{FK},s}
@@ -462,22 +488,22 @@ $$
 \quad \Sigma_s=L_sL_s^T
 $$
 
-FK factor에는 Huber loss를 적용한다. `--fk_covariance_json`이 없으면 고정 Simulation prior를 사용한다. 최종 후보로 비교하려면 External GT 공개 전에 covariance와 artifact를 frozen해야 한다. 실측 파일은 측정 source와 estimator가 명시되어야 하고, full-rank 6D 표본 covariance의 수학적 최소 조건인 7회 이상의 독립 반복, 대칭성, positive-definiteness를 통과해야 한다.
+corrected-FK soft factor에는 Huber loss를 적용한다. `--fk_covariance_json`이 없으면 고정 Simulation prior를 사용한다. 최종 후보로 비교하려면 External GT 공개 전에 covariance와 artifact를 frozen해야 한다. 실측 파일은 측정 source와 estimator가 명시되어야 하고, full-rank 6D 표본 covariance의 수학적 최소 조건인 7회 이상의 독립 반복, 대칭성, positive-definiteness를 통과해야 한다.
 
-### 8.6 A5 — vision-aligned-FK-fixed 최종 후보
+### 8.6 A5 — corrected-FK hard fixed (VISION-aligned) 최종 후보
 
-A5는 A4와 동일한 board-free train-only aligned-FK artifact를 사용하되, set별 cube pose를 자유변수와 FK factor에서 모두 제거하고 상수로 고정한다.
+A5는 A4와 동일한 board-free train-only corrected-FK artifact를 사용하되, set별 cube pose를 자유변수와 corrected-FK soft factor에서 모두 제거하고 상수로 고정한다.
 
 $$
 T^B_{\mathrm{cube}}(s)=T^B_{\mathrm{FK,cube,raw}}(s)\Delta_{\mathrm{train}}
 $$
 
-따라서 A3↔A5는 mechanical raw FK와 train-vision alignment의 차이를, A4↔A5는 동일 aligned target을 soft factor와 hard constraint로 사용하는 차이를 분리한다. `\Delta_{\mathrm{train}}`이 train 영상으로 적합되었으므로 External GT 공개 전에 절차와 artifact hash를 frozen해야 최종 후보로 사용할 수 있다.
+따라서 A3↔A5는 FK와 train-only corrected-FK의 차이를, A4↔A5는 동일 corrected-FK target을 soft factor와 hard constraint로 사용하는 차이를 분리한다. `\Delta_{\mathrm{train}}`이 train 영상으로 적합되었으므로 External GT 공개 전에 절차와 artifact hash를 frozen해야 최종 후보로 사용할 수 있다.
 
 ### 8.7 B1/B2/B3 — 원인 분리용 ablation
 
-- B1↔A4: marker와 FK factor는 같고 순차/통합만 다르다.
-- B2↔A4: cube와 FK factor는 같고 board residual 유무만 다르다.
+- B1↔A4: marker와 corrected-FK soft factor는 같고 순차/통합만 다르다.
+- B2↔A4: cube와 corrected-FK soft factor는 같고 board residual 유무만 다르다.
 - B3↔A2: Board-based Unified Optimization (보드 기반 통합 최적화)이라는 동일 조건에서 Cube Residual (큐브 잔차) 유무를 본다.
 
 B2/B3는 all-marker shared initializer에서 시작한 뒤 residual과 변수를 제거한다. 따라서 “처음부터 cube-only/board-only 시스템을 구축했을 때의 성능”이 아니라 **동일 초기조건에서 최적화 항의 기여도**를 측정한다.
@@ -488,11 +514,11 @@ B2/B3는 all-marker shared initializer에서 시작한 뒤 residual과 변수를
 
 ```bash
 python3 tools/compare_markers.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/sessionNN/marker_system_end_to_end
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/marker_system_end_to_end
 ```
 
 | 시스템 | 초기화에 허용되는 marker | 최종 목적함수 marker | 최종 자유변수 |
@@ -501,7 +527,7 @@ python3 tools/compare_markers.py \
 | `cube_only` | cube만 | cube만 | cameras, Hand–Eye, cube poses |
 | `board_cube` | board+cube | board+cube | cameras, Hand–Eye, board/cube poses |
 
-세 시스템은 split, raw detection, $(K,D)$, solver, seed와 held-out 평가 population을 공유하지만 초기값은 modality별로 별도 생성한다. cube-only는 board-free train-only FK artifact로 Hand–Eye를 초기화하지만, 최종 목적함수에는 FK factor가 없다.
+세 시스템은 split, raw detection, $(K,D)$, solver, seed와 held-out 평가 population을 공유하지만 초기값은 modality별로 별도 생성한다. cube-only는 board-free train-only FK artifact로 Hand–Eye를 초기화하지만, 최종 목적함수에는 corrected-FK soft factor가 없다.
 
 최종 Table 1에서는 어떤 Marker (마커)로 캘리브레이션했는지와 무관하게 cube target 평가만 사용한다. Cross-view pixel transfer와 Cam-common Obj-Cam consistency는 fixed-camera pair와 fixed-gripper pair를 하나의 보조 지표로 함께 집계하며, External GT (외부 정답)가 아니므로 절대 정확도 주장은 할 수 없다.
 
@@ -513,12 +539,12 @@ ablation 관측으로는 사용하지만, 최종 heldout 또는 External GT rank
 
 ```bash
 python3 tools/evaluate_cross_target.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --table1_result CP_result/sessionNN/late_table1/table1_methods.json \
-  --out_dir CP_result/sessionNN/cross_target_evaluation
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --table1_result ABLATION_TEST_result_0909/sessionNN/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/cross_target_evaluation
 ```
 
 현재 cross-target artifact는 board/cube 값을 모두 보존할 수 있지만, 자동 생성되는
@@ -536,10 +562,12 @@ python3 tools/evaluate_cross_target.py \
 train+heldout 전체 cube evaluation data에 frozen calibration을 적용해 cube corner를
 재투영한다. 전체 fit sanity check이며 일반화 지표는 아니다.
 
-### 11.3 Train RMSE px
+### 11.3 Train Cube RMSE px
 
-solver가 사용한 train corner에서 계산한다. 수렴/학습 적합도 진단이며 방법 순위
-지표가 아니다.
+모든 방법의 camera/Hand-Eye를 frozen하고, train cube로 set별 evaluation pose를
+맞춘 뒤 동일한 724개 train cube corner를 재투영한다. A0/B3도 calibration에는 cube를
+쓰지 않지만 이 평가에는 같은 cube 모집단을 사용한다. Pose를 맞춘 동일 관측의
+in-sample fit이므로 방법 순위 지표는 아니다.
 
 ### 11.4 Heldout Cube RMSE px
 
@@ -553,8 +581,9 @@ $$
 ### 11.5 Cross-view pixel transfer RMSE px
 
 한 카메라의 cube PnP pose를 다른 카메라 영상으로 전달해 observed cube corner와
-비교한다. fixed-camera pair와 fixed-gripper pair를 같은 metric family 안에서
-combined 값으로 보고한다.
+비교한다. 동일한 9 fixed-fixed + 27 fixed-gripper pair의 원시 양방향 오차를
+904개 destination-corner에서 직접 pooling한다. Fixed-gripper 27 pair 중 18 pair는
+train fixed-anchor와 heldout gripper event를 연결하므로 mixed-anchor 내부 closure다.
 
 $$
 T^{B,(i)}_{cube}=T^B_{C_i}T^{C_i}_{cube,\mathrm{PnP}}
@@ -568,9 +597,10 @@ $$
 
 ### 11.6 Cam-common Obj-Cam consistency mm/deg
 
-두 카메라가 같은 cube event에서 계산한 base-frame cube pose 차이를 translation mm와
-rotation deg로 계산한다. 공통 systematic error는 검출하지 못하므로 최종 순위 지표가
-아니다.
+Cross-view와 같은 36개 frozen cube pair에서 두 경로가 계산한 base-frame cube pose
+차이를 translation mm와 rotation deg로 pooling한다. Fixed-gripper 경로에는 Hand-Eye와
+Robot FK가 포함된다. Cross-view px와 같은 pair discrepancy를 다른 단위로 본 값이므로
+독립된 두 번째 증거가 아니며, 공통 systematic error도 검출하지 못한다.
 
 $$
 T^{B,(i)}_{cube}=T^B_{C_i}T^{C_i}_{cube,\mathrm{PnP}}
@@ -582,29 +612,29 @@ $$
 
 | Research Question (연구 질문) | Comparison (비교) | Shared Evaluation Metric (동일하게 볼 지표) |
 | --- | --- | --- |
-| board-only에서 순차/통합 차이가 있는가 | A0 -> B3 | External cube GT + heldout cube |
+| 단일 target에서 순차/통합이 사실상 동등한가 | A0 -> B3 | Negative control + External cube GT |
 | cube train 관측 추가가 도움이 되는가 | A0 -> A1 | External cube GT + heldout cube |
-| vision 조건에서 통합 feedback이 도움이 되는가 | A1 -> A2 | External cube GT + heldout cube |
+| VISION 조건에서 통합 feedback이 도움이 되는가 | A1 -> A2 | External cube GT + heldout cube |
 | unified에서 cube residual이 필요한가 | B3 -> A2 | External cube GT + heldout cube |
-| raw FK hard fixed가 좋은가 | A2 -> A3 | External cube GT + heldout cube |
+| FK hard fixed가 좋은가 | A2 -> A3 | External cube GT + heldout cube |
 | corrected-FK soft factor가 좋은가 | A2 -> A4 | External cube GT + heldout cube |
-| soft FK 조건에서도 통합이 필요한가 | B1 -> A4 | External cube GT + heldout cube |
+| corrected-FK soft factor 조건에서도 통합이 필요한가 | B1 -> A4 | External cube GT + heldout cube |
 | board residual이 cube 보정에 도움이 되는가 | B2 -> A4 | External cube GT + heldout cube |
-| aligned FK hard fixed를 최종 방법으로 둘 수 있는가 | A3/A4 -> A5 | External cube GT + heldout cube |
+| corrected-FK hard fixed를 최종 방법으로 둘 수 있는가 | A3/A4 -> A5 | External cube GT + heldout cube |
 
 Board heldout, board/cube pooled overall, 별도 camera-scope 순위표는 최종 Table 1
 순위에 사용하지 않는다.
 
 ## 13. 현재 session04 결과와 비교별 해석
 
-Canonical 결과 인덱스는 [CP_result/README.md](CP_result/README.md), 상세 자동 생성 보고서는 [CP_result/session04/late_table1/TABLE1_RESULTS.md](CP_result/session04/late_table1/TABLE1_RESULTS.md)다. 결과 문서는 A0~A5, B1~B3 한 벌만 사용하며, heldout과 External GT 평가는 항상 cube target으로 통일한다.
+Canonical 결과 인덱스는 [ABLATION_TEST_result_0909/README.md](ABLATION_TEST_result_0909/README.md), 상세 자동 생성 보고서는 [ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md](ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md)다. 결과 문서는 A0~A5, B1~B3 한 벌만 사용하며, heldout과 External GT 평가는 항상 cube target으로 통일한다.
 
 핵심 요약은 다음과 같다.
 
-- 동일한 cube+board marker population에서 A1→A2 heldout cube는 `4.1402 → 3.5958 px`로 감소해 Unified feedback의 내부 효과를 지원한다.
-- A3 raw-FK-fixed의 heldout cube는 `6.3959 px`로 증가했으므로 raw tool4/mechanical pose를 외부 GT처럼 취급하지 않는다.
-- A2와 A4의 heldout cube는 `3.5958`, `3.5805 px`로 거의 동일하다. A4/B1/B2는 External GT 공개 전에 covariance와 artifact를 frozen해야 최종 후보로 비교할 수 있다.
-- A5의 heldout cube는 `3.2274 px`로 현재 내부 cube 값이 가장 낮다. 따라서 A5는 배제하지 않고, External GT 공개 전에 방법과 train-only alignment artifact를 frozen한 최종 후보로 둔다.
+- 동일한 cube+board marker population에서 A1→A2 heldout cube는 `3.6938 → 3.5960 px`로 감소해 Unified feedback의 내부 효과를 지원한다.
+- A3 FK hard fixed의 heldout cube는 `6.7199 px`로 증가했으므로 보정 전 tool4/mechanical pose를 외부 GT처럼 취급하지 않는다.
+- A2와 A4의 heldout cube는 `3.5960`, `3.5786 px`로 거의 동일하다. A4/B1/B2는 External GT 공개 전에 covariance와 artifact를 frozen해야 최종 후보로 비교할 수 있다.
+- A5의 heldout cube는 `3.4180 px`로 현재 내부 cube 값이 가장 낮다. 따라서 A5는 배제하지 않고, External GT 공개 전에 방법과 train-only alignment artifact를 frozen한 최종 후보로 둔다.
 - 최종 물리 순위는 다음주 Independent External cube GT 이후 Translation Error, Rotation Error, P95, Failure Rate로 결정한다.
 - Board heldout, board/cube pooled overall, 별도 pair-type 순위표는 최종 비교표에서 사용하지 않는다.
 
@@ -613,26 +643,26 @@ Canonical 결과 인덱스는 [CP_result/README.md](CP_result/README.md), 상세
 ### 14.1 Table 1 원시 출력
 
 ```text
-CP_result/sessionNN/late_table1/
+ABLATION_TEST_result_0909/sessionNN/ABLATION_TEST_table1/
 ├── shared_train_only_baseline.json
 ├── shared_board_free_fk_cube.json
-├── table1_methods.json
-├── table1_results.csv
-└── TABLE1_RESULTS.md
+├── ABLATION_TEST_table1_methods.json
+├── ABLATION_TEST_table1_results.csv
+└── ABLATION_TEST_TABLE1_RESULTS.md
 ```
 
 - `shared_train_only_baseline.json`: Split (분할), Solver (최적화기), Observation Loader (관측 로더), Shared/Row-specific Initial State (동일/행별 초기 상태), Meta/Intrinsics/Implementation (메타/내부 파라미터/구현 파일) 및 Train/Held-out Observation Population SHA-256
 - `shared_board_free_fk_cube.json`: board/held-out 미사용 FK–cube alignment provenance
-- `table1_methods.json`: 각 행·seed의 transforms, train/test px, path metrics, solver/Jacobian diagnostics
-- `table1_results.csv`: 논문/HTML용 요약 숫자의 canonical table
-- `TABLE1_RESULTS.md`: 교수님 피드백, 결과표, 지표 해석 문서
+- `ABLATION_TEST_table1_methods.json`: 각 행·seed의 transforms, train/test px, path metrics, solver/Jacobian diagnostics
+- `ABLATION_TEST_table1_results.csv`: 논문/HTML용 요약 숫자의 canonical table
+- `ABLATION_TEST_TABLE1_RESULTS.md`: 교수님 피드백, 결과표, 지표 해석 문서
 
-기본 실행은 3개 Initial States (초기값)를 사용한다. Seed 0 (시드 0)은 Shared Baseline (동일 초기값) 그대로이고, 나머지 seed는 각 자유 transform에 결정론적인 5 mm/1° Perturbation (교란)을 준다. `table1_methods.json`에는 각 run의 원값을 보존하고, CSV/표에는 Converged Runs (수렴 실행 수)와 Metric Mean (지표 평균)을 요약한다. 따라서 한 번의 우연한 초기값에서 얻은 숫자만 보고하지 않는다.
+기본 실행은 3개 Initial States (초기값)를 사용한다. Seed 0 (시드 0)은 Shared Baseline (동일 초기값) 그대로이고, 나머지 seed는 각 자유 transform에 결정론적인 5 mm/1° Perturbation (교란)을 준다. `ABLATION_TEST_table1_methods.json`에는 각 run의 원값을 보존하고, CSV/표에는 Converged Runs (수렴 실행 수)와 Metric Mean (지표 평균)을 요약한다. 따라서 한 번의 우연한 초기값에서 얻은 숫자만 보고하지 않는다.
 
 ### 14.2 보조 평가 출력
 
 ```text
-CP_result/sessionNN/
+ABLATION_TEST_result_0909/sessionNN/
 ├── cross_target_evaluation/
 │   ├── cross_target_evaluation.json
 │   └── cross_target_evaluation.csv
@@ -657,13 +687,13 @@ CP_result/sessionNN/
 ### 14.3 시각화 동기화
 
 ```text
-table1_methods.json ─┐
+ABLATION_TEST_table1_methods.json ─┐
 cross_target CSV ────┼─> tools/sync_table1_canonical_data.py
 marker-system CSV ───┘             │
-                                   ├─> table1_results.csv
-                                   └─> TABLE1_INTERACTIVE.html
+                                   ├─> ABLATION_TEST_table1_results.csv
+                                   └─> ABLATION_TEST_TABLE1_INTERACTIVE.html
 
-table1_results.csv + 2 evaluation CSV + HTML + MD
+ABLATION_TEST_table1_results.csv + 2 evaluation CSV + HTML + MD
         └─> tools/verify_table1_visual_sync.py
 ```
 
@@ -683,12 +713,12 @@ Markdown/HTML은 새 JSON/CSV만 입력으로 사용해 다시 생성한다. 이
 | `calibration_pipeline/se3.py` | PnP pose의 robust 평균과 meta/FK 로딩 |
 | `calibration_pipeline/fk_alignment.py` | board-free train-only FK–cube alignment |
 | `calibration_pipeline/reprojection.py` | 모든 조건에서 동일하게 쓰는 Raw-corner Pixel Solver (원시 코너 픽셀 최적화기) |
-| `calibration_pipeline/fk_factor.py` | covariance-whitened corrected-FK factor |
+| `calibration_pipeline/fk_factor.py` | covariance-whitened corrected-FK soft factor |
 | `calibration_pipeline/evaluation.py` | Train/heldout reprojection과 set-level diagnostic 계산 |
 | `calibration_pipeline/path_evaluation.py` | Cross-view pixel transfer와 camera consistency 계산 |
 | `calibration_pipeline/cross_target.py` | 모든 Table 1 transform의 두 camera scope 재평가 |
 | `calibration_pipeline/marker_system.py` | modality별 초기화부터 수행하는 end-to-end 비교 |
-| `calibration_pipeline/opencv_relative_baseline.py` | OpenCV PnP 기반 FK-free fixed-camera reference baseline |
+| `calibration_pipeline/opencv_relative_baseline.py` | OpenCV PnP 기반 VISION fixed-camera reference baseline |
 | `calibration_pipeline/blind_prediction.py` | GT-blind pose prediction |
 | `calibration_pipeline/external_gt.py` | 독립 GT 통계 평가 |
 | `calibration_pipeline/task_trial.py` | Paired peg-in-hole/grasp success·접촉 오차 평가 |
@@ -704,94 +734,94 @@ Markdown/HTML은 새 JSON/CSV만 입력으로 사용해 다시 생성한다. 이
 ```bash
 # 선택: Shared Baseline (동일 초기값)만 먼저 생성
 python3 05_calibrate.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/sessionNN/late_table1 \
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/ABLATION_TEST_table1 \
   --baseline_only
 
 # A0~A5/B1~B3 최종 9행 실행
 python3 05_calibrate.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --num_inits 3 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/sessionNN/late_table1
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/ABLATION_TEST_table1
 
 # 상세 calibration 결과와 모든 행렬 출력
 python3 06_make_report.py \
-  --root_folder data/sessionNN/calib_train \
-  --table1 CP_result/sessionNN/late_table1/table1_methods.json \
-  --out_dir CP_result/sessionNN/late_table1
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
+  --table1 ABLATION_TEST_result_0909/sessionNN/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/ABLATION_TEST_table1
 
 # 선택 평가: 저장된 모든 방법의 외부-GT 전 board/cube 내부 평가
 python3 tools/evaluate_cross_target.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --table1_result CP_result/sessionNN/late_table1/table1_methods.json \
-  --out_dir CP_result/sessionNN/cross_target_evaluation
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --table1_result ABLATION_TEST_result_0909/sessionNN/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/cross_target_evaluation
 
 # 선택 평가: marker modality별 end-to-end 비교
 python3 tools/compare_markers.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/sessionNN/marker_system_end_to_end
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/marker_system_end_to_end
 
-# 선택 평가: OpenCV PnP 독립 FK-free relative-pose 기준선
+# 선택 평가: OpenCV PnP 독립 VISION relative-pose 기준선
 python3 tools/opencv_baseline.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/sessionNN/opencv_relative_baseline
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/opencv_relative_baseline
 
 # 독립 robot task trial 수집 후 success/contact-error 평가
 python3 -m calibration_pipeline.task_trial \
   --manifest protocol_templates/robot_task_trial_manifest_<날짜>.json \
-  --output_dir CP_result/sessionNN/robot_task_trial
+  --output_dir ABLATION_TEST_result_0909/sessionNN/robot_task_trial
 
 # Outlier soft-weighting 대조: 같은 관측을 linear loss로 재실행
 python3 05_calibrate.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --num_inits 3 \
   --loss linear \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir CP_result/sessionNN/outlier_ablation/linear_table1
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/outlier_ablation/linear_table1
 python3 tools/evaluate_cross_target.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --loss linear \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --table1_result CP_result/sessionNN/outlier_ablation/linear_table1/table1_methods.json \
-  --out_dir CP_result/sessionNN/outlier_ablation/linear_cross_target
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --table1_result ABLATION_TEST_result_0909/sessionNN/outlier_ablation/linear_table1/ABLATION_TEST_table1_methods.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/outlier_ablation/linear_cross_target
 python3 tools/summarize_outlier_ablation.py
 
 # Hard rejection 민감도: strict 관측 정책으로 재보정 후 동일 held-out 비교
 python3 05_calibrate.py \
-  --root_folder data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --num_inits 3 \
-  --observation-manifest data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
   --observation-filter-policy strict \
-  --out_dir CP_result/sessionNN/outlier_ablation/strict_table1
+  --out_dir ABLATION_TEST_result_0909/sessionNN/outlier_ablation/strict_table1
 python3 tools/summarize_hard_rejection_ablation.py
 
 # 선택 확장 평가의 기존 통합 Markdown/HTML 재생성 및 동기화 검증
@@ -804,23 +834,23 @@ python3 tools/verify_camera_scope_evaluation.py
 
 현재 canonical session04 결과는 다음에서 확인한다.
 
-- [Session04 결과 인덱스](CP_result/README.md)
-- [모든 행·seed의 calibration 행렬 JSON](CP_result/session04/late_table1/calibration_matrices.json)
-- [Table 1 결과 및 평가 계약](CP_result/session04/late_table1/TABLE1_RESULTS.md)
-- [추가 진단 실험 단일 요약표](ADDITIONAL_EXPERIMENTS_SUMMARY.md)
-- [Interactive 결과](CP_result/session04/late_table1/TABLE1_INTERACTIVE.html)
-- [OpenCV FK-free reference baseline](CP_result/session04/opencv_relative_baseline/OPENCV_RELATIVE_BASELINE.md)
-- [Soft-L1 vs linear outlier loss 대조](CP_result/session04/outlier_ablation/OUTLIER_LOSS_ABLATION.md)
-- [Standard vs strict hard-rejection 민감도](CP_result/session04/outlier_ablation/HARD_REJECTION_ABLATION.md)
-- [Corner refinement와 weighting 대조](CP_result/session04/corner_weighting_ablation/CORNER_WEIGHTING_ABLATION.md)
-- [순차/통합 및 FK factor 수식 상세](CALIBRATION_EXPLANATION_LATEX.md)
+- [Session04 결과 인덱스](ABLATION_TEST_result_0909/README.md)
+- [모든 행·seed의 calibration 행렬 JSON](ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/calibration_matrices.json)
+- [Table 1 결과 및 평가 계약](ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md)
+- [추가 진단 실험 단일 요약표](ADD_EXPERIMENTS_SUMMARY.md)
+- [Interactive 결과](ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_INTERACTIVE.html)
+- [OpenCV VISION reference baseline](ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/opencv_relative_baseline/OPENCV_RELATIVE_BASELINE.md)
+- [Soft-L1 vs linear outlier loss 대조](ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/outlier_ablation/OUTLIER_LOSS_ABLATION.md)
+- [Standard vs strict hard-rejection 민감도](ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/outlier_ablation/HARD_REJECTION_ABLATION.md)
+- [Corner refinement와 weighting 대조](ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/corner_weighting_ablation/CORNER_WEIGHTING_ABLATION.md)
+- [순차/통합 및 corrected-FK soft factor 수식 상세](CALIBRATION_EXPLANATION_LATEX.md)
 - [Simulation backend migration 계획](Simulation/MIGRATION_PLAN.md)
 
 ## 17. 현재 해석 한계
 
-1. A3는 raw FK와 mechanical frame map만 hard constraint로 사용한다. 눈금 cube jig의 반복 파지 실측 없이 FK를 정답으로 주장할 수 없다.
+1. A3는 FK와 mechanical frame map만 hard constraint로 사용한다. 눈금 cube jig의 반복 파지 실측 없이 FK를 정답으로 주장할 수 없다.
 2. A4/B1/B2는 External GT 공개 전에 corrected-FK covariance와 artifact를 frozen해야 최종 후보로 비교할 수 있다.
-3. A5는 train vision으로 정렬한 FK를 hard-fixed한 방법이다. External GT 공개 전에 frozen하면 최종 후보이고, GT를 본 뒤 정의하면 사후 진단으로만 둔다.
+3. A5는 train-only VISION으로 보정한 `corrected-FK hard fixed` 방법이다. External GT 공개 전에 frozen하면 최종 후보이고, GT를 본 뒤 정의하면 사후 진단으로만 둔다.
 4. Cross-view pixel transfer와 Cam-common Obj-Cam consistency는 외부 GT 전 내부 일관성 지표일 뿐 External Absolute Accuracy (외부 절대 정확도)가 아니다.
 5. heldout cube pixel 평가는 관측 일반화 검증이며 새로운 작업 위치 전체에 대한 물리 정확도를 직접 보장하지 않는다.
 6. B2/B3 shared-baseline ablation과 marker-system end-to-end 비교는 연구 질문이 다르므로 최종 Table 1 순위와 섞지 않는다.

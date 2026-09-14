@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 FIG_DIR = os.path.join(os.path.dirname(__file__), "results", "figures")
 COLORS = {"EXP1": "#4c72b0", "EXP4": "#c44e52", "EXP7": "#dd8452", "EXP3": "#55a868"}
-NAMES = {"EXP1": "Ours (corr)", "EXP4": "no-FK", "EXP7": "FK-fixed", "EXP3": "cube-only"}
+NAMES = {"EXP1": "Ours (corr)", "EXP4": "VISION", "EXP7": "FK hard fixed", "EXP3": "cube-only"}
 MARK = {"EXP1": "o", "EXP4": "s", "EXP7": "^", "EXP3": "D"}
 
 

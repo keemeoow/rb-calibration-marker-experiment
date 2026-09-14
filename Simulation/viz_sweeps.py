@@ -19,10 +19,10 @@ STYLE = {
     "EXP1": ("#0072B2", "-",  3.0, "o", "Ours"),                 # 파랑 굵게
     "EXP2": ("#E69F00", "-",  1.6, "s", "−unified"),             # 주황 (corr)
     "EXP3": ("#009E73", "-",  1.6, "^", "−board"),               # 초록 (corr)
-    "EXP4": ("#D55E00", "--", 1.6, "v", "−FK"),                  # 주홍 (none, dashed)
-    "EXP5": ("#CC79A7", "--", 1.6, "D", "−FK−unified"),          # 자주 (none, dashed)
+    "EXP4": ("#D55E00", "--", 1.6, "v", "VISION"),             # 주홍 (none, dashed)
+    "EXP5": ("#CC79A7", "--", 1.6, "D", "VISION−unified"),     # 자주 (none, dashed)
     "EXP6": ("#000000", ":",  1.6, "P", "−cube (board-only)"),   # 검정 (none, dotted)
-    "EXP7": ("#56B4E9", "-.", 2.0, "X", "FK-fixed"),             # 하늘 (fixed, dash-dot)
+    "EXP7": ("#56B4E9", "-.", 2.0, "X", "FK hard fixed"),             # 하늘 (fixed, dash-dot)
 }
 ORDER = ["EXP4", "EXP5", "EXP2", "EXP3", "EXP7", "EXP1"]   # Ours 마지막(맨 위)
 # 각 지표: (key, 제목, 단위). y캡은 데이터에서 자동(붕괴 EXP6 제외한 최대의 1.15배).
@@ -114,13 +114,13 @@ def main():
     lax.axis("off")
     # 각 방식의 세 축 정보 (configs.py 와 일치)
     INFO = {   # name: (FK, solve, markers)
-        "EXP1": ("FK-corr", "unified", "cube+board"),
-        "EXP2": ("FK-corr", "separate", "cube+board"),
-        "EXP3": ("FK-corr", "unified", "cube-only"),
-        "EXP4": ("no-FK",   "unified", "cube+board"),
-        "EXP5": ("no-FK",   "separate", "cube+board"),
-        "EXP6": ("no-FK",   "unified", "board-only"),
-        "EXP7": ("FK-fixed", "unif=sep", "cube+board"),
+        "EXP1": ("corrected-FK", "unified", "cube+board"),
+        "EXP2": ("corrected-FK", "separate", "cube+board"),
+        "EXP3": ("corrected-FK", "unified", "cube-only"),
+        "EXP4": ("VISION",   "unified", "cube+board"),
+        "EXP5": ("VISION",   "separate", "cube+board"),
+        "EXP6": ("VISION",   "unified", "board-only"),
+        "EXP7": ("FK hard fixed", "unif=sep", "cube+board"),
     }
     order = ["EXP1", "EXP2", "EXP3", "EXP4", "EXP5", "EXP6", "EXP7"]
     # 표 헤더
@@ -146,7 +146,7 @@ def main():
         lax.text(0.76, y, mkr, fontsize=8.5, va="center", transform=lax.transAxes, fontweight=w)
         y -= 0.115
     lax.text(0.02, -0.04,
-             "line style:  solid = FK-corr,  dashed = no-FK,  dash-dot = FK-fixed",
+             "line style:  solid = corrected-FK,  dashed = VISION,  dash-dot = FK hard fixed",
              fontsize=7.5, color="#666", transform=lax.transAxes, style="italic")
 
     bg = blob["meta"].get("bg_intrinsic", 0), blob["meta"].get("bg_outlier", 0)

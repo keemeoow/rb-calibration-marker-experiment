@@ -68,8 +68,8 @@ from session2_pick_and_place import (  # noqa: E402
     SESSION2_DIR_DEFAULT, compute_ordered_targets,
 )
 
-SESSION1_DIR_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "data" / "session1_handheld_fixed_cam"
-SESSION3_DIR_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "data" / "session3_wrist_motion_gripper_cam"
+SESSION1_DIR_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "data" / "session1_handheld_fixed_cam_0909"
+SESSION3_DIR_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "data" / "session3_wrist_motion_gripper_cam_0909"
 FIT_JSON_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "pass1_grasp_offset_replayed.json"
 GRIPPER_LOCAL_ID = LOCAL_CAM_IDS["gripper"]  # 3
 SESSION3_EVENT_OFFSET = 2000  # session1(0..15)/session2(1000..1014)와 안 겹치게

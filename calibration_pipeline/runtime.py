@@ -7,6 +7,7 @@ import numpy as np
 
 from calibration_pipeline.apriltag_cube import AprilTagCubeTarget, depth_metrics_to_fields, rodrigues_to_Rt
 from calibration_pipeline.charuco import CharucoTarget
+from calibration_pipeline.result_paths import ablation_result_root
 from calibration_pipeline.config import (
     CharucoBoardConfig,
     CubeConfig,
@@ -1029,11 +1030,11 @@ def build_event_cube_selection(meta: dict,
 # from --root_folder through these helpers.
 # ---------------------------------------------------------------------------
 
-DEFAULT_SESSION_ROOT = "data/session04/calib_train"
+DEFAULT_SESSION_ROOT = "data/session02_NOUSE_session04_0814/calib_train"
 
 
 def infer_session_name(root_folder: str) -> str:
-    """Return the ``sessionNN`` component of a dataset root."""
+    """Return the ``sessionNN[_<label>]_<MMDD>`` component of a dataset root."""
     parts = os.path.normpath(str(root_folder)).split(os.sep)
     return next((part for part in reversed(parts)
                  if part.startswith("session")), "session")
@@ -1045,7 +1046,7 @@ def session_paths(root_folder: str) -> Dict[str, str]:
     session = infer_session_name(root)
     session_dir = os.path.dirname(root) or root
     calib_dir = os.path.join(session_dir, "calib_out")
-    cp_dir = os.path.join("CP_result", session)
+    cp_dir = os.path.join(ablation_result_root(), session)
     return {
         "session": session,
         "session_dir": session_dir,
@@ -1053,9 +1054,9 @@ def session_paths(root_folder: str) -> Dict[str, str]:
         "observation_manifest": os.path.join(
             calib_dir, "capture_filter", "Step2b_observation_manifest.json"),
         "cp_dir": cp_dir,
-        "table1_dir": os.path.join(cp_dir, "late_table1"),
+        "table1_dir": os.path.join(cp_dir, "ABLATION_TEST_table1"),
         "table1_result": os.path.join(
-            cp_dir, "late_table1", "table1_methods.json"),
+            cp_dir, "ABLATION_TEST_table1", "ABLATION_TEST_table1_methods.json"),
         "cross_target_dir": os.path.join(cp_dir, "cross_target_evaluation"),
         "cross_target_result": os.path.join(
             cp_dir, "cross_target_evaluation", "cross_target_evaluation.json"),

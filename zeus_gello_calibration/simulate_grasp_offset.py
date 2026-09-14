@@ -12,7 +12,7 @@ translate into T_gripper_cube error)?"
 
 This is NOT a real-image test -- no cameras or robot are touched. It reuses:
   - the real session1 robot_T (T_base_gripper per capture) from
-    data/session1_handheld_fixed_cam/capture_replayed/<idx>/robot.json
+    data/session1_handheld_fixed_cam_0909/capture_replayed/<idx>/robot.json
   - the real camera intrinsics (K_map, D_map) via fit_grasp_offset's loaders
   - the cube's real marker geometry (AprilTagCubeModel / config.py)
   - the SAME estimate_grasp_offset_one_camera + solve_corner_reprojection
@@ -61,7 +61,7 @@ from fit_grasp_offset import (  # noqa: E402
     load_intrinsics_by_label, load_robot_T,
 )
 
-DEFAULT_SESSION_ROOT = REPO_ROOT / "zeus_gello_calibration" / "data" / "session1_handheld_fixed_cam"
+DEFAULT_SESSION_ROOT = REPO_ROOT / "zeus_gello_calibration" / "data" / "session1_handheld_fixed_cam_0909"
 DEFAULT_FIT_JSON = REPO_ROOT / "zeus_gello_calibration" / "pass1_grasp_offset_replayed.json"
 IMAGE_SIZE = (1280, 720)  # RealSense color stream used for this session
 

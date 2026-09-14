@@ -32,7 +32,342 @@ SAFE_MODE_Z_LIFT = "z_lift_only"
 CAPTURE_PROTOCOL_KEY = "capture_protocol"
 PROTOCOL_PER_SET_AB = "per_set_AB"          # every set: B sweep + A placement
 PROTOCOL_A_SETS_B_STATION = "A_sets_plus_B_station"  # A-only sets, one terminal B station
-CAPTURE_PROTOCOLS = (PROTOCOL_PER_SET_AB, PROTOCOL_A_SETS_B_STATION)
+PROTOCOL_COMPOSITE_RIG_45 = "composite_rig_45_v2"
+CAPTURE_PROTOCOLS = (
+    PROTOCOL_PER_SET_AB,
+    PROTOCOL_A_SETS_B_STATION,
+    PROTOCOL_COMPOSITE_RIG_45,
+)
+
+PHASE_P1 = "P1_MOVING_RIG"
+PHASE_P2 = "P2_PICK_PLACE"
+PHASE_P3 = "P3_STATIONARY_RIG"
+TARGET_GRIPPED = "gripped"
+TARGET_RELEASED = "released"
+TARGET_STATIONARY = "stationary"
+P3_STATIONARY_SET_INDEX = 10
+
+POSE_PLAN_SCHEMA = "capture_pose_plan_v4"
+CAPTURE_FLANGE_POSE_KEY = "capture_flange_pose_6dof_mm_deg"
+
+
+def default_pose_diversity_requirements():
+    """Frozen minimum geometry for the final 45-event protocol.
+
+    These thresholds are deliberately part of the pose-plan contract.  Changing
+    them after capture would change the experiment, so a different threshold
+    set must be introduced under a new schema instead of editing one JSON file.
+    """
+    return {
+        "schema": "composite_rig_pose_diversity_v1",
+        "joint_duplicate_tolerance_deg": 0.1,
+        "p1_translation_span_xyz_mm": [100.0, 100.0, 80.0],
+        "p1_roll_pitch_span_deg": [15.0, 15.0],
+        "p2_placement_xy_span_mm": [100.0, 100.0],
+        "p2_placement_yaw_span_deg": 20.0,
+        "p2_min_view_translation_mm": 30.0,
+        "p2_min_view_roll_pitch_delta_deg": 10.0,
+        "p3_translation_span_xyz_mm": [80.0, 80.0, 50.0],
+        "p3_roll_pitch_span_deg": [15.0, 15.0],
+    }
+
+
+def _require_nonempty_text(value, label):
+    if value is None or not str(value).strip():
+        raise ValueError("{} must be a non-empty string".format(label))
+    return str(value)
+
+
+def _validate_capture_joint_waypoint(wp, label):
+    """Final protocol uses taught joint poses; no inferred robot coordinates."""
+    return validate_joint_vector(wp.get("capture_joints"), label + ".capture_joints")
+
+
+def _shortest_angle_delta_deg(a, b):
+    delta = abs(float(a) - float(b)) % 360.0
+    return min(delta, 360.0 - delta)
+
+
+def _axis_span(values, axis):
+    axis_values = [float(value[axis]) for value in values]
+    return max(axis_values) - min(axis_values)
+
+
+def _angular_span(values, axis):
+    return max(
+        _shortest_angle_delta_deg(a[axis], b[axis])
+        for a in values for b in values
+    )
+
+
+def _translation_distance_mm(a, b):
+    return math.sqrt(sum((float(a[i]) - float(b[i])) ** 2 for i in range(3)))
+
+
+def _require_minimum(actual, required, label):
+    if float(actual) + 1e-9 < float(required):
+        raise ValueError(
+            "{} is {:.3f}, below required {:.3f}".format(label, actual, required)
+        )
+
+
+def pose_diversity_summary(data):
+    """Return the geometric coverage checked before robot motion."""
+    waypoints = data.get("waypoints", [])
+    by_phase = {}
+    for phase in (PHASE_P1, PHASE_P2, PHASE_P3):
+        by_phase[phase] = [
+            validate_joint_vector(
+                wp.get(CAPTURE_FLANGE_POSE_KEY),
+                "{}.{}".format(wp.get("planned_event_id", "waypoint"),
+                               CAPTURE_FLANGE_POSE_KEY),
+            )
+            for wp in waypoints if wp.get("phase") == phase
+        ]
+    p1 = by_phase[PHASE_P1]
+    p2 = by_phase[PHASE_P2]
+    p3 = by_phase[PHASE_P3]
+    placements = data.get("placements", [])
+    placement_tcps = [
+        validate_joint_vector(
+            placement.get("place_tcp"),
+            "{}.place_tcp".format(placement.get("placement_id", "placement")),
+        )
+        for placement in placements
+    ]
+    p2_pairs = []
+    for placement in placements:
+        placement_id = placement.get("placement_id")
+        views = [
+            wp for wp in waypoints
+            if wp.get("phase") == PHASE_P2
+            and wp.get("placement_id") == placement_id
+        ]
+        if len(views) != 2:
+            continue
+        poses = [validate_joint_vector(
+            wp.get(CAPTURE_FLANGE_POSE_KEY),
+            "{}.{}".format(wp.get("planned_event_id"), CAPTURE_FLANGE_POSE_KEY),
+        ) for wp in views]
+        p2_pairs.append({
+            "placement_id": placement_id,
+            "translation_mm": _translation_distance_mm(poses[0], poses[1]),
+            "roll_pitch_delta_deg": max(
+                _shortest_angle_delta_deg(poses[0][5], poses[1][5]),
+                _shortest_angle_delta_deg(poses[0][4], poses[1][4]),
+            ),
+        })
+    return {
+        "p1_translation_span_xyz_mm": [_axis_span(p1, i) for i in range(3)],
+        "p1_roll_pitch_span_deg": [_angular_span(p1, 5), _angular_span(p1, 4)],
+        "p2_placement_xy_span_mm": [
+            _axis_span(placement_tcps, 0), _axis_span(placement_tcps, 1)],
+        "p2_placement_yaw_span_deg": _angular_span(placement_tcps, 3),
+        "p2_min_view_translation_mm": min(
+            pair["translation_mm"] for pair in p2_pairs),
+        "p2_min_view_roll_pitch_delta_deg": min(
+            pair["roll_pitch_delta_deg"] for pair in p2_pairs),
+        "p2_view_pairs": p2_pairs,
+        "p3_translation_span_xyz_mm": [_axis_span(p3, i) for i in range(3)],
+        "p3_roll_pitch_span_deg": [_angular_span(p3, 5), _angular_span(p3, 4)],
+    }
+
+
+def _validate_pose_diversity(data, waypoints):
+    requirements = data.get("pose_diversity_requirements")
+    expected = default_pose_diversity_requirements()
+    if requirements != expected:
+        raise ValueError(
+            "pose_diversity_requirements must exactly match the frozen {} contract".format(
+                expected["schema"])
+        )
+
+    joints = []
+    for idx, waypoint in enumerate(waypoints):
+        joints.append(_validate_capture_joint_waypoint(
+            waypoint, "waypoints[{}]".format(idx)))
+        validate_joint_vector(
+            waypoint.get(CAPTURE_FLANGE_POSE_KEY),
+            "waypoints[{}].{}".format(idx, CAPTURE_FLANGE_POSE_KEY),
+        )
+    duplicate_tolerance = float(requirements["joint_duplicate_tolerance_deg"])
+    for left in range(len(joints)):
+        for right in range(left + 1, len(joints)):
+            if max(shortest_joint_error_deg(joints[left], joints[right])) <= duplicate_tolerance:
+                raise ValueError(
+                    "waypoints[{}] and waypoints[{}] repeat the same taught joint pose "
+                    "within {:.3f}deg".format(left, right, duplicate_tolerance)
+                )
+
+    summary = pose_diversity_summary(data)
+    vector_checks = (
+        "p1_translation_span_xyz_mm",
+        "p1_roll_pitch_span_deg",
+        "p2_placement_xy_span_mm",
+        "p3_translation_span_xyz_mm",
+        "p3_roll_pitch_span_deg",
+    )
+    for key in vector_checks:
+        for axis, (actual, required) in enumerate(zip(summary[key], requirements[key])):
+            _require_minimum(actual, required, "{}[{}]".format(key, axis))
+    scalar_checks = (
+        "p2_placement_yaw_span_deg",
+        "p2_min_view_translation_mm",
+        "p2_min_view_roll_pitch_delta_deg",
+    )
+    for key in scalar_checks:
+        _require_minimum(summary[key], requirements[key], key)
+    return summary
+
+
+def _validate_composite_rig_45(data, waypoints):
+    """Validate the preregistered 15/20/10 composite-rig capture plan."""
+    if data.get("schema_version") != POSE_PLAN_SCHEMA:
+        raise ValueError("schema_version must be {}".format(POSE_PLAN_SCHEMA))
+    if data.get("template_only") is not False:
+        raise ValueError("template_only must be false after all taught poses are filled")
+    if data.get(SAFE_MODE_KEY) == SAFE_MODE_Z_LIFT:
+        raise ValueError(
+            "{} requires explicit safe_joints_empty and safe_joints_gripped; "
+            "z_lift_only is not allowed".format(PROTOCOL_COMPOSITE_RIG_45)
+        )
+    validate_joint_vector(data.get(SAFE_EMPTY_KEY), SAFE_EMPTY_KEY)
+    validate_joint_vector(data.get(SAFE_GRIPPED_KEY), SAFE_GRIPPED_KEY)
+    _require_nonempty_text(data.get("target_rig_id"), "target_rig_id")
+    _require_nonempty_text(data.get("rig_geometry_file"), "rig_geometry_file")
+    rig_hash = _require_nonempty_text(
+        data.get("rig_geometry_sha256"), "rig_geometry_sha256"
+    )
+    if len(rig_hash) != 64 or any(ch not in "0123456789abcdefABCDEF" for ch in rig_hash):
+        raise ValueError("rig_geometry_sha256 must be a 64-character hexadecimal SHA-256")
+    raw_max_attempts = data.get("max_transport_attempts_per_event", 3)
+    try:
+        max_attempts = int(raw_max_attempts)
+    except (TypeError, ValueError):
+        raise ValueError("max_transport_attempts_per_event must be an integer")
+    if isinstance(raw_max_attempts, bool) or float(raw_max_attempts) != max_attempts:
+        raise ValueError("max_transport_attempts_per_event must be an integer")
+    if max_attempts < 1 or max_attempts > 5:
+        raise ValueError("max_transport_attempts_per_event must be in [1, 5]")
+
+    placements = data.get("placements")
+    if not isinstance(placements, list) or len(placements) != 10:
+        raise ValueError("placements must contain exactly 10 entries")
+    placement_by_id = {}
+    for idx, placement in enumerate(placements):
+        label = "placements[{}]".format(idx)
+        if not isinstance(placement, dict):
+            raise ValueError("{} must be an object".format(label))
+        expected_id = "PLACEMENT_{:02d}".format(idx)
+        placement_id = placement.get("placement_id")
+        if placement_id != expected_id:
+            raise ValueError(
+                "{}.placement_id must be {!r}".format(label, expected_id)
+            )
+        if placement_id in placement_by_id:
+            raise ValueError("duplicate placement_id {!r}".format(placement_id))
+        validate_joint_vector(
+            placement.get("place_approach_joints"),
+            label + ".place_approach_joints",
+        )
+        place_tcp = validate_joint_vector(
+            placement.get("place_tcp"), label + ".place_tcp"
+        )
+        approach_tcp = validate_joint_vector(
+            placement.get("place_approach_tcp"), label + ".place_approach_tcp"
+        )
+        if approach_tcp[2] - place_tcp[2] < 10.0:
+            raise ValueError(
+                "{}.place_approach_tcp must be at least 10mm above place_tcp".format(label)
+            )
+        if max(abs(approach_tcp[axis] - place_tcp[axis]) for axis in (0, 1)) > 2.0:
+            raise ValueError(
+                "{}.place approach/contact x,y must match within 2mm".format(label)
+            )
+        rotation_error = []
+        for axis in (3, 4, 5):
+            delta = abs(approach_tcp[axis] - place_tcp[axis]) % 360.0
+            rotation_error.append(min(delta, 360.0 - delta))
+        if max(rotation_error) > 2.0:
+            raise ValueError(
+                "{}.place approach/contact rotation must match within 2deg".format(label)
+            )
+        placement_by_id[placement_id] = placement
+
+    if len(waypoints) != 45:
+        raise ValueError(
+            "{} requires exactly 45 waypoints, found {}".format(
+                PROTOCOL_COMPOSITE_RIG_45, len(waypoints)
+            )
+        )
+
+    expected = []
+    for idx in range(15):
+        expected.append(("P1_{:02d}".format(idx), PHASE_P1, TARGET_GRIPPED, None, idx))
+    for placement_idx in range(10):
+        for view_idx in range(2):
+            expected.append((
+                "P2_PLACEMENT_{:02d}_VIEW_{}".format(placement_idx, view_idx),
+                PHASE_P2,
+                TARGET_RELEASED,
+                "PLACEMENT_{:02d}".format(placement_idx),
+                view_idx,
+            ))
+    for idx in range(10):
+        expected.append((
+            "P3_{:02d}".format(idx),
+            PHASE_P3,
+            TARGET_STATIONARY,
+            "PLACEMENT_09",
+            idx,
+        ))
+
+    seen_ids = set()
+    for idx, (wp, exp) in enumerate(zip(waypoints, expected)):
+        label = "waypoints[{}]".format(idx)
+        if not isinstance(wp, dict):
+            raise ValueError("{} must be an object".format(label))
+        event_id, phase, target_state, placement_id, view_index = exp
+        if wp.get("planned_event_id") != event_id:
+            raise ValueError(
+                "{}.planned_event_id must be {!r}".format(label, event_id)
+            )
+        if event_id in seen_ids:
+            raise ValueError("duplicate planned_event_id {!r}".format(event_id))
+        seen_ids.add(event_id)
+        if wp.get("capture_index") != idx:
+            raise ValueError("{}.capture_index must be {}".format(label, idx))
+        if wp.get("phase") != phase:
+            raise ValueError("{}.phase must be {!r}".format(label, phase))
+        if wp.get("target_state") != target_state:
+            raise ValueError(
+                "{}.target_state must be {!r}".format(label, target_state)
+            )
+        if wp.get("placement_id") != placement_id:
+            raise ValueError(
+                "{}.placement_id must be {!r}".format(label, placement_id)
+            )
+        if wp.get("view_index") != view_index:
+            raise ValueError(
+                "{}.view_index must be {!r}".format(label, view_index)
+            )
+        _validate_capture_joint_waypoint(wp, label)
+        expected_gripped = phase == PHASE_P1
+        if wp.get("cube_gripped") is not expected_gripped:
+            raise ValueError(
+                "{}.cube_gripped must be {}".format(label, expected_gripped)
+            )
+        expected_block = "B_eyetohand" if expected_gripped else "A_placement"
+        if wp.get("capture_block") != expected_block:
+            raise ValueError(
+                "{}.capture_block must be {!r}".format(label, expected_block)
+            )
+        if placement_id is not None and placement_id not in placement_by_id:
+            raise ValueError(
+                "{}.placement_id {!r} is not declared".format(label, placement_id)
+            )
+    _validate_pose_diversity(data, waypoints)
+    return True
 
 
 def validate_safe_joint_config(data):
@@ -67,7 +402,7 @@ def shortest_joint_error_deg(actual, target):
 def validate_waypoint_semantics(data):
     """Reject mislabeled A/B records before the robot performs any motion.
 
-    Two layouts are legal, and the payload must say which one it is via
+    The payload must declare one of the supported layouts via
     ``capture_protocol``.  A missing key means the legacy ``per_set_AB`` shape,
     so an old file keeps its old contract.  Neither branch accepts a set whose
     blocks merely "look plausible": the claimed shape is checked exactly, so a
@@ -84,6 +419,8 @@ def validate_waypoint_semantics(data):
     waypoints = data.get("waypoints")
     if not isinstance(waypoints, list) or not waypoints:
         raise ValueError("waypoints must be a non-empty list")
+    if protocol == PROTOCOL_COMPOSITE_RIG_45:
+        return _validate_composite_rig_45(data, waypoints)
     seen_capture_indices = set()
     blocks_by_set = {}
     set_order = []

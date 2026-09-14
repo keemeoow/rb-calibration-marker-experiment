@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Preregistered hard rejection threshold sensitivity experiment (OFAT).
 
-See CP_result/session04/outlier_ablation/PREREGISTRATION_HARD_THRESHOLD.md.
+See ABLATION_TEST_result_<MMDD>/session02_NOUSE_session04_0814/outlier_ablation/PREREGISTRATION_HARD_THRESHOLD.md.
 
 Each point moves exactly one of the three rejection criteria away from the
 ``standard`` baseline.  Rejection is applied to train events only: the held-out
@@ -20,6 +20,7 @@ import json
 import os
 import subprocess
 import sys
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BASELINE = {"rmse": 3.0, "inlier": 0.0, "corners": 4}
@@ -150,18 +151,18 @@ def run_table1(manifest, policy, out_dir, session_root, intrinsics_dir, calib_di
         "--rows", ROWS, "--observation-manifest", manifest,
         "--observation-filter-policy", policy, "--out_dir", out_dir],
        out_dir + "_table1.log")
-    with open(os.path.join(out_dir, "table1_methods.json")) as handle:
+    with open(os.path.join(out_dir, "ABLATION_TEST_table1_methods.json")) as handle:
         return json.load(handle)
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--session-root", default="data/session04/calib_train")
+    parser.add_argument("--session-root", default="data/session02_NOUSE_session04_0814/calib_train")
     parser.add_argument("--intrinsics-dir", default="intrinsics")
-    parser.add_argument("--calib-dir", default="data/session04/calib_out")
+    parser.add_argument("--calib-dir", default="data/session02_NOUSE_session04_0814/calib_out")
     parser.add_argument("--work-dir", required=True)
     parser.add_argument("--out-dir",
-                        default="CP_result/session04/outlier_ablation/hard_threshold_sensitivity")
+                        default=f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/outlier_ablation/hard_threshold_sensitivity")
     args = parser.parse_args()
     work = os.path.abspath(args.work_dir)
     out_dir = os.path.join(REPO, args.out_dir)
@@ -219,7 +220,7 @@ def main():
         writer.writerows(records)
     with open(os.path.join(out_dir, "hard_threshold_sensitivity.json"), "w") as handle:
         json.dump({"preregistration":
-                   "CP_result/session04/outlier_ablation/PREREGISTRATION_HARD_THRESHOLD.md",
+                   f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/outlier_ablation/PREREGISTRATION_HARD_THRESHOLD.md",
                    "baseline_split": baseline_split, "points": records},
                   handle, indent=2)
     print(f"[DONE] {csv_path}")

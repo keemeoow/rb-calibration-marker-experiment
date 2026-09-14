@@ -24,19 +24,20 @@ from tools.sync_table1_canonical_data import (
     _csv_rows,
     _method_rows,
 )
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 
-TABLE1_JSON = ROOT / "CP_result/session04/late_table1/table1_methods.json"
+TABLE1_JSON = ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json"
 CROSS_JSON = (
-    ROOT / "CP_result/session04/cross_target_evaluation/"
+    ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/cross_target_evaluation/"
     "cross_target_evaluation.json")
 MARKER_JSON = (
-    ROOT / "CP_result/session04/marker_system_end_to_end/"
+    ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/marker_system_end_to_end/"
     "marker_system_end_to_end.json")
-CANONICAL_CSV = ROOT / "CP_result/session04/late_table1/table1_results.csv"
+CANONICAL_CSV = ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_results.csv"
 REPORTS = (
-    ROOT / "CP_result/session04/late_table1/TABLE1_RESULTS.md",
-    ROOT / "CP_result/session04/late_table1/TABLE1_INTERACTIVE.html",
+    ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md",
+    ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_INTERACTIVE.html",
 )
 
 
@@ -80,7 +81,7 @@ def _verify_reports(table1: dict, marker: dict,
         "Final protocol before External GT",
         "Current Data Warnings (현재 데이터 경고)",
         "Final Protocol Lock (최종 단일 기준)",
-        "Final Comparison Table (최종 비교실험표)",
+        "Final Comparison Table (최종 ABLATION_TEST)",
         "Matched Contrast Decision Table (비교실험 구성 확정표)",
         "Metric Decision Matrix (평가지표 판정표)",
         "External cube TRE / rotation / P95 / failure",

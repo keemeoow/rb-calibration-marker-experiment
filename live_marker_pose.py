@@ -14,7 +14,7 @@
 실행 예:
     python live_marker_pose.py
     python live_marker_pose.py --flange "300 0 400 180 0 0"
-    python live_marker_pose.py --calib data/session04/calib_out_nofk
+    python live_marker_pose.py --calib data/session02_NOUSE_session04_0814/calib_out_nofk
 """
 import os
 import sys
@@ -106,10 +106,10 @@ def get_flange_from_robot(ip, port, timeout=4.0):
 # ── 본체 ──────────────────────────────────────────────────
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--calib", default=os.path.join(HERE, "data/session04/calib_out"))
+    ap.add_argument("--calib", default=os.path.join(HERE, "data/session02_NOUSE_session04_0814/calib_out"))
     ap.add_argument("--intr", default=os.path.join(HERE, "intrinsics/cam1.npz"))
     ap.add_argument("--cube_config", default=os.path.join(
-        HERE, "data/session04/calib_train/meta.json"))
+        HERE, "data/session02_NOUSE_session04_0814/calib_train/meta.json"))
     ap.add_argument("--flange", default=None,
                     help='"x y z Rz Ry Rx" (mm, 도). 로봇 티치펜던트 표시 순서 그대로')
     ap.add_argument("--robot_ip", default="192.168.0.23")

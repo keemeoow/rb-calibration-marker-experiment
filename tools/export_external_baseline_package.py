@@ -18,15 +18,16 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = (
-    ROOT / "data/session04/calib_out/capture_filter/"
+    ROOT / "data/session02_NOUSE_session04_0814/calib_out/capture_filter/"
     "Step2b_observation_manifest.json"
 )
-DEFAULT_TABLE1 = ROOT / "CP_result/session04/late_table1/table1_methods.json"
-DEFAULT_OUT_DIR = ROOT / "CP_result/session04/external_baseline_package"
+DEFAULT_TABLE1 = ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json"
+DEFAULT_OUT_DIR = ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/external_baseline_package"
 
 
 def sha256_file(path: Path) -> str:
@@ -331,7 +332,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--observation-manifest", default=str(DEFAULT_MANIFEST))
     parser.add_argument("--table1-json", default=str(DEFAULT_TABLE1))
-    parser.add_argument("--session-root", default="data/session04/calib_train")
+    parser.add_argument("--session-root", default="data/session02_NOUSE_session04_0814/calib_train")
     parser.add_argument("--intrinsics-dir", default="intrinsics")
     parser.add_argument("--policy", default="standard", choices=("standard", "strict"))
     parser.add_argument("--out-dir", default=str(DEFAULT_OUT_DIR))

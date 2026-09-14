@@ -76,7 +76,7 @@ def _global_ax_zb_initial_candidate(pnp_items, raw_by_set, robot_T) -> dict:
 
     The legacy initializer needs at least five motions *within one cube set*.
     A global view-budget experiment can instead have one observation in each
-    of several sets.  With raw FK cube poses known, every observation still
+    of several sets.  With FK cube poses known, every observation still
     constrains the same ``T_gripper_cam`` and FK-to-object delta.  This helper
     minimizes only that cube-PnP pose consistency to obtain an initializer;
     the returned transforms are subsequently refined by the canonical corner
@@ -304,7 +304,7 @@ class BoardFreeFKCubeProblem:
                 raise RuntimeError("board-free artifact received a non-eih-cube observation")
             event, set_index = int(obs.event), int(obs.set_idx)
             if event not in self.robot_T or set_index not in self.raw:
-                raise RuntimeError("board-free artifact observation lacks raw FK support")
+                raise RuntimeError("board-free artifact observation lacks FK support")
             T_base_cam = np.asarray(self.robot_T[event], dtype=np.float64) @ gtc
             T_base_object = np.asarray(self.raw[set_index], dtype=np.float64) @ delta
             prediction = project_points(
@@ -383,7 +383,7 @@ def estimate_board_free_fk_cube_artifact(
     init_rotation_deg: float = 1.0,
     raw_fk_source_event_by_set: Optional[Mapping[int, int]] = None,
 ) -> Tuple[Dict[int, np.ndarray], np.ndarray, dict]:
-    """Return aligned FK poses, board-free gTc, and hashed provenance artifact."""
+    """Return corrected-FK poses, board-free gTc, and hashed provenance artifact."""
     options.validate()
     allowed_sets = {int(s) for s in training_set_ids}
     raw = {int(s): np.asarray(T, dtype=np.float64)

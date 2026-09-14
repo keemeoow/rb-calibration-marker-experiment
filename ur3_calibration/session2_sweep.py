@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """ur3_calibration/session2_sweep.py -- session2 데이터셋의 x,y,rz(yaw)만 이용해 스윕
 
-session2_floor_board_dual_cam/poses.json 은 프리드라이브로 기록한 값이라
+session2_floor_board_dual_cam_0909/poses.json 은 프리드라이브로 기록한 값이라
 z(높이)와 rx,ry(tilt)가 포즈마다 조금씩 흔들려 있다. 이 스크립트는 그
 z, rx, ry 를 무시하고 grasp_flange_pose.json 자세의 높이(z)와 기울기로
 고정한 뒤, 각 session2 포즈에서는 x, y 위치와 yaw만 뽑아 15개의 새 목표
@@ -45,7 +45,7 @@ from scipy.spatial.transform import Rotation
 
 import rtde_control
 
-from capture_poses import session_path
+from capture_poses import UR3_CAPTURE_DATA_ROOT, session_path
 
 ROBOT_IP_DEFAULT = "192.168.1.101"
 GRASP_POSE_DEFAULT = Path(__file__).resolve().parent / "data" / "grasp_flange_pose.json"
@@ -93,7 +93,7 @@ def main():
     ap.add_argument("--grasp-pose", default=str(GRASP_POSE_DEFAULT))
     ap.add_argument(
         "--session-poses",
-        default=str(session_path(Path(__file__).resolve().parent / "data", SESSION_ID)),
+        default=str(session_path(UR3_CAPTURE_DATA_ROOT, SESSION_ID)),
     )
     ap.add_argument("--speed", type=float, default=MOVE_SPEED_DEFAULT)
     ap.add_argument("--accel", type=float, default=MOVE_ACCEL_DEFAULT)

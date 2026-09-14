@@ -1,8 +1,8 @@
 {
   "warning": "train-pooled (session1+2+3 \ud568\uaed8, \uace0\uc815\ucea03+\uadf8\ub9ac\ud37c\ucea01), held-out \ubd84\ub9ac \uc5c6\uc74c -- table1.py\uc758 \uc815\uc2dd \uc9c0\ud45c\uac00 \uc544\ub2d8. no_fk/fixed_fk \ub450 \uc870\uac74\ub07c\ub9ac \ube44\uad50\ud558\ub294 \uc6a9\ub3c4.",
-  "session1_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session1_handheld_fixed_cam",
-  "session2_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam",
-  "session3_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session3_wrist_motion_gripper_cam",
+  "session1_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session1_handheld_fixed_cam_0909",
+  "session2_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909",
+  "session3_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session3_wrist_motion_gripper_cam_0909",
   "fit_json_source": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/pass1_grasp_offset_replayed.json",
   "charuco_board_config": {
     "squares_x": 11,

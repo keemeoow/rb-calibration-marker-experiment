@@ -584,11 +584,11 @@ def _write_markdown(path, report, meta):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--session-root", default="data/session04/calib_train")
+    parser.add_argument("--session-root", default="data/session02_NOUSE_session04_0814/calib_train")
     parser.add_argument("--intrinsics-dir", default="intrinsics")
     parser.add_argument(
         "--output-dir",
-        default="data/session04/calib_out/verify/cube_observation_quality",
+        default="data/session02_NOUSE_session04_0814/calib_out/verify/cube_observation_quality",
     )
     parser.add_argument(
         "--policy", choices=("core_multiface", "legacy"),

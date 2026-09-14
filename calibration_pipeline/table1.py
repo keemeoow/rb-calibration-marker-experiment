@@ -7,19 +7,19 @@ The runner implements the contract in ``calibration_pipeline.schema``:
 * ``seq`` is eih-only fitting followed by an e2h-only camera fit, with an
   explicit freeze boundary and no alternating pass;
 * ``U`` fits both paths in one objective;
-* A3 freezes raw FK after a preregistered mechanical frame conversion;
-* A4/A5/B1/B2 reuse one train-only image-aligned FK cube artifact;
+* A3 uses FK hard fixed after a preregistered mechanical frame conversion;
+* A4/A5/B1/B2 reuse one train-only corrected-FK cube artifact;
 * every row starts from one train-only shared reference state for overlapping
   transforms, before its declared marker/FK treatment is applied;
 * A0/A1/A2/A3/A4/A5/B1/B2/B3 are emitted by this runner only;
 * A3/A5 use the same canonical corner solver directly, with cube poses frozen;
-* A4/B1/B2 use one shared covariance-whitened robust FK-factor implementation;
+* A4/B1/B2 use one shared covariance-whitened robust corrected-FK soft factor;
 * the primary metric is event-grouped, set-stratified held-out corner
   reprojection with every fitted transform frozen;
 * a noise-free A1=A2 sequential-vs-unified test must pass before real data are fitted.
 
-No FK anchor, Ridge, SE(3), or other post-correction is used in estimated-cube
-rows.  Camera intrinsics and distortion are constants in every stage.
+VISION rows use neither a cube-pose FK anchor nor Ridge, SE(3), or another
+post-correction. Camera intrinsics and distortion are constants in every stage.
 """
 
 from __future__ import annotations
@@ -93,6 +93,13 @@ from calibration_pipeline.fk_factor import (
     solve_factorized_fk,
     validate_covariance,
 )
+from capture_pipeline.waypoint_safety import (
+    PHASE_P1,
+    PHASE_P2,
+    PHASE_P3,
+    P3_STATIONARY_SET_INDEX,
+    PROTOCOL_COMPOSITE_RIG_45,
+)
 from calibration_pipeline.path_evaluation import (
     build_frozen_path_evaluation_mask,
     evaluate_paths_with_frozen_mask,
@@ -131,6 +138,7 @@ from calibration_pipeline.evaluation import (
 SHARED_BASELINE_SCHEMA = "table1_shared_train_only_baseline_v2"
 RUNNABLE_ROWS = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
 BASELINE_ROWS = ("A0", "A1", "A2", "A3", "A4", "A5", "A6", "B1", "B2", "B3")
+TRAIN_ONLY_CUBE_EVALUATION_SCHEMA = "train_only_cube_evaluation_pose_v1"
 PENDING_ROWS = {
     "A6": {
         "status": "not_run",
@@ -417,6 +425,148 @@ def build_event_split(observations: Sequence[PixelObs], gripper: int, fraction: 
     }
 
 
+COMPOSITE_PLACEMENT_SPLIT = "composite_rig_p2_placement_grouped_v1"
+
+
+def capture_protocol_from_meta(meta: Mapping) -> Optional[str]:
+    config = meta.get("capture_config")
+    if isinstance(config, Mapping) and config.get("capture_protocol"):
+        return str(config["capture_protocol"])
+    protocols = {
+        str(capture.get("protocol_version"))
+        for capture in meta.get("captures", [])
+        if capture.get("protocol_version")
+    }
+    if len(protocols) == 1:
+        return protocols.pop()
+    return None
+
+
+def selected_composite_protocol_captures(meta: Mapping) -> List[dict]:
+    """Return one transport-valid attempt for every final planned event."""
+    captures = [
+        capture for capture in meta.get("captures", [])
+        if capture.get("protocol_version") == PROTOCOL_COMPOSITE_RIG_45
+        and capture.get("selected_for_analysis") is True
+    ]
+    planned_ids = [str(capture.get("planned_event_id", "")) for capture in captures]
+    if len(captures) != 45 or len(set(planned_ids)) != 45 or "" in planned_ids:
+        raise RuntimeError(
+            "composite_rig_45 analysis requires exactly one selected transport-valid "
+            "attempt for each of 45 planned events"
+        )
+    expected_phase_counts = {PHASE_P1: 15, PHASE_P2: 20, PHASE_P3: 10}
+    actual_phase_counts = {
+        phase: sum(capture.get("phase") == phase for capture in captures)
+        for phase in expected_phase_counts
+    }
+    if actual_phase_counts != expected_phase_counts:
+        raise RuntimeError(
+            "composite_rig_45 selected phase counts must be 15/20/10; got {}".format(
+                actual_phase_counts)
+        )
+    p3_sets = {get_capture_set_index(capture) for capture in captures
+               if capture.get("phase") == PHASE_P3}
+    if p3_sets != {P3_STATIONARY_SET_INDEX}:
+        raise RuntimeError(
+            "P3 must use independent set_index {}; got {}".format(
+                P3_STATIONARY_SET_INDEX, sorted(
+                    value for value in p3_sets if value is not None))
+        )
+    return sorted(captures, key=lambda capture: int(capture["event_id"]))
+
+
+def build_composite_placement_split(meta: Mapping, fraction: float,
+                                    seed: int) -> dict:
+    """Hold out whole P2 placements; P1/P3 remain calibration-only.
+
+    A placement is the physical target pose.  Its two camera-view events must
+    never cross the train/held-out boundary, even when their event IDs differ.
+    """
+    fraction = float(fraction)
+    if not 0.0 < fraction < 1.0:
+        raise ValueError("test fraction must be strictly between 0 and 1")
+    captures = selected_composite_protocol_captures(meta)
+    p2_by_placement: Dict[str, List[dict]] = defaultdict(list)
+    always_train = []
+    for capture in captures:
+        phase = capture.get("phase")
+        event = int(capture["event_id"])
+        if phase == PHASE_P2:
+            placement_id = str(capture.get("placement_id") or "")
+            if not placement_id:
+                raise RuntimeError("P2 capture lacks placement_id")
+            p2_by_placement[placement_id].append(capture)
+        else:
+            always_train.append(event)
+    if len(p2_by_placement) != 10:
+        raise RuntimeError(
+            "P2 split requires exactly 10 placement groups, got {}".format(
+                len(p2_by_placement))
+        )
+    set_by_placement = {}
+    for placement_id, group in sorted(p2_by_placement.items()):
+        views = {int(capture.get("view_index", -1)) for capture in group}
+        sets = {get_capture_set_index(capture) for capture in group}
+        if len(group) != 2 or views != {0, 1} or len(sets) != 1 or None in sets:
+            raise RuntimeError(
+                "{} must contain views 0 and 1 under one set_index".format(
+                    placement_id)
+            )
+        set_by_placement[placement_id] = int(next(iter(sets)))
+    if len(set(set_by_placement.values())) != 10:
+        raise RuntimeError("each P2 placement must have a distinct set_index")
+
+    placements = sorted(p2_by_placement)
+    rng = np.random.default_rng(int(seed))
+    shuffled = list(placements)
+    rng.shuffle(shuffled)
+    heldout_count = max(1, min(len(placements) - 1,
+                               int(round(fraction * len(placements)))))
+    heldout_placements = set(shuffled[:heldout_count])
+    train_placements = set(placements) - heldout_placements
+    train_events = set(always_train)
+    test_events = set()
+    per_set = {}
+    for placement_id in placements:
+        events = sorted(int(capture["event_id"])
+                        for capture in p2_by_placement[placement_id])
+        role = "heldout" if placement_id in heldout_placements else "train"
+        destination = test_events if role == "heldout" else train_events
+        destination.update(events)
+        per_set[str(set_by_placement[placement_id])] = {
+            "placement_id": placement_id,
+            "split_role": role,
+            "events": events,
+        }
+    if train_events & test_events:
+        raise RuntimeError("placement-grouped split produced event leakage")
+    return {
+        "strategy": COMPOSITE_PLACEMENT_SPLIT,
+        "seed": int(seed),
+        "test_fraction_requested": fraction,
+        "split_unit": "P2 placement_id",
+        "p1_p3_role": "always_train_calibration_only",
+        "eligible_sets": sorted(set_by_placement.values()),
+        "train_events": sorted(train_events),
+        "test_events": sorted(test_events),
+        "train_placement_ids": sorted(train_placements),
+        "heldout_placement_ids": sorted(heldout_placements),
+        "always_train_events": sorted(always_train),
+        "per_set": per_set,
+        "dropped_sets": {},
+    }
+
+
+def build_protocol_event_split(observations: Sequence[PixelObs], meta: Mapping,
+                               gripper: int, fraction: float, seed: int,
+                               min_train_eih_cube_events: int) -> dict:
+    if capture_protocol_from_meta(meta) == PROTOCOL_COMPOSITE_RIG_45:
+        return build_composite_placement_split(meta, fraction, seed)
+    return build_event_split(
+        observations, gripper, fraction, seed, min_train_eih_cube_events)
+
+
 def support_report(observations: Sequence[PixelObs], gripper: int) -> dict:
     counts: Dict[Tuple[int, str, str], Dict[str, int]] = defaultdict(
         lambda: {"observations": 0, "corners": 0, "events": set()})
@@ -504,7 +654,7 @@ def make_initial_state(
     elif condition.fk_to_cube == POSE_SOURCE_ALIGNED_FK_FIXED:
         if aligned_fixed_cubes is None:
             raise ValueError(
-                f"{condition.row}: vision-aligned FK fixed poses are required")
+                f"{condition.row}: corrected-FK hard-fixed poses are required")
         state.cubes = {
             int(s): np.asarray(T, dtype=np.float64).copy()
             for s, T in aligned_fixed_cubes.items()
@@ -713,10 +863,109 @@ def solve_stage(observations: Sequence[PixelObs], free_families: Sequence[str],
     )
 
 
+def cube_evaluation_observations(
+        observations: Sequence[PixelObs], gripper: int,
+        registered_cams: Iterable[int]) -> List[PixelObs]:
+    """Select the frozen cube evaluation population independent of row target_set."""
+    cams = {int(camera_id) for camera_id in registered_cams}
+    selected = []
+    for obs in observations:
+        if obs.marker != "cube":
+            continue
+        camera_id = int(obs.cam)
+        if camera_id != int(gripper) and camera_id not in cams:
+            continue
+        if obs.set_idx is None:
+            raise RuntimeError(
+                f"cube evaluation observation lacks set index at event {obs.event}")
+        selected.append(obs)
+    return selected
+
+
+def fit_train_only_cube_evaluation(
+        final_state: PoseState,
+        train_obs: Sequence[PixelObs],
+        test_obs: Sequence[PixelObs],
+        initial_cube_poses: Mapping[int, np.ndarray],
+        gripper: int,
+        robot_T,
+        K_map,
+        D_map,
+        seed: int,
+        args) -> dict:
+    """Fit only cube target poses for the cube metric after calibration is frozen.
+
+    This lets board-only rows (A0/B3) report cube RMSE without letting cube
+    observations update camera extrinsics or hand-eye during calibration.
+    """
+    train_cube = cube_evaluation_observations(
+        train_obs, gripper, final_state.cams)
+    heldout_cube = cube_evaluation_observations(
+        test_obs, gripper, final_state.cams)
+    if not train_cube or not heldout_cube:
+        raise RuntimeError("cube evaluation requires train and held-out cube observations")
+    required_sets = sorted({
+        int(obs.set_idx) for obs in list(train_cube) + list(heldout_cube)
+    })
+    missing = [
+        set_index for set_index in required_sets
+        if int(set_index) not in initial_cube_poses
+    ]
+    if missing:
+        raise RuntimeError(
+            f"cube evaluation pose source missing sets {missing}")
+    reference = final_state.clone()
+    reference.cubes = {
+        int(set_index): np.asarray(initial_cube_poses[int(set_index)],
+                                   dtype=np.float64).copy()
+        for set_index in required_sets
+    }
+    keys = variable_keys(("T_base_cube_by_set",), reference)
+    options = canonical_solver_options(args)
+    fitted_state, diagnostics = solve_corner_reprojection(
+        observations=train_cube,
+        variable_keys_=keys,
+        reference_state=reference,
+        robot_T=robot_T,
+        K_map=K_map,
+        D_map=D_map,
+        gripper_cam_idx=gripper,
+        options=options,
+        seed=int(seed),
+        init_translation_mm=0.0,
+        init_rotation_deg=0.0,
+    )
+    return {
+        "artifact_schema": TRAIN_ONLY_CUBE_EVALUATION_SCHEMA,
+        "pose_source": (
+            "train_cube_nuisance_pose_fit_with_frozen_camera_and_hand_eye"),
+        "camera_and_hand_eye_frozen": True,
+        "free_variables": ["T_base_cube_by_set"],
+        "train_cube_observations_used_for_pose_fit": True,
+        "heldout_cube_observations_used_for_pose_fit": False,
+        "external_ground_truth_used": False,
+        "model_dependent_observation_rejection": False,
+        "initial_cube_pose_source": "shared_train_only_visual_initialization",
+        "train_population": observation_population(train_cube, gripper),
+        "heldout_population": observation_population(heldout_cube, gripper),
+        "fit_diagnostics": _solve_summary(diagnostics),
+        "evaluation_state_sha256": state_sha256(fitted_state),
+        "T_base_cube_by_set": {
+            str(set_index): fitted_state.cubes[int(set_index)].tolist()
+            for set_index in sorted(fitted_state.cubes)
+        },
+        "train": pixel_reprojection_metrics(
+            train_cube, fitted_state, robot_T, K_map, D_map, gripper),
+        "heldout": pixel_reprojection_metrics(
+            heldout_cube, fitted_state, robot_T, K_map, D_map, gripper),
+    }
+
+
 def run_condition_once(condition: AblationCondition, initial_state: PoseState,
                        train_obs: Sequence[PixelObs], test_obs: Sequence[PixelObs],
                        gripper: int, robot_T, K_map, D_map, seed: int, args,
-                       path_evaluation_mask: Mapping) -> dict:
+                       path_evaluation_mask: Mapping,
+                       cube_evaluation_pose_source: Mapping[int, np.ndarray]) -> dict:
     relevant_train = filter_observations(
         train_obs, condition, None, gripper, initial_state.cams)
     relevant_test = filter_observations(
@@ -756,6 +1005,9 @@ def run_condition_once(condition: AblationCondition, initial_state: PoseState,
         relevant_train, final_state, robot_T, K_map, D_map, gripper)
     test_metrics = pixel_reprojection_metrics(
         relevant_test, final_state, robot_T, K_map, D_map, gripper)
+    cube_evaluation = fit_train_only_cube_evaluation(
+        final_state, train_obs, test_obs, cube_evaluation_pose_source,
+        gripper, robot_T, K_map, D_map, seed, args)
     if condition.target_set in {"cube", "cube+board"}:
         # Use the full held-out cube pool and the same pre-fit mask for every
         # cube-bearing row.  The row-specific target filter must not alter the
@@ -774,6 +1026,7 @@ def run_condition_once(condition: AblationCondition, initial_state: PoseState,
         "stages": stages,
         "train_reprojection": train_metrics,
         "heldout_reprojection": test_metrics,
+        "cube_evaluation_reprojection": cube_evaluation,
         "heldout_path_metrics": path,
         "transforms": serialize_state(final_state),
     }
@@ -981,6 +1234,9 @@ def run_factor_condition_once(condition: AblationCondition, initial_state: PoseS
     test_metrics = pixel_reprojection_metrics(
         relevant_test, final_state, data.robot_T, data.K_map, data.D_map,
         data.gripper)
+    cube_evaluation = fit_train_only_cube_evaluation(
+        final_state, data.train_obs, data.test_obs, data.visual_cubes,
+        data.gripper, data.robot_T, data.K_map, data.D_map, seed, args)
     path = evaluate_paths_with_frozen_mask(
         list(data.train_obs) + list(data.test_obs),
         final_state.cams, final_state.gtc, data.robot_T,
@@ -992,6 +1248,7 @@ def run_factor_condition_once(condition: AblationCondition, initial_state: PoseS
         "stages": stages,
         "train_reprojection": train_metrics,
         "heldout_reprojection": test_metrics,
+        "cube_evaluation_reprojection": cube_evaluation,
         "heldout_path_metrics": path,
         "transforms": serialize_state(final_state),
     }
@@ -1092,7 +1349,7 @@ def solve_synthetic(condition: AblationCondition, observations, truth: PoseState
     init = perturbed_state(truth)
     if condition.fk_to_cube in {
             POSE_SOURCE_FK_FIXED, POSE_SOURCE_ALIGNED_FK_FIXED}:
-        # FK-fixed transforms are constants, not perturbed initialization
+        # FK hard-fixed transforms are constants, not perturbed initialization
         # variables.  Perturbing them would simulate FK noise, not solver init.
         source = truth.cubes if fixed_cube_poses is None else fixed_cube_poses
         init.cubes = {int(s): np.asarray(T, float).copy() for s, T in source.items()}
@@ -1425,6 +1682,15 @@ def prepare_ablation_data(args) -> PreparedAblationData:
     if included_set_indices and not meta.get("captures"):
         raise RuntimeError(
             f"include_sets={args.include_sets!r} did not match any captures")
+    protocol = capture_protocol_from_meta(meta)
+    if protocol == PROTOCOL_COMPOSITE_RIG_45:
+        if included_set_indices:
+            raise RuntimeError(
+                "composite_rig_45 uses a frozen phase-aware population; "
+                "--include_sets is not allowed")
+        selected_captures = selected_composite_protocol_captures(meta)
+        meta = dict(meta)
+        meta["captures"] = selected_captures
     meta, pose_convention = apply_pose_convention_manifest(
         args.root_folder, meta)
     all_cam_ids = sorted({int(ci) for cap in meta.get("captures", [])
@@ -1437,15 +1703,25 @@ def prepare_ablation_data(args) -> PreparedAblationData:
     robot_T = cp.load_robot_poses_from_meta(meta)
     observations, cube_cfg_source, cube_reason = detect_observations(
         args, meta, K_map, D_map, all_cam_ids, gripper)
-    split = build_event_split(
-        observations, gripper, args.test_fraction, args.split_seed,
+    split = build_protocol_event_split(
+        observations, meta, gripper, args.test_fraction, args.split_seed,
         args.min_train_eih_cube_events)
     eligible = set(split["eligible_sets"])
     train_events = set(split["train_events"])
     test_events = set(split["test_events"])
-    pool = [obs for obs in observations if obs.set_idx in eligible]
+    if split["strategy"] == COMPOSITE_PLACEMENT_SPLIT:
+        selected_events = train_events | test_events
+        pool = [obs for obs in observations if int(obs.event) in selected_events]
+    else:
+        pool = [obs for obs in observations if obs.set_idx in eligible]
     train_obs = [obs for obs in pool if int(obs.event) in train_events]
     test_obs = [obs for obs in pool if int(obs.event) in test_events]
+    if split["strategy"] == COMPOSITE_PLACEMENT_SPLIT:
+        raise RuntimeError(
+            "composite_rig_45 placement-grouped split is active, but the final "
+            "common-rig target model is not implemented in 05_calibrate.py yet; "
+            "refusing to run the legacy static-board/per-set-cube model on P1/P2/P3"
+        )
     if bool(getattr(args, "align_board_metric_scale", False)):
         board_metric_scale = estimate_train_board_metric_scale(
             train_obs, gripper, K_map, D_map)
@@ -1524,16 +1800,16 @@ def prepare_ablation_data(args) -> PreparedAblationData:
         if isinstance(event, int) and int(event) in set(split["test_events"])}
     if leaked_raw_events:
         raise RuntimeError(
-            f"board-free FK artifact raw FK came from held-out events "
+            f"board-free corrected-FK artifact used held-out FK events "
             f"{sorted(leaked_raw_events)}")
     missing_aligned_fk = sorted(eligible - set(aligned_fk_all))
     if missing_aligned_fk:
         raise RuntimeError(
-            "board-free aligned FK cube pose missing for sets "
+            "board-free corrected-FK cube pose missing for sets "
             f"{missing_aligned_fk}")
     missing_raw_fk = sorted(eligible - set(raw_fk_all))
     if missing_raw_fk:
-        raise RuntimeError(f"raw FK cube pose missing for sets {missing_raw_fk}")
+        raise RuntimeError(f"FK cube pose missing for sets {missing_raw_fk}")
     mechanical_frame_map = np.asarray(
         RAW_FK_CUBE_CENTER_TO_OBJECT, dtype=np.float64)
     fixed_cubes = {
@@ -1725,6 +2001,22 @@ def validate_result_evaluation_contract(result: Mapping) -> None:
             raise ValueError(f"{row}: row-level evaluation-mask SHA mismatch")
         has_cube = entry.get("condition", {}).get("target_set") in {"cube", "cube+board"}
         for run in entry.get("runs", []):
+            cube_eval = run.get("cube_evaluation_reprojection")
+            if not cube_eval:
+                raise ValueError(f"{row}: missing train-only cube evaluation")
+            if cube_eval.get("artifact_schema") != TRAIN_ONLY_CUBE_EVALUATION_SCHEMA:
+                raise ValueError(f"{row}: unknown cube evaluation schema")
+            if cube_eval.get("camera_and_hand_eye_frozen") is not True:
+                raise ValueError(f"{row}: cube evaluation refit changed calibration")
+            if cube_eval.get("heldout_cube_observations_used_for_pose_fit") is not False:
+                raise ValueError(f"{row}: heldout cube leaked into pose fit")
+            if cube_eval.get("external_ground_truth_used") is not False:
+                raise ValueError(f"{row}: cube evaluation used external GT")
+            for split_name in ("train", "heldout"):
+                cube = cube_eval.get(split_name, {}).get("cube")
+                if cube is None or cube.get("n_corners") in (None, 0):
+                    raise ValueError(
+                        f"{row}: cube evaluation lacks {split_name} cube support")
             metrics = run.get("heldout_path_metrics", {})
             if metrics.get("evaluation_mask_sha256") != mask_sha:
                 raise ValueError(f"{row}: run-level evaluation-mask SHA mismatch")
@@ -1756,7 +2048,7 @@ def write_outputs(result: dict, out_dir: str) -> None:
     """
     validate_result_evaluation_contract(result)
     os.makedirs(out_dir, exist_ok=True)
-    with open(os.path.join(out_dir, "table1_methods.json"), "w") as handle:
+    with open(os.path.join(out_dir, "ABLATION_TEST_table1_methods.json"), "w") as handle:
         json.dump(_jsonable(result), handle, indent=2)
 
 
@@ -1789,7 +2081,7 @@ def parse_args(argv=None):
                         help="Default: <session>/calib_out from --root_folder.")
     parser.add_argument(
         "--out_dir",
-        help=("Output directory. Default: CP_result/<sessionNN>/late_table1 "
+        help=("Output directory. Default: ABLATION_TEST_result_<MMDD>/<sessionNN>/ABLATION_TEST_table1 "
               "inferred from --root_folder."),
     )
     parser.add_argument(
@@ -2011,6 +2303,20 @@ def main(argv=None, force_baseline_only: bool = False) -> None:
                     "reported_components": (
                         "overall/marker/role/camera/marker-camera"),
                 },
+                "cube_evaluation_reprojection": {
+                    "schema": TRAIN_ONLY_CUBE_EVALUATION_SCHEMA,
+                    "target": "cube",
+                    "camera_and_hand_eye_frozen": True,
+                    "free_variables": ("T_base_cube_by_set",),
+                    "pose_fit_observations": "train_cube_only",
+                    "score_observations": "train_cube_and_heldout_cube",
+                    "heldout_information_used_for_pose_fit": False,
+                    "external_ground_truth_used": False,
+                    "purpose": (
+                        "report Train/ALL/Heldout cube RMSE on one shared cube "
+                        "population even for board-only A0/B3 without letting "
+                        "cube observations update camera calibration"),
+                },
                 "e_e2e": {
                     "model_dependent_gating": False,
                     "evaluation_mask_sha256": path_evaluation_mask[
@@ -2096,7 +2402,7 @@ def main(argv=None, force_baseline_only: bool = False) -> None:
                 run = run_condition_once(
                     condition, initial_state, train_obs, test_obs,
                     gripper, robot_T, K_map, D_map, seed, args,
-                    path_evaluation_mask)
+                    path_evaluation_mask, prepared.visual_cubes)
             runs.append(run)
             held = run["heldout_reprojection"].get("overall", {}).get("rmse_px")
             print(f"    converged={run['converged']} heldout_reproj={held}")
@@ -2122,7 +2428,7 @@ def main(argv=None, force_baseline_only: bool = False) -> None:
             "initialization_dispersion": transform_dispersion(runs),
         }
         write_outputs(result, args.out_dir)
-    print(f"[SAVE] {args.out_dir}/table1_methods.json")
+    print(f"[SAVE] {args.out_dir}/ABLATION_TEST_table1_methods.json")
 
 
 if __name__ == "__main__":

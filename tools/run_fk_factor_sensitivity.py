@@ -4,7 +4,7 @@
 This is not a confirmatory physical-accuracy experiment.  It keeps the Session04
 manifest, split, solver, and A4 row fixed, then changes only the Simulation
 prior standard deviation used by the corrected-FK soft factor.  Smaller scale
-means a stronger FK factor.
+means a stronger corrected-FK soft factor.
 """
 
 from __future__ import annotations
@@ -22,10 +22,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import calibration_pipeline.table1 as table1  # noqa: E402
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT  # noqa: E402
 
 
 DEFAULT_SCALES = (0.25, 0.5, 1.0, 2.0, 4.0)
-DEFAULT_OUT_DIR = ROOT / "CP_result/session04/fk_factor_sensitivity"
+DEFAULT_OUT_DIR = ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/fk_factor_sensitivity"
 
 
 def _mean(values: Iterable[float | None]) -> float | None:
@@ -127,7 +128,7 @@ def _run_one(args: argparse.Namespace, scale: float) -> dict:
         table1.SIGMA_FK_MM = original_mm
         table1.SIGMA_FK_DEG = original_deg
 
-    json_path = Path(args.out_dir) / f"scale_{scale:g}x" / "table1_methods.json"
+    json_path = Path(args.out_dir) / f"scale_{scale:g}x" / "ABLATION_TEST_table1_methods.json"
     payload = json.loads(json_path.read_text())
     payload["_source_json"] = str(json_path)
     return payload
@@ -163,23 +164,23 @@ def _write(rows: list[dict], args: argparse.Namespace, baseline: dict) -> None:
         "scale_semantics": (
             "preflight_std_scale multiplies both translation and rotation "
             "Simulation-prior standard deviations; smaller scale makes the "
-            "FK factor stronger"),
+            "corrected-FK soft factor stronger"),
         "rows": rows,
     }, indent=2) + "\n")
 
     lines = [
-        "# FK Factor Sensitivity (Preflight)",
+        "# corrected-FK soft factor Sensitivity (Preflight)",
         "",
         "목적: 8/3 피드백 #4, 즉 \"카메라 관측 수가 많아 FK 항이 묻히는가\"에 "
         "답하기 위한 preflight 분석이다.",
         "",
         "이 실험은 canonical Table 1을 덮어쓰지 않는다. Session04 manifest, split, "
         "solver, A4 row를 고정하고 Simulation prior covariance의 표준편차 scale만 "
-        "바꾼다. `preflight_std_scale < 1`은 FK factor를 더 강하게, `> 1`은 더 약하게 "
+        "바꾼다. `preflight_std_scale < 1`은 corrected-FK soft factor를 더 강하게, `> 1`은 더 약하게 "
         "넣는다는 뜻이다.",
         "",
         "> External GT를 사용하지 않았으므로 이 결과는 물리 정확도 우월성 근거가 "
-        "아니라 FK factor 영향도 점검이다.",
+        "아니라 corrected-FK soft factor 영향도 점검이다.",
         "",
         f"- A2 held-out baseline: overall `{baseline['overall']:.4f}` px, "
         f"board `{baseline['board']:.4f}` px, cube `{baseline['cube']:.4f}` px",
@@ -217,7 +218,7 @@ def _write(rows: list[dict], args: argparse.Namespace, baseline: dict) -> None:
         f"- 가장 강한 FK 설정 `{strongest['preflight_std_scale']:.2f}x`와 가장 약한 "
         f"설정 `{weakest['preflight_std_scale']:.2f}x` 사이의 held-out overall 차이는 "
         f"`{strongest['heldout_overall_rmse_px'] - weakest['heldout_overall_rmse_px']:+.4f}` px다.",
-        "- 따라서 현재 데이터에서는 FK factor가 완전히 무시된다고 보기는 어렵지만, "
+        "- 따라서 현재 데이터에서는 corrected-FK soft factor가 완전히 무시된다고 보기는 어렵지만, "
         "A2 대비 A4의 내부 held-out 차이는 매우 작아 최종 우월성 claim으로 쓰기에는 부족하다.",
         "- 이 결과는 #4에 대한 개선된 답변이다. 단순 residual 개수나 FK cost fraction만 "
         "보지 않고, covariance scale을 바꿨을 때 출력 지표가 실제로 움직이는지도 같이 본다.",
@@ -232,16 +233,16 @@ def _write(rows: list[dict], args: argparse.Namespace, baseline: dict) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root_folder", default="data/session04/calib_train")
+    parser.add_argument("--root_folder", default="data/session02_NOUSE_session04_0814/calib_train")
     parser.add_argument("--intrinsics_dir", default="intrinsics")
-    parser.add_argument("--calib_dir", default="data/session04/calib_out")
+    parser.add_argument("--calib_dir", default="data/session02_NOUSE_session04_0814/calib_out")
     parser.add_argument("--include_sets", default="0-12")
     parser.add_argument("--split_seed", type=int, default=20260731)
     parser.add_argument("--min_train_eih_cube_events", type=int, default=3)
     parser.add_argument("--num_inits", type=int, default=3)
     parser.add_argument(
         "--observation-manifest",
-        default=("data/session04/calib_out/capture_filter/"
+        default=("data/session02_NOUSE_session04_0814/calib_out/capture_filter/"
                  "Step2b_observation_manifest.json"))
     parser.add_argument("--observation-filter-policy", default="standard")
     parser.add_argument(
@@ -263,7 +264,7 @@ def main() -> None:
     scales = [float(raw) for raw in args.scales.split(",") if raw.strip()]
     if not scales or any(scale <= 0.0 for scale in scales):
         raise ValueError("all scales must be positive")
-    baseline = _baseline_a2(ROOT / "CP_result/session04/late_table1/table1_methods.json")
+    baseline = _baseline_a2(ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
     rows = []
     for scale in scales:
         print(f"[SCALE] {scale:g}x", flush=True)

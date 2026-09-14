@@ -68,7 +68,7 @@ from calibration_pipeline.runtime import (  # noqa: E402
 )
 from calibration_pipeline.schema import RAW_FK_CUBE_CENTER_TO_OBJECT  # noqa: E402
 
-ROOT = str(REPO_ROOT / "data" / "ur3_session12" / "calib_train")
+ROOT = str(REPO_ROOT / "data" / "session10_ur3_handheld_floor_meta_0909" / "calib_train")
 INTRINSICS_DIR = str(REPO_ROOT / "ur3_calibration" / "intrinsics")
 PASS1_JSON = REPO_ROOT / "ur3_calibration" / "pass1_grasp_offset.json"
 MECHANICAL_MAP = np.asarray(RAW_FK_CUBE_CENTER_TO_OBJECT, dtype=np.float64)
@@ -188,7 +188,7 @@ def main():
         "warning": (
             "NOT table1.py's frozen held-out Table 1 metric -- train-pooled, "
             "no held-out split (blocked; see fit_grasp_offset.py docstring). "
-            "Comparable to each other, not to any table1_methods.json row."),
+            "Comparable to each other, not to any ABLATION_TEST_table1_methods.json row."),
         "results": results,
         "delta_train_translation_mm": (
             np.asarray(artifact["T_fk_cube_center_to_tag_object"])[:3, 3] * 1000).tolist(),

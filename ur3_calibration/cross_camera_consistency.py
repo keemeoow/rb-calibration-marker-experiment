@@ -8,7 +8,7 @@ accuracy, is done -- see leave_one_out_eval.py/leave_one_out_eval.json).
 Background: ``calibration_pipeline/path_evaluation.py`` (``evaluate_fixed_to_
 fixed_cross_target`` etc., driven via ``tools/evaluate_cross_target.py``) is
 the pipeline's built-in tool for this, but it is wired to a frozen evaluation
-mask built from a completed ``table1_methods.json`` row -- artifacts this
+mask built from a completed ``ABLATION_TEST_table1_methods.json`` row -- artifacts this
 project cannot produce (blocked by the same event-split issue documented in
 ``fit_grasp_offset.py`` and ``leave_one_out_eval.py``: session2 photographed
 each of its 12 placements exactly once, so ``table1.py``'s A2/A3/A4 rows and
@@ -106,7 +106,7 @@ from calibration_pipeline.runtime import (  # noqa: E402
 )
 from calibration_pipeline.schema import RAW_FK_CUBE_CENTER_TO_OBJECT  # noqa: E402
 
-ROOT = str(REPO_ROOT / "data" / "ur3_session12" / "calib_train")
+ROOT = str(REPO_ROOT / "data" / "session10_ur3_handheld_floor_meta_0909" / "calib_train")
 INTRINSICS_DIR = str(REPO_ROOT / "ur3_calibration" / "intrinsics")
 PASS1_JSON = REPO_ROOT / "ur3_calibration" / "pass1_grasp_offset.json"
 DEVICE_MAP_JSON = REPO_ROOT / "ur3_calibration" / "intrinsics" / "device_map.json"

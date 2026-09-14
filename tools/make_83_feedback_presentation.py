@@ -56,28 +56,29 @@ from tools.make_calibration_result_presentation import (  # noqa: E402
     table,
     text_w,
 )
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 OUT_PDF = ROOT / "캘리브레이션_8-3_피드백_해결_시각화_발표자료.pdf"
-OUT_PNG_DIR = ROOT / "CP_result/session04/feedback_resolution_slides"
-STEP2B_OVERLAY = ROOT / "data/session04/calib_out/capture_filter/Step2b_review_overlay.jpg"
+OUT_PNG_DIR = ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/feedback_resolution_slides"
+STEP2B_OVERLAY = ROOT / "data/session02_NOUSE_session04_0814/calib_out/capture_filter/Step2b_review_overlay.jpg"
 REDETECTION_OVERLAY = (
-    ROOT / "data/session04/calib_out/verify/cube_observation_quality/"
+    ROOT / "data/session02_NOUSE_session04_0814/calib_out/verify/cube_observation_quality/"
     "redetection_recovered_core_overlay.png"
 )
 CUBE_MODEL_OVERLAY = (
-    ROOT / "data/session04/calib_out/verify/0826_cube_model_validation/"
+    ROOT / "data/session02_NOUSE_session04_0814/calib_out/verify/0826_cube_model_validation/"
     "cube_model_overlay_event00000.png"
 )
 BOARD_CUBE_OVERLAY = (
-    ROOT / "data/session04/calib_out/verify/board_cube_relative_pose/"
+    ROOT / "data/session02_NOUSE_session04_0814/calib_out/verify/board_cube_relative_pose/"
     "camera1_camera3_board_cube_overlay.png"
 )
 ROBOT_BASE_POINTCLOUD = (
-    ROOT / "CP_result/session04/robot_base_pointcloud/"
+    ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/robot_base_pointcloud/"
     "robot_base_pointcloud_A2_event0054.png"
 )
 ROBOT_BASE_POINTCLOUD_JSON = (
-    ROOT / "CP_result/session04/robot_base_pointcloud/"
+    ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/robot_base_pointcloud/"
     "robot_base_pointcloud_diagnostic.json"
 )
 
@@ -292,7 +293,7 @@ def slide_solution_contract(ctx: dict, i: int, n: int) -> Image.Image:
     )
     rows = [
         ["C1", "#1 #2 #18", "관측 품질 / 이상치", "frame-prune, refit/rollback, 실제 overlay QA"],
-        ["C2", "#3 #4 #9 #19", "목적함수 / FK 사용", "visual-only 1항, soft-FK 2항, A2/A4/A5 역할 분리"],
+        ["C2", "#3 #4 #9 #19", "목적함수 / FK 사용", "VISION 1항, corrected-FK soft factor 2항, A2/A4/A5 역할 분리"],
         ["C3", "#5 #8 #10 #11 #12", "평가 공정성 / 지표", "matched contrast, event split, camera-scope, mm/deg 보조 지표"],
         ["C4", "#13", "기여도 / ablation", "A1/B1은 제안 방법이 아니라 효과 분리 baseline"],
         ["C5", "#6", "큰 오차 원인 진단", "Board-Cube conflict 10.8077 mm를 제한으로 명시"],
@@ -490,7 +491,7 @@ def slide_algorithm(ctx: dict, i: int, n: int) -> Image.Image:
     card(
         draw,
         (68, y, 760, y + 208),
-        "Visual-only rows",
+        "VISION rows",
         "A0, A1, A2, A3, A5, B3\n"
         "고정 K/D와 3D object corner → 2D native pixel reprojection residual만 사용한다.",
         BLUE,
@@ -498,9 +499,9 @@ def slide_algorithm(ctx: dict, i: int, n: int) -> Image.Image:
     card(
         draw,
         (804, y, 1564, y + 208),
-        "Soft-FK rows",
+        "corrected-FK soft factor rows",
         "A4, B1, B2\n"
-        "visual reprojection에 covariance-whitened FK factor를 추가한다.",
+        "visual reprojection에 covariance-whitened corrected-FK soft factor를 추가한다.",
         TEAL,
     )
     card(
@@ -533,13 +534,13 @@ def slide_experiment_table(ctx: dict, i: int, n: int) -> Image.Image:
     )
     rows = [
         ["A0", "board", "seq", "-", "board-only baseline"],
-        ["A1", "board+cube", "seq", "estimated", "cube 추가 reference"],
-        ["A2", "board+cube", "unified", "estimated", "vision-only unified 후보"],
-        ["A3", "board+cube", "unified", "raw-FK hard", "FK 위험성 진단"],
-        ["A4", "board+cube", "unified", "soft-FK", "FK cov 대기 후보"],
-        ["A5", "board+cube", "unified", "aligned-FK hard", "GT 전 frozen 최종 후보"],
-        ["B1", "board+cube", "seq", "soft-FK", "A4 대비 -Unified"],
-        ["B2", "cube", "unified", "soft-FK", "A4 대비 -board"],
+        ["A1", "board+cube", "seq", "VISION", "cube 추가 reference"],
+        ["A2", "board+cube", "unified", "VISION", "VISION unified 후보"],
+        ["A3", "board+cube", "unified", "FK hard fixed", "FK 위험성 진단"],
+        ["A4", "board+cube", "unified", "corrected-FK soft factor", "FK cov 대기 후보"],
+        ["A5", "board+cube", "unified", "corrected-FK hard fixed", "GT 전 frozen 최종 후보"],
+        ["B1", "board+cube", "seq", "corrected-FK soft factor", "A4 대비 -Unified"],
+        ["B2", "cube", "unified", "corrected-FK soft factor", "A4 대비 -board"],
         ["B3", "board", "unified", "-", "A2 대비 -cube"],
     ]
     table(
@@ -569,7 +570,7 @@ def slide_metrics(ctx: dict, i: int, n: int) -> Image.Image:
         ["Final", "External cube TRE/rot/P95/fail", "Independent External GT 후 최종 물리 순위"],
         ["Support", "Heldout Cube RMSE px", "미사용 cube event 재투영"],
         ["Support", "ALL Cube RMSE px", "train+heldout cube fit sanity check"],
-        ["Diagnostic", "Train RMSE px", "solver 수렴/학습 적합도"],
+        ["Diagnostic", "Train Cube RMSE px", "동일 724 train cube의 in-sample fit"],
         ["Diagnostic", "Cross-view pixel transfer", "fixed/gripper camera cube px 일관성"],
         ["Diagnostic", "Cam-common Obj-Cam mm/deg", "카메라가 본 cube pose 차이"],
     ]
@@ -635,22 +636,22 @@ def slide_cube_result(ctx: dict, i: int, n: int) -> Image.Image:
         (
             "A2 → A3 cube",
             delta(ctx, "A2", "A3", "heldout_cube_reprojection_rmse_px"),
-            "raw-FK hard fixed effect",
+            "FK hard fixed effect",
         ),
         (
             "A2 → A4 cube",
             delta(ctx, "A2", "A4", "heldout_cube_reprojection_rmse_px"),
-            "soft-FK factor effect",
+            "corrected-FK soft factor effect",
         ),
         (
             "B2 → A4 cube",
             delta(ctx, "B2", "A4", "heldout_cube_reprojection_rmse_px"),
-            "soft-FK 조건에서 board residual 도움",
+            "corrected-FK soft factor 조건에서 board residual 도움",
         ),
         (
             "A4 → A5 cube",
             delta(ctx, "A4", "A5", "heldout_cube_reprojection_rmse_px"),
-            "aligned-FK hard fixed 후보",
+            "corrected-FK hard fixed 후보",
         ),
     ]
     img, draw, y = content_base(
@@ -665,7 +666,8 @@ def slide_cube_result(ctx: dict, i: int, n: int) -> Image.Image:
         (68, y, 1088, y + 462),
         "Second - first Δ RMSE px",
         entries,
-        note="음수는 두 번째 방법이 더 좋다는 뜻이다. A0/B3는 현재 cube heldout이 없어 최종 capture 후 채운다.",
+        note=("음수는 두 번째 방법이 더 좋다는 뜻이다. A0/B3도 "
+              "train-only cube evaluation pose로 cube heldout을 계산한다."),
     )
     card(
         draw,
@@ -704,27 +706,27 @@ def slide_fk_result(ctx: dict, i: int, n: int) -> Image.Image:
         "Heldout cube reprojection RMSE px",
         entries,
         max_value=7.0,
-        note="A3 hard-FK fixed는 cube에서 크게 악화된다. A5는 GT 전 frozen 후보로 둔다.",
+        note="A3 FK hard fixed는 cube에서 크게 악화된다. A5는 GT 전 frozen 후보로 둔다.",
     )
     card(
         draw,
         (1080, y, 1564, y + 146),
         "A2",
-        "vision-only unified 후보. cube pose estimated.",
+        "VISION unified 후보. cube pose estimated.",
         BLUE,
     )
     card(
         draw,
         (1080, y + 174, 1564, y + 318),
         "A3",
-        "raw FK hard fixed가 나빠짐. FK를 GT로 쓰면 위험.",
+        "FK hard fixed가 나빠짐. FK를 GT로 쓰면 위험.",
         RED,
     )
     card(
         draw,
         (1080, y + 346, 1564, y + 462),
         "A4",
-        "soft-FK 후보. 우월성은 External cube GT로 판정.",
+        "corrected-FK soft factor 후보. 우월성은 External cube GT로 판정.",
         TEAL,
     )
     return img

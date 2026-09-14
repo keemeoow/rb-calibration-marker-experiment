@@ -126,7 +126,7 @@ def main():
                     help="명령에 쓸 settool 값 (기본 115.5). TCP 표시용")
     ap.add_argument("--symmetry", type=float, default=90.0,
                     help="단면 회전 대칭 각도. 정사각 90, 직사각 180 (기본 90)")
-    ap.add_argument("--calib", default=os.path.join(HERE, "data/session04/calib_out"))
+    ap.add_argument("--calib", default=os.path.join(HERE, "data/session02_NOUSE_session04_0814/calib_out"))
     ap.add_argument("--table", type=float, default=TABLE_Z_MM,
                     help="검산에 쓸 테이블 높이 mm (기본 -30.57)")
     ap.add_argument("--no_check", action="store_true", help="테이블 검산을 건너뛴다")

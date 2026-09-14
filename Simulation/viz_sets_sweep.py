@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 
 TBL = os.path.join(os.path.dirname(__file__), "results", "tables")
 FIG = os.path.join(os.path.dirname(__file__), "results", "figures")
-STYLE = {"Ours": ("#0072B2", "-", 3.0, "o"), "fixed-FK": ("#56B4E9", "-.", 2.0, "X"),
-         "no-FK": ("#D55E00", "--", 1.8, "v"), "-unified(indep)": ("#E69F00", "-", 1.8, "s")}
+STYLE = {"Ours": ("#0072B2", "-", 3.0, "o"), "FK hard fixed": ("#56B4E9", "-.", 2.0, "X"),
+         "VISION": ("#D55E00", "--", 1.8, "v"), "-unified(indep)": ("#E69F00", "-", 1.8, "s")}
 
 
 def main():
@@ -37,7 +37,7 @@ def main():
     # markdown 표
     lines = ["| 방식 \\ 셋 수 | " + " | ".join(str(s) for s in sets) + " |",
              "|---|" + "|".join("--:" for _ in sets) + "|"]
-    for name in ["Ours", "fixed-FK", "no-FK", "-unified(indep)"]:
+    for name in ["Ours", "FK hard fixed", "VISION", "-unified(indep)"]:
         if name not in curves:
             continue
         vals = [f"{v:.1f}" if v is not None else "—" for v in curves[name]]

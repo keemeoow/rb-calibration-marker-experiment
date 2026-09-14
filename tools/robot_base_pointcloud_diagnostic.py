@@ -41,14 +41,15 @@ from tools.make_calibration_result_presentation import (  # noqa: E402
     font,
     rounded,
 )
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 
-DEFAULT_OUT_DIR = ROOT / "CP_result/session04/robot_base_pointcloud"
-DEFAULT_MATRIX_JSON = ROOT / "CP_result/session04/late_table1/calibration_matrices.json"
+DEFAULT_OUT_DIR = ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/robot_base_pointcloud"
+DEFAULT_MATRIX_JSON = ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/calibration_matrices.json"
 DEFAULT_MANIFEST = (
-    ROOT / "data/session04/calib_out/capture_filter/Step2b_observation_manifest.json"
+    ROOT / "data/session02_NOUSE_session04_0814/calib_out/capture_filter/Step2b_observation_manifest.json"
 )
-DEFAULT_SESSION_ROOT = ROOT / "data/session04/calib_train"
+DEFAULT_SESSION_ROOT = ROOT / "data/session02_NOUSE_session04_0814/calib_train"
 DEFAULT_INTRINSICS = ROOT / "intrinsics"
 
 CAMERA_COLORS = {
@@ -74,11 +75,11 @@ METHOD_ROLES = {
     "A0": "board-only sequential baseline",
     "A1": "board+cube sequential",
     "A2": "board+cube unified internal main",
-    "A3": "raw-FK hard fixed diagnostic",
-    "A4": "soft-FK preflight",
-    "A5": "vision-aligned FK hard fixed",
-    "B1": "-Unified soft-FK baseline",
-    "B2": "-board cube-only soft-FK",
+    "A3": "FK hard fixed diagnostic",
+    "A4": "corrected-FK soft factor preflight",
+    "A5": "corrected-FK hard fixed (VISION-aligned)",
+    "B1": "-Unified corrected-FK soft factor baseline",
+    "B2": "-board cube-only corrected-FK soft factor",
     "B3": "-cube board-only unified",
 }
 

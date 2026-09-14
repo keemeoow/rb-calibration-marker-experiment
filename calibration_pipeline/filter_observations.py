@@ -7,7 +7,7 @@ Cube와 ChArUco 관측을 standard/strict 기준으로 선별하고, 선택된 2
 
 [실행 명령어]
 python3 04_filter_observations.py \
-  --session-root data/session04/calib_train \
+  --session-root data/session02_NOUSE_session04_0814/calib_train \
   --intrinsics-dir intrinsics
 """
 
@@ -46,6 +46,7 @@ from calibration_pipeline.runtime import (
     load_intrinsics_with_depth_scale,
     resolve_cube_config_for_run,
 )
+from capture_pipeline.waypoint_safety import PROTOCOL_COMPOSITE_RIG_45
 
 
 OUTPUT_NAMES = {
@@ -103,6 +104,9 @@ def _capture_index(meta: dict) -> Dict[int, dict]:
 def _saved_camera_rows(meta: dict) -> Iterable[Tuple[dict, int, dict]]:
     for capture in meta.get("captures", []):
         if int(capture.get("event_id", -1)) < 0:
+            continue
+        if (capture.get("protocol_version") == PROTOCOL_COMPOSITE_RIG_45
+                and capture.get("selected_for_analysis") is not True):
             continue
         for camera_text, camera_info in capture.get("cams", {}).items():
             if camera_info.get("saved"):
@@ -211,10 +215,22 @@ def _cube_records(session_root: Path, meta: dict, cube, K_map, D_map,
             "event_id": event,
             "camera_id": camera,
             "set_idx": quality.get("set_idx"),
-            "grasp_idx": None,
+            "grasp_idx": (
+                int(capture.get("grasp_id"))
+                if (capture.get("protocol_version") == PROTOCOL_COMPOSITE_RIG_45
+                    and capture.get("cube_gripped")
+                    and capture.get("grasp_id") is not None)
+                else None
+            ),
             "capture_block": capture.get("capture_gate", {}).get(
                 "capture_block"),
             "cube_gripped": bool(capture.get("cube_gripped")),
+            "protocol_version": capture.get("protocol_version"),
+            "phase": capture.get("phase"),
+            "placement_id": capture.get("placement_id"),
+            "view_index": capture.get("view_index"),
+            "analysis_group_id": capture.get("analysis_group_id"),
+            "split_unit_id": capture.get("split_unit_id"),
             "image_path": str(camera_info.get("rgb_path", "")),
             "corner_count": int(
                 len(observation.image_points) if observation is not None else 0),
@@ -301,10 +317,22 @@ def _board_records(session_root: Path, meta: dict, board_cfg, image_scale: float
             "event_id": event,
             "camera_id": camera,
             "set_idx": None if set_index is None else int(set_index),
-            "grasp_idx": None,
+            "grasp_idx": (
+                int(capture.get("grasp_id"))
+                if (capture.get("protocol_version") == PROTOCOL_COMPOSITE_RIG_45
+                    and capture.get("cube_gripped")
+                    and capture.get("grasp_id") is not None)
+                else None
+            ),
             "capture_block": capture.get("capture_gate", {}).get(
                 "capture_block"),
             "cube_gripped": bool(capture.get("cube_gripped")),
+            "protocol_version": capture.get("protocol_version"),
+            "phase": capture.get("phase"),
+            "placement_id": capture.get("placement_id"),
+            "view_index": capture.get("view_index"),
+            "analysis_group_id": capture.get("analysis_group_id"),
+            "split_unit_id": capture.get("split_unit_id"),
             "image_path": relative,
             "corner_count": int(len(image_points)),
             "charuco_ids": charuco_ids,
@@ -334,6 +362,12 @@ def _event_summaries(meta: dict, records: Sequence[dict]) -> List[dict]:
             "capture_block": capture.get("capture_gate", {}).get(
                 "capture_block"),
             "cube_gripped": bool(capture.get("cube_gripped")),
+            "protocol_version": capture.get("protocol_version"),
+            "phase": capture.get("phase"),
+            "placement_id": capture.get("placement_id"),
+            "view_index": capture.get("view_index"),
+            "analysis_group_id": capture.get("analysis_group_id"),
+            "split_unit_id": capture.get("split_unit_id"),
         }
         for policy in ("standard", "strict"):
             cube = [record for record in event_records
@@ -745,6 +779,23 @@ def run_filter(args) -> dict:
     meta_path = session_root / "meta.json"
     with meta_path.open("r", encoding="utf-8") as stream:
         meta = json.load(stream)
+    is_final_protocol = (
+        meta.get("capture_config", {}).get("capture_protocol")
+        == PROTOCOL_COMPOSITE_RIG_45
+    )
+    if is_final_protocol:
+        selected_captures = [
+            capture for capture in meta.get("captures", [])
+            if capture.get("protocol_version") == PROTOCOL_COMPOSITE_RIG_45
+            and capture.get("selected_for_analysis") is True
+        ]
+        if len(selected_captures) != 45:
+            raise RuntimeError(
+                "final protocol filter requires 45 selected_for_analysis captures; "
+                f"found {len(selected_captures)}"
+            )
+        meta = dict(meta)
+        meta["captures"] = selected_captures
     camera_ids = sorted({
         int(camera) for capture in meta.get("captures", [])
         for camera in capture.get("cams", {})
@@ -788,7 +839,10 @@ def run_filter(args) -> dict:
     cube_records, cube_diagnostics = _cube_records(
         session_root, meta, cube, K_map, D_map, camera_ids, gripper,
         float(args.image_scale), policies,
-        exclude_gripped=not bool(getattr(args, "include_gripped_cube", False)))
+        exclude_gripped=(
+            False if is_final_protocol
+            else not bool(getattr(args, "include_gripped_cube", False))
+        ))
     board_records = _board_records(
         session_root, meta, board_cfg, float(args.image_scale), policies)
     records = sorted(cube_records + board_records, key=lambda record: (
@@ -875,7 +929,7 @@ def run_filter(args) -> dict:
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--session-root", default="data/session04/calib_train")
+        "--session-root", default="data/session02_NOUSE_session04_0814/calib_train")
     parser.add_argument("--intrinsics-dir", default="intrinsics")
     parser.add_argument("--output-dir")
     parser.add_argument("--image-scale", type=float, default=1.0)

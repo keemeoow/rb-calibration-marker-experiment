@@ -37,7 +37,7 @@
 
 ### 2.1 외부파라미터 — 카메라를 로봇 베이스에 연결
 
-경로는 `data/session04/calib_out/` 이다.
+경로는 `data/session02_NOUSE_session04_0814/calib_out/` 이다.
 
 | 파일 | 뜻 | 언제 쓰나 |
 |---|---|---|
@@ -193,7 +193,7 @@ import numpy as np
 
 FINGERTIP_Z = 115.5          # mm, 플랜지 → 손가락 끝
 
-T_base_C1 = np.load("data/session04/calib_out/T_base_C1.npy")   # 미터 단위
+T_base_C1 = np.load("data/session02_NOUSE_session04_0814/calib_out/T_base_C1.npy")   # 미터 단위
 
 # ① 비전이 준 카메라 기준 물체 자세 → 4x4 (미터)
 T_cam_obj = ...              # 회전 규약은 비전 쪽 출력에 맞춘다

@@ -74,7 +74,7 @@ Session04에는 held-out 누수 없이 이를 추정할 반복 관측이 없다.
 
 ## 4. Track C — 외부 GT
 
-**목적:** A4, A2, A5, A3가 예측한 $T^B_{cube}$를 캘리브레이션 영상·robot FK·aligned-FK와 독립적으로 측정한 $T^B_{cube,GT}$와 비교한다. `calibration_pipeline/external_gt.py`가 이미 구현돼 있고 **독립 GT 데이터만 없다.** `protocol_templates/external_gt_eval_manifest_TEMPLATE.json`을 채우면 바로 채점된다.
+**목적:** A4, A2, A5, A3가 예측한 $T^B_{cube}$를 캘리브레이션 영상·robot FK·corrected-FK와 독립적으로 측정한 $T^B_{cube,GT}$와 비교한다. `calibration_pipeline/external_gt.py`가 이미 구현돼 있고 **독립 GT 데이터만 없다.** `protocol_templates/external_gt_eval_manifest_TEMPLATE.json`을 채우면 바로 채점된다.
 
 ### 4.1 권장 측정계 구성
 
@@ -173,7 +173,7 @@ python3 tools/opencv_baseline.py       $COMMON
 
 # 3) A2/A3/A4/A5 blind prediction을 동일 run_index=0으로 생성하고 동결
 python3 -m calibration_pipeline.blind_prediction \
-  --table1_result_json CP_result/<새세션>/late_table1/table1_methods.json \
+  --table1_result_json ABLATION_TEST_result_0909/<새세션>/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
   --method A4 --run_index 0 --blind_root data/<새세션>/blind_test \
   --intrinsics_dir intrinsics --output data/<새세션>/predictions/A4.json
 # 위 명령의 --method/--output만 A2, A3, A5로 바꾸어 반복한다.
@@ -185,7 +185,7 @@ python3 -m calibration_pipeline.external_gt \
 # 5) paired peg-in-hole/grasp trial 평가
 python3 -m calibration_pipeline.task_trial \
   --manifest protocol_templates/robot_task_trial_manifest_<날짜>.json \
-  --output_dir CP_result/<새세션>/robot_task_trial
+  --output_dir ABLATION_TEST_result_0909/<새세션>/robot_task_trial
 ```
 
 ## 6. 촬영 전 체크리스트
