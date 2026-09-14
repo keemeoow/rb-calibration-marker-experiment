@@ -1,0 +1,1834 @@
+{
+  "roots": [
+    "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session1_handheld_fixed_cam_0909/capture_replayed_0914",
+    "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909/capture_placed_0914",
+    "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session3_wrist_motion_gripper_cam_0909/capture_replayed_0914",
+    "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/gt_frames_0914"
+  ],
+  "n_images_detected": 267,
+  "n_multi_marker_images": 179,
+  "face_roll_deg": {
+    "0": 0.0,
+    "1": 0.0,
+    "2": 90.0,
+    "3": 180.0,
+    "4": 270.0,
+    "5": 0.0
+  },
+  "rmse_before_px": 2.3222312223674066,
+  "rmse_after_px": 0.5004536092100005,
+  "marker_pose_4x4": {
+    "0": [
+      [
+        0.99998398478415,
+        -0.004540125902885204,
+        -0.003378969073409054,
+        -0.0002532234995599727
+      ],
+      [
+        0.004523649282537735,
+        0.9999779193468801,
+        -0.004867999163241997,
+        -0.028133250346864733
+      ],
+      [
+        0.003400995792661299,
+        0.004852635930159996,
+        0.9999824424219396,
+        0.06458095334878847
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "1": [
+      [
+        0.9999788208186223,
+        -0.006166377479755757,
+        0.002081754782592978,
+        -0.0005615307730670139
+      ],
+      [
+        0.006202761963036816,
+        0.9998196658486209,
+        -0.01794885863730626,
+        0.028931114159630525
+      ],
+      [
+        -0.001970699933422475,
+        0.017961391124555498,
+        0.9998367390582541,
+        0.06491092688039912
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "2": [
+      [
+        -0.00020365050423848396,
+        0.008555584135910232,
+        0.9999633795827553,
+        0.02932518596551818
+      ],
+      [
+        0.999997511541149,
+        -0.002219760957540562,
+        0.00022264950261402516,
+        0.0005153256428941425
+      ],
+      [
+        0.0022215845655205735,
+        0.999960936557716,
+        -0.008555110790252896,
+        -8.828030671994663e-05
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "3": [
+      [
+        -0.9999885716106214,
+        0.0038097344658055456,
+        -0.0028883509912934462,
+        -0.0005883782502469583
+      ],
+      [
+        -0.002899348353270284,
+        -0.0028842906612542383,
+        0.9999916372882864,
+        0.03022244290814047
+      ],
+      [
+        0.0038013717623038906,
+        0.9999885833301705,
+        0.002895303445807287,
+        0.0001113055758112447
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "4": [
+      [
+        -0.0033465131139634174,
+        0.004658581473588497,
+        -0.9999835490989998,
+        -0.030341092243478154
+      ],
+      [
+        -0.9999368739465566,
+        -0.010741621244496874,
+        0.003296315371429659,
+        0.00024645898960574475
+      ],
+      [
+        -0.010726088381428744,
+        0.9999314552466552,
+        0.004694234372085354,
+        9.369211684530772e-05
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "5": [
+      [
+        0.9999999999989999,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        -0.9999999999989999,
+        -0.0295
+      ],
+      [
+        0.0,
+        0.9999999999989999,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ]
+  },
+  "gauge": [
+    5
+  ],
+  "top_size_scale": 1.0,
+  "per_image": [
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/000/cam_039422061216.png",
+      "rmse_before": 3.854779740659327,
+      "rmse_after": 0.3086444871894977,
+      "markers": [
+        0,
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/000/cam_fixed3.png",
+      "rmse_before": 0.5927474306542956,
+      "rmse_after": 0.26186585694146375,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/001/cam_039422061216.png",
+      "rmse_before": 4.353896894486821,
+      "rmse_after": 0.4164116151412946,
+      "markers": [
+        1,
+        3
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/001/cam_fixed2.png",
+      "rmse_before": 0.5889224652967564,
+      "rmse_after": 0.3383581237036147,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/001/cam_fixed3.png",
+      "rmse_before": 0.24444570210715125,
+      "rmse_after": 0.23303743174735878,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/002/cam_039422061216.png",
+      "rmse_before": 2.776756860353189,
+      "rmse_after": 0.5837067187863383,
+      "markers": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/002/cam_fixed3.png",
+      "rmse_before": 0.34512649313753735,
+      "rmse_after": 0.19954187205348797,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/003/cam_fixed3.png",
+      "rmse_before": 0.30232754717890686,
+      "rmse_after": 0.39933726352291754,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/004/cam_039422061216.png",
+      "rmse_before": 4.1590859161021445,
+      "rmse_after": 0.4020584597877417,
+      "markers": [
+        1,
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/004/cam_fixed3.png",
+      "rmse_before": 3.207675041534244,
+      "rmse_after": 0.2076794811560024,
+      "markers": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/005/cam_039422061216.png",
+      "rmse_before": 0.5054769415815404,
+      "rmse_after": 0.41916068066981654,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/005/cam_fixed2.png",
+      "rmse_before": 0.3348942106631682,
+      "rmse_after": 0.2880815563210857,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/005/cam_fixed3.png",
+      "rmse_before": 0.29479355398839097,
+      "rmse_after": 0.18022143662446571,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/006/cam_039422061216.png",
+      "rmse_before": 2.764950483355886,
+      "rmse_after": 0.3329254416958399,
+      "markers": [
+        0,
+        5
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/006/cam_fixed2.png",
+      "rmse_before": 0.2928403072726777,
+      "rmse_after": 0.1873958231452798,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/006/cam_fixed3.png",
+      "rmse_before": 0.28632280390328857,
+      "rmse_after": 0.22732019107115778,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/007/cam_039422061216.png",
+      "rmse_before": 0.5415893573955104,
+      "rmse_after": 0.2819770318483687,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/007/cam_fixed2.png",
+      "rmse_before": 0.4147814718853909,
+      "rmse_after": 0.32152532380030713,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/007/cam_fixed3.png",
+      "rmse_before": 0.40013209907660163,
+      "rmse_after": 0.33309029801171974,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/008/cam_039422061216.png",
+      "rmse_before": 3.074993817593993,
+      "rmse_after": 2.856330601283292,
+      "markers": [
+        1,
+        4
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/008/cam_fixed2.png",
+      "rmse_before": 0.6078766021089704,
+      "rmse_after": 0.5180594655395953,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/008/cam_fixed3.png",
+      "rmse_before": 0.34353378463667134,
+      "rmse_after": 0.3353001239400688,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/009/cam_039422061216.png",
+      "rmse_before": 0.35821218924842735,
+      "rmse_after": 0.2537577013998006,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/009/cam_fixed2.png",
+      "rmse_before": 0.5112947319875292,
+      "rmse_after": 0.2271638167585562,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/011/cam_039422061216.png",
+      "rmse_before": 0.41682834359703774,
+      "rmse_after": 0.3616080431254881,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/011/cam_fixed2.png",
+      "rmse_before": 1.131783687694528,
+      "rmse_after": 0.63761998484727,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/011/cam_fixed3.png",
+      "rmse_before": 3.370513995666451,
+      "rmse_after": 0.24611738702802347,
+      "markers": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/012/cam_fixed2.png",
+      "rmse_before": 0.40728316383318885,
+      "rmse_after": 0.34439757789743886,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/012/cam_fixed3.png",
+      "rmse_before": 0.8811606905900143,
+      "rmse_after": 0.7683614414428772,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/013/cam_039422061216.png",
+      "rmse_before": 0.5244105707293878,
+      "rmse_after": 0.3876553850527933,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/013/cam_fixed2.png",
+      "rmse_before": 0.602276343923278,
+      "rmse_after": 0.21778830583591813,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/014/cam_039422061216.png",
+      "rmse_before": 4.850395493298722,
+      "rmse_after": 0.3702191182871826,
+      "markers": [
+        0,
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/014/cam_fixed2.png",
+      "rmse_before": 0.3058776668722177,
+      "rmse_after": 0.31077443780715763,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/014/cam_fixed3.png",
+      "rmse_before": 0.3559374212871708,
+      "rmse_after": 0.29191094396797945,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/015/cam_039422061216.png",
+      "rmse_before": 4.485329545519017,
+      "rmse_after": 0.3586888271812342,
+      "markers": [
+        1,
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session1_handheld_fixed_cam_0909/capture_replayed_0914/015/cam_fixed2.png",
+      "rmse_before": 0.6177809918166496,
+      "rmse_after": 0.1955548553943328,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/000/cam_039422061216.png",
+      "rmse_before": 4.954834833662206,
+      "rmse_after": 0.4336355172565155,
+      "markers": [
+        0,
+        1,
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/000/cam_gripper.png",
+      "rmse_before": 0.5696343637507759,
+      "rmse_after": 0.14050912065291862,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/001/cam_039422061216.png",
+      "rmse_before": 0.49389366117574485,
+      "rmse_after": 0.2829095596196115,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/001/cam_fixed2.png",
+      "rmse_before": 0.4739551129375235,
+      "rmse_after": 0.14321992552581556,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/001/cam_gripper.png",
+      "rmse_before": 0.5461815756067706,
+      "rmse_after": 0.1993324155707912,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/002/cam_fixed2.png",
+      "rmse_before": 5.958117860345204,
+      "rmse_after": 0.6308675248391608,
+      "markers": [
+        0,
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/002/cam_gripper.png",
+      "rmse_before": 1.661361642049225,
+      "rmse_after": 0.4380127304479584,
+      "markers": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/003/cam_fixed2.png",
+      "rmse_before": 0.6108128291370145,
+      "rmse_after": 0.3321623023938374,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/003/cam_gripper.png",
+      "rmse_before": 0.6071447901508696,
+      "rmse_after": 0.29129708886406086,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/004/cam_039422061216.png",
+      "rmse_before": 4.468444792932855,
+      "rmse_after": 0.4132289705845734,
+      "markers": [
+        1,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/004/cam_fixed2.png",
+      "rmse_before": 0.6713589688869612,
+      "rmse_after": 0.23957286124967386,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/004/cam_fixed3.png",
+      "rmse_before": 0.3408643744370101,
+      "rmse_after": 0.24245251739288534,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/004/cam_gripper.png",
+      "rmse_before": 1.4113502961187931,
+      "rmse_after": 0.2629553121908438,
+      "markers": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/005/cam_gripper.png",
+      "rmse_before": 1.8103258564759197,
+      "rmse_after": 0.2619737333522987,
+      "markers": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/006/cam_fixed2.png",
+      "rmse_before": 0.41779550278848815,
+      "rmse_after": 0.2632872043224538,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/006/cam_fixed3.png",
+      "rmse_before": 0.403421141100353,
+      "rmse_after": 0.23650562546144324,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/006/cam_gripper.png",
+      "rmse_before": 1.3504417204430312,
+      "rmse_after": 0.2689903344518773,
+      "markers": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/007/cam_fixed2.png",
+      "rmse_before": 0.5454102396995751,
+      "rmse_after": 0.33423645897272625,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/007/cam_fixed3.png",
+      "rmse_before": 4.818001191566903,
+      "rmse_after": 1.394406673074592,
+      "markers": [
+        0,
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/007/cam_gripper.png",
+      "rmse_before": 0.4846050113479373,
+      "rmse_after": 0.09979763319449811,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/008/cam_fixed3.png",
+      "rmse_before": 0.35000130996830686,
+      "rmse_after": 0.20183240075240194,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/008/cam_gripper.png",
+      "rmse_before": 0.45289417879351845,
+      "rmse_after": 0.12370502094402244,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/009/cam_fixed3.png",
+      "rmse_before": 0.2980771978922465,
+      "rmse_after": 0.18320028088384463,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/009/cam_gripper.png",
+      "rmse_before": 0.4694603006425101,
+      "rmse_after": 0.12775899164242105,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/010/cam_039422061216.png",
+      "rmse_before": 5.299369682224634,
+      "rmse_after": 0.40901065834203376,
+      "markers": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/010/cam_fixed3.png",
+      "rmse_before": 0.29543129114379685,
+      "rmse_after": 0.24772056501613426,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/010/cam_gripper.png",
+      "rmse_before": 1.1903265840825386,
+      "rmse_after": 0.2181667883377567,
+      "markers": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/011/cam_039422061216.png",
+      "rmse_before": 0.4754805066978404,
+      "rmse_after": 0.2908001791472611,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/011/cam_fixed3.png",
+      "rmse_before": 0.3796147486561153,
+      "rmse_after": 0.30871570584361024,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/011/cam_gripper.png",
+      "rmse_before": 1.5315933087637483,
+      "rmse_after": 0.15656202812935566,
+      "markers": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/012/cam_039422061216.png",
+      "rmse_before": 0.3668301678711496,
+      "rmse_after": 0.22790352786135784,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/012/cam_fixed2.png",
+      "rmse_before": 0.45264023697522004,
+      "rmse_after": 0.2449121581748247,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/012/cam_fixed3.png",
+      "rmse_before": 4.78534363525872,
+      "rmse_after": 0.4118873114442381,
+      "markers": [
+        0,
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/012/cam_gripper.png",
+      "rmse_before": 1.3886235071656334,
+      "rmse_after": 0.2583304878205329,
+      "markers": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/013/cam_039422061216.png",
+      "rmse_before": 3.904906522221983,
+      "rmse_after": 0.32539332926550385,
+      "markers": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/013/cam_fixed2.png",
+      "rmse_before": 0.3940255217781237,
+      "rmse_after": 0.24943514666036656,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/013/cam_gripper.png",
+      "rmse_before": 0.5736368012341656,
+      "rmse_after": 0.17138803712578105,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/014/cam_039422061216.png",
+      "rmse_before": 0.31235312389705716,
+      "rmse_after": 0.16838187652469278,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/014/cam_fixed2.png",
+      "rmse_before": 0.480981896964523,
+      "rmse_after": 0.33455730869551237,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/014/cam_gripper.png",
+      "rmse_before": 1.2994279475521642,
+      "rmse_after": 0.17211495291670298,
+      "markers": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/000/cam_039422061216.png",
+      "rmse_before": 4.7172176401159245,
+      "rmse_after": 0.3576261587938414,
+      "markers": [
+        1,
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/001/cam_039422061216.png",
+      "rmse_before": 0.5095713846508968,
+      "rmse_after": 0.3556639615599793,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/001/cam_fixed2.png",
+      "rmse_before": 0.4612098192156175,
+      "rmse_after": 0.16146749350619496,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/001/cam_fixed3.png",
+      "rmse_before": 4.61813482573043,
+      "rmse_after": 3.064112102019293,
+      "markers": [
+        0,
+        2
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/002/cam_039422061216.png",
+      "rmse_before": 4.108403879671105,
+      "rmse_after": 0.24992186583411216,
+      "markers": [
+        1,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/002/cam_fixed2.png",
+      "rmse_before": 5.945698030515208,
+      "rmse_after": 0.5295822555801751,
+      "markers": [
+        0,
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/003/cam_fixed2.png",
+      "rmse_before": 0.62832579758956,
+      "rmse_after": 0.3191357722866642,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/004/cam_039422061216.png",
+      "rmse_before": 4.486268316872487,
+      "rmse_after": 0.4298517971770331,
+      "markers": [
+        1,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/004/cam_fixed2.png",
+      "rmse_before": 0.697744689754825,
+      "rmse_after": 0.2522462270401373,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/004/cam_fixed3.png",
+      "rmse_before": 0.3641720698153023,
+      "rmse_after": 0.23959241264862013,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/006/cam_039422061216.png",
+      "rmse_before": 3.787420116934173,
+      "rmse_after": 0.34378336867825166,
+      "markers": [
+        1,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/006/cam_fixed2.png",
+      "rmse_before": 0.4263415768726027,
+      "rmse_after": 0.25260554171462346,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/006/cam_fixed3.png",
+      "rmse_before": 0.40351226286171793,
+      "rmse_after": 0.2459255419868423,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/007/cam_fixed2.png",
+      "rmse_before": 0.6469965001909534,
+      "rmse_after": 0.4505722708503478,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/007/cam_fixed3.png",
+      "rmse_before": 0.34318003113735096,
+      "rmse_after": 0.37350272734087053,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/008/cam_fixed3.png",
+      "rmse_before": 0.3689392960444918,
+      "rmse_after": 0.2234464009352442,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/009/cam_fixed3.png",
+      "rmse_before": 4.738611701065138,
+      "rmse_after": 0.2693436446199295,
+      "markers": [
+        0,
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/010/cam_039422061216.png",
+      "rmse_before": 4.82195654800514,
+      "rmse_after": 0.2430450764818074,
+      "markers": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/010/cam_fixed3.png",
+      "rmse_before": 0.29012721764224114,
+      "rmse_after": 0.2459721207049713,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/011/cam_039422061216.png",
+      "rmse_before": 4.146640383477861,
+      "rmse_after": 0.31242689939046786,
+      "markers": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/011/cam_fixed3.png",
+      "rmse_before": 0.3343014470547067,
+      "rmse_after": 0.29785895880052976,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/012/cam_039422061216.png",
+      "rmse_before": 0.3806178728913279,
+      "rmse_after": 0.25298597220285934,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/012/cam_fixed2.png",
+      "rmse_before": 0.4888960069065388,
+      "rmse_after": 0.32601164174003794,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/012/cam_fixed3.png",
+      "rmse_before": 0.307069663558602,
+      "rmse_after": 0.20820939578099418,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/013/cam_039422061216.png",
+      "rmse_before": 0.3172396769819486,
+      "rmse_after": 0.2274579861986813,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/013/cam_fixed2.png",
+      "rmse_before": 0.41948226680023604,
+      "rmse_after": 0.34210928575524585,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/014/cam_039422061216.png",
+      "rmse_before": 0.35884990611061685,
+      "rmse_after": 0.222440300249892,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/held/014/cam_fixed2.png",
+      "rmse_before": 0.5263431582179458,
+      "rmse_after": 0.388626802165629,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/000/cam_039422061216.png",
+      "rmse_before": 4.6784480955376235,
+      "rmse_after": 0.33148927696976466,
+      "markers": [
+        1,
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/001/cam_039422061216.png",
+      "rmse_before": 0.4747121790884946,
+      "rmse_after": 0.27054184097887163,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/001/cam_fixed2.png",
+      "rmse_before": 0.46172709378307497,
+      "rmse_after": 0.14125732367235566,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/001/cam_fixed3.png",
+      "rmse_before": 4.713394706416973,
+      "rmse_after": 3.165583123963891,
+      "markers": [
+        0,
+        2
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/002/cam_039422061216.png",
+      "rmse_before": 4.170333930010839,
+      "rmse_after": 0.3210506025054417,
+      "markers": [
+        1,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/002/cam_fixed2.png",
+      "rmse_before": 5.922928936069182,
+      "rmse_after": 0.5541608888017627,
+      "markers": [
+        0,
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/003/cam_fixed2.png",
+      "rmse_before": 0.6136385337602013,
+      "rmse_after": 0.32610102917574363,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/004/cam_fixed2.png",
+      "rmse_before": 0.6842279914321915,
+      "rmse_after": 0.24929076546612092,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/004/cam_fixed3.png",
+      "rmse_before": 0.34437303741536884,
+      "rmse_after": 0.26570370709424557,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/006/cam_fixed2.png",
+      "rmse_before": 0.4363673316267143,
+      "rmse_after": 0.26453144527120426,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/006/cam_fixed3.png",
+      "rmse_before": 0.4185200274384311,
+      "rmse_after": 0.24967668862529258,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/007/cam_fixed3.png",
+      "rmse_before": 0.3044306557031578,
+      "rmse_after": 0.34340726167756364,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/008/cam_fixed3.png",
+      "rmse_before": 0.3766170020579763,
+      "rmse_after": 0.22312706581234099,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/009/cam_fixed3.png",
+      "rmse_before": 0.2906522315285601,
+      "rmse_after": 0.18053885797977362,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/010/cam_039422061216.png",
+      "rmse_before": 4.8698698977861525,
+      "rmse_after": 0.26634111704578095,
+      "markers": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/010/cam_fixed3.png",
+      "rmse_before": 0.2921694116500453,
+      "rmse_after": 0.24243244935308234,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/011/cam_039422061216.png",
+      "rmse_before": 0.4707129533577806,
+      "rmse_after": 0.29191472929878465,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/011/cam_fixed3.png",
+      "rmse_before": 0.32115155116281274,
+      "rmse_after": 0.24521150243742634,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/012/cam_039422061216.png",
+      "rmse_before": 0.3594710329866245,
+      "rmse_after": 0.22139396573051986,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/012/cam_fixed2.png",
+      "rmse_before": 0.45413447966167203,
+      "rmse_after": 0.2369089940631627,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/012/cam_fixed3.png",
+      "rmse_before": 4.861002009579598,
+      "rmse_after": 0.6701281427176714,
+      "markers": [
+        0,
+        2,
+        5
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/013/cam_039422061216.png",
+      "rmse_before": 3.947842480481511,
+      "rmse_after": 0.301546024122117,
+      "markers": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/013/cam_fixed2.png",
+      "rmse_before": 0.39051295061572966,
+      "rmse_after": 0.2592306674222803,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/014/cam_039422061216.png",
+      "rmse_before": 0.3112204751734363,
+      "rmse_after": 0.17353048002458674,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session2_floor_board_dual_cam_0909/capture_placed_0914/released/014/cam_fixed2.png",
+      "rmse_before": 0.4973219637461283,
+      "rmse_after": 0.35587912151477585,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/000/cam_039422061216.png",
+      "rmse_before": 0.3171957747113641,
+      "rmse_after": 0.1877879866716795,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/000/cam_fixed2.png",
+      "rmse_before": 0.4913728711553744,
+      "rmse_after": 0.34816013538204227,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/001/cam_039422061216.png",
+      "rmse_before": 0.3141023216501843,
+      "rmse_after": 0.17378232516920952,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/001/cam_fixed2.png",
+      "rmse_before": 0.5010145606487629,
+      "rmse_after": 0.358749146335142,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/001/cam_gripper.png",
+      "rmse_before": 0.7112961338591169,
+      "rmse_after": 0.18720903057323351,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/002/cam_039422061216.png",
+      "rmse_before": 0.3032858721619111,
+      "rmse_after": 0.18251293108729988,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/002/cam_fixed2.png",
+      "rmse_before": 0.48635855663117034,
+      "rmse_after": 0.3348279112224986,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/002/cam_gripper.png",
+      "rmse_before": 0.6724589896934831,
+      "rmse_after": 0.17941750559433425,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/003/cam_039422061216.png",
+      "rmse_before": 0.31931424863758395,
+      "rmse_after": 0.1735461615528309,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/003/cam_fixed2.png",
+      "rmse_before": 0.501387802596527,
+      "rmse_after": 0.3623253078912796,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/003/cam_gripper.png",
+      "rmse_before": 0.5239592259835346,
+      "rmse_after": 0.1383354870134437,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/004/cam_039422061216.png",
+      "rmse_before": 0.2934480615629119,
+      "rmse_after": 0.16750157490121095,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/004/cam_fixed2.png",
+      "rmse_before": 0.48156058555842707,
+      "rmse_after": 0.3342661446393365,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/004/cam_gripper.png",
+      "rmse_before": 1.4504522182648134,
+      "rmse_after": 0.22557827419979165,
+      "markers": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/005/cam_039422061216.png",
+      "rmse_before": 0.31383464615257667,
+      "rmse_after": 0.18619240866848646,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/005/cam_fixed2.png",
+      "rmse_before": 0.47417157827414347,
+      "rmse_after": 0.3360266722019452,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/005/cam_gripper.png",
+      "rmse_before": 1.3592623946102835,
+      "rmse_after": 0.29903559352072134,
+      "markers": [
+        0,
+        1,
+        2
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/006/cam_039422061216.png",
+      "rmse_before": 0.3121712108775855,
+      "rmse_after": 0.1739117929434575,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/006/cam_fixed2.png",
+      "rmse_before": 0.4948034087197615,
+      "rmse_after": 0.3471778503963815,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/006/cam_gripper.png",
+      "rmse_before": 0.47743438643082703,
+      "rmse_after": 0.09643172606956468,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/007/cam_039422061216.png",
+      "rmse_before": 0.29222823061492353,
+      "rmse_after": 0.15277151381078555,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/007/cam_fixed2.png",
+      "rmse_before": 0.3959002803229335,
+      "rmse_after": 0.25660337019466845,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/007/cam_gripper.png",
+      "rmse_before": 3.963783770975564,
+      "rmse_after": 0.5245477270655242,
+      "markers": [
+        0,
+        1,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/008/cam_039422061216.png",
+      "rmse_before": 0.29858652455498647,
+      "rmse_after": 0.15888150534887738,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/008/cam_fixed2.png",
+      "rmse_before": 0.41424230299519166,
+      "rmse_after": 0.2975650156526749,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/009/cam_039422061216.png",
+      "rmse_before": 0.3021143448757864,
+      "rmse_after": 0.17254150641452634,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/009/cam_fixed2.png",
+      "rmse_before": 0.4428603141462991,
+      "rmse_after": 0.28788547697956735,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/009/cam_gripper.png",
+      "rmse_before": 2.1762308599298077,
+      "rmse_after": 0.4665847315947819,
+      "markers": [
+        0,
+        1,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/010/cam_039422061216.png",
+      "rmse_before": 0.312362011710108,
+      "rmse_after": 0.1759242875212089,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/010/cam_fixed2.png",
+      "rmse_before": 0.4794549784873093,
+      "rmse_after": 0.3339505680839589,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/010/cam_gripper.png",
+      "rmse_before": 0.5416474139075866,
+      "rmse_after": 0.08709290312805656,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/011/cam_039422061216.png",
+      "rmse_before": 0.30660560459979724,
+      "rmse_after": 0.1745285633816978,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/011/cam_fixed2.png",
+      "rmse_before": 0.4372961264577532,
+      "rmse_after": 0.3022587807291793,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/011/cam_gripper.png",
+      "rmse_before": 0.5097066452432593,
+      "rmse_after": 0.15319059165808765,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/012/cam_039422061216.png",
+      "rmse_before": 0.3147378049974465,
+      "rmse_after": 0.18153986066849945,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/012/cam_fixed2.png",
+      "rmse_before": 0.4665500911868501,
+      "rmse_after": 0.32768847860897593,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/012/cam_gripper.png",
+      "rmse_before": 0.5439346324605955,
+      "rmse_after": 0.07756641227231603,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/013/cam_039422061216.png",
+      "rmse_before": 0.3055053052278128,
+      "rmse_after": 0.17530148874497498,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/013/cam_fixed2.png",
+      "rmse_before": 0.48375318926339633,
+      "rmse_after": 0.3396976296615816,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/013/cam_gripper.png",
+      "rmse_before": 0.6289396502111495,
+      "rmse_after": 0.12753633583936783,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/014/cam_039422061216.png",
+      "rmse_before": 0.2928420104793616,
+      "rmse_after": 0.1672814711708209,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/014/cam_fixed2.png",
+      "rmse_before": 0.4867377409851665,
+      "rmse_after": 0.33259965121121965,
+      "markers": [
+        3,
+        4
+      ]
+    },
+    {
+      "image": "session3_wrist_motion_gripper_cam_0909/capture_replayed_0914/014/cam_gripper.png",
+      "rmse_before": 0.6631686531592543,
+      "rmse_after": 0.1443410965968066,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "gt_frames_0914/20260914_232234/000/cam_039422061216.png",
+      "rmse_before": 4.598025337213402,
+      "rmse_after": 0.48194039383608656,
+      "markers": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "image": "gt_frames_0914/20260914_232234/000/cam_fixed3.png",
+      "rmse_before": 0.32392421527670695,
+      "rmse_after": 0.2668423635959344,
+      "markers": [
+        2,
+        5
+      ]
+    },
+    {
+      "image": "gt_frames_0914/20260914_232234/000/cam_gripper.png",
+      "rmse_before": 0.44344255760235657,
+      "rmse_after": 0.3435610756889477,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "gt_frames_0914/20260914_232234/001/cam_039422061216.png",
+      "rmse_before": 0.3338014802997941,
+      "rmse_after": 0.19414937546520236,
+      "markers": [
+        2,
+        3
+      ]
+    },
+    {
+      "image": "gt_frames_0914/20260914_232234/001/cam_gripper.png",
+      "rmse_before": 0.39476355478944053,
+      "rmse_after": 0.3644290989105359,
+      "markers": [
+        0,
+        1
+      ]
+    },
+    {
+      "image": "gt_frames_0914/20260914_232234/002/cam_fixed2.png",
+      "rmse_before": 0.6123376666473751,
+      "rmse_after": 0.25887938827456664,
+      "markers": [
+        4,
+        5
+      ]
+    },
+    {
+      "image": "gt_frames_0914/20260914_232234/002/cam_gripper.png",
+      "rmse_before": 0.515917274231563,
+      "rmse_after": 0.4517323125206186,
+      "markers": [
+        0,
+        1
+      ]
+    }
+  ]
+}

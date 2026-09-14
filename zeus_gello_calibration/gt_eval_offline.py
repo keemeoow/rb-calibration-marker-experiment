@@ -47,7 +47,7 @@ CAPTURE_ROOT = REPO_ROOT / "zeus_gello_calibration" / "gt_compare_captures"
 LABELS = ("039422061216", "fixed2", "fixed3", "gripper")
 
 
-def load_capture(folder: Path):
+def load_capture(folder: Path, assumed_flange_pose=None):
     frames = {}
     for label in LABELS:
         p = folder / f"cam_{label}.png"
@@ -55,6 +55,10 @@ def load_capture(folder: Path):
     robot = json.loads((folder / "robot.json").read_text())
     pose = robot.get("pose")
     if pose is None:
+        if assumed_flange_pose is not None:
+            # 로봇 미접속 촬영이지만 촬영 자세를 아는 경우(--assume-flange-dz):
+            # GT flange pose 에서 z 만 dz 올린 자세로 그리퍼캠을 base 로 옮긴다.
+            return frames, pose6_to_T(list(assumed_flange_pose))
         # 로봇 미접속 촬영(capture_frames.py --robot 없이): 그리퍼캠은 base 좌표로
         # 못 옮기므로 제외하고 고정캠만 쓴다.
         frames["gripper"] = (None, None)
@@ -75,6 +79,8 @@ def main():
     ap.add_argument("--device-map", default=str(REPO_ROOT / "intrinsics" / "device_map.json"))
     ap.add_argument("--gt-cube-config", default=str(GT_CUBE_CONFIG_PATH))
     ap.add_argument("--reproj-thr-px", type=float, default=10.0)
+    ap.add_argument("--assume-flange-dz", type=float, default=None,
+                    help="robot.json 에 pose 가 없을 때, 촬영 자세 = GT flange pose 의 z 에 이 값(mm)을 더한 것으로 가정 (그리퍼캠 사용)")
     ap.add_argument("--out", default=str(REPO_ROOT / "zeus_gello_calibration" / "gt_eval_offline.json"))
     args = ap.parse_args()
 
@@ -116,6 +122,11 @@ def main():
     if not trials:
         ap.error("--trial 최소 1개 필요 (또는 --list)")
 
+    def assumed(gt):
+        if args.assume_flange_dz is None:
+            return None
+        return [gt[0], gt[1], gt[2] + args.assume_flange_dz, gt[3], gt[4], gt[5]]
+
     if args.per_camera:
         from calibration_pipeline.apriltag_cube import rodrigues_to_Rt
         from fit_grasp_offset import LOCAL_CAM_IDS
@@ -126,7 +137,7 @@ def main():
             for cam_label in LABELS:
                 rows = []
                 for folder, gt in trials:
-                    frames, T_bg = load_capture(Path(args.capture_root) / folder)
+                    frames, T_bg = load_capture(Path(args.capture_root) / folder, assumed(gt))
                     img = frames.get(cam_label, (None, None))[0]
                     if img is None:
                         continue
@@ -169,7 +180,7 @@ def main():
         tgc_z = float(np.asarray(T_gripper_cube)[2, 3] * 1000.0)
         rows = []
         for folder, gt in trials:
-            frames, T_bg = load_capture(Path(args.capture_root) / folder)
+            frames, T_bg = load_capture(Path(args.capture_root) / folder, assumed(gt))
             T, report = detect_cube_pose_all(frames, K_map, D_map, T_base_cam, T_gripper_cam, T_bg, cube_target, args.reproj_thr_px)
             if T is None:
                 print(f"{label:>22} | {folder:>16} | 검출 실패")

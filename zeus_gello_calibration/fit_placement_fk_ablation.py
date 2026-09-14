@@ -86,7 +86,9 @@ def build_synthetic_meta_placed(capture_root: Path, capture_indices) -> dict:
         folder = f"{idx:03d}"
         cams = {}
         for local_id, label in label_by_id.items():
-            rel = f"capture_placed/{folder}/cam_{label}.png"
+            # capture_root 의 실제 폴더명(capture_placed, capture_placed_0914 ...)을 써야
+            # 다른 촬영분(--session2-capture-subdir)이 예전 사진을 읽는 일이 없다.
+            rel = f"{capture_root.name}/{folder}/cam_{label}.png"
             if (capture_root.parent / rel).is_file():
                 cams[str(local_id)] = {"saved": True, "rgb_path": rel}
         captures.append({
