@@ -215,10 +215,12 @@ def _cube_records(session_root: Path, meta: dict, cube, K_map, D_map,
             "event_id": event,
             "camera_id": camera,
             "set_idx": quality.get("set_idx"),
+            # grasp 모델(T_gripper_cube[grasp_idx])용 -- cube_gripped 이벤트면
+            # 프로토콜 버전과 무관하게 기록한다 (legacy 변환 세션의 session1 쥔
+            # 큐브도 05의 --include_gripped_cube 로 쓰이려면 필요).
             "grasp_idx": (
                 int(capture.get("grasp_id"))
-                if (capture.get("protocol_version") == PROTOCOL_COMPOSITE_RIG_45
-                    and capture.get("cube_gripped")
+                if (capture.get("cube_gripped")
                     and capture.get("grasp_id") is not None)
                 else None
             ),
@@ -317,13 +319,7 @@ def _board_records(session_root: Path, meta: dict, board_cfg, image_scale: float
             "event_id": event,
             "camera_id": camera,
             "set_idx": None if set_index is None else int(set_index),
-            "grasp_idx": (
-                int(capture.get("grasp_id"))
-                if (capture.get("protocol_version") == PROTOCOL_COMPOSITE_RIG_45
-                    and capture.get("cube_gripped")
-                    and capture.get("grasp_id") is not None)
-                else None
-            ),
+            "grasp_idx": None,   # 보드는 grasp 모델 대상이 아님 (정지 타깃)
             "capture_block": capture.get("capture_gate", {}).get(
                 "capture_block"),
             "cube_gripped": bool(capture.get("cube_gripped")),

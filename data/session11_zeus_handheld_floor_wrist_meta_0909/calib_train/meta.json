@@ -178,7 +178,7 @@
         "capture_block": "B_eyetohand"
       },
       "capture_block": "B_eyetohand",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": true,
       "grasp_id": 0,
       "robot_pose_6dof": [
@@ -255,7 +255,7 @@
         "capture_block": "B_eyetohand"
       },
       "capture_block": "B_eyetohand",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": true,
       "grasp_id": 0,
       "robot_pose_6dof": [
@@ -332,7 +332,7 @@
         "capture_block": "B_eyetohand"
       },
       "capture_block": "B_eyetohand",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": true,
       "grasp_id": 0,
       "robot_pose_6dof": [
@@ -409,7 +409,7 @@
         "capture_block": "B_eyetohand"
       },
       "capture_block": "B_eyetohand",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": true,
       "grasp_id": 0,
       "robot_pose_6dof": [
@@ -486,7 +486,7 @@
         "capture_block": "B_eyetohand"
       },
       "capture_block": "B_eyetohand",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": true,
       "grasp_id": 0,
       "robot_pose_6dof": [
@@ -563,7 +563,7 @@
         "capture_block": "B_eyetohand"
       },
       "capture_block": "B_eyetohand",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": true,
       "grasp_id": 0,
       "robot_pose_6dof": [
@@ -640,7 +640,7 @@
         "capture_block": "B_eyetohand"
       },
       "capture_block": "B_eyetohand",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": true,
       "grasp_id": 0,
       "robot_pose_6dof": [
@@ -717,7 +717,7 @@
         "capture_block": "B_eyetohand"
       },
       "capture_block": "B_eyetohand",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": true,
       "grasp_id": 0,
       "robot_pose_6dof": [
@@ -794,7 +794,7 @@
         "capture_block": "B_eyetohand"
       },
       "capture_block": "B_eyetohand",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": true,
       "grasp_id": 0,
       "robot_pose_6dof": [
@@ -871,7 +871,7 @@
         "capture_block": "B_eyetohand"
       },
       "capture_block": "B_eyetohand",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": true,
       "grasp_id": 0,
       "robot_pose_6dof": [
@@ -948,7 +948,7 @@
         "capture_block": "B_eyetohand"
       },
       "capture_block": "B_eyetohand",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": true,
       "grasp_id": 0,
       "robot_pose_6dof": [
@@ -1025,7 +1025,7 @@
         "capture_block": "B_eyetohand"
       },
       "capture_block": "B_eyetohand",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": true,
       "grasp_id": 0,
       "robot_pose_6dof": [
@@ -1102,7 +1102,7 @@
         "capture_block": "B_eyetohand"
       },
       "capture_block": "B_eyetohand",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": true,
       "grasp_id": 0,
       "robot_pose_6dof": [
@@ -1179,7 +1179,7 @@
         "capture_block": "B_eyetohand"
       },
       "capture_block": "B_eyetohand",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": true,
       "grasp_id": 0,
       "robot_pose_6dof": [
@@ -1256,7 +1256,7 @@
         "capture_block": "B_eyetohand"
       },
       "capture_block": "B_eyetohand",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": true,
       "grasp_id": 0,
       "robot_pose_6dof": [
@@ -1333,7 +1333,7 @@
         "capture_block": "B_eyetohand"
       },
       "capture_block": "B_eyetohand",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": true,
       "grasp_id": 0,
       "robot_pose_6dof": [
@@ -4110,7 +4110,7 @@
         "capture_block": "A_placement"
       },
       "capture_block": "A_placement",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": false,
       "grasp_id": null,
       "robot_pose_6dof": [
@@ -4187,7 +4187,7 @@
         "capture_block": "A_placement"
       },
       "capture_block": "A_placement",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": false,
       "grasp_id": null,
       "robot_pose_6dof": [
@@ -4264,7 +4264,7 @@
         "capture_block": "A_placement"
       },
       "capture_block": "A_placement",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": false,
       "grasp_id": null,
       "robot_pose_6dof": [
@@ -4341,7 +4341,7 @@
         "capture_block": "A_placement"
       },
       "capture_block": "A_placement",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": false,
       "grasp_id": null,
       "robot_pose_6dof": [
@@ -4418,7 +4418,7 @@
         "capture_block": "A_placement"
       },
       "capture_block": "A_placement",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": false,
       "grasp_id": null,
       "robot_pose_6dof": [
@@ -4495,7 +4495,7 @@
         "capture_block": "A_placement"
       },
       "capture_block": "A_placement",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": false,
       "grasp_id": null,
       "robot_pose_6dof": [
@@ -4572,7 +4572,7 @@
         "capture_block": "A_placement"
       },
       "capture_block": "A_placement",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": false,
       "grasp_id": null,
       "robot_pose_6dof": [
@@ -4649,7 +4649,7 @@
         "capture_block": "A_placement"
       },
       "capture_block": "A_placement",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": false,
       "grasp_id": null,
       "robot_pose_6dof": [
@@ -4726,7 +4726,7 @@
         "capture_block": "A_placement"
       },
       "capture_block": "A_placement",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": false,
       "grasp_id": null,
       "robot_pose_6dof": [
@@ -4803,7 +4803,7 @@
         "capture_block": "A_placement"
       },
       "capture_block": "A_placement",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": false,
       "grasp_id": null,
       "robot_pose_6dof": [
@@ -4880,7 +4880,7 @@
         "capture_block": "A_placement"
       },
       "capture_block": "A_placement",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": false,
       "grasp_id": null,
       "robot_pose_6dof": [
@@ -4957,7 +4957,7 @@
         "capture_block": "A_placement"
       },
       "capture_block": "A_placement",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": false,
       "grasp_id": null,
       "robot_pose_6dof": [
@@ -5034,7 +5034,7 @@
         "capture_block": "A_placement"
       },
       "capture_block": "A_placement",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": false,
       "grasp_id": null,
       "robot_pose_6dof": [
@@ -5111,7 +5111,7 @@
         "capture_block": "A_placement"
       },
       "capture_block": "A_placement",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": false,
       "grasp_id": null,
       "robot_pose_6dof": [
@@ -5188,7 +5188,7 @@
         "capture_block": "A_placement"
       },
       "capture_block": "A_placement",
-      "set_index": 0,
+      "set_index": null,
       "cube_gripped": false,
       "grasp_id": null,
       "robot_pose_6dof": [

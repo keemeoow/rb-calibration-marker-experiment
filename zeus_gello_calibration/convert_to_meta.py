@@ -10,10 +10,13 @@
 거친다 -- 그래야 옛 결과와 새 결과가 같은 러너(05)로 비교된다.
 
 세 세션을 **하나의 meta.json** 으로 합친다 (한 이벤트 = 한 로봇 자세, 카메라 4대):
-  session1 (쥔 큐브, 고정캠)      -> cube_gripped=True,  grasp_id=0, set_index=0, block B_eyetohand
-  session2 (놓인 큐브, 촬영 자세)  -> cube_gripped=False, set_index=1..N,  block A_placement
+  session1 (쥔 큐브, 고정캠)      -> cube_gripped=True,  grasp_id=0, set_index=null, block B_eyetohand
+  session2 (놓인 큐브, 촬영 자세)  -> cube_gripped=False, set_index=1..N,   block A_placement
                                     + set_cube_center_6dof (A3 raw-FK용, 아래 참고)
-  session3 (손목 보드)             -> cube_gripped=False, set_index=0,    block A_placement
+                                    (기본: 고정캠 이벤트 + 그리퍼캠 이벤트 둘로 분리, 아래 참고)
+  session3 (손목 보드)             -> cube_gripped=False, set_index=null,   block A_placement
+set_index=null 인 이벤트는 placement 세트가 아니라 05 에서 train 전용 보조 관측
+(grasp+FK 큐브, 정지 보드)으로만 쓰인다.
 보드는 session2 사진에도 그대로 들어 있으므로 04 가 자동으로 검출한다.
 
 A3(raw-FK hard fixed)용 set_cube_center: 05 는 "큐브 중심을 가리키는 로봇 FK
@@ -106,7 +109,7 @@ def build_capture(*, event_id, capture_index, set_index, cube_gripped, grasp_id,
         "capture_index": int(capture_index),
         "capture_gate": {"capture_block": capture_block},
         "capture_block": capture_block,
-        "set_index": int(set_index),
+        "set_index": (None if set_index is None else int(set_index)),   # null = placement 세트가 아닌 이벤트(쥔 큐브, 손목 보드)
         "cube_gripped": bool(cube_gripped),
         "grasp_id": (None if grasp_id is None else int(grasp_id)),
         "robot_pose_6dof": pose6,                       # [x,y,z mm, rz,ry,rx deg], Zeus i611 extrinsic ZYX
@@ -177,7 +180,7 @@ def convert(args):
     # session1: 쥔 큐브
     s1 = SESSION1_DIR / args.session1_capture_subdir
     for idx in sorted(int(p.name) for p in s1.iterdir() if p.is_dir()):
-        captures.append(build_capture(event_id=event_id, capture_index=idx, set_index=0, cube_gripped=True, grasp_id=0,
+        captures.append(build_capture(event_id=event_id, capture_index=idx, set_index=None, cube_gripped=True, grasp_id=0,
                                       capture_block="B_eyetohand", capture_dir=s1 / f"{idx:03d}",
                                       calib_train_dir=calib_train_dir, charuco=charuco, session_tag="session1"))
         event_id += 1
@@ -213,7 +216,7 @@ def convert(args):
     # session3: 손목 보드
     s3 = SESSION3_DIR / args.session3_capture_subdir
     for idx in sorted(int(p.name) for p in s3.iterdir() if p.is_dir()):
-        captures.append(build_capture(event_id=event_id, capture_index=idx, set_index=0, cube_gripped=False, grasp_id=None,
+        captures.append(build_capture(event_id=event_id, capture_index=idx, set_index=None, cube_gripped=False, grasp_id=None,
                                       capture_block="A_placement", capture_dir=s3 / f"{idx:03d}",
                                       calib_train_dir=calib_train_dir, charuco=charuco, session_tag="session3"))
         event_id += 1

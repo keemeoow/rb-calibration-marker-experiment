@@ -349,7 +349,12 @@ def estimate_fixed_camera_initials(fixed_obs: Sequence[PixelObs], board: Optiona
     for obs in fixed_obs:
         if int(obs.cam) == int(gripper):
             continue
-        target = board if obs.marker == "board" else cubes.get(int(obs.set_idx))
+        if obs.marker == "board":
+            target = board
+        elif obs.set_idx is None:
+            continue   # 쥔 큐브(grasp 모델) 관측: 초기 카메라 추정엔 안 쓴다 (grasp offset 미지)
+        else:
+            target = cubes.get(int(obs.set_idx))
         if target is None:
             continue
         T_C_O = solve_observed_pose(obs, K_map, D_map)
@@ -876,6 +881,8 @@ def cube_evaluation_observations(
         if camera_id != int(gripper) and camera_id not in cams:
             continue
         if obs.set_idx is None:
+            if obs.grasp_idx is not None:
+                continue   # 쥔 큐브(grasp 모델) 관측은 placement 큐브 평가 대상이 아님
             raise RuntimeError(
                 f"cube evaluation observation lacks set index at event {obs.event}")
         selected.append(obs)
@@ -1703,6 +1710,14 @@ def prepare_ablation_data(args) -> PreparedAblationData:
     robot_T = cp.load_robot_poses_from_meta(meta)
     observations, cube_cfg_source, cube_reason = detect_observations(
         args, meta, K_map, D_map, all_cam_ids, gripper)
+    # placement 세트도 아니고 쥔 큐브도 아닌 큐브 관측(예: 보드 촬영 이벤트에
+    # 우연히 남아 있던 큐브)은 어느 모델에도 못 넣으므로 뺀다.
+    stray_cube = [obs for obs in observations
+                  if obs.marker == "cube" and obs.set_idx is None and obs.grasp_idx is None]
+    if stray_cube:
+        print(f"[WARN] dropping {len(stray_cube)} cube observations with neither set index nor grasp id "
+              f"(events {sorted({int(o.event) for o in stray_cube})[:8]}...)")
+        observations = [obs for obs in observations if obs not in stray_cube]
     split = build_protocol_event_split(
         observations, meta, gripper, args.test_fraction, args.split_seed,
         args.min_train_eih_cube_events)
@@ -1714,6 +1729,24 @@ def prepare_ablation_data(args) -> PreparedAblationData:
         pool = [obs for obs in observations if int(obs.event) in selected_events]
     else:
         pool = [obs for obs in observations if obs.set_idx in eligible]
+        # 세트에 묶이지 않는 관측 -- 쥔 큐브(grasp+FK 모델, grasp_idx 있음)와
+        # 정지 보드 -- 는 placement 세트가 아니어서 위 필터에서 통째로 빠진다
+        # (예: Zeus session1 쥔 큐브 16 이벤트, session3 손목 보드 15 이벤트가
+        # set_index 0). 이들은 held-out 대상이 아니므로 train 전용 보조 관측으로
+        # 남긴다. held-out 이벤트에 속한 것은 넣지 않는다.
+        aux_train = [obs for obs in observations
+                     if obs.set_idx not in eligible and int(obs.event) not in test_events
+                     and (obs.grasp_idx is not None or obs.marker == "board")]
+        if aux_train:
+            pool = pool + aux_train
+            aux_events = {int(obs.event) for obs in aux_train}
+            train_events |= aux_events
+            split["train_events"] = sorted(set(split["train_events"]) | aux_events)
+            split["auxiliary_train_only_events"] = sorted(aux_events)
+            split["auxiliary_train_only_observations"] = {
+                "gripped_cube": sum(1 for o in aux_train if o.grasp_idx is not None),
+                "board": sum(1 for o in aux_train if o.marker == "board"),
+            }
     train_obs = [obs for obs in pool if int(obs.event) in train_events]
     test_obs = [obs for obs in pool if int(obs.event) in test_events]
     if split["strategy"] == COMPOSITE_PLACEMENT_SPLIT:
