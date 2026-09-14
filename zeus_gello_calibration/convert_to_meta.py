@@ -48,7 +48,8 @@ sys.path.insert(0, str(REPO_ROOT / "zeus_gello_calibration"))
 
 from calibration_pipeline.board_config import charuco_config_from_dict  # noqa: E402
 from calibration_pipeline.charuco import CharucoTarget  # noqa: E402
-from calibration_pipeline.runtime import get_default_cube_config_source  # noqa: E402
+from calibration_pipeline.config import get_default_cube_config, get_default_cube_config_source  # noqa: E402
+from calibration_pipeline.cube_config import cube_config_to_dict  # noqa: E402
 from robot.backends.zeus_client import T_to_pose6, pose6_to_T  # noqa: E402
 
 from fit_full_calibration import CHARUCO_BOARD_CONFIG  # noqa: E402
@@ -72,11 +73,12 @@ def link_or_copy(src: Path, dst: Path):
         shutil.copy2(src, dst)
 
 
-def build_cams(capture_dir: Path, calib_train_dir: Path, event_id: int, charuco: CharucoTarget) -> dict:
+def build_cams(capture_dir: Path, calib_train_dir: Path, event_id: int, charuco: CharucoTarget,
+               only_labels=None) -> dict:
     cams = {}
     for label, idx in LOCAL_CAM_IDS.items():
         src = capture_dir / f"cam_{label}.png"
-        if not src.is_file():
+        if not src.is_file() or (only_labels is not None and label not in only_labels):
             cams[str(idx)] = {"saved": False}
             continue
         rel = f"cam{idx}/rgb_{event_id:05d}.png"
@@ -95,7 +97,8 @@ def load_pose6(capture_dir: Path):
 
 
 def build_capture(*, event_id, capture_index, set_index, cube_gripped, grasp_id, capture_block,
-                  capture_dir, calib_train_dir, charuco, session_tag, set_cube_center_6dof=None):
+                  capture_dir, calib_train_dir, charuco, session_tag, set_cube_center_6dof=None,
+                  only_labels=None):
     pose6, joints = load_pose6(capture_dir)
     T = pose6_to_T(pose6)
     cap = {
@@ -109,7 +112,7 @@ def build_capture(*, event_id, capture_index, set_index, cube_gripped, grasp_id,
         "robot_pose_6dof": pose6,                       # [x,y,z mm, rz,ry,rx deg], Zeus i611 extrinsic ZYX
         "robot_pose_matrix_4x4": np.asarray(T, dtype=float).tolist(),   # metres
         "robot_joints_deg": joints,
-        "cams": build_cams(capture_dir, calib_train_dir, event_id, charuco),
+        "cams": build_cams(capture_dir, calib_train_dir, event_id, charuco, only_labels),
         "source_capture_dir": str(capture_dir),
         "source_session": session_tag,
     }
@@ -151,6 +154,8 @@ def convert(args):
         "charuco_board_config_source": "zeus_gello_calibration.fit_full_calibration.CHARUCO_BOARD_CONFIG",
         "charuco_board_config": dict(CHARUCO_BOARD_CONFIG),
         "cube_config_source": get_default_cube_config_source(),
+        # 05가 manifest(04)의 동결 cube config와 여기 값을 비교한다 -- 없으면 실패
+        "cube_config": cube_config_to_dict(get_default_cube_config()),
         "pose_convention_note": "robot_pose_6dof = Zeus i611 [x,y,z mm, rz,ry,rx deg] extrinsic ZYX; matrix in metres",
         "set_cube_center_source": (
             f"place command flange pose @ nominal +z {args.nominal_flange_to_cube_center_mm} mm "
@@ -187,12 +192,22 @@ def convert(args):
             continue
         T_place = pose6_to_T(items[idx]["target"])
         center6 = [float(v) for v in T_to_pose6(T_place @ T_nom)]
-        captures.append(build_capture(event_id=event_id, capture_index=idx, set_index=idx + 1, cube_gripped=False, grasp_id=None,
-                                      capture_block="A_placement", capture_dir=s2 / f"{idx:03d}",
-                                      calib_train_dir=calib_train_dir, charuco=charuco, session_tag="session2",
-                                      set_cube_center_6dof=center6))
-        captures[-1]["place_command_pose_6dof"] = [float(v) for v in items[idx]["target"]]
-        event_id += 1
+        # 05의 event-stratified split은 세트 안에서 이벤트를 train/test로 나눈다.
+        # Zeus session2는 세트당 촬영 이벤트가 1개(한 자세에서 4대 동시)라 그대로
+        # 넣으면 그 하나가 test로 가고 train이 비어 실패한다. 그래서 기본값은
+        # 같은 로봇 자세·같은 순간의 사진을 "고정캠 3대 이벤트"와 "그리퍼캠
+        # 이벤트" 둘로 나눠 넣는다 -- 물리적으로 같은 촬영이고, held-out은
+        # "train 이벤트로 잡은 큐브 pose를 test 이벤트 카메라가 맞추는가"가 된다.
+        groups = ([("fixed", ("039422061216", "fixed2", "fixed3")), ("gripper", ("gripper",))]
+                  if args.placement_event_mode == "fixed_gripper_split" else [("all", None)])
+        for tag, labels in groups:
+            captures.append(build_capture(event_id=event_id, capture_index=idx, set_index=idx + 1, cube_gripped=False, grasp_id=None,
+                                          capture_block="A_placement", capture_dir=s2 / f"{idx:03d}",
+                                          calib_train_dir=calib_train_dir, charuco=charuco, session_tag="session2",
+                                          set_cube_center_6dof=center6, only_labels=labels))
+            captures[-1]["place_command_pose_6dof"] = [float(v) for v in items[idx]["target"]]
+            captures[-1]["placement_event_group"] = tag
+            event_id += 1
     n2 = event_id - n1
 
     # session3: 손목 보드
@@ -207,7 +222,9 @@ def convert(args):
     meta["captures"] = captures
     meta_path = calib_train_dir / "meta.json"
     meta_path.write_text(json.dumps(meta, indent=2))
-    print(f"wrote {meta_path}\n  {len(captures)} events: session1 {n1} (gripped) + session2 {n2} (placements, sets 1..{n2}) + session3 {n3} (wrist board)")
+    n_sets = len({c["set_index"] for c in captures if c["source_session"] == "session2"})
+    print(f"wrote {meta_path}\n  {len(captures)} events: session1 {n1} (gripped) + session2 {n2} events / {n_sets} placement sets "
+          f"({args.placement_event_mode}) + session3 {n3} (wrist board)")
     print(f"  intrinsics -> {intrinsics_dir}")
     return meta_path
 
@@ -222,6 +239,8 @@ def main():
     ap.add_argument("--ur3-intrinsics-dir", default=str(REPO_ROOT / "ur3_calibration" / "intrinsics"))
     ap.add_argument("--device-map", default=str(REPO_ROOT / "intrinsics" / "device_map.json"))
     ap.add_argument("--nominal-flange-to-cube-center-mm", type=float, default=NOMINAL_FLANGE_TO_CUBE_CENTER_MM)
+    ap.add_argument("--placement-event-mode", choices=("fixed_gripper_split", "single"), default="fixed_gripper_split",
+                    help="session2 placement 한 촬영을 고정캠 이벤트 + 그리퍼캠 이벤트 둘로 나눔(기본; 05 split 요건) / single = 이벤트 1개")
     args = ap.parse_args()
     convert(args)
 

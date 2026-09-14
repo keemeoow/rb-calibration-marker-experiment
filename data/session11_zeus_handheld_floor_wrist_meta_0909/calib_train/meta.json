@@ -27,6 +27,115 @@
     "marker_id_start": 5
   },
   "cube_config_source": "config_py:CubeConfig",
+  "cube_config": {
+    "cube_side_m": 0.059,
+    "marker_size_m": 0.051,
+    "marker_size_by_id": {
+      "0": 0.025,
+      "1": 0.025,
+      "2": 0.051,
+      "3": 0.051,
+      "4": 0.051,
+      "5": 0.051
+    },
+    "marker_center_m": {
+      "0": [
+        0.0,
+        -0.014,
+        0.0625
+      ],
+      "1": [
+        0.0,
+        0.014,
+        0.0625
+      ],
+      "2": [
+        0.0295,
+        0.0,
+        -0.001
+      ],
+      "3": [
+        0.0,
+        0.0295,
+        -0.001
+      ],
+      "4": [
+        -0.0295,
+        0.0,
+        -0.001
+      ],
+      "5": [
+        0.0,
+        -0.0295,
+        -0.001
+      ]
+    },
+    "marker_inset_m": 0.0,
+    "dictionary_name": "DICT_APRILTAG_36h11",
+    "marker_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "id_to_face": {
+      "0": "+Z",
+      "1": "+Z",
+      "2": "+X",
+      "3": "+Y",
+      "4": "-X",
+      "5": "-Y"
+    },
+    "corner_reorder": {
+      "0": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "1": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "2": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "3": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "4": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "5": [
+        0,
+        1,
+        2,
+        3
+      ]
+    },
+    "face_roll_deg": {
+      "0": 0.0,
+      "1": 0.0,
+      "2": 90.0,
+      "3": 180.0,
+      "4": 270.0,
+      "5": 0.0
+    },
+    "marker_pose_4x4": {}
+  },
   "pose_convention_note": "robot_pose_6dof = Zeus i611 [x,y,z mm, rz,ry,rx deg] extrinsic ZYX; matrix in metres",
   "set_cube_center_source": "place command flange pose @ nominal +z 160.0 mm (flange->cube top datum 97.5 + cube origin->top 62.5; no vision)",
   "capture_config": {
@@ -1363,8 +1472,94 @@
           "charuco_detect_n": 46
         },
         "3": {
+          "saved": false
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909/capture_placed/000",
+      "source_session": "session2",
+      "set_cube_center_6dof": [
+        -188.903,
+        287.53000000000003,
+        18.74999999999999,
+        -150.5031212304768,
+        -0.0,
+        180.0
+      ],
+      "place_command_pose_6dof": [
+        -188.903,
+        287.53000000000003,
+        178.75,
+        -150.5031212304768,
+        -0.0,
+        180.0
+      ],
+      "placement_event_group": "fixed"
+    },
+    {
+      "event_id": 17,
+      "capture_index": 0,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 1,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_6dof": [
+        -80.785,
+        270.964,
+        603.407,
+        -120.54699694031345,
+        4.803105196581691,
+        161.17812709467725
+      ],
+      "robot_pose_matrix_4x4": [
+        [
+          -0.5064601524324722,
+          -0.8288900334160789,
+          -0.23756983499924522,
+          -0.080785
+        ],
+        [
+          -0.8581882610792639,
+          0.4578022041254415,
+          0.23222844451883318,
+          0.270964
+        ],
+        [
+          -0.08373184904100774,
+          0.3214940969930541,
+          -0.9432022704885705,
+          0.603407
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "robot_joints_deg": [
+        36.479888613861384,
+        14.589959777227723,
+        -95.20010829207921,
+        3.0800587871287126,
+        -80.23004331683168,
+        -113.78001237623762
+      ],
+      "cams": {
+        "0": {
+          "saved": false
+        },
+        "1": {
+          "saved": false
+        },
+        "2": {
+          "saved": false
+        },
+        "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00016.png",
+          "rgb_path": "cam3/rgb_00017.png",
           "charuco_detect_n": 0
         }
       },
@@ -1385,10 +1580,11 @@
         -150.5031212304768,
         -0.0,
         180.0
-      ]
+      ],
+      "placement_event_group": "gripper"
     },
     {
-      "event_id": 17,
+      "event_id": 18,
       "capture_index": 1,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -1442,22 +1638,108 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00017.png",
+          "rgb_path": "cam0/rgb_00018.png",
           "charuco_detect_n": 56
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00017.png",
+          "rgb_path": "cam1/rgb_00018.png",
           "charuco_detect_n": 0
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00017.png",
+          "rgb_path": "cam2/rgb_00018.png",
           "charuco_detect_n": 36
         },
         "3": {
+          "saved": false
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909/capture_placed/001",
+      "source_session": "session2",
+      "set_cube_center_6dof": [
+        -366.17499999999995,
+        273.64300000000003,
+        18.74999999999999,
+        -130.09860445560088,
+        -0.0,
+        180.0
+      ],
+      "place_command_pose_6dof": [
+        -366.17499999999995,
+        273.64300000000003,
+        178.75,
+        -130.09860445560088,
+        -0.0,
+        180.0
+      ],
+      "placement_event_group": "fixed"
+    },
+    {
+      "event_id": 19,
+      "capture_index": 1,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 2,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_6dof": [
+        -80.785,
+        270.964,
+        603.407,
+        -120.54699694031345,
+        4.803105196581691,
+        161.17812709467725
+      ],
+      "robot_pose_matrix_4x4": [
+        [
+          -0.5064601524324722,
+          -0.8288900334160789,
+          -0.23756983499924522,
+          -0.080785
+        ],
+        [
+          -0.8581882610792639,
+          0.4578022041254415,
+          0.23222844451883318,
+          0.270964
+        ],
+        [
+          -0.08373184904100774,
+          0.3214940969930541,
+          -0.9432022704885705,
+          0.603407
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "robot_joints_deg": [
+        36.479888613861384,
+        14.589959777227723,
+        -95.20010829207921,
+        3.0800587871287126,
+        -80.23004331683168,
+        -113.78001237623762
+      ],
+      "cams": {
+        "0": {
+          "saved": false
+        },
+        "1": {
+          "saved": false
+        },
+        "2": {
+          "saved": false
+        },
+        "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00017.png",
+          "rgb_path": "cam3/rgb_00019.png",
           "charuco_detect_n": 60
         }
       },
@@ -1478,10 +1760,11 @@
         -130.09860445560088,
         -0.0,
         180.0
-      ]
+      ],
+      "placement_event_group": "gripper"
     },
     {
-      "event_id": 18,
+      "event_id": 20,
       "capture_index": 2,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -1535,22 +1818,108 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00018.png",
+          "rgb_path": "cam0/rgb_00020.png",
           "charuco_detect_n": 54
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00018.png",
+          "rgb_path": "cam1/rgb_00020.png",
           "charuco_detect_n": 26
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00018.png",
+          "rgb_path": "cam2/rgb_00020.png",
           "charuco_detect_n": 47
         },
         "3": {
+          "saved": false
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909/capture_placed/002",
+      "source_session": "session2",
+      "set_cube_center_6dof": [
+        -249.97500000000002,
+        590.951,
+        18.74999999999999,
+        -118.31698790588479,
+        -0.0,
+        180.0
+      ],
+      "place_command_pose_6dof": [
+        -249.975,
+        590.951,
+        178.75,
+        -118.31698790588479,
+        -0.0,
+        180.0
+      ],
+      "placement_event_group": "fixed"
+    },
+    {
+      "event_id": 21,
+      "capture_index": 2,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 3,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_6dof": [
+        -80.785,
+        270.964,
+        603.407,
+        -120.54699694031345,
+        4.803105196581691,
+        161.17812709467725
+      ],
+      "robot_pose_matrix_4x4": [
+        [
+          -0.5064601524324722,
+          -0.8288900334160789,
+          -0.23756983499924522,
+          -0.080785
+        ],
+        [
+          -0.8581882610792639,
+          0.4578022041254415,
+          0.23222844451883318,
+          0.270964
+        ],
+        [
+          -0.08373184904100774,
+          0.3214940969930541,
+          -0.9432022704885705,
+          0.603407
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "robot_joints_deg": [
+        36.479888613861384,
+        14.589959777227723,
+        -95.20010829207921,
+        3.0800587871287126,
+        -80.23004331683168,
+        -113.78001237623762
+      ],
+      "cams": {
+        "0": {
+          "saved": false
+        },
+        "1": {
+          "saved": false
+        },
+        "2": {
+          "saved": false
+        },
+        "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00018.png",
+          "rgb_path": "cam3/rgb_00021.png",
           "charuco_detect_n": 54
         }
       },
@@ -1571,10 +1940,11 @@
         -118.31698790588479,
         -0.0,
         180.0
-      ]
+      ],
+      "placement_event_group": "gripper"
     },
     {
-      "event_id": 19,
+      "event_id": 22,
       "capture_index": 3,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -1628,22 +1998,108 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00019.png",
+          "rgb_path": "cam0/rgb_00022.png",
           "charuco_detect_n": 51
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00019.png",
+          "rgb_path": "cam1/rgb_00022.png",
           "charuco_detect_n": 28
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00019.png",
+          "rgb_path": "cam2/rgb_00022.png",
           "charuco_detect_n": 17
         },
         "3": {
+          "saved": false
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909/capture_placed/003",
+      "source_session": "session2",
+      "set_cube_center_6dof": [
+        -361.783,
+        417.097,
+        18.74999999999999,
+        -116.87496772709952,
+        -0.0,
+        180.0
+      ],
+      "place_command_pose_6dof": [
+        -361.783,
+        417.097,
+        178.75,
+        -116.87496772709952,
+        -0.0,
+        180.0
+      ],
+      "placement_event_group": "fixed"
+    },
+    {
+      "event_id": 23,
+      "capture_index": 3,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 4,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_6dof": [
+        -80.785,
+        270.964,
+        603.407,
+        -120.54699694031345,
+        4.803105196581691,
+        161.17812709467725
+      ],
+      "robot_pose_matrix_4x4": [
+        [
+          -0.5064601524324722,
+          -0.8288900334160789,
+          -0.23756983499924522,
+          -0.080785
+        ],
+        [
+          -0.8581882610792639,
+          0.4578022041254415,
+          0.23222844451883318,
+          0.270964
+        ],
+        [
+          -0.08373184904100774,
+          0.3214940969930541,
+          -0.9432022704885705,
+          0.603407
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "robot_joints_deg": [
+        36.479888613861384,
+        14.589959777227723,
+        -95.20010829207921,
+        3.0800587871287126,
+        -80.23004331683168,
+        -113.78001237623762
+      ],
+      "cams": {
+        "0": {
+          "saved": false
+        },
+        "1": {
+          "saved": false
+        },
+        "2": {
+          "saved": false
+        },
+        "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00019.png",
+          "rgb_path": "cam3/rgb_00023.png",
           "charuco_detect_n": 51
         }
       },
@@ -1664,10 +2120,11 @@
         -116.87496772709952,
         -0.0,
         180.0
-      ]
+      ],
+      "placement_event_group": "gripper"
     },
     {
-      "event_id": 20,
+      "event_id": 24,
       "capture_index": 4,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -1721,22 +2178,108 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00020.png",
+          "rgb_path": "cam0/rgb_00024.png",
           "charuco_detect_n": 39
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00020.png",
+          "rgb_path": "cam1/rgb_00024.png",
           "charuco_detect_n": 28
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00020.png",
+          "rgb_path": "cam2/rgb_00024.png",
           "charuco_detect_n": 44
         },
         "3": {
+          "saved": false
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909/capture_placed/004",
+      "source_session": "session2",
+      "set_cube_center_6dof": [
+        -182.29800000000003,
+        522.692,
+        18.74999999999999,
+        -114.72889700965752,
+        -0.0,
+        180.0
+      ],
+      "place_command_pose_6dof": [
+        -182.298,
+        522.692,
+        178.75,
+        -114.72889700965752,
+        -0.0,
+        180.0
+      ],
+      "placement_event_group": "fixed"
+    },
+    {
+      "event_id": 25,
+      "capture_index": 4,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 5,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_6dof": [
+        -80.785,
+        270.964,
+        603.407,
+        -120.54699694031345,
+        4.803105196581691,
+        161.17812709467725
+      ],
+      "robot_pose_matrix_4x4": [
+        [
+          -0.5064601524324722,
+          -0.8288900334160789,
+          -0.23756983499924522,
+          -0.080785
+        ],
+        [
+          -0.8581882610792639,
+          0.4578022041254415,
+          0.23222844451883318,
+          0.270964
+        ],
+        [
+          -0.08373184904100774,
+          0.3214940969930541,
+          -0.9432022704885705,
+          0.603407
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "robot_joints_deg": [
+        36.479888613861384,
+        14.589959777227723,
+        -95.20010829207921,
+        3.0800587871287126,
+        -80.23004331683168,
+        -113.78001237623762
+      ],
+      "cams": {
+        "0": {
+          "saved": false
+        },
+        "1": {
+          "saved": false
+        },
+        "2": {
+          "saved": false
+        },
+        "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00020.png",
+          "rgb_path": "cam3/rgb_00025.png",
           "charuco_detect_n": 53
         }
       },
@@ -1757,10 +2300,11 @@
         -114.72889700965752,
         -0.0,
         180.0
-      ]
+      ],
+      "placement_event_group": "gripper"
     },
     {
-      "event_id": 21,
+      "event_id": 26,
       "capture_index": 5,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -1814,22 +2358,108 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00021.png",
+          "rgb_path": "cam0/rgb_00026.png",
           "charuco_detect_n": 58
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00021.png",
+          "rgb_path": "cam1/rgb_00026.png",
           "charuco_detect_n": 8
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00021.png",
+          "rgb_path": "cam2/rgb_00026.png",
           "charuco_detect_n": 46
         },
         "3": {
+          "saved": false
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909/capture_placed/005",
+      "source_session": "session2",
+      "set_cube_center_6dof": [
+        -368.834,
+        611.03,
+        18.74999999999999,
+        -110.23112102210104,
+        -0.0,
+        180.0
+      ],
+      "place_command_pose_6dof": [
+        -368.834,
+        611.03,
+        178.75,
+        -110.23112102210104,
+        -0.0,
+        180.0
+      ],
+      "placement_event_group": "fixed"
+    },
+    {
+      "event_id": 27,
+      "capture_index": 5,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 6,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_6dof": [
+        -80.785,
+        270.964,
+        603.407,
+        -120.54699694031345,
+        4.803105196581691,
+        161.17812709467725
+      ],
+      "robot_pose_matrix_4x4": [
+        [
+          -0.5064601524324722,
+          -0.8288900334160789,
+          -0.23756983499924522,
+          -0.080785
+        ],
+        [
+          -0.8581882610792639,
+          0.4578022041254415,
+          0.23222844451883318,
+          0.270964
+        ],
+        [
+          -0.08373184904100774,
+          0.3214940969930541,
+          -0.9432022704885705,
+          0.603407
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "robot_joints_deg": [
+        36.479888613861384,
+        14.589959777227723,
+        -95.20010829207921,
+        3.0800587871287126,
+        -80.23004331683168,
+        -113.78001237623762
+      ],
+      "cams": {
+        "0": {
+          "saved": false
+        },
+        "1": {
+          "saved": false
+        },
+        "2": {
+          "saved": false
+        },
+        "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00021.png",
+          "rgb_path": "cam3/rgb_00027.png",
           "charuco_detect_n": 60
         }
       },
@@ -1850,10 +2480,11 @@
         -110.23112102210104,
         -0.0,
         180.0
-      ]
+      ],
+      "placement_event_group": "gripper"
     },
     {
-      "event_id": 22,
+      "event_id": 28,
       "capture_index": 6,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -1907,22 +2538,108 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00022.png",
+          "rgb_path": "cam0/rgb_00028.png",
           "charuco_detect_n": 44
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00022.png",
+          "rgb_path": "cam1/rgb_00028.png",
           "charuco_detect_n": 16
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00022.png",
+          "rgb_path": "cam2/rgb_00028.png",
           "charuco_detect_n": 28
         },
         "3": {
+          "saved": false
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909/capture_placed/006",
+      "source_session": "session2",
+      "set_cube_center_6dof": [
+        -322.224,
+        479.72700000000003,
+        18.74999999999999,
+        -103.83679743688202,
+        -0.0,
+        180.0
+      ],
+      "place_command_pose_6dof": [
+        -322.224,
+        479.72700000000003,
+        178.75,
+        -103.83679743688202,
+        -0.0,
+        180.0
+      ],
+      "placement_event_group": "fixed"
+    },
+    {
+      "event_id": 29,
+      "capture_index": 6,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 7,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_6dof": [
+        -80.785,
+        270.964,
+        603.407,
+        -120.54699694031345,
+        4.803105196581691,
+        161.17812709467725
+      ],
+      "robot_pose_matrix_4x4": [
+        [
+          -0.5064601524324722,
+          -0.8288900334160789,
+          -0.23756983499924522,
+          -0.080785
+        ],
+        [
+          -0.8581882610792639,
+          0.4578022041254415,
+          0.23222844451883318,
+          0.270964
+        ],
+        [
+          -0.08373184904100774,
+          0.3214940969930541,
+          -0.9432022704885705,
+          0.603407
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "robot_joints_deg": [
+        36.479888613861384,
+        14.589959777227723,
+        -95.20010829207921,
+        3.0800587871287126,
+        -80.23004331683168,
+        -113.78001237623762
+      ],
+      "cams": {
+        "0": {
+          "saved": false
+        },
+        "1": {
+          "saved": false
+        },
+        "2": {
+          "saved": false
+        },
+        "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00022.png",
+          "rgb_path": "cam3/rgb_00029.png",
           "charuco_detect_n": 44
         }
       },
@@ -1943,10 +2660,11 @@
         -103.83679743688202,
         -0.0,
         180.0
-      ]
+      ],
+      "placement_event_group": "gripper"
     },
     {
-      "event_id": 23,
+      "event_id": 30,
       "capture_index": 7,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -2000,22 +2718,108 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00023.png",
+          "rgb_path": "cam0/rgb_00030.png",
           "charuco_detect_n": 60
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00023.png",
+          "rgb_path": "cam1/rgb_00030.png",
           "charuco_detect_n": 32
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00023.png",
+          "rgb_path": "cam2/rgb_00030.png",
           "charuco_detect_n": 45
         },
         "3": {
+          "saved": false
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909/capture_placed/007",
+      "source_session": "session2",
+      "set_cube_center_6dof": [
+        -293.54,
+        280.152,
+        18.74999999999999,
+        -98.75890168175557,
+        -0.0,
+        180.0
+      ],
+      "place_command_pose_6dof": [
+        -293.54,
+        280.152,
+        178.75,
+        -98.75890168175557,
+        -0.0,
+        180.0
+      ],
+      "placement_event_group": "fixed"
+    },
+    {
+      "event_id": 31,
+      "capture_index": 7,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 8,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_6dof": [
+        -80.785,
+        270.964,
+        603.407,
+        -120.54699694031345,
+        4.803105196581691,
+        161.17812709467725
+      ],
+      "robot_pose_matrix_4x4": [
+        [
+          -0.5064601524324722,
+          -0.8288900334160789,
+          -0.23756983499924522,
+          -0.080785
+        ],
+        [
+          -0.8581882610792639,
+          0.4578022041254415,
+          0.23222844451883318,
+          0.270964
+        ],
+        [
+          -0.08373184904100774,
+          0.3214940969930541,
+          -0.9432022704885705,
+          0.603407
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "robot_joints_deg": [
+        36.479888613861384,
+        14.589959777227723,
+        -95.20010829207921,
+        3.0800587871287126,
+        -80.23004331683168,
+        -113.78001237623762
+      ],
+      "cams": {
+        "0": {
+          "saved": false
+        },
+        "1": {
+          "saved": false
+        },
+        "2": {
+          "saved": false
+        },
+        "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00023.png",
+          "rgb_path": "cam3/rgb_00031.png",
           "charuco_detect_n": 60
         }
       },
@@ -2036,10 +2840,11 @@
         -98.75890168175557,
         -0.0,
         180.0
-      ]
+      ],
+      "placement_event_group": "gripper"
     },
     {
-      "event_id": 24,
+      "event_id": 32,
       "capture_index": 8,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -2093,22 +2898,108 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00024.png",
+          "rgb_path": "cam0/rgb_00032.png",
           "charuco_detect_n": 42
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00024.png",
+          "rgb_path": "cam1/rgb_00032.png",
           "charuco_detect_n": 20
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00024.png",
+          "rgb_path": "cam2/rgb_00032.png",
           "charuco_detect_n": 23
         },
         "3": {
+          "saved": false
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909/capture_placed/008",
+      "source_session": "session2",
+      "set_cube_center_6dof": [
+        -327.839,
+        443.867,
+        18.74999999999999,
+        -96.9952802925634,
+        -0.0,
+        180.0
+      ],
+      "place_command_pose_6dof": [
+        -327.839,
+        443.867,
+        178.75,
+        -96.9952802925634,
+        -0.0,
+        180.0
+      ],
+      "placement_event_group": "fixed"
+    },
+    {
+      "event_id": 33,
+      "capture_index": 8,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 9,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_6dof": [
+        -80.785,
+        270.964,
+        603.407,
+        -120.54699694031345,
+        4.803105196581691,
+        161.17812709467725
+      ],
+      "robot_pose_matrix_4x4": [
+        [
+          -0.5064601524324722,
+          -0.8288900334160789,
+          -0.23756983499924522,
+          -0.080785
+        ],
+        [
+          -0.8581882610792639,
+          0.4578022041254415,
+          0.23222844451883318,
+          0.270964
+        ],
+        [
+          -0.08373184904100774,
+          0.3214940969930541,
+          -0.9432022704885705,
+          0.603407
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "robot_joints_deg": [
+        36.479888613861384,
+        14.589959777227723,
+        -95.20010829207921,
+        3.0800587871287126,
+        -80.23004331683168,
+        -113.78001237623762
+      ],
+      "cams": {
+        "0": {
+          "saved": false
+        },
+        "1": {
+          "saved": false
+        },
+        "2": {
+          "saved": false
+        },
+        "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00024.png",
+          "rgb_path": "cam3/rgb_00033.png",
           "charuco_detect_n": 46
         }
       },
@@ -2129,10 +3020,11 @@
         -96.9952802925634,
         -0.0,
         180.0
-      ]
+      ],
+      "placement_event_group": "gripper"
     },
     {
-      "event_id": 25,
+      "event_id": 34,
       "capture_index": 9,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -2186,22 +3078,108 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00025.png",
+          "rgb_path": "cam0/rgb_00034.png",
           "charuco_detect_n": 45
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00025.png",
+          "rgb_path": "cam1/rgb_00034.png",
           "charuco_detect_n": 30
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00025.png",
+          "rgb_path": "cam2/rgb_00034.png",
           "charuco_detect_n": 10
         },
         "3": {
+          "saved": false
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909/capture_placed/009",
+      "source_session": "session2",
+      "set_cube_center_6dof": [
+        -345.76099999999997,
+        378.625,
+        18.74999999999999,
+        -87.5983713819613,
+        -0.0,
+        180.0
+      ],
+      "place_command_pose_6dof": [
+        -345.76099999999997,
+        378.625,
+        178.75,
+        -87.5983713819613,
+        -0.0,
+        180.0
+      ],
+      "placement_event_group": "fixed"
+    },
+    {
+      "event_id": 35,
+      "capture_index": 9,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 10,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_6dof": [
+        -80.785,
+        270.964,
+        603.407,
+        -120.54699694031345,
+        4.803105196581691,
+        161.17812709467725
+      ],
+      "robot_pose_matrix_4x4": [
+        [
+          -0.5064601524324722,
+          -0.8288900334160789,
+          -0.23756983499924522,
+          -0.080785
+        ],
+        [
+          -0.8581882610792639,
+          0.4578022041254415,
+          0.23222844451883318,
+          0.270964
+        ],
+        [
+          -0.08373184904100774,
+          0.3214940969930541,
+          -0.9432022704885705,
+          0.603407
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "robot_joints_deg": [
+        36.479888613861384,
+        14.589959777227723,
+        -95.20010829207921,
+        3.0800587871287126,
+        -80.23004331683168,
+        -113.78001237623762
+      ],
+      "cams": {
+        "0": {
+          "saved": false
+        },
+        "1": {
+          "saved": false
+        },
+        "2": {
+          "saved": false
+        },
+        "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00025.png",
+          "rgb_path": "cam3/rgb_00035.png",
           "charuco_detect_n": 51
         }
       },
@@ -2222,10 +3200,11 @@
         -87.5983713819613,
         -0.0,
         180.0
-      ]
+      ],
+      "placement_event_group": "gripper"
     },
     {
-      "event_id": 26,
+      "event_id": 36,
       "capture_index": 10,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -2279,22 +3258,108 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00026.png",
+          "rgb_path": "cam0/rgb_00036.png",
           "charuco_detect_n": 37
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00026.png",
+          "rgb_path": "cam1/rgb_00036.png",
           "charuco_detect_n": 27
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00026.png",
+          "rgb_path": "cam2/rgb_00036.png",
           "charuco_detect_n": 47
         },
         "3": {
+          "saved": false
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909/capture_placed/010",
+      "source_session": "session2",
+      "set_cube_center_6dof": [
+        -139.949,
+        457.249,
+        18.74999999999999,
+        -71.4905224085509,
+        -0.0,
+        180.0
+      ],
+      "place_command_pose_6dof": [
+        -139.94899999999998,
+        457.249,
+        178.75,
+        -71.4905224085509,
+        -0.0,
+        180.0
+      ],
+      "placement_event_group": "fixed"
+    },
+    {
+      "event_id": 37,
+      "capture_index": 10,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 11,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_6dof": [
+        -80.785,
+        270.964,
+        603.407,
+        -120.54699694031345,
+        4.803105196581691,
+        161.17812709467725
+      ],
+      "robot_pose_matrix_4x4": [
+        [
+          -0.5064601524324722,
+          -0.8288900334160789,
+          -0.23756983499924522,
+          -0.080785
+        ],
+        [
+          -0.8581882610792639,
+          0.4578022041254415,
+          0.23222844451883318,
+          0.270964
+        ],
+        [
+          -0.08373184904100774,
+          0.3214940969930541,
+          -0.9432022704885705,
+          0.603407
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "robot_joints_deg": [
+        36.479888613861384,
+        14.589959777227723,
+        -95.20010829207921,
+        3.0800587871287126,
+        -80.23004331683168,
+        -113.78001237623762
+      ],
+      "cams": {
+        "0": {
+          "saved": false
+        },
+        "1": {
+          "saved": false
+        },
+        "2": {
+          "saved": false
+        },
+        "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00026.png",
+          "rgb_path": "cam3/rgb_00037.png",
           "charuco_detect_n": 60
         }
       },
@@ -2315,10 +3380,11 @@
         -71.4905224085509,
         -0.0,
         180.0
-      ]
+      ],
+      "placement_event_group": "gripper"
     },
     {
-      "event_id": 27,
+      "event_id": 38,
       "capture_index": 11,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -2372,22 +3438,108 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00027.png",
+          "rgb_path": "cam0/rgb_00038.png",
           "charuco_detect_n": 31
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00027.png",
+          "rgb_path": "cam1/rgb_00038.png",
           "charuco_detect_n": 15
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00027.png",
+          "rgb_path": "cam2/rgb_00038.png",
           "charuco_detect_n": 33
         },
         "3": {
+          "saved": false
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909/capture_placed/011",
+      "source_session": "session2",
+      "set_cube_center_6dof": [
+        -277.246,
+        502.157,
+        18.74999999999999,
+        -65.07689014563599,
+        -0.0,
+        180.0
+      ],
+      "place_command_pose_6dof": [
+        -277.246,
+        502.157,
+        178.75,
+        -65.07689014563599,
+        -0.0,
+        180.0
+      ],
+      "placement_event_group": "fixed"
+    },
+    {
+      "event_id": 39,
+      "capture_index": 11,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 12,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_6dof": [
+        -80.785,
+        270.964,
+        603.407,
+        -120.54699694031345,
+        4.803105196581691,
+        161.17812709467725
+      ],
+      "robot_pose_matrix_4x4": [
+        [
+          -0.5064601524324722,
+          -0.8288900334160789,
+          -0.23756983499924522,
+          -0.080785
+        ],
+        [
+          -0.8581882610792639,
+          0.4578022041254415,
+          0.23222844451883318,
+          0.270964
+        ],
+        [
+          -0.08373184904100774,
+          0.3214940969930541,
+          -0.9432022704885705,
+          0.603407
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "robot_joints_deg": [
+        36.479888613861384,
+        14.589959777227723,
+        -95.20010829207921,
+        3.0800587871287126,
+        -80.23004331683168,
+        -113.78001237623762
+      ],
+      "cams": {
+        "0": {
+          "saved": false
+        },
+        "1": {
+          "saved": false
+        },
+        "2": {
+          "saved": false
+        },
+        "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00027.png",
+          "rgb_path": "cam3/rgb_00039.png",
           "charuco_detect_n": 39
         }
       },
@@ -2408,10 +3560,11 @@
         -65.07689014563599,
         -0.0,
         180.0
-      ]
+      ],
+      "placement_event_group": "gripper"
     },
     {
-      "event_id": 28,
+      "event_id": 40,
       "capture_index": 12,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -2465,22 +3618,108 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00028.png",
+          "rgb_path": "cam0/rgb_00040.png",
           "charuco_detect_n": 48
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00028.png",
+          "rgb_path": "cam1/rgb_00040.png",
           "charuco_detect_n": 27
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00028.png",
+          "rgb_path": "cam2/rgb_00040.png",
           "charuco_detect_n": 14
         },
         "3": {
+          "saved": false
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909/capture_placed/012",
+      "source_session": "session2",
+      "set_cube_center_6dof": [
+        -374.778,
+        379.701,
+        18.74999999999999,
+        -63.103566203425906,
+        -0.0,
+        180.0
+      ],
+      "place_command_pose_6dof": [
+        -374.778,
+        379.701,
+        178.75,
+        -63.103566203425906,
+        -0.0,
+        180.0
+      ],
+      "placement_event_group": "fixed"
+    },
+    {
+      "event_id": 41,
+      "capture_index": 12,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 13,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_6dof": [
+        -80.785,
+        270.964,
+        603.407,
+        -120.54699694031345,
+        4.803105196581691,
+        161.17812709467725
+      ],
+      "robot_pose_matrix_4x4": [
+        [
+          -0.5064601524324722,
+          -0.8288900334160789,
+          -0.23756983499924522,
+          -0.080785
+        ],
+        [
+          -0.8581882610792639,
+          0.4578022041254415,
+          0.23222844451883318,
+          0.270964
+        ],
+        [
+          -0.08373184904100774,
+          0.3214940969930541,
+          -0.9432022704885705,
+          0.603407
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "robot_joints_deg": [
+        36.479888613861384,
+        14.589959777227723,
+        -95.20010829207921,
+        3.0800587871287126,
+        -80.23004331683168,
+        -113.78001237623762
+      ],
+      "cams": {
+        "0": {
+          "saved": false
+        },
+        "1": {
+          "saved": false
+        },
+        "2": {
+          "saved": false
+        },
+        "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00028.png",
+          "rgb_path": "cam3/rgb_00041.png",
           "charuco_detect_n": 54
         }
       },
@@ -2501,10 +3740,11 @@
         -63.103566203425906,
         -0.0,
         180.0
-      ]
+      ],
+      "placement_event_group": "gripper"
     },
     {
-      "event_id": 29,
+      "event_id": 42,
       "capture_index": 13,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -2558,22 +3798,108 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00029.png",
+          "rgb_path": "cam0/rgb_00042.png",
           "charuco_detect_n": 56
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00029.png",
+          "rgb_path": "cam1/rgb_00042.png",
           "charuco_detect_n": 29
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00029.png",
+          "rgb_path": "cam2/rgb_00042.png",
           "charuco_detect_n": 50
         },
         "3": {
+          "saved": false
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909/capture_placed/013",
+      "source_session": "session2",
+      "set_cube_center_6dof": [
+        -272.59499999999997,
+        227.18999999999997,
+        18.74999999999999,
+        -42.20991535884677,
+        -0.0,
+        180.0
+      ],
+      "place_command_pose_6dof": [
+        -272.59499999999997,
+        227.19,
+        178.75,
+        -42.20991535884677,
+        -0.0,
+        180.0
+      ],
+      "placement_event_group": "fixed"
+    },
+    {
+      "event_id": 43,
+      "capture_index": 13,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 14,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_6dof": [
+        -80.785,
+        270.964,
+        603.407,
+        -120.54699694031345,
+        4.803105196581691,
+        161.17812709467725
+      ],
+      "robot_pose_matrix_4x4": [
+        [
+          -0.5064601524324722,
+          -0.8288900334160789,
+          -0.23756983499924522,
+          -0.080785
+        ],
+        [
+          -0.8581882610792639,
+          0.4578022041254415,
+          0.23222844451883318,
+          0.270964
+        ],
+        [
+          -0.08373184904100774,
+          0.3214940969930541,
+          -0.9432022704885705,
+          0.603407
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "robot_joints_deg": [
+        36.479888613861384,
+        14.589959777227723,
+        -95.20010829207921,
+        3.0800587871287126,
+        -80.23004331683168,
+        -113.78001237623762
+      ],
+      "cams": {
+        "0": {
+          "saved": false
+        },
+        "1": {
+          "saved": false
+        },
+        "2": {
+          "saved": false
+        },
+        "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00029.png",
+          "rgb_path": "cam3/rgb_00043.png",
           "charuco_detect_n": 60
         }
       },
@@ -2594,10 +3920,11 @@
         -42.20991535884677,
         -0.0,
         180.0
-      ]
+      ],
+      "placement_event_group": "gripper"
     },
     {
-      "event_id": 30,
+      "event_id": 44,
       "capture_index": 14,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -2651,22 +3978,108 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00030.png",
+          "rgb_path": "cam0/rgb_00044.png",
           "charuco_detect_n": 44
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00030.png",
+          "rgb_path": "cam1/rgb_00044.png",
           "charuco_detect_n": 30
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00030.png",
+          "rgb_path": "cam2/rgb_00044.png",
           "charuco_detect_n": 19
         },
         "3": {
+          "saved": false
+        }
+      },
+      "source_capture_dir": "/home/sstone/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909/capture_placed/014",
+      "source_session": "session2",
+      "set_cube_center_6dof": [
+        -330.052,
+        382.868,
+        18.74999999999999,
+        -41.49532239675961,
+        -0.0,
+        180.0
+      ],
+      "place_command_pose_6dof": [
+        -330.052,
+        382.868,
+        178.75,
+        -41.49532239675961,
+        -0.0,
+        180.0
+      ],
+      "placement_event_group": "fixed"
+    },
+    {
+      "event_id": 45,
+      "capture_index": 14,
+      "capture_gate": {
+        "capture_block": "A_placement"
+      },
+      "capture_block": "A_placement",
+      "set_index": 15,
+      "cube_gripped": false,
+      "grasp_id": null,
+      "robot_pose_6dof": [
+        -80.785,
+        270.964,
+        603.407,
+        -120.54699694031345,
+        4.803105196581691,
+        161.17812709467725
+      ],
+      "robot_pose_matrix_4x4": [
+        [
+          -0.5064601524324722,
+          -0.8288900334160789,
+          -0.23756983499924522,
+          -0.080785
+        ],
+        [
+          -0.8581882610792639,
+          0.4578022041254415,
+          0.23222844451883318,
+          0.270964
+        ],
+        [
+          -0.08373184904100774,
+          0.3214940969930541,
+          -0.9432022704885705,
+          0.603407
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "robot_joints_deg": [
+        36.479888613861384,
+        14.589959777227723,
+        -95.20010829207921,
+        3.0800587871287126,
+        -80.23004331683168,
+        -113.78001237623762
+      ],
+      "cams": {
+        "0": {
+          "saved": false
+        },
+        "1": {
+          "saved": false
+        },
+        "2": {
+          "saved": false
+        },
+        "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00030.png",
+          "rgb_path": "cam3/rgb_00045.png",
           "charuco_detect_n": 44
         }
       },
@@ -2687,10 +4100,11 @@
         -41.49532239675961,
         -0.0,
         180.0
-      ]
+      ],
+      "placement_event_group": "gripper"
     },
     {
-      "event_id": 31,
+      "event_id": 46,
       "capture_index": 0,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -2744,22 +4158,22 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00031.png",
+          "rgb_path": "cam0/rgb_00046.png",
           "charuco_detect_n": 54
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00031.png",
+          "rgb_path": "cam1/rgb_00046.png",
           "charuco_detect_n": 28
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00031.png",
+          "rgb_path": "cam2/rgb_00046.png",
           "charuco_detect_n": 46
         },
         "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00031.png",
+          "rgb_path": "cam3/rgb_00046.png",
           "charuco_detect_n": 10
         }
       },
@@ -2767,7 +4181,7 @@
       "source_session": "session3"
     },
     {
-      "event_id": 32,
+      "event_id": 47,
       "capture_index": 1,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -2821,22 +4235,22 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00032.png",
+          "rgb_path": "cam0/rgb_00047.png",
           "charuco_detect_n": 54
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00032.png",
+          "rgb_path": "cam1/rgb_00047.png",
           "charuco_detect_n": 36
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00032.png",
+          "rgb_path": "cam2/rgb_00047.png",
           "charuco_detect_n": 46
         },
         "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00032.png",
+          "rgb_path": "cam3/rgb_00047.png",
           "charuco_detect_n": 60
         }
       },
@@ -2844,7 +4258,7 @@
       "source_session": "session3"
     },
     {
-      "event_id": 33,
+      "event_id": 48,
       "capture_index": 2,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -2898,22 +4312,22 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00033.png",
+          "rgb_path": "cam0/rgb_00048.png",
           "charuco_detect_n": 60
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00033.png",
+          "rgb_path": "cam1/rgb_00048.png",
           "charuco_detect_n": 30
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00033.png",
+          "rgb_path": "cam2/rgb_00048.png",
           "charuco_detect_n": 54
         },
         "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00033.png",
+          "rgb_path": "cam3/rgb_00048.png",
           "charuco_detect_n": 60
         }
       },
@@ -2921,7 +4335,7 @@
       "source_session": "session3"
     },
     {
-      "event_id": 34,
+      "event_id": 49,
       "capture_index": 3,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -2975,22 +4389,22 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00034.png",
+          "rgb_path": "cam0/rgb_00049.png",
           "charuco_detect_n": 60
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00034.png",
+          "rgb_path": "cam1/rgb_00049.png",
           "charuco_detect_n": 26
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00034.png",
+          "rgb_path": "cam2/rgb_00049.png",
           "charuco_detect_n": 52
         },
         "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00034.png",
+          "rgb_path": "cam3/rgb_00049.png",
           "charuco_detect_n": 60
         }
       },
@@ -2998,7 +4412,7 @@
       "source_session": "session3"
     },
     {
-      "event_id": 35,
+      "event_id": 50,
       "capture_index": 4,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -3052,22 +4466,22 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00035.png",
+          "rgb_path": "cam0/rgb_00050.png",
           "charuco_detect_n": 55
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00035.png",
+          "rgb_path": "cam1/rgb_00050.png",
           "charuco_detect_n": 30
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00035.png",
+          "rgb_path": "cam2/rgb_00050.png",
           "charuco_detect_n": 56
         },
         "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00035.png",
+          "rgb_path": "cam3/rgb_00050.png",
           "charuco_detect_n": 60
         }
       },
@@ -3075,7 +4489,7 @@
       "source_session": "session3"
     },
     {
-      "event_id": 36,
+      "event_id": 51,
       "capture_index": 5,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -3129,22 +4543,22 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00036.png",
+          "rgb_path": "cam0/rgb_00051.png",
           "charuco_detect_n": 56
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00036.png",
+          "rgb_path": "cam1/rgb_00051.png",
           "charuco_detect_n": 31
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00036.png",
+          "rgb_path": "cam2/rgb_00051.png",
           "charuco_detect_n": 47
         },
         "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00036.png",
+          "rgb_path": "cam3/rgb_00051.png",
           "charuco_detect_n": 60
         }
       },
@@ -3152,7 +4566,7 @@
       "source_session": "session3"
     },
     {
-      "event_id": 37,
+      "event_id": 52,
       "capture_index": 6,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -3206,22 +4620,22 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00037.png",
+          "rgb_path": "cam0/rgb_00052.png",
           "charuco_detect_n": 60
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00037.png",
+          "rgb_path": "cam1/rgb_00052.png",
           "charuco_detect_n": 29
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00037.png",
+          "rgb_path": "cam2/rgb_00052.png",
           "charuco_detect_n": 44
         },
         "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00037.png",
+          "rgb_path": "cam3/rgb_00052.png",
           "charuco_detect_n": 60
         }
       },
@@ -3229,7 +4643,7 @@
       "source_session": "session3"
     },
     {
-      "event_id": 38,
+      "event_id": 53,
       "capture_index": 7,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -3283,22 +4697,22 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00038.png",
+          "rgb_path": "cam0/rgb_00053.png",
           "charuco_detect_n": 50
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00038.png",
+          "rgb_path": "cam1/rgb_00053.png",
           "charuco_detect_n": 30
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00038.png",
+          "rgb_path": "cam2/rgb_00053.png",
           "charuco_detect_n": 44
         },
         "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00038.png",
+          "rgb_path": "cam3/rgb_00053.png",
           "charuco_detect_n": 60
         }
       },
@@ -3306,7 +4720,7 @@
       "source_session": "session3"
     },
     {
-      "event_id": 39,
+      "event_id": 54,
       "capture_index": 8,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -3360,22 +4774,22 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00039.png",
+          "rgb_path": "cam0/rgb_00054.png",
           "charuco_detect_n": 56
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00039.png",
+          "rgb_path": "cam1/rgb_00054.png",
           "charuco_detect_n": 30
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00039.png",
+          "rgb_path": "cam2/rgb_00054.png",
           "charuco_detect_n": 50
         },
         "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00039.png",
+          "rgb_path": "cam3/rgb_00054.png",
           "charuco_detect_n": 60
         }
       },
@@ -3383,7 +4797,7 @@
       "source_session": "session3"
     },
     {
-      "event_id": 40,
+      "event_id": 55,
       "capture_index": 9,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -3437,22 +4851,22 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00040.png",
+          "rgb_path": "cam0/rgb_00055.png",
           "charuco_detect_n": 51
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00040.png",
+          "rgb_path": "cam1/rgb_00055.png",
           "charuco_detect_n": 25
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00040.png",
+          "rgb_path": "cam2/rgb_00055.png",
           "charuco_detect_n": 46
         },
         "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00040.png",
+          "rgb_path": "cam3/rgb_00055.png",
           "charuco_detect_n": 60
         }
       },
@@ -3460,7 +4874,7 @@
       "source_session": "session3"
     },
     {
-      "event_id": 41,
+      "event_id": 56,
       "capture_index": 10,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -3514,22 +4928,22 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00041.png",
+          "rgb_path": "cam0/rgb_00056.png",
           "charuco_detect_n": 51
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00041.png",
+          "rgb_path": "cam1/rgb_00056.png",
           "charuco_detect_n": 24
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00041.png",
+          "rgb_path": "cam2/rgb_00056.png",
           "charuco_detect_n": 52
         },
         "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00041.png",
+          "rgb_path": "cam3/rgb_00056.png",
           "charuco_detect_n": 60
         }
       },
@@ -3537,7 +4951,7 @@
       "source_session": "session3"
     },
     {
-      "event_id": 42,
+      "event_id": 57,
       "capture_index": 11,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -3591,22 +5005,22 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00042.png",
+          "rgb_path": "cam0/rgb_00057.png",
           "charuco_detect_n": 60
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00042.png",
+          "rgb_path": "cam1/rgb_00057.png",
           "charuco_detect_n": 30
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00042.png",
+          "rgb_path": "cam2/rgb_00057.png",
           "charuco_detect_n": 51
         },
         "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00042.png",
+          "rgb_path": "cam3/rgb_00057.png",
           "charuco_detect_n": 60
         }
       },
@@ -3614,7 +5028,7 @@
       "source_session": "session3"
     },
     {
-      "event_id": 43,
+      "event_id": 58,
       "capture_index": 12,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -3668,22 +5082,22 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00043.png",
+          "rgb_path": "cam0/rgb_00058.png",
           "charuco_detect_n": 55
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00043.png",
+          "rgb_path": "cam1/rgb_00058.png",
           "charuco_detect_n": 34
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00043.png",
+          "rgb_path": "cam2/rgb_00058.png",
           "charuco_detect_n": 48
         },
         "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00043.png",
+          "rgb_path": "cam3/rgb_00058.png",
           "charuco_detect_n": 60
         }
       },
@@ -3691,7 +5105,7 @@
       "source_session": "session3"
     },
     {
-      "event_id": 44,
+      "event_id": 59,
       "capture_index": 13,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -3745,22 +5159,22 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00044.png",
+          "rgb_path": "cam0/rgb_00059.png",
           "charuco_detect_n": 55
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00044.png",
+          "rgb_path": "cam1/rgb_00059.png",
           "charuco_detect_n": 30
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00044.png",
+          "rgb_path": "cam2/rgb_00059.png",
           "charuco_detect_n": 48
         },
         "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00044.png",
+          "rgb_path": "cam3/rgb_00059.png",
           "charuco_detect_n": 60
         }
       },
@@ -3768,7 +5182,7 @@
       "source_session": "session3"
     },
     {
-      "event_id": 45,
+      "event_id": 60,
       "capture_index": 14,
       "capture_gate": {
         "capture_block": "A_placement"
@@ -3822,22 +5236,22 @@
       "cams": {
         "0": {
           "saved": true,
-          "rgb_path": "cam0/rgb_00045.png",
+          "rgb_path": "cam0/rgb_00060.png",
           "charuco_detect_n": 60
         },
         "1": {
           "saved": true,
-          "rgb_path": "cam1/rgb_00045.png",
+          "rgb_path": "cam1/rgb_00060.png",
           "charuco_detect_n": 27
         },
         "2": {
           "saved": true,
-          "rgb_path": "cam2/rgb_00045.png",
+          "rgb_path": "cam2/rgb_00060.png",
           "charuco_detect_n": 54
         },
         "3": {
           "saved": true,
-          "rgb_path": "cam3/rgb_00045.png",
+          "rgb_path": "cam3/rgb_00060.png",
           "charuco_detect_n": 60
         }
       },

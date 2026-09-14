@@ -1831,11 +1831,20 @@ def prepare_ablation_data(args) -> PreparedAblationData:
         train_obs, "cube", board_gtc, robot_T, K_map, D_map, gripper)
     missing_visual = sorted(eligible - set(visual_cubes))
     if missing_visual:
-        raise RuntimeError(
-            f"visual cube initialization missing for train sets {missing_visual}")
+        # 그리퍼캠(eye-in-hand) 큐브 관측이 train에 없는 세트(Zeus처럼 세트당
+        # 그리퍼 뷰가 1개뿐인 리그에서 그 뷰가 held-out으로 빠진 경우). 초기값만
+        # raw-FK 큐브 pose로 대신 잡는다 -- 자유 변수 행(A1/A2/B*)은 이 값을
+        # 재최적화하므로 결과가 FK에 묶이지는 않는다. 어떤 세트가 fallback을
+        # 썼는지는 shared_reference_diag에 남긴다.
+        print(f"[WARN] visual cube initialization missing for train sets {missing_visual}; "
+              "initializing those sets from the raw-FK cube pose (initial value only)")
+        for s in missing_visual:
+            visual_cubes[s] = np.asarray(fixed_cubes[s], dtype=np.float64).copy()
     shared_reference_state, shared_reference_diag = build_shared_reference_state(
         train_obs, gripper, robot_T, K_map, D_map,
         board_gtc, board_initial, visual_cubes)
+    shared_reference_diag = dict(shared_reference_diag)
+    shared_reference_diag["visual_init_fallback_raw_fk_sets"] = list(missing_visual)
     return PreparedAblationData(
         meta=meta,
         cube_config_source=cube_cfg_source,
