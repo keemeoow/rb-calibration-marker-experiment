@@ -22,45 +22,48 @@ sequential_frozen_stage(A1, 그리퍼가 먼저 정하고 고정캠이 일방적
 이 정의와 안 맞아서 제거했다 — "서로 정보 교환 없음"이 아니라 한쪽이 다른
 쪽에 일방적으로 맞추는 비대칭 구조이기 때문.)
 
-## 2026-09-14 재촬영 결과 (GT 큐브, 카메라 리그 재배치)
+## 2026-09-14 재촬영 결과 (GT 큐브, 카메라 리그 재배치, cam0 내부 파라미터 재촬영 반영)
 
 > 09-14 밤에 session1/2/3를 전부 다시 찍고(`capture_replayed_0914`, `capture_placed_0914`(+held/released), `capture_replayed_0914`),
 > 외부 GT 3장(`data/gt_frames_0914/20260914_232234/000..002`)을 찍었다. **세 세션 모두 GT 큐브**(`targets/gt_cube/cube_config.json`)를 썼고,
 > 카메라 리그는 09-09와 130~335mm 다르게 놓였다(세션 간에는 ≤1mm/0.2° 고정 확인). 아래 숫자는 전부 0914 데이터 기준이며
-> 0909 결과(다음 절 이하)와는 **같은 절차·다른 리그**다. session3는 그리퍼캠만 쓴다(`--s3-gripper-only`; 고정캠 보드 41개 제외).
+> 0909 결과(다음 절 이하)와는 **같은 절차·다른 리그·다른 내부 파라미터**다. session3는 그리퍼캠만 쓴다(`--s3-gripper-only`; 고정캠 보드 41개 제외).
 
-### 먼저 고친 것 두 가지
+### 먼저 고친 것 세 가지
 
 1. **코드 버그**: `fit_placement_fk_ablation.build_synthetic_meta_placed`가 session2 큐브 사진 경로를 `capture_placed/`로 **하드코딩**해서,
    `--session2-capture-subdir capture_placed_0914`를 줘도 **0909 옛 사진(메인 큐브)** 을 읽고 있었다. 처음 나온 train 15px / cam-common 234mm는 이 때문. 지금은 폴더명을 그대로 쓴다.
-2. **GT 큐브 마커 모델이 실물과 달랐다** (`calibrate_gt_cube_geometry.py`로 자체 보정):
-   - 상단 마커(0,1)가 측면 마커 기준 **z −9.9mm** (도면 +74.5 → 실측 +64.5mm). 다면 관측 PnP가 9~19px로 튀던 원인.
-   - 측면 roll(90/180/270/0)은 메인 큐브 값이 맞았다. 마커 6개 6-DoF를 마커 5 게이지로 BA한 뒤 다면 코너 RMSE **2.32 → 0.50px** (사진 179장, `marker_pose_4x4`로 기록).
-   - **마커가 공칭보다 약 1% 작게 인쇄됨**: 전체 스케일 0.985~1.01 스윕에서 0.99이 통합 train RMSE(0.566→0.526px)와 session2 큐브 사후합의(6.5→1.5mm) 둘 다 최소, session1 hand-eye 스케일 검사도 0.993. config에 0.99 적용(51→50.49mm, 25→24.75mm). **캘리퍼스로 측면 마커 한 변 ≈50.5mm인지 확인 바람.**
+2. **cam0(serial 039422061216) 내부 파라미터 재촬영**: 지금까지 쓰던 `ur3_calibration/intrinsics/cam0.npz`는 fx 943.6으로 공장값(915.6)과 3% 달랐다.
+   09-15 새로 찍은 값(ChArUco 11장, RMS 0.26px)은 fx 919.0 / cx 645(공장값과 0.4%). `intrinsics/overrides/039422061216_20260915.npz`에 넣었고,
+   `fit_grasp_offset.load_intrinsics_by_label`이 `intrinsics/overrides/<serial>*.npz`가 있으면 그 카메라는 자동으로 그 값을 쓴다(모든 Zeus 스크립트 공통; `ZEUS_INTRINSICS_NO_OVERRIDE=1`로 끌 수 있음).
+3. **GT 큐브 마커 모델이 실물과 달랐다** (`calibrate_gt_cube_geometry.py`로 자체 보정, 새 내부 파라미터로 다시 돌림):
+   - 상단 마커(0,1)가 측면 마커 기준 **z −9.8mm** (도면 +74.5 → 실측 +64.5mm = 본체 윗면에서 +35mm). 다면 관측 PnP가 9~19px로 튀던 원인.
+   - 측면 roll(90/180/270/0)은 메인 큐브 값이 맞았다. 마커 6개 6-DoF를 마커 5 게이지로 BA한 뒤 다면 코너 RMSE **2.29 → 0.49px** (사진 179장, `marker_pose_4x4`로 기록). 스티커 부착 오차는 위치 0.2~0.9mm, 기울기 0.2~0.8°, 면내 회전 ≤0.6°.
+   - **마커가 공칭보다 약 1% 작게 인쇄됨**: 새 내부 파라미터로도 전체 스케일 0.985~1.01 스윕에서 0.99~0.995가 통합 train RMSE 최소(1.0: 0.549 → 0.99: 0.529px)이고 session2 큐브 사후합의는 0.99에서 최소(6.3 → 1.6mm). config에 0.99 적용(51→50.49mm, 25→24.75mm). **캘리퍼스로 측면 마커 한 변 ≈50.5mm인지 확인 바람.**
 
-데이터 풀 168개: session1 41 / session2-고정캠 39 / session2-그리퍼캠 15 / session2-보드 58 / session3-그리퍼캠 15. `pass1_grasp_offset_replayed_0914.json`: train 0.67px, T_gripper_cube t=[0.45, −0.07, 162.29]mm.
+데이터 풀 168개: session1 41 / session2-고정캠 39 / session2-그리퍼캠 15 / session2-보드 58 / session3-그리퍼캠 15. `pass1_grasp_offset_replayed_0914.json`: T_gripper_cube t=[0.43, −0.07, 162.04]mm.
 
-### Table 1 (0914)
+### Table 1 (0914, 새 내부 파라미터)
 
 | 방법 | Train RMSE px | Heldout Cube RMSE px | Held-out mm/deg (PnP 평균) | Held-out mm/deg (**joint 삼각측량**) | Cross-view Cube px | Cam-common Cube mm/deg | External GT xyz TRE / rz (고정캠 3대, n=3) |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| 통합_no-fk | **0.5259** | 2.1671 | 1.49 / 0.49 | 0.992 / 0.467 | **2.9463** | 3.6298 / 0.7292 | 3.39 / 0.97 |
-| 통합_raw-fk | 0.7179 | **1.9304** | 1.48 / 0.46 | **0.779** / 0.445 | 3.1144 | 3.9477 / 0.7420 | 3.72 / 0.97 |
-| 독립_no-fk | 0.50 / 0.49 | 2.9746 | 1.87 / 0.51 | 1.952 / 0.559 | 3.0132 | **3.5531** / 0.7233 | **3.32** / **0.90** |
+| 통합_no-fk | 0.5292 | 2.1487 | 1.55 / 0.46 | 1.046 / 0.427 | 2.8485 | 3.6425 / 0.7267 | 3.04 / 0.87 |
+| 통합_raw-fk | 0.7226 | **1.8909** | 1.62 / 0.45 | **0.820** / 0.427 | 3.2983 | 4.2243 / 0.7524 | 3.37 / 0.89 |
+| 독립_no-fk | **0.5273 / 0.4937** | 2.4891 | 1.79 / 0.47 | 1.507 / 0.442 | **2.7262** | **3.5017** / 0.7388 | **2.86** / **0.81** |
 
-held-out 방식 Cross-view / Cam-common(15 fold pooled): 통합_no-fk 2.9724px / 3.6507mm·0.7327°, 통합_raw-fk 3.1642 / 3.9789·0.7499, 독립 3.0299 / 3.5706·0.7250 — train-pooled와 같음.
+held-out 방식 Cross-view / Cam-common(15 fold pooled): 통합_no-fk 2.8693px / 3.6623mm·0.7290°, 통합_raw-fk 3.2922 / 4.2039·0.7554, 독립 2.7431 / 3.5233·0.7403 — train-pooled와 같음.
 
 평균 기준 일관성:
 
 | 방법 | Cross-view **mean** \|e\| px | P95 px | 3D 코너 일관성 **mean** mm | RMS / P95 mm | 고정-고정 / 그리퍼-고정 mean mm |
 |---|---:|---:|---:|---:|---:|
-| 통합_no-fk | 3.258 | 8.86 | 3.656 | 4.249 / 7.77 | 4.31 / 3.10 |
-| 통합_raw-fk | 3.670 | 8.86 | 3.982 | 4.447 / 7.69 | 4.59 / 3.47 |
-| 독립_no-fk | **3.221** | 9.84 | **3.589** | 4.240 / 8.07 | 4.13 / 3.13 |
+| 통합_no-fk | 3.380 | 7.49 | 3.657 | 4.006 / 6.70 | 4.32 / 3.10 |
+| 통합_raw-fk | 3.979 | 8.05 | 4.237 | 4.591 / 7.27 | 5.10 / 3.51 |
+| 독립_no-fk | **3.288** | 6.87 | **3.531** | 3.853 / 6.40 | 4.06 / 3.08 |
 
-독립 사후합의: session2 큐브 평균 1.52mm/0.63°(최대 3.05mm/1.96°), session3 보드 1.53mm/0.21°.
+독립 사후합의: session2 큐브 평균 1.58mm/0.63°(최대 3.17mm/1.92°), session3 보드 0.56mm/0.26°.
 
-0909와 같은 그림이다: **raw-fk는 FK 앵커 held-out(joint 0.78mm)에서 이기고, 카메라 간 일치(cross-view/cam-common/3D 코너)는 no-fk·독립이 낫다.** 절대값은 0909보다 좋아졌다(cross-view 3.87→2.95px, cam-common 4.16→3.63mm, joint held-out 1.76→0.99mm) — 리그·큐브가 달라서 직접 비교는 못 하지만, 큐브 기하를 데이터로 맞춘 효과가 크다.
+0909와 같은 그림이다: **raw-fk는 FK 앵커 held-out(joint 0.82mm)에서 이기고, 카메라 간 일치(cross-view/cam-common/3D 코너)와 외부 GT는 독립·no-fk가 낫다.** 절대값은 0909보다 좋아졌다(cross-view 3.87→2.85px, cam-common 4.16→3.64mm, joint held-out 1.76→1.05mm) — 리그·큐브·내부 파라미터가 달라서 직접 비교는 못 하지만, 큐브 기하를 데이터로 맞춘 효과가 크다. cam0 내부 파라미터 교체 전후(같은 데이터)로는 cross-view 2.95→2.85px, 외부 GT TRE 3.39→3.04mm, 그리퍼캠 포함 외부 GT 2.48→2.04mm로 소폭 개선.
 
 ### 외부 GT (0914, `gt_eval_offline.py`, 절대값 평균 n=3)
 
@@ -68,29 +71,27 @@ GT flange pose: 000 (−242.01, 430.02, 178.71, −60.01), 001 (−302.00, 370.0
 
 | 방식 | \|dx\| | \|dy\| | \|dz\| | **xyz TRE** | \|drz\| | (그리퍼캠 포함 가정) xyz TRE / rz |
 |---|---:|---:|---:|---:|---:|---:|
-| 독립_no-fk | 1.57 | 1.23 | 2.25 | **3.32** | **0.90** | **2.27** / 0.94 |
-| 통합_no-fk | 1.65 | 1.12 | 2.40 | 3.39 | 0.97 | 2.48 / 0.98 |
-| 통합_raw-fk | 2.04 | 1.20 | 2.51 | 3.72 | 0.97 | 2.94 / 0.99 |
+| 독립_no-fk | 1.42 | 1.07 | 2.11 | **2.86** | **0.81** | **1.82** / 0.87 |
+| 통합_no-fk | 1.77 | 0.98 | 2.17 | 3.04 | 0.87 | 2.04 / 0.92 |
+| 통합_raw-fk | 2.13 | 1.04 | 2.29 | 3.37 | 0.89 | 2.42 / 0.94 |
 
-트라이얼별(통합_no-fk): dx −2.19/−2.50/−0.26, dy +0.94/−0.82/−1.60, dz +1.81/+1.66/+3.72, drz +0.71/+1.00/+1.20. 세 방식 모두 **dx ≈ −2mm, dz ≈ +2mm가 공통**으로 깔려 있고 방식 간 차이(0.4mm)는 그보다 작다 → 0909와 같은 결론: n=3으로 방식 순위를 못 가른다.
+축별(부호 = 검출 − GT, 고정캠 3대 공동, n=3 평균): 통합_no-fk x −1.77, y −0.44, **z +2.17**, rz +0.87°; raw-fk x −2.13, y −0.61, z +2.29; 독립 x −1.42, y −0.82, z +2.11. 트라이얼별(통합_no-fk): dx −2.23/−1.81/−1.27, dy +0.80/−0.90/−1.23, dz +1.72/+1.82/+2.98, drz +0.63/+0.99/+0.98. 세 방식 모두 **dx ≈ −1.8mm, dz ≈ +2.2mm가 공통**이고 방식 간 차이(0.5mm)는 그보다 작다 → n=3으로 방식 순위를 못 가른다.
 
-카메라별 단일 PnP(통합_no-fk): cam0 4.97mm, fixed2 3.94, fixed3 4.22, 그리퍼(가정) 2.51 — 공동 추정(3.39)이 어느 단일 카메라보다 좋다.
+카메라별 단일 PnP(통합_no-fk, xyz TRE): cam0 3.03mm(축별 평균 x −1.86는 트라이얼 002만 +4.0으로 튐), fixed2 4.47, fixed3 5.33, 그리퍼(가정) 2.76 — 공동 추정(3.04)이 어느 고정캠 하나보다 좋다. z는 세 고정캠이 전부 +2.0~+2.4로 같고(카메라-FK 공통 편향), 그리퍼캠은 z −2.4로 부호가 반대(가정한 촬영 높이 오차 가능).
 
 ### 릴리즈 슬립 vs 카메라-FK 편향 (`analyze_release_slip.py`, held/released 15세트)
 
 | 항목 | 중앙값 dx dy dz (mm) | MAD | \|·\| 평균 |
 |---|---|---|---:|
-| 릴리즈 슬립 (released − held) | −0.07 −0.16 +0.12 | 0.35 0.43 0.31 | 0.85 |
-| 카메라-FK 편향 (held − FK@T_gripper_cube) | +0.59 +1.04 **+2.23** | 1.24 1.11 0.92 | 2.89 |
-| 합계 (released − anchor) | +0.85 +0.97 +2.44 | 1.67 2.12 0.76 | 3.08 |
+| 릴리즈 슬립 (released − held, 3대 평균 pose) | −0.07 −0.16 +0.12 | 0.35 0.30 0.28 | 0.77 |
+| 카메라-FK 편향 (held − FK@T_gripper_cube) | +0.71 +0.92 **+2.01** | 0.56 0.81 0.77 | 2.80 |
+| 합계 (released − anchor) | +0.74 +1.01 +2.20 | 0.70 1.96 0.44 | 2.86 |
 
-**카메라별(같은 카메라의 held/released 두 장만 빼서 외부 파라미터 오차를 완전히 상쇄)** 슬립: cam0 중앙값 [0.00, −0.07, +0.10] MAD [0.42, 0.27, 0.32], fixed2 [0.00, −0.03, +0.04] MAD [0.14, 0.32, 0.23], fixed3 [−0.09, −0.03, +0.07] MAD [0.27, 0.39, 0.32] mm; 카메라 간 편차(std) 평균 [0.50, 0.46, 0.39] mm가 슬립 측정의 노이즈 바닥. 15세트 중 13세트는 세 카메라 모두 |슬립| < 0.5mm(중앙값 기준 사실상 0), **세트 13·14만 세 카메라가 일치해서 1.1~2.0mm / 1.4° 슬립**을 본다. 세트 4·6(cam0 3.7/6.4mm)·7(fixed2 5.9mm)은 그 카메라 한 대만 튀고 나머지 둘은 0.1~0.5mm라 실제 슬립이 아니라 단일 카메라 PnP 튐이다.
+**카메라별(같은 카메라의 held/released 두 장만 빼서 외부 파라미터 오차를 완전히 상쇄)** 슬립: cam0 중앙값 [0.00, −0.08, +0.10] MAD [0.43, 0.27, 0.32], fixed2 [0.00, −0.03, +0.04] MAD [0.14, 0.32, 0.23], fixed3 [−0.09, −0.03, +0.07] MAD [0.34, 0.39, 0.39] mm; 카메라 간 편차(std) 평균 [0.42, 0.43, 0.33] mm가 슬립 측정의 노이즈 바닥. 15세트 중 13세트는 세 카메라 모두 |슬립| < 0.5mm(중앙값 기준 사실상 0), **세트 13·14만 세 카메라가 일치해서 1.1~2.0mm / 1.4° 슬립**을 본다. 세트 4·6(cam0)·7(fixed2)은 그 카메라 한 대만 튀고 나머지 둘은 0.1~0.5mm라 실제 슬립이 아니라 단일 카메라 PnP 튐이다.
 
-외부 GT 축별(고정캠 3대 공동, 부호 = 검출 − GT, n=3 평균 ± std): 통합_no-fk x −1.65 ± 1.21, y −0.49 ± 1.30, **z +2.40 ± 1.15** mm, rz +0.97 ± 0.25°; raw-fk x −2.04, y −0.72, z +2.51, rz +0.97; 독립 x −1.57, y −0.92, z +2.25, rz +0.90. 세 방식 평균의 트라이얼별 값: dx [−2.29, −2.63, −0.34], dy [+0.71, −1.03, −1.81], dz [+1.79, +1.65, **+3.71**], drz [+0.69, +0.98, +1.18] — 방식 간 차이 최대 0.55mm/0.07°로 축마다 공통 편향(x −1.8, z +2.4mm, rz +1°)이 방식 차이보다 크다. 카메라별 단일 PnP(통합_no-fk)는 cam0 z +2.55, fixed2 z +2.27, fixed3 z +2.36mm로 **z +2.3mm는 세 고정캠이 전부 똑같이** 보고, x·y는 카메라마다 부호가 달라(cam0 x +0.25, fixed2 x −2.53, fixed3 x −2.67; y −1.05 / +1.69 / −2.12) 외부 파라미터의 카메라별 잔차다. 그리퍼캠(GT+z300 가정)은 z −1.96mm로 부호가 반대 — 가정한 촬영 높이(z+300)의 오차일 수 있다.
+그리퍼가 아직 큐브를 쥔 상태에서도 카메라가 보는 큐브가 FK 예측보다 **z +2.0mm** 위에 있다(MAD 0.8) — 외부 GT의 dz +2.2mm와 같은 값. 릴리즈 슬립은 0.8mm로 작다. 즉 held-out 0.5mm 벽의 정체는 슬립이 아니라 테이블 높이에서의 **카메라-FK 계통 편향**이고, 이건 session1(큐브가 카메라 가까이·높이 다양)로 맞춘 외부 파라미터가 테이블 높이까지 그대로 안 맞는 것이다. 이 편향은 cam0 내부 파라미터 교체 후에도 그대로라(2.23 → 2.01mm) cam0 문제가 아니었다. 마커 스케일을 1.0으로 두면 이 z 편향은 0에 가깝지만 카메라 쌍 불일치가 8mm로 커진다 — 스케일은 내부 일관성으로 정했고, 캘리퍼스 실측이 이 둘을 가른다.
 
-그리퍼가 아직 큐브를 쥔 상태에서도 카메라가 보는 큐브가 FK 예측보다 **z +2.2mm** 위에 있다(MAD 0.9) — 외부 GT의 dz +2mm와 같은 값. 릴리즈 슬립은 0.85mm로 작다. 즉 held-out 0.5mm 벽의 정체는 슬립이 아니라 테이블 높이에서의 **카메라-FK 계통 편향**이고, 이건 session1(큐브가 카메라 가까이·높이 다양)로 맞춘 외부 파라미터가 테이블 높이까지 그대로 안 맞는 것이다. (마커 스케일 1.0으로 두면 이 z 편향은 0에 가깝지만 카메라 쌍 불일치가 8mm로 커진다 — 스케일은 내부 일관성으로 정했다.)
-
-재현: `fit_grasp_offset.py --capture-subdir capture_replayed_0914 --cube-config ../targets/gt_cube/cube_config.json --out pass1_grasp_offset_replayed_0914.json` → `fit_calibration_methods.py`/`eval_heldout_and_consistency.py` 에 `--session1-capture-subdir capture_replayed_0914 --session2-capture-subdir capture_placed_0914 --session3-capture-subdir capture_replayed_0914 --fit-json pass1_grasp_offset_replayed_0914.json --cube-config ../targets/gt_cube/cube_config.json --s3-gripper-only [--tag _0914]` → `gt_eval_offline.py --capture-root data/gt_frames_0914/20260914_232234 --trial ... --fits fit_*_0914.json` → `analyze_release_slip.py --fit fit_통합_no-fk_0914.json --capture-subdir capture_placed_0914 --cube-config ../targets/gt_cube/cube_config.json`.
+재현: `fit_grasp_offset.py --capture-subdir capture_replayed_0914 --cube-config ../targets/gt_cube/cube_config.json --out pass1_grasp_offset_replayed_0914.json` → `fit_calibration_methods.py`/`eval_heldout_and_consistency.py` 에 `--session1-capture-subdir capture_replayed_0914 --session2-capture-subdir capture_placed_0914 --session3-capture-subdir capture_replayed_0914 --fit-json pass1_grasp_offset_replayed_0914.json --cube-config ../targets/gt_cube/cube_config.json --s3-gripper-only [--tag _0914]` → `gt_eval_offline.py --capture-root data/gt_frames_0914/20260914_232234 --trial ... --fits fit_*_0914.json` → `analyze_release_slip.py --fit fit_통합_no-fk_0914.json --capture-subdir capture_placed_0914 --cube-config ../targets/gt_cube/cube_config.json`. (GT 큐브 기하: `calibrate_gt_cube_geometry.py --gauge side5 --write` 후 스케일 0.99 적용.)
 
 ---
 

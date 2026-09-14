@@ -4,89 +4,89 @@
   "results": {
     "\ud1b5\ud569_no-fk": {
       "success": true,
-      "rmse_px": 0.5258508895765996,
+      "rmse_px": 0.5292146333137392,
       "n_corners": 3228,
       "n_observations": 168
     },
     "\ud1b5\ud569_raw-fk": {
       "success": true,
-      "rmse_px": 0.7178676021544947,
+      "rmse_px": 0.7226051534219065,
       "n_corners": 3228,
       "n_observations": 168
     },
     "\ub3c5\ub9bd_no-fk (\uc9c4\uc9dc \ub3c5\ub9bd, \ud050\ube0c pose \ube44\uacf5\uc720)": {
       "success": true,
-      "fixed_group_rmse_px": 0.5016437056847082,
-      "gripper_group_rmse_px": 0.49375795187207,
+      "fixed_group_rmse_px": 0.5272515448674068,
+      "gripper_group_rmse_px": 0.4937137089500764,
       "n_observations": 168,
       "consensus_per_set": {
         "0": {
-          "translation_mm": 0.4428105709785248,
-          "rotation_deg": 1.9356198135799791
+          "translation_mm": 0.9743586903203112,
+          "rotation_deg": 1.6734357736901468
         },
         "1": {
-          "translation_mm": 2.4583263174123116,
-          "rotation_deg": 1.9564485888048195
+          "translation_mm": 3.1654289289047535,
+          "rotation_deg": 1.919000587733266
         },
         "2": {
-          "translation_mm": 0.921080685885655,
-          "rotation_deg": 0.2567184316793845
+          "translation_mm": 1.7639581840603442,
+          "rotation_deg": 0.44673908439754145
         },
         "3": {
-          "translation_mm": 2.336174432227602,
-          "rotation_deg": 0.32232238595421625
+          "translation_mm": 1.6604129506130456,
+          "rotation_deg": 0.25269013520711586
         },
         "4": {
-          "translation_mm": 1.1228272565348236,
-          "rotation_deg": 0.561584671275347
+          "translation_mm": 1.836245425419163,
+          "rotation_deg": 0.389301852217408
         },
         "5": {
-          "translation_mm": 0.994534771172773,
-          "rotation_deg": 0.3942913649810832
+          "translation_mm": 1.5588268244226913,
+          "rotation_deg": 0.2863994202815298
         },
         "6": {
-          "translation_mm": 1.7447646351906165,
-          "rotation_deg": 0.20949746945899161
+          "translation_mm": 1.9469631047802738,
+          "rotation_deg": 0.33888830776816115
         },
         "7": {
-          "translation_mm": 1.065655090934339,
-          "rotation_deg": 0.8689893850090835
+          "translation_mm": 0.4856980758520622,
+          "rotation_deg": 0.7970139402364109
         },
         "8": {
-          "translation_mm": 0.8044879676636598,
-          "rotation_deg": 0.25428613994203597
+          "translation_mm": 0.8238067392564383,
+          "rotation_deg": 0.5366229958209401
         },
         "9": {
-          "translation_mm": 3.049364222297461,
-          "rotation_deg": 0.02576745601652253
+          "translation_mm": 2.295363170943787,
+          "rotation_deg": 0.25612761744779283
         },
         "10": {
-          "translation_mm": 0.7857317722281538,
-          "rotation_deg": 0.6023845539428875
+          "translation_mm": 1.4941412517991914,
+          "rotation_deg": 0.23438352863346865
         },
         "11": {
-          "translation_mm": 1.977861383051819,
-          "rotation_deg": 0.17596360705608688
+          "translation_mm": 1.6040346928196674,
+          "rotation_deg": 0.31108705918157736
         },
         "12": {
-          "translation_mm": 1.753644167104821,
-          "rotation_deg": 0.2684666737413217
+          "translation_mm": 1.5804208103049877,
+          "rotation_deg": 0.4197504231232701
         },
         "13": {
-          "translation_mm": 1.5811546720304244,
-          "rotation_deg": 1.343274376624279
+          "translation_mm": 1.4486394139447831,
+          "rotation_deg": 1.3590596546178277
         },
         "14": {
-          "translation_mm": 1.7621407844717079,
-          "rotation_deg": 0.26666088719775005
+          "translation_mm": 1.0509296874985883,
+          "rotation_deg": 0.18108329456068248
         }
       },
-      "consensus_mean_mm": 1.5200372486123126,
-      "consensus_mean_deg": 0.6294850536842526,
-      "consensus_max_mm": 3.049364222297461,
-      "consensus_max_deg": 1.9564485888048195,
-      "consensus_board_mm": 1.5337438629577507,
-      "consensus_board_deg": 0.2115219972243276
+      "consensus_mean_mm": 1.5792818633960057,
+      "consensus_mean_deg": 0.6267722449944759,
+      "consensus_max_mm": 3.1654289289047535,
+      "consensus_max_deg": 1.919000587733266,
+      "consensus_board_mm": 0.5579216247348153,
+      "consensus_board_deg": 0.2568071406565033
     }
   }
 }

@@ -70,6 +70,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -122,13 +123,37 @@ def resolve_zeus_camera_serials(device_map_path: Path) -> dict:
     return label_to_serial, serial_to_idx
 
 
+def find_intrinsics_override(zeus_intrinsics_dir: Path, serial: str):
+    """`<zeus_intrinsics_dir>/overrides/<serial>*.npz` 가 있으면 그 파일(이름순 마지막 = 최신)을
+    돌려준다. 카메라 하나만 다시 찍은 내부 파라미터를 모든 스크립트에 한 번에 적용하기 위한
+    규약. 환경변수 ZEUS_INTRINSICS_NO_OVERRIDE=1 이면 무시."""
+    if os.environ.get("ZEUS_INTRINSICS_NO_OVERRIDE"):
+        return None
+    cands = sorted((zeus_intrinsics_dir / "overrides").glob(f"{serial}*.npz"))
+    return cands[-1] if cands else None
+
+
+def load_intrinsics_npz_generic(path: Path):
+    """K/D 또는 color_K/color_D 키를 가진 npz 에서 (K, D) 를 읽는다."""
+    z = np.load(path, allow_pickle=True)
+    kk = "K" if "K" in z else "color_K"
+    dk = "D" if "D" in z else "color_D"
+    return np.asarray(z[kk], dtype=np.float64).reshape(3, 3), np.asarray(z[dk], dtype=np.float64).reshape(-1)
+
+
 def load_intrinsics_by_label(zeus_intrinsics_dir: Path, ur3_intrinsics_dir: Path,
                              device_map_path: Path) -> tuple:
-    """Return (K_map, D_map) keyed by LOCAL_CAM_IDS, from the two directories."""
+    """Return (K_map, D_map) keyed by LOCAL_CAM_IDS, from the two directories.
+    `<zeus_intrinsics_dir>/overrides/<serial>*.npz` 가 있으면 그 카메라는 그 값을 우선 쓴다."""
     label_to_serial, serial_to_idx = resolve_zeus_camera_serials(device_map_path)
     K_map, D_map = {}, {}
     for label, local_id in LOCAL_CAM_IDS.items():
-        if label == BORROWED_UR3_LABEL:
+        serial_for_label = BORROWED_UR3_LABEL if label == BORROWED_UR3_LABEL else label_to_serial[label]
+        override = find_intrinsics_override(Path(zeus_intrinsics_dir), serial_for_label)
+        if override is not None:
+            K, D = load_intrinsics_npz_generic(override)
+            print(f"[intrinsics] {label} (serial {serial_for_label}): override {override.name} 사용 (fx={K[0,0]:.1f})")
+        elif label == BORROWED_UR3_LABEL:
             K, D, _ = load_intrinsics_with_depth_scale(str(ur3_intrinsics_dir), 0)
             npz = np.load(ur3_intrinsics_dir / "cam0.npz", allow_pickle=True)
             actual_serial = str(npz["serial"]) if "serial" in npz else None
