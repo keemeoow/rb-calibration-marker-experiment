@@ -120,7 +120,14 @@ def main():
         slip_t, slip_r = delta_vec(T_h, T_r)
         ha_t, ha_r = delta_vec(T_anchor, T_h)
         ra_t, ra_r = delta_vec(T_anchor, T_r)
-        rows.append({"set": idx, "slip_mm": slip_t.tolist(), "slip_deg": slip_r,
+        # 카메라별 슬립: 같은 카메라의 held/released 두 장을 그 카메라 기준으로만 빼서
+        # 외부 파라미터 오차가 완전히 상쇄된 값 (기존 3대 평균 pose 차이와 별도)
+        per_cam_slip = {}
+        for label in FIXED_LABELS:
+            if label in pc_h and label in pc_r:
+                st, sr = delta_vec(pc_h[label], pc_r[label])
+                per_cam_slip[label] = {"mm": st.tolist(), "deg": sr}
+        rows.append({"set": idx, "slip_mm": slip_t.tolist(), "slip_deg": slip_r, "per_camera_slip": per_cam_slip,
                      "held_minus_anchor_mm": ha_t.tolist(), "held_minus_anchor_deg": ha_r,
                      "released_minus_anchor_mm": ra_t.tolist(), "released_minus_anchor_deg": ra_r,
                      "held_cams": sorted(pc_h), "released_cams": sorted(pc_r)})
@@ -138,6 +145,34 @@ def main():
                       ("released_minus_anchor_mm", "합계 (released − anchor)")):
         med, mad, norms = stats(key)
         print(f"  {name:>32}: 중앙값 {np.round(med, 2)}  MAD {np.round(mad, 2)}  |·| 평균 {norms.mean():.2f} mm (n={len(rows)})")
+    print("\n=== 카메라별 릴리즈 슬립 (released − held, 같은 카메라끼리; base 프레임 mm) ===")
+    print(f"{'set':>3} | " + " | ".join(f"{lab[:12]:>28}" for lab in FIXED_LABELS) + " | 카메라 간 편차(std)")
+    per_cam_all = {lab: [] for lab in FIXED_LABELS}
+    spread = []
+    for r in rows:
+        cells = []
+        vs = []
+        for lab in FIXED_LABELS:
+            v = r["per_camera_slip"].get(lab)
+            if v is None:
+                cells.append(f"{'-':>28}")
+                continue
+            a = np.array(v["mm"]); per_cam_all[lab].append(a); vs.append(a)
+            cells.append(f"{a[0]:6.2f} {a[1]:6.2f} {a[2]:6.2f} |{np.linalg.norm(a):5.2f}| {v['deg']:4.2f}°")
+        if len(vs) >= 2:
+            sd = np.array(vs).std(axis=0); spread.append(sd)
+            sp = f"{sd[0]:.2f} {sd[1]:.2f} {sd[2]:.2f}"
+        else:
+            sp = "-"
+        print(f"{r['set']:>3} | " + " | ".join(cells) + f" | {sp}")
+    for lab in FIXED_LABELS:
+        A = np.array(per_cam_all[lab])
+        if len(A) == 0:
+            continue
+        med = np.median(A, axis=0); mad = np.median(np.abs(A - med), axis=0) * 1.4826
+        print(f"  {lab:>13}: 중앙값 {np.round(med, 2)}  MAD {np.round(mad, 2)}  |·| 평균 {np.linalg.norm(A, axis=1).mean():.2f} mm (n={len(A)})")
+    if spread:
+        print(f"  카메라 간 편차(std) 평균: {np.round(np.mean(spread, axis=0), 2)} mm  -> 슬립 측정 자체의 노이즈 바닥")
     out = Path(args.out) if args.out else Path(args.fit).with_name(f"release_slip_{args.capture_subdir}.json")
     out.write_text(json.dumps(rows, indent=2))
     print(f"\nwrote {out}")
