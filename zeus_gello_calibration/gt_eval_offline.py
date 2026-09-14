@@ -5,7 +5,7 @@
 JSON 목록에 대해 로봇/카메라 없이 오프라인으로 외부 GT 오차를 계산한다.
 
 새 캘리브레이션 변형(corrected-FK 등)을 만들 때마다 실물 실험을 다시 하지
-않고 같은 사진으로 비교하기 위한 것. 오차 정의는 ABLATION_RESULTS.md "결과 2"와
+않고 같은 사진으로 비교하기 위한 것. 오차 정의는 METHODS_ANALYSIS.md "결과 2"와
 같다: x,y는 offset 없이, z는 `검출 z − (GT flange z − 그 fit의 T_gripper_cube z)`,
 rz는 offset 없이 직접 비교.
 

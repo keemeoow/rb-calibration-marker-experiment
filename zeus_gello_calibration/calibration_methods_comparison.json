@@ -16,77 +16,77 @@
     },
     "\ub3c5\ub9bd_no-fk (\uc9c4\uc9dc \ub3c5\ub9bd, \ud050\ube0c pose \ube44\uacf5\uc720)": {
       "success": true,
-      "fixed_group_rmse_px": 0.6148259302035431,
+      "fixed_group_rmse_px": 0.614826047145809,
       "gripper_group_rmse_px": 0.548415749448067,
       "n_observations": 220,
       "consensus_per_set": {
         "0": {
-          "translation_mm": 7.329714299790928,
-          "rotation_deg": 2.329888580046432
+          "translation_mm": 7.329152297657178,
+          "rotation_deg": 2.329807934112557
         },
         "1": {
-          "translation_mm": 1.7832570212574714,
-          "rotation_deg": 1.1493873170573428
+          "translation_mm": 1.7834704872257388,
+          "rotation_deg": 1.1493809637263304
         },
         "2": {
-          "translation_mm": 3.8875110303106992,
-          "rotation_deg": 1.0580255643303986
+          "translation_mm": 3.8879624799969625,
+          "rotation_deg": 1.0594334678113757
         },
         "3": {
-          "translation_mm": 2.867095621557189,
-          "rotation_deg": 0.9045578059105907
+          "translation_mm": 2.8673735474557147,
+          "rotation_deg": 0.9045874792286976
         },
         "4": {
-          "translation_mm": 0.7858282831453866,
-          "rotation_deg": 0.39072611776321864
+          "translation_mm": 0.7854166066798061,
+          "rotation_deg": 0.3906979542953266
         },
         "5": {
-          "translation_mm": 5.092777007888509,
-          "rotation_deg": 0.8875321196743161
+          "translation_mm": 5.092992273733874,
+          "rotation_deg": 0.8875972132061357
         },
         "6": {
-          "translation_mm": 1.866444076791567,
-          "rotation_deg": 0.7847785385165358
+          "translation_mm": 1.8666955585378862,
+          "rotation_deg": 0.7848552732441822
         },
         "7": {
-          "translation_mm": 2.1215464351394635,
-          "rotation_deg": 1.3605403785519439
+          "translation_mm": 2.121598067465645,
+          "rotation_deg": 1.3605783501299322
         },
         "8": {
-          "translation_mm": 1.6194670372676148,
-          "rotation_deg": 0.9391017958529156
+          "translation_mm": 1.61967477556409,
+          "rotation_deg": 0.9391988731903224
         },
         "9": {
-          "translation_mm": 1.9257687681057156,
-          "rotation_deg": 1.162045639686586
+          "translation_mm": 1.9259007406923914,
+          "rotation_deg": 1.162102633023991
         },
         "10": {
-          "translation_mm": 2.3095262146055435,
-          "rotation_deg": 0.5876755394621989
+          "translation_mm": 2.3091416262261752,
+          "rotation_deg": 0.5876704237731145
         },
         "11": {
-          "translation_mm": 2.7869911267655407,
-          "rotation_deg": 0.2789528717867289
+          "translation_mm": 2.786683313202939,
+          "rotation_deg": 0.2789930354179466
         },
         "12": {
-          "translation_mm": 1.767556658159641,
-          "rotation_deg": 0.7811783060529381
+          "translation_mm": 1.7672571848195753,
+          "rotation_deg": 0.7812369408033091
         },
         "13": {
-          "translation_mm": 4.453242276844954,
-          "rotation_deg": 1.9063460411009243
+          "translation_mm": 4.452844081606522,
+          "rotation_deg": 1.9063186116385928
         },
         "14": {
-          "translation_mm": 2.5457401835079767,
-          "rotation_deg": 0.6923859118273077
+          "translation_mm": 2.545437711507765,
+          "rotation_deg": 0.6924304530379364
         }
       },
-      "consensus_mean_mm": 2.8761644027425466,
-      "consensus_mean_deg": 1.0142081685080249,
-      "consensus_max_mm": 7.329714299790928,
-      "consensus_max_deg": 2.329888580046432,
-      "consensus_board_mm": 2.0146333241381877,
-      "consensus_board_deg": 0.19723843191653984
+      "consensus_mean_mm": 2.8761067168248173,
+      "consensus_mean_deg": 1.0143259737759835,
+      "consensus_max_mm": 7.329152297657178,
+      "consensus_max_deg": 2.329807934112557,
+      "consensus_board_mm": 2.0143908925084912,
+      "consensus_board_deg": 0.1971553211041541
     }
   }
 }
