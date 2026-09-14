@@ -46,7 +46,16 @@ from calibration_pipeline.runtime import (
     load_intrinsics_with_depth_scale,
     resolve_cube_config_for_run,
 )
-from capture_pipeline.waypoint_safety import PROTOCOL_COMPOSITE_RIG_45
+from capture_pipeline.waypoint_safety import (
+    PROTOCOL_COMPOSITE_RIG_45,
+    PROTOCOL_SAVED_POSE_REPLAY,
+)
+
+
+PHASE_AWARE_CAPTURE_PROTOCOLS = {
+    PROTOCOL_COMPOSITE_RIG_45,
+    PROTOCOL_SAVED_POSE_REPLAY,
+}
 
 
 OUTPUT_NAMES = {
@@ -105,7 +114,7 @@ def _saved_camera_rows(meta: dict) -> Iterable[Tuple[dict, int, dict]]:
     for capture in meta.get("captures", []):
         if int(capture.get("event_id", -1)) < 0:
             continue
-        if (capture.get("protocol_version") == PROTOCOL_COMPOSITE_RIG_45
+        if (capture.get("protocol_version") in PHASE_AWARE_CAPTURE_PROTOCOLS
                 and capture.get("selected_for_analysis") is not True):
             continue
         for camera_text, camera_info in capture.get("cams", {}).items():
@@ -217,7 +226,7 @@ def _cube_records(session_root: Path, meta: dict, cube, K_map, D_map,
             "set_idx": quality.get("set_idx"),
             "grasp_idx": (
                 int(capture.get("grasp_id"))
-                if (capture.get("protocol_version") == PROTOCOL_COMPOSITE_RIG_45
+                if (capture.get("protocol_version") in PHASE_AWARE_CAPTURE_PROTOCOLS
                     and capture.get("cube_gripped")
                     and capture.get("grasp_id") is not None)
                 else None
@@ -319,7 +328,7 @@ def _board_records(session_root: Path, meta: dict, board_cfg, image_scale: float
             "set_idx": None if set_index is None else int(set_index),
             "grasp_idx": (
                 int(capture.get("grasp_id"))
-                if (capture.get("protocol_version") == PROTOCOL_COMPOSITE_RIG_45
+                if (capture.get("protocol_version") in PHASE_AWARE_CAPTURE_PROTOCOLS
                     and capture.get("cube_gripped")
                     and capture.get("grasp_id") is not None)
                 else None
@@ -779,19 +788,33 @@ def run_filter(args) -> dict:
     meta_path = session_root / "meta.json"
     with meta_path.open("r", encoding="utf-8") as stream:
         meta = json.load(stream)
-    is_final_protocol = (
-        meta.get("capture_config", {}).get("capture_protocol")
-        == PROTOCOL_COMPOSITE_RIG_45
-    )
+    capture_protocol = meta.get("capture_config", {}).get("capture_protocol")
+    is_final_protocol = capture_protocol in PHASE_AWARE_CAPTURE_PROTOCOLS
     if is_final_protocol:
         selected_captures = [
             capture for capture in meta.get("captures", [])
-            if capture.get("protocol_version") == PROTOCOL_COMPOSITE_RIG_45
+            if capture.get("protocol_version") == capture_protocol
             and capture.get("selected_for_analysis") is True
         ]
-        if len(selected_captures) != 45:
+        expected_count = int(
+            meta.get("capture_config", {}).get(
+                "expected_event_count",
+                45 if capture_protocol == PROTOCOL_COMPOSITE_RIG_45 else 0,
+            )
+        )
+        planned_ids = [
+            str(capture.get("planned_event_id") or "")
+            for capture in selected_captures
+        ]
+        if (
+            expected_count <= 0
+            or len(selected_captures) != expected_count
+            or len(set(planned_ids)) != expected_count
+            or "" in planned_ids
+        ):
             raise RuntimeError(
-                "final protocol filter requires 45 selected_for_analysis captures; "
+                "phase-aware protocol filter requires exactly one selected capture "
+                f"for each of {expected_count} planned events; "
                 f"found {len(selected_captures)}"
             )
         meta = dict(meta)

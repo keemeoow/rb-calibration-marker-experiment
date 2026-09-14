@@ -35,6 +35,11 @@ composite_rig_45_v2
     실패만 같은 event ID로 재시도한다. 품질을 이유로 재촬영하면 표적이 잘 보이는
     자세만 남아 표본이 편향되므로 일부러 분리해 둔 것이다.
 
+saved_pose_replay_v1
+    ``--saved-pose-replay --all-phases``에서 Zeus legacy session1/2/3의 저장 pose를
+    모두 사용한다. P1/P2/P3 개수는 원본 파일에서 읽고, 세 phase를 하나의 새
+    ``calib_train`` session에 저장한다.
+
 입력 / 처리 / 출력
 ------------------
 입력: 02단계의 intrinsics/, 카메라들, composite rig, 로봇 서버, 검증된 waypoint 파일.
@@ -69,8 +74,13 @@ import를 main() 안에 두는 이유: pyrealsense2와 로봇 서버 의존성�
 """
 
 def main() -> None:
-    # 내부 구현은 모듈로 유지하되, 최종 protocol만 이 진입점에서 허용한다.
-    from capture_pipeline.capture import main as run
+    import sys
+
+    if "--saved-pose-replay" in sys.argv:
+        sys.argv.remove("--saved-pose-replay")
+        from zeus_gello_calibration.replay_and_recapture import main as run
+    else:
+        from capture_pipeline.capture import main as run
     run()
 
 
