@@ -157,15 +157,26 @@ def grip(state, desc):
     return {"kind": "grip", "state": state, "desc": desc}
 
 
-def cap(desc):
-    return {"kind": "capture", "desc": desc}
+def cap(desc, tag=None, settle_s=None):
+    """tag=None: 캘리브레이션용 본 촬영(파킹 자세, out_root/NNN).
+    tag="held"/"released": 놓는 자리에서 그리퍼 열기 전/후 진단 촬영(out_root/<tag>/NNN).
+    held-released 차이가 릴리즈 슬립, held vs FK anchor 차이가 테이블 높이에서의 카메라-FK 편향."""
+    return {"kind": "capture", "desc": desc, "tag": tag, "settle_s": settle_s}
+
+
+RELEASE_SETTLE_S = 1.0   # 그리퍼 연 뒤 큐브가 자리 잡을 시간 (released 촬영 전)
 
 
 def build_plan(items, start_pose, start_joints, cam_pose, cam_pose_joints, approach_mm, return_home,
-               move_speed=MOVE_LIN_SPEED, descend_speed=DESCEND_LIN_SPEED, jnt_speed=JNT_SPEED_PARK):
+               move_speed=MOVE_LIN_SPEED, descend_speed=DESCEND_LIN_SPEED, jnt_speed=JNT_SPEED_PARK,
+               held_released=True):
     """이동 순서: 위치+회전을 한 movel에 같이 넣지 않는다 -- 큰 회전 변화가
     있는 구간마다 먼저 "제자리에서 회전만 정렬"(align_rotation)한 뒤에
-    위치를 옮긴다. 그래야 각 movel이 더 단순해져서 Unreachable이 덜 난다."""
+    위치를 옮긴다. 그래야 각 movel이 더 단순해져서 Unreachable이 덜 난다.
+
+    held_released=True면 놓는 자리에서 그리퍼 열기 **전**(held)과 **후**(released)에
+    한 장씩 더 찍는다(로봇은 그 사이 안 움직임). 캘리브레이션 본 데이터는 그대로
+    파킹 자세 촬영(NNN/)이고, held/·released/는 진단용 별도 폴더."""
     steps = []
 
     def place_only_block(label, current_pose, dest_pose):
@@ -173,7 +184,12 @@ def build_plan(items, start_pose, start_joints, cam_pose, cam_pose_joints, appro
                         f"[{label}] place 방향 정렬 (제자리 회전)"))
         steps.append(mv(approach_of(dest_pose, approach_mm), move_speed, f"[{label}] place approach 이동"))
         steps.append(mv(dest_pose, descend_speed, f"[{label}] place 수직 하강"))
+        if held_released:
+            steps.append(cap(f"[{label}] 진단 촬영: 그리퍼 열기 전 (held)", tag="held"))
         steps.append(grip("open", f"[{label}] 그리퍼 열기 (place)"))
+        if held_released:
+            steps.append(cap(f"[{label}] 진단 촬영: 그리퍼 연 후 (released, {RELEASE_SETTLE_S}s 정착 대기)",
+                             tag="released", settle_s=RELEASE_SETTLE_S))
         steps.append(mv(approach_of(dest_pose, approach_mm), descend_speed, f"[{label}] place 수직 상승"))
         steps.append(mj(cam_pose_joints, jnt_speed, f"[{label}] 고정 촬영 위치로 이동"))
         steps.append(cap(f"[{label}] 촬영 자리"))
@@ -223,7 +239,11 @@ def execute_plan(steps, rb: ZeusClient, cams, labels, out_root: Path, view, no_s
                   skip_steps: int = 0):
     # 건너뛰는 스텝 중 몇 개가 "촬영" 스텝이었는지 세어서, 재개했을 때 캡처
     # 번호가 처음부터 다시 매겨지며 기존 파일을 덮어쓰지 않게 한다.
-    capture_counter = sum(1 for s in steps[:skip_steps] if s["kind"] == "capture")
+    # 본 촬영(tag None)과 진단 촬영(held/released)은 번호를 따로 센다.
+    counters = {None: 0, "held": 0, "released": 0}
+    for s in steps[:skip_steps]:
+        if s["kind"] == "capture":
+            counters[s.get("tag")] = counters.get(s.get("tag"), 0) + 1
 
     for i, step in enumerate(steps):
         if i < skip_steps:
@@ -247,13 +267,17 @@ def execute_plan(steps, rb: ZeusClient, cams, labels, out_root: Path, view, no_s
             elif step["kind"] == "grip":
                 rb.grip(step["state"], timeout_s=GRIP_TIMEOUT_S)
             else:  # capture
-                time.sleep(SETTLE_S)
+                tag = step.get("tag")
+                time.sleep(step.get("settle_s") or SETTLE_S)
                 if view is not None:
                     view.show()
-                robot_state = read_robot_state(rb, {"capture_index": capture_counter, "step_index": i})
+                n = counters.get(tag, 0)
+                robot_state = read_robot_state(rb, {"capture_index": n, "step_index": i,
+                                                    "capture_tag": tag or "parking"})
                 frames = grab_frames(cams, labels)
-                write_capture(frames, out_root / f"{capture_counter:03d}", robot_state)
-                capture_counter += 1
+                dest = out_root / f"{n:03d}" if tag is None else out_root / tag / f"{n:03d}"
+                write_capture(frames, dest, robot_state)
+                counters[tag] = n + 1
         except ZeusError as exc:
             print(f"\n  [ERROR] 스텝 {i + 1} 실패, 중단합니다: {exc}")
             print(f"  이어서 하려면: --skip-steps {i} (이 스텝부터 다시 시도) "
@@ -278,6 +302,8 @@ def main():
     ap.add_argument("--descend-speed", type=float, default=DESCEND_LIN_SPEED, help="수직 하강/상승 movel 속도")
     ap.add_argument("--jnt-speed", type=float, default=JNT_SPEED_PARK, help="movej(0단계, 촬영 파킹) 속도")
     ap.add_argument("--return-home", action="store_true", help="마지막에 큐브를 GRASP_REF_POSE 위치로 복귀")
+    ap.add_argument("--no-held-released", action="store_true",
+                    help="놓는 자리에서 그리퍼 열기 전(held)/후(released) 진단 촬영을 생략 (기본은 촬영, out_root/held/, out_root/released/)")
     ap.add_argument("--execute", action="store_true", help="실제로 이동/그리퍼/촬영 (없으면 dry-run)")
     ap.add_argument("--no-step", action="store_true", help="스텝마다 Enter로 확인하지 않고 연속 실행")
     ap.add_argument("--skip-steps", type=int, default=0,
@@ -318,7 +344,7 @@ def main():
     steps = build_plan(items, start_pose, start_joints, cam_pose, cam_pose_joints,
                         args.approach_mm, args.return_home,
                         move_speed=args.move_speed, descend_speed=args.descend_speed,
-                        jnt_speed=args.jnt_speed)
+                        jnt_speed=args.jnt_speed, held_released=not args.no_held_released)
     print_plan(steps)
 
     if not args.execute:
