@@ -58,17 +58,17 @@ def _summary(runs):
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root-folder", default="data/session04/calib_train")
+    parser.add_argument("--root-folder", default="data/session02_NOUSE_session04_0814/calib_train")
     parser.add_argument("--intrinsics-dir", default="intrinsics")
     parser.add_argument(
         "--manifest",
-        default=("data/session04/calib_out/capture_filter/"
+        default=("data/session02_NOUSE_session04_0814/calib_out/capture_filter/"
                  "Step2b_observation_manifest.json"))
     parser.add_argument("--include-sets", default="4-12")
     parser.add_argument("--num-inits", type=int, default=3)
     parser.add_argument(
         "--output",
-        default=("data/session04/calib_out/verify/"
+        default=("data/session02_NOUSE_session04_0814/calib_out/verify/"
                  "a3_fk_pose_source_comparison.json"))
     return parser.parse_args(argv)
 

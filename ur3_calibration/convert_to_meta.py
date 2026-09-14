@@ -2,14 +2,14 @@
 # -*- coding: utf-8 -*-
 """ur3_calibration/convert_to_meta.py -- UR3 raw capture -> calibration_pipeline meta.json
 
-Converts the raw captures under ur3_calibration/data/session{1,2,3}_*/capture/
+Converts the raw captures under ur3_calibration/data/session{1,2,3}_*_<MMDD>/capture/
 into the calibration_pipeline's expected data/<session>/calib_train/{meta.json,
 camN/*.png} layout, so that 04_filter_observations.py / 05_calibrate.py
 (calibration_pipeline.table1) can run against them unmodified.
 
 Three raw sessions, two output meta.json files:
 
-  data/ur3_session12/calib_train/meta.json
+  data/session10_ur3_handheld_floor_meta_0909/calib_train/meta.json
       session1 (cube gripped throughout, fixed cams watch it move) +
       session2 (cube placed ungripped at 12 floor spots, fixed cams + the
       parked gripper cam watch each spot) combined into one dataset so
@@ -19,11 +19,8 @@ Three raw sessions, two output meta.json files:
 
       event_id: 0..14 = session1 captures 000..014 (in original order),
                 15..26 = session2 captures 000..011 (in original order,
-                which is already the actual robot execution order -- see
-                session2_pick_and_place.py: capture indices are assigned by
-                make_session2_capture_callback() in the exact order
-                build_session2_steps()/compute_ordered_targets() visits
-                targets, i.e. delta_yaw-ascending order, NOT poses.json's
+                which is already the archived robot execution order: capture
+                indices follow delta-yaw ascending order, not poses.json's
                 original per-pose index).
       set_index: session1 -> 0 (single set, all 15 events share it);
                  session2 -> 1..12, one per floor placement (= capture
@@ -32,7 +29,7 @@ Three raw sessions, two output meta.json files:
       capture_block: "B_eyetohand" for session1 (matches Zeus's convention
                  for gripped/hand-eye captures), "A_placement" for session2.
 
-  data/ur3_session3/calib_train/meta.json
+  data/session09_ur3_wrist_meta_0909/calib_train/meta.json
       session3 (gripper empty, only the wrist moves, watching the stationary
       floor ChArUco board) -- board-only, cube_gripped=False throughout,
       no cube observations at all. See the module docstring notes in the
@@ -252,7 +249,7 @@ def convert_session12(
     meta = meta_header(calib_train_dir)
     captures = []
 
-    session1_dir = UR3_DATA_ROOT / "session1_handheld_fixed_cam" / "capture"
+    session1_dir = UR3_DATA_ROOT / "session1_handheld_fixed_cam_0909" / "capture"
     session1_indices = sorted(int(p.name) for p in session1_dir.iterdir() if p.is_dir())
     for event_id, idx in enumerate(session1_indices):
         capture_dir = session1_dir / f"{idx:03d}"
@@ -267,7 +264,7 @@ def convert_session12(
             calib_train_dir=calib_train_dir,
         ))
 
-    session2_dir = UR3_DATA_ROOT / "session2_floor_board_dual_cam" / "capture"
+    session2_dir = UR3_DATA_ROOT / "session2_floor_board_dual_cam_0909" / "capture"
     session2_indices = sorted(int(p.name) for p in session2_dir.iterdir() if p.is_dir())
     event_offset = len(session1_indices)
     for order, idx in enumerate(session2_indices):
@@ -305,7 +302,7 @@ def convert_session3(out_root: Path) -> Path:
     meta = meta_header(calib_train_dir)
     captures = []
 
-    session3_dir = UR3_DATA_ROOT / "session3_wrist_motion_gripper_cam" / "capture"
+    session3_dir = UR3_DATA_ROOT / "session3_wrist_motion_gripper_cam_0909" / "capture"
     session3_indices = sorted(int(p.name) for p in session3_dir.iterdir() if p.is_dir())
     for event_id, idx in enumerate(session3_indices):
         capture_dir = session3_dir / f"{idx:03d}"
@@ -329,8 +326,8 @@ def convert_session3(out_root: Path) -> Path:
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--out-root-12", default=str(REPO_ROOT / "data" / "ur3_session12"))
-    ap.add_argument("--out-root-3", default=str(REPO_ROOT / "data" / "ur3_session3"))
+    ap.add_argument("--out-root-12", default=str(REPO_ROOT / "data" / "session10_ur3_handheld_floor_meta_0909"))
+    ap.add_argument("--out-root-3", default=str(REPO_ROOT / "data" / "session09_ur3_wrist_meta_0909"))
     ap.add_argument("--set-cube-center-json", default=None,
                     help=("Pass 2 only: JSON produced by fit_grasp_offset.py mapping "
                           "{set_index(str): {'pose6': [...], 'matrix4x4': [[...]]}}."))

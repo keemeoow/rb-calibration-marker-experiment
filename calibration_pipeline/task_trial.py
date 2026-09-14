@@ -16,6 +16,7 @@ import os
 from typing import Mapping, Sequence
 
 import numpy as np
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 
 MANIFEST_SCHEMA = "robot_task_trial_manifest_v1"
@@ -402,7 +403,7 @@ def parse_args(argv=None):
         description="Paired peg-in-hole/grasp robot task-trial evaluation")
     parser.add_argument("--manifest", required=True)
     parser.add_argument(
-        "--output_dir", default="ABLATION_TEST_result/shared/robot_task_trial")
+        "--output_dir", default=f"{ABLATION_RESULT_ROOT}/shared/robot_task_trial")
     return parser.parse_args(argv)
 
 

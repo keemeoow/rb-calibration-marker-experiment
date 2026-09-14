@@ -16,6 +16,7 @@ if str(REPO_ROOT) not in sys.path:
 from capture_pipeline.capture import load_and_validate_rig_geometry  # noqa: E402
 from capture_pipeline.waypoint_safety import (  # noqa: E402
     PROTOCOL_COMPOSITE_RIG_45,
+    pose_diversity_summary,
     validate_waypoint_semantics,
 )
 
@@ -68,6 +69,8 @@ def main() -> None:
     print(f"target_rig_id: {plan['target_rig_id']}")
     print(f"rig_geometry_sha256: {actual_hash}")
     print(f"phase_counts: {phase_counts}")
+    print("pose_diversity:")
+    print(json.dumps(pose_diversity_summary(plan), indent=2))
 
 
 if __name__ == "__main__":

@@ -23,7 +23,7 @@
 끄기 가능). 로봇이 움직이는 동안에도 백그라운드 스레드에서 계속
 갱신되며, 실제 저장되는 캡처와는 별개로 확인용이다.
 
-출력: data/session{N}_.../capture/<index:03d>/
+출력: ur3_calibration/data/session{N}_..._<MMDD>/capture/<index:03d>/
   cam_<라벨 또는 serial>.png       (컬러)
   cam_<라벨 또는 serial>_depth.png (컬러에 정렬된 16bit depth, mm, z16)
   robot.json                       (tcp_pose, joint_radians/degrees, timestamp)
@@ -55,7 +55,7 @@ import rtde_control
 import rtde_receive
 from gripper import RobotiqGripper
 
-from capture_poses import SESSIONS, session_path
+from capture_poses import SESSIONS, UR3_CAPTURE_DATA_ROOT, session_path
 from session2_pick_and_place import (
     ROBOT_IP_DEFAULT, GRASP_POSE_DEFAULT, CAM_POSE_DEFAULT,
     APPROACH_MM_DEFAULT, PICK_LIFT_MM_DEFAULT, PLACE_LIFT_MM_DEFAULT,
@@ -242,7 +242,7 @@ def move_and_capture_poses(session_id, args, cams, labels, rtde_c, rtde_r, start
     이미 연결된 rtde_c/rtde_r을 받아서 쓴다 -- run_simple_session(단독 실행)과
     run_full_pipeline(결합 실행, 큐브를 든 채로 이어옴) 양쪽에서 재사용.
     """
-    poses_path = session_path(Path(__file__).resolve().parent / "data", session_id)
+    poses_path = session_path(UR3_CAPTURE_DATA_ROOT, session_id)
     poses = json.loads(poses_path.read_text())["poses"]
     out_root = poses_path.parent / "capture"
 
@@ -287,7 +287,7 @@ def move_and_capture_poses(session_id, args, cams, labels, rtde_c, rtde_r, start
 def run_simple_session(session_id, args, cams, labels, view=None):
     """세션 1/3 단독 실행: poses.json 순서대로 이동 후 촬영."""
     info = SESSIONS[session_id]
-    poses_path = session_path(Path(__file__).resolve().parent / "data", session_id)
+    poses_path = session_path(UR3_CAPTURE_DATA_ROOT, session_id)
     poses = json.loads(poses_path.read_text())["poses"]
 
     print(f"=== 세션 {session_id}: {info['name']} ===  {len(poses)}개 자세")
@@ -314,7 +314,7 @@ def run_simple_session(session_id, args, cams, labels, view=None):
 def build_session2_steps(args):
     grasp_pose = load_pose(Path(args.grasp_pose))
     cam_pose = load_pose(Path(args.cam_pose))
-    session_poses = session_path(Path(__file__).resolve().parent / "data", 2)
+    session_poses = session_path(UR3_CAPTURE_DATA_ROOT, 2)
     items = compute_ordered_targets(session_poses, grasp_pose[3:6], grasp_pose[2])
 
     if args.release_pos is None:

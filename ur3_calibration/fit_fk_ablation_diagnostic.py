@@ -68,7 +68,7 @@ from calibration_pipeline.runtime import (  # noqa: E402
 )
 from calibration_pipeline.schema import RAW_FK_CUBE_CENTER_TO_OBJECT  # noqa: E402
 
-ROOT = str(REPO_ROOT / "data" / "ur3_session12" / "calib_train")
+ROOT = str(REPO_ROOT / "data" / "session10_ur3_handheld_floor_meta_0909" / "calib_train")
 INTRINSICS_DIR = str(REPO_ROOT / "ur3_calibration" / "intrinsics")
 PASS1_JSON = REPO_ROOT / "ur3_calibration" / "pass1_grasp_offset.json"
 MECHANICAL_MAP = np.asarray(RAW_FK_CUBE_CENTER_TO_OBJECT, dtype=np.float64)

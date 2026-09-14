@@ -1,6 +1,6 @@
 {
   "protocol": {
-    "dataset": "data/session04/calib_train",
+    "dataset": "data/session02_NOUSE_session04_0814/calib_train",
     "intrinsics_dir": "intrinsics",
     "requested_set_filter": "0-12",
     "resolved_set_indices": [
@@ -17,7 +17,7 @@
     "cube_config_source": "config_py:CubeConfig",
     "source_data_provenance": {
       "meta_json": {
-        "path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session04/calib_train/meta.json",
+        "path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session02_NOUSE_session04_0814/calib_train/meta.json",
         "sha256": "0740c75897408e7c913bcbcaf66dee63dd79abbf56470855e3d846037c74b1cd"
       },
       "intrinsics": {
@@ -189,7 +189,7 @@
         }
       },
       "observation_manifest": {
-        "path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session04/calib_out/capture_filter/Step2b_observation_manifest.json",
+        "path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session02_NOUSE_session04_0814/calib_out/capture_filter/Step2b_observation_manifest.json",
         "sha256": "bb864bc3149afadb2c7f4d9991c939493c6fe55662c595e02df621b745737ea7",
         "policy": "strict"
       }
@@ -1230,7 +1230,7 @@
     },
     "backbone_fk_used_in_all_conditions": true,
     "shared_train_only_baseline": {
-      "path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/ABLATION_TEST_result/session04/outlier_ablation/strict_table1/shared_train_only_baseline.json",
+      "path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/outlier_ablation/strict_table1/shared_train_only_baseline.json",
       "schema": "table1_shared_train_only_baseline_v2",
       "sha256": "9cf7363dca5352a9830dd242cb6c256646fa5e6bb7ffde87411344a62f6b746f",
       "shared_reference_state_sha256": "38f565ecc0b63761a7d077a47aba6b82ea44fdbbf7ff91dc1a7720dbf04838eb",
@@ -1602,7 +1602,7 @@
       "status": "ok",
       "reason": "",
       "source": "post_capture_frozen_manifest",
-      "manifest_path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session04/calib_out/capture_filter/Step2b_observation_manifest.json",
+      "manifest_path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session02_NOUSE_session04_0814/calib_out/capture_filter/Step2b_observation_manifest.json",
       "manifest_sha256": "bb864bc3149afadb2c7f4d9991c939493c6fe55662c595e02df621b745737ea7",
       "manifest_schema": "post_capture_observation_manifest_v2",
       "cube_config_source": "config_py:CubeConfig",
@@ -23814,7 +23814,7 @@
     }
   },
   "shared_fk_cube_artifact": {
-    "path": "ABLATION_TEST_result/session04/outlier_ablation/strict_table1/shared_board_free_fk_cube.json",
+    "path": "ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/outlier_ablation/strict_table1/shared_board_free_fk_cube.json",
     "sha256": "0e78903a4c74f7f1350526db1cc079b68aaa933bfbab0f21dd3b6c1b9d18fa13",
     "consumers": [
       "A4",

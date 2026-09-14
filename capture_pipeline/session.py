@@ -4,15 +4,21 @@ from __future__ import annotations
 
 import json
 import os
-import re
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
-from zeus_gello_calibration.paths import ZEUS_DATA_ROOT, require_zeus_data_path
+from capture_pipeline.paths import (
+    REPO_ROOT,
+    SESSION_DATE_FORMAT,
+    SESSION_DIGITS,
+    SESSION_PREFIX,
+    require_data_path_inside,
+    session_folder_name,
+    session_index,
+)
 
+ZEUS_CALIBRATION_ROOT = REPO_ROOT / "zeus_gello_calibration"
 
-SESSION_PREFIX = "session"
-SESSION_DIGITS = 2
 CALIBRATION_SUBDIR = "calib_train"
 SESSION_SUBDIRS = (
     CALIBRATION_SUBDIR,
@@ -33,8 +39,13 @@ class CaptureSession:
     manifest_path: str
 
 
+def _date_suffix() -> str:
+    """Return today's ``MMDD`` stamp used as the session folder suffix."""
+    return date.today().strftime(SESSION_DATE_FORMAT)
+
+
 def _existing_indices(data_root: str) -> list[int]:
-    pattern = re.compile(rf"^{re.escape(SESSION_PREFIX)}([0-9]+)$")
+    # 날짜/설명이 붙기 전에 만들어진 sessionNN 도 세어야 번호가 뒤로 가지 않는다.
     indices: list[int] = []
     try:
         entries = os.scandir(data_root)
@@ -44,25 +55,30 @@ def _existing_indices(data_root: str) -> list[int]:
         for entry in entries:
             if not entry.is_dir(follow_symlinks=False):
                 continue
-            match = pattern.fullmatch(entry.name)
-            if match:
-                indices.append(int(match.group(1)))
+            index = session_index(entry.name)
+            if index is not None:
+                indices.append(index)
     return indices
 
 
-def allocate_next_capture_session(data_root: str = str(ZEUS_DATA_ROOT)) -> CaptureSession:
-    """Atomically reserve ``sessionNN`` and create its calibration capture root.
+def allocate_next_capture_session(data_root: str,
+                                  label: str | None = None) -> CaptureSession:
+    """Reserve a numbered session under the explicit Zeus ``--data_root``.
 
     Numbering always advances from the largest existing numbered session.  A
     directory is never reused, even if it is empty, so an interrupted or
-    partially captured session cannot be overwritten silently.
+    partially captured session cannot be overwritten silently.  ``MMDD`` is the
+    capture date, so the folder name alone says which day the data came from,
+    and ``label`` (e.g. ``"zeus wrist motion"``) says what was captured.
     """
-    data_root = str(require_zeus_data_path(data_root, label="capture data root"))
+    data_root = str(require_data_path_inside(
+        data_root, ZEUS_CALIBRATION_ROOT, label="Zeus data root"))
     os.makedirs(data_root, exist_ok=True)
     next_index = max(_existing_indices(data_root), default=0) + 1
+    date_suffix = _date_suffix()
 
     while True:
-        session_id = f"{SESSION_PREFIX}{next_index:0{SESSION_DIGITS}d}"
+        session_id = session_folder_name(next_index, label)
         session_root = os.path.join(data_root, session_id)
         try:
             os.mkdir(session_root)
@@ -82,7 +98,10 @@ def allocate_next_capture_session(data_root: str = str(ZEUS_DATA_ROOT)) -> Captu
         "calibration_capture_root": capture_root,
         "blind_test_root": os.path.join(session_root, "blind_test"),
         "allocated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "capture_date_suffix": date_suffix,
+        "capture_label": label,
         "allocation_policy": "max_existing_index_plus_one_no_reuse",
+        "naming_policy": "<--data_root>/session<NN>[_<label>]_<MMDD>",
         "status": "allocated",
     }
     with open(manifest_path, "x", encoding="utf-8") as handle:

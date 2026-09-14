@@ -77,8 +77,8 @@ from fit_placement_fk_ablation import SESSION2_EVENT_OFFSET, build_synthetic_met
 from fit_full_calibration import CHARUCO_BOARD_CONFIG, GRIPPER_LOCAL_ID, build_synthetic_meta_board  # noqa: E402
 from session2_pick_and_place import SESSION2_DIR_DEFAULT, compute_ordered_targets  # noqa: E402
 
-SESSION1_DIR_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "data" / "session1_handheld_fixed_cam"
-SESSION3_DIR_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "data" / "session3_wrist_motion_gripper_cam"
+SESSION1_DIR_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "data" / "session1_handheld_fixed_cam_0909"
+SESSION3_DIR_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "data" / "session3_wrist_motion_gripper_cam_0909"
 FIT_JSON_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "pass1_grasp_offset_replayed.json"
 
 # 이벤트 id 네임스페이스 충돌 방지 (robot_T 딕셔너리 키). session2는

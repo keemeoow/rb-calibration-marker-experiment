@@ -57,6 +57,7 @@ from calibration_pipeline.cube_config import (  # noqa: E402
     load_cube_config_from_json_file,
     load_cube_config_from_meta,
 )
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 BG = "#11151b"
 PANEL = "#161b22"
@@ -584,7 +585,7 @@ def main() -> None:
                         help="JSON describing the physical solid (mm boxes); "
                              "default is the body + protrusion implied by config.py")
     parser.add_argument("--title", default=None, help="override the figure title")
-    parser.add_argument("--output-dir", default="ABLATION_TEST_result/cube_model")
+    parser.add_argument("--output-dir", default=f"{ABLATION_RESULT_ROOT}/cube_model")
     args = parser.parse_args()
 
     cfg, source = resolve_cfg(args)

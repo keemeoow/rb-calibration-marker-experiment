@@ -143,7 +143,7 @@ A5는 내부 cube 지표가 가장 좋으므로 최종 후보에서 제외하지
 ## 9. 근거 문서
 
 - [CALIBRATION_EXPERIMENT_VALIDATION.md](CALIBRATION_EXPERIMENT_VALIDATION.md): 최종 실험표와 평가지표 단일 기준
-- [ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md](ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md): 자동 생성된 현재 결과표
+- [ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md](ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md): 자동 생성된 현재 결과표
 - [FK_use_A2-A5.md](FK_use_A2-A5.md): A2-A5 FK 사용 방식
 - [8-3_meeting.md](8-3_meeting.md): 8/3 피드백 반영 현황
 - [RUN_PIPELINE.md](RUN_PIPELINE.md): 재현 파이프라인

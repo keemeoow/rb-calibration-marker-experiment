@@ -26,21 +26,22 @@ from tools.sync_table1_canonical_data import (
     _load,
     _method_rows,
 )
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 
 OUT_PDF = ROOT / "캘리브레이션_실험결과_발표자료.pdf"
 
-TABLE1_JSON = ROOT / "ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json"
+TABLE1_JSON = ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json"
 CROSS_JSON = (
-    ROOT / "ABLATION_TEST_result/session04/cross_target_evaluation/"
+    ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/cross_target_evaluation/"
     "cross_target_evaluation.json"
 )
 MARKER_JSON = (
-    ROOT / "ABLATION_TEST_result/session04/marker_system_end_to_end/"
+    ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/marker_system_end_to_end/"
     "marker_system_end_to_end.json"
 )
 OPENCV_JSON = (
-    ROOT / "ABLATION_TEST_result/session04/opencv_relative_baseline/"
+    ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/opencv_relative_baseline/"
     "opencv_relative_baseline.json"
 )
 

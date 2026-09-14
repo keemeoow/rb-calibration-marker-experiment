@@ -1,7 +1,7 @@
 {
   "artifact_schema": "calibration_matrices_v1",
-  "source_table1": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json",
-  "dataset": "data/session04/calib_train",
+  "source_table1": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json",
+  "dataset": "data/session02_NOUSE_session04_0814/calib_train",
   "representative_seed": 0,
   "representative_seed_contract": "seed 0 is the unperturbed shared initialization; it is fixed before held-out evaluation and is not chosen by held-out score",
   "matrix_semantics": {

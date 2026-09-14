@@ -14,7 +14,7 @@
 
 ## Current Data Warnings (현재 데이터 경고)
 
-> 아래 수치는 기존 `data/session04`를 재평가한 **내부 preflight 결과**다. 새 `CAPTURE_PROTOCOL.md`의 composite rig 45-event 촬영 결과가 아니므로, 최종 논문 수치로 확정하지 않는다.
+> 아래 수치는 기존 `data/session02_NOUSE_session04_0814`를 재평가한 **내부 preflight 결과**다. 새 `CAPTURE_PROTOCOL.md`의 composite rig 45-event 촬영 결과가 아니므로, 최종 논문 수치로 확정하지 않는다.
 
 | 점검 항목 | 현재 데이터 | 결과 해석에 미치는 영향 |
 | --- | --- | --- |

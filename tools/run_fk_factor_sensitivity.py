@@ -22,10 +22,11 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import calibration_pipeline.table1 as table1  # noqa: E402
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT  # noqa: E402
 
 
 DEFAULT_SCALES = (0.25, 0.5, 1.0, 2.0, 4.0)
-DEFAULT_OUT_DIR = ROOT / "ABLATION_TEST_result/session04/fk_factor_sensitivity"
+DEFAULT_OUT_DIR = ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/fk_factor_sensitivity"
 
 
 def _mean(values: Iterable[float | None]) -> float | None:
@@ -232,16 +233,16 @@ def _write(rows: list[dict], args: argparse.Namespace, baseline: dict) -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root_folder", default="data/session04/calib_train")
+    parser.add_argument("--root_folder", default="data/session02_NOUSE_session04_0814/calib_train")
     parser.add_argument("--intrinsics_dir", default="intrinsics")
-    parser.add_argument("--calib_dir", default="data/session04/calib_out")
+    parser.add_argument("--calib_dir", default="data/session02_NOUSE_session04_0814/calib_out")
     parser.add_argument("--include_sets", default="0-12")
     parser.add_argument("--split_seed", type=int, default=20260731)
     parser.add_argument("--min_train_eih_cube_events", type=int, default=3)
     parser.add_argument("--num_inits", type=int, default=3)
     parser.add_argument(
         "--observation-manifest",
-        default=("data/session04/calib_out/capture_filter/"
+        default=("data/session02_NOUSE_session04_0814/calib_out/capture_filter/"
                  "Step2b_observation_manifest.json"))
     parser.add_argument("--observation-filter-policy", default="standard")
     parser.add_argument(
@@ -263,7 +264,7 @@ def main() -> None:
     scales = [float(raw) for raw in args.scales.split(",") if raw.strip()]
     if not scales or any(scale <= 0.0 for scale in scales):
         raise ValueError("all scales must be positive")
-    baseline = _baseline_a2(ROOT / "ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
+    baseline = _baseline_a2(ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
     rows = []
     for scale in scales:
         print(f"[SCALE] {scale:g}x", flush=True)

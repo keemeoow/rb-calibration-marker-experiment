@@ -13,7 +13,7 @@ from calibration_pipeline.runtime import load_intrinsics_with_depth_scale
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SESSION_ROOT = ROOT / "data" / "session04" / "calib_train"
+SESSION_ROOT = ROOT / "data" / "session02_NOUSE_session04_0814" / "calib_train"
 INTRINSICS_ROOT = ROOT / "intrinsics"
 
 

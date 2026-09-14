@@ -49,12 +49,12 @@
   "representative_seed": 0,
   "role": "diagnostic_only_not_external_gt",
   "depth_role": "aligned depth is transformed to robot-base frame for visual diagnostics; it is not used as calibration objective or physical GT",
-  "source_manifest": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/data/session04/calib_out/capture_filter/Step2b_observation_manifest.json",
+  "source_manifest": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/data/session02_NOUSE_session04_0814/calib_out/capture_filter/Step2b_observation_manifest.json",
   "manifest": {
     "status": "ok",
     "reason": "",
     "source": "post_capture_frozen_manifest",
-    "manifest_path": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/data/session04/calib_out/capture_filter/Step2b_observation_manifest.json",
+    "manifest_path": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/data/session02_NOUSE_session04_0814/calib_out/capture_filter/Step2b_observation_manifest.json",
     "manifest_sha256": "bb864bc3149afadb2c7f4d9991c939493c6fe55662c595e02df621b745737ea7",
     "manifest_schema": "post_capture_observation_manifest_v2",
     "cube_config_source": "config_py:CubeConfig",
@@ -22091,8 +22091,8 @@
     "n_board_observations": 147,
     "source_hashes_validated": true,
     "session_root_relocated": true,
-    "manifest_recorded_session_root": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session04/calib_train",
-    "local_session_root": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/data/session04/calib_train"
+    "manifest_recorded_session_root": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session02_NOUSE_session04_0814/calib_train",
+    "local_session_root": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/data/session02_NOUSE_session04_0814/calib_train"
   },
   "events": [
     24,

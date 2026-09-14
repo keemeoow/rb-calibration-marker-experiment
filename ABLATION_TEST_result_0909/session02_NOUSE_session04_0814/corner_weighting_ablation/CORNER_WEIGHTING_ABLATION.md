@@ -44,19 +44,19 @@ Line intersection은 Cube와 fixed-camera consistency를 개선하는 대신 공
 
 ```bash
 python3 04_filter_observations.py \
-  --session-root data/session04/calib_train \
+  --session-root data/session02_NOUSE_session04_0814/calib_train \
   --intrinsics-dir intrinsics \
   --output-dir /tmp/session04_capture_filter_line \
   --cube-corner-refinement-mode line_intersection
 
 python3 05_calibrate.py \
-  --root_folder data/session04/calib_train \
+  --root_folder data/session02_NOUSE_session04_0814/calib_train \
   --intrinsics_dir intrinsics \
-  --calib_dir data/session04/calib_out \
+  --calib_dir data/session02_NOUSE_session04_0814/calib_out \
   --include_sets 0-12 --split_seed 20260731 \
   --min_train_eih_cube_events 3 --num_inits 3 --rows A2 \
   --residual-weighting equal_observation_total \
-  --observation-manifest data/session04/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --observation-manifest data/session02_NOUSE_session04_0814/calib_out/capture_filter/Step2b_observation_manifest.json \
   --observation-filter-policy standard \
   --out_dir /tmp/table1_obsnorm
 ```

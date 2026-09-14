@@ -1,18 +1,11 @@
 """
 멀티카메라 캘리브레이션용 데이터셋을 캡처한다.
 
-최종 composite_rig_45_v2 파이프라인:
+composite_rig_45_v2 파이프라인:
   1. 사전 검증된 pose plan을 PC에서 robot server로 보낸다.
   2. P1 15, P2 20, P3 10 planned event를 순서대로 동기 촬영한다.
   3. 모든 카메라 RGB-D와 robot/release state를 attempt 단위로 저장한다.
   4. Marker quality는 진단으로만 기록하고 transport/sync 실패만 같은 ID로 재시도한다.
-
-Legacy 파이프라인:
-  1. 로봇이 큐브를 놓고 `set`을 실행하면 set 기준 pose를 저장한다.
-  2. 같은 set에서 그리퍼 카메라를 여러 자세로 이동시키며 촬영한다.
-  3. 각 이벤트에서 모든 카메라(그리퍼 + 고정)가 동시에 color/depth를 저장한다.
-  4. AprilTag cube / gripper ChArUco를 즉시 검출하고 pose 후보와 품질 지표를 meta.json에 기록한다.
-  5. `set_index`, robot pose, set_cube_center_6dof, capture gate 결과를 함께 저장한다.
 """
 
 """
@@ -27,7 +20,9 @@ gc
 
 << 최종 45-event 촬영 >>
 python3 03_capture.py \
-    --data_root zeus_gello_calibration/data --intrinsics_dir intrinsics \
+    --data_root zeus_gello_calibration/data \
+    --session_label zeus_composite_rig \
+    --intrinsics_dir intrinsics \
     --waypoints_file capture_plans/composite_rig_45.json \
     --use_robot --manual_robot \
     --robot_ip 192.168.0.23 --robot_port 12348 \
@@ -40,7 +35,6 @@ python3 03_capture.py \
 
 참고:
   - depth 저장은 기본 ON이다. 끄려면 `--no-save-depth`를 사용한다.
-  - legacy 05 calibration은 set_cube_center_6dof를 사용한다.
   - 최종 protocol은 flange/release state와 frozen rig geometry를 사용한다.
 """
 
@@ -83,11 +77,26 @@ from calibration_pipeline.cube_config import (
 )
 from capture_pipeline.robot import euler_deg_to_matrix
 from capture_pipeline.waypoint_safety import (
+    PHASE_P2,
+    PHASE_P3,
     PROTOCOL_COMPOSITE_RIG_45,
     validate_safe_joint_config,
     validate_waypoint_semantics,
 )
-from zeus_gello_calibration.paths import ZEUS_DATA_ROOT, require_zeus_data_path
+from capture_pipeline.paths import REPO_ROOT, require_data_path_inside
+
+ZEUS_CALIBRATION_ROOT = REPO_ROOT / "zeus_gello_calibration"
+
+
+def resolve_capture_roots(data_root, root_folder=None):
+    """Make the explicit CLI data root authoritative for this capture run."""
+    resolved_data = require_data_path_inside(
+        data_root, ZEUS_CALIBRATION_ROOT, label="--data_root")
+    resolved_root = None
+    if root_folder is not None:
+        resolved_root = require_data_path_inside(
+            root_folder, resolved_data, label="--root_folder")
+    return str(resolved_data), None if resolved_root is None else str(resolved_root)
 
 
 def ensure_dir(p: str) -> str:
@@ -746,26 +755,37 @@ def estimate_per_marker_poses(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Place-and-Capture calibration: gripper camera + fixed cameras"
+        description=(
+            "Zeus composite_rig_45_v2 capture: synchronized RGB-D and robot state"
+        )
     )
     parser.add_argument(
         "--root_folder",
         default=None,
         help=(
-            "Explicit capture folder for a deliberate resume/legacy run. "
-            "It must be inside zeus_gello_calibration/data. Omit this option "
+            "Explicit capture folder for a deliberate resume. "
+            "It must be inside the explicit --data_root. Omit this option "
             "for automatic sessionNN/calib_train allocation."
         ),
     )
     parser.add_argument(
         "--data_root",
-        default=str(ZEUS_DATA_ROOT),
-        help=("Parent for automatic sessionNN allocation when --root_folder is omitted; "
-              f"must stay inside {ZEUS_DATA_ROOT}"),
+        required=True,
+        help=("Parent for automatic session allocation when --root_folder is omitted; "
+              f"must be inside {ZEUS_CALIBRATION_ROOT}"),
+    )
+    parser.add_argument(
+        "--session_label",
+        default=None,
+        help=("Short description folded into the new session folder name, e.g. "
+              "\"zeus wrist motion\" -> "
+              "<--data_root>/session11_zeus_wrist_motion_<MMDD>. "
+              "Required for a newly allocated session; omit only when "
+              "--root_folder deliberately resumes an existing session."),
     )
     parser.add_argument(
         "--waypoints_file",
-        default=None,
+        required=True,
         help=(
             "Validated waypoint JSON to copy into a newly allocated session as "
             "capture_waypoints.json before robot connection"
@@ -915,7 +935,7 @@ def main():
     parser.add_argument("--robot_ip", type=str, default="192.168.0.23")
     parser.add_argument("--robot_port", type=int, default=12348)
     parser.add_argument("--manual_robot", action="store_true",
-                        help="Robot-server mode: server/c1.py sends capture commands over newline JSON")
+                        help="Required robot-server mode: server/c1.py sends final protocol commands")
     parser.add_argument("--preview_frac", type=float, default=0.6,
                         help="프리뷰 창이 차지할 화면 비율(0~1). 종횡비는 유지하고 "
                              "원본보다 키우지는 않는다. 기본 0.6 = 모니터의 60%%.")
@@ -933,12 +953,51 @@ def main():
 
     args = parser.parse_args()
     try:
-        args.data_root = str(require_zeus_data_path(args.data_root, label="--data_root"))
-        if args.root_folder is not None:
-            args.root_folder = str(require_zeus_data_path(
-                args.root_folder, label="--root_folder"))
+        args.data_root, args.root_folder = resolve_capture_roots(
+            args.data_root, args.root_folder)
     except ValueError as exc:
         parser.error(str(exc))
+
+    waypoint_source = None
+    waypoint_payload = None
+    if args.waypoints_file:
+        waypoint_source = os.path.abspath(os.path.expanduser(args.waypoints_file))
+        try:
+            with open(waypoint_source, "r", encoding="utf-8") as waypoint_handle:
+                waypoint_payload = json.load(waypoint_handle)
+            validate_safe_joint_config(waypoint_payload)
+            validate_waypoint_semantics(waypoint_payload)
+        except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
+            parser.error(f"invalid --waypoints_file: {exc}")
+
+    if waypoint_payload is None:
+        parser.error(
+            "03_capture.py requires --waypoints_file with a validated "
+            f"{PROTOCOL_COMPOSITE_RIG_45} plan"
+        )
+    protocol = waypoint_payload.get("capture_protocol")
+    if protocol != PROTOCOL_COMPOSITE_RIG_45:
+        parser.error(
+            "03_capture.py accepts only capture_protocol="
+            f"{PROTOCOL_COMPOSITE_RIG_45!r}; received {protocol!r}"
+        )
+    if not (args.use_robot and args.manual_robot):
+        parser.error(
+            "03_capture.py requires --use_robot --manual_robot for the final protocol"
+        )
+    if args.root_folder is None and not str(args.session_label or "").strip():
+        parser.error(
+            "new capture requires --session_label so the generated "
+            "<--data_root>/sessionNN_<label>_<MMDD> folder "
+            "identifies the dataset"
+        )
+    if args.root_folder is not None and args.session_label is not None:
+        parser.error(
+            "--session_label cannot be combined with --root_folder; "
+            "the existing session folder already fixes the dataset name"
+        )
+    if float(args.max_capture_span_ms) <= 0:
+        parser.error("03_capture.py requires a positive --max_capture_span_ms")
 
     try:
         from capture_pipeline.camera import RealSenseCamera
@@ -948,15 +1007,6 @@ def main():
                 "[ERROR] pyrealsense2가 없습니다. RealSense Python 환경에서 "
                 "03번을 실행하세요.") from error
         raise
-
-    waypoint_source = None
-    waypoint_payload = None
-    if args.waypoints_file:
-        waypoint_source = os.path.abspath(os.path.expanduser(args.waypoints_file))
-        with open(waypoint_source, "r", encoding="utf-8") as waypoint_handle:
-            waypoint_payload = json.load(waypoint_handle)
-        validate_safe_joint_config(waypoint_payload)
-        validate_waypoint_semantics(waypoint_payload)
     intr_dir = args.intrinsics_dir
     print(f"[INFO] Depth capture/save: {'ON' if args.save_depth else 'OFF'}")
 
@@ -1047,7 +1097,8 @@ def main():
     # This avoids consuming a session number for an invalid command/config.
     allocated_session = None
     if args.root_folder is None:
-        allocated_session = allocate_next_capture_session(args.data_root)
+        allocated_session = allocate_next_capture_session(
+            args.data_root, label=args.session_label)
         root = allocated_session.capture_root
         print(f"[SESSION] Allocated {allocated_session.session_id}: {allocated_session.session_root}")
         print(f"[SESSION] Calibration capture root: {root}")
@@ -1518,9 +1569,9 @@ def main():
             cv2.destroyAllWindows()
             return
 
-    print("\nControls:")
-    print("  SPACE : manual capture (if in manual mode)")
-    print("  ESC/q : quit\n")
+    print("\n[MODE] Final robot-server capture")
+    print("  server/c1.py controls all 45 planned events")
+    print("  ESC/q : abort\n")
 
     def do_capture(
         capture_gripper_pose_6dof: Optional[List[float]] = None,
@@ -1711,6 +1762,11 @@ def main():
         }
 
         if is_final_protocol:
+            analysis_group_id = (
+                f"P2:{placement_id}" if phase == PHASE_P2
+                else "P3:STATIONARY_RIG" if phase == PHASE_P3
+                else f"P1:{planned_event_id}"
+            )
             cap_rec.update({
                 "protocol_version": protocol_version,
                 "planned_event_id": str(planned_event_id),
@@ -1722,6 +1778,10 @@ def main():
                 "planned_waypoint": planned_waypoint,
                 "robot_state": robot_state,
                 "release_state": release_state,
+                "analysis_group_id": analysis_group_id,
+                "split_unit_id": (
+                    str(placement_id) if phase == PHASE_P2 else None
+                ),
             })
 
         # 로봇 포즈 데이터
@@ -1944,12 +2004,11 @@ def main():
 
     try:
         if args.use_robot and args.manual_robot:
-            # ─── 수동 로봇 모드 (robot_calb.py 서버 사용) ───
+            # ─── final robot-server mode ───
             # cv2는 main thread 전용. 소켓 recv는 백그라운드 스레드.
             # main thread가 recv에 블로킹되면 cv2 윈도우가 응답 없음 상태가 되므로
             # 분리한다.
-            print("[MODE] Manual Robot - waiting for server capture commands")
-            print("[INFO] Move robot on server side, press 'c' to capture\n")
+            print("[MODE] Waiting for final protocol commands from server/c1.py")
 
             import threading
 
@@ -2417,61 +2476,7 @@ def main():
                         json.dump(wp_save, f, indent=2)
                     print(f"[INFO] Recorded waypoints saved: {wp_path} ({len(wp_list)} poses)")
 
-            print(f"\n[DONE] Manual robot capture complete. {event_id} captures saved.")
-
-        else:
-            # ─── Manual mode ───
-            print("[MODE] Manual capture (press SPACE)")
-            while True:
-                frames_view: Dict[int, dict] = {}
-                for ci, cam in cams.items():
-                    color, depth, ts_ms = cam.get_latest()
-                    if color is None:
-                        continue
-                    frames_view[ci] = build_frame_record(
-                        ci, color, depth, ts_ms,
-                        include_marker_poses=False,
-                        include_charuco_pose=False,
-                        log_pose_status=False,
-                    )
-
-                if args.show:
-                    gate = evaluate_capture_gate(
-                        frames_view,
-                        capture_gate_cfg,
-                        gripper_cam_idx=gripper_cam_idx,
-                    )
-                    gate_lines = build_capture_gate_lines(gate, gripper_cam_idx, frames_view)
-                    panel = np.zeros((28 * len(gate_lines) + 12, 1100, 3), dtype=np.uint8)
-                    for line_idx, gate_line in enumerate(gate_lines):
-                        color = (0, 255, 0) if (line_idx == 0 and gate["pass"]) else (
-                            (0, 0, 255) if line_idx == 0 else (255, 255, 255)
-                        )
-                        cv2.putText(panel, gate_line, (12, 28 + line_idx * 28),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.58, color, 2)
-                    cv2.imshow("Capture Gate", fit_to_screen(panel, float(args.preview_frac)))
-                    for ci in sorted(frames_view.keys()):
-                        img = frames_view[ci]["color"].copy()
-                        ids_np = frames_view[ci]["ids_np"]
-                        corners = frames_view[ci]["corners"]
-                        if ids_np is not None:
-                            try:
-                                draw_ids = ids_np.reshape(-1, 1) if getattr(ids_np, "ndim", 1) == 1 else ids_np
-                                cv2.aruco.drawDetectedMarkers(img, corners, draw_ids)
-                            except Exception:
-                                pass
-                        tag = "GRIP" if ci == gripper_cam_idx else "FIX"
-                        n = 0 if ids_np is None else len(ids_np)
-                        txt = f"cam{ci}({tag}) markers={n} ok={frames_view[ci]['ok']}"
-                        cv2.putText(img, txt, (10, 30),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                        cv2.imshow(f"cam{ci}", fit_to_screen(img, float(args.preview_frac) / 2.0))
-
-                key = cv2.waitKey(1) & 0xFF
-                if key == 27 or key == ord('q'):
-                    break
-                if key == 32:  # SPACE
-                    do_capture()
+            print(f"\n[DONE] Final robot capture complete. {event_id} captures saved.")
 
     finally:
         for cam in cams.values():
@@ -2480,7 +2485,3 @@ def main():
 
     print(f"\n[DONE] Total captures: {event_id}")
     print(f"  Meta saved: {meta_path}")
-
-
-if __name__ == "__main__":
-    main()

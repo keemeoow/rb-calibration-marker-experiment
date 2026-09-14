@@ -8,6 +8,7 @@ import csv
 import json
 from pathlib import Path
 from statistics import fmean, pstdev
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 
 METHODS = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
@@ -366,17 +367,17 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--standard_table",
-        default="ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
+        default=f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
     parser.add_argument(
         "--strict_table",
-        default=("ABLATION_TEST_result/session04/outlier_ablation/strict_table1/"
+        default=(f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/outlier_ablation/strict_table1/"
                  "ABLATION_TEST_table1_methods.json"))
     parser.add_argument(
         "--manifest",
-        default=("data/session04/calib_out/capture_filter/"
+        default=("data/session02_NOUSE_session04_0814/calib_out/capture_filter/"
                  "Step2b_observation_manifest.json"))
     parser.add_argument(
-        "--out_dir", default="ABLATION_TEST_result/session04/outlier_ablation")
+        "--out_dir", default=f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/outlier_ablation")
     return parser.parse_args()
 
 

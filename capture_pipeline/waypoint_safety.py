@@ -45,6 +45,31 @@ PHASE_P3 = "P3_STATIONARY_RIG"
 TARGET_GRIPPED = "gripped"
 TARGET_RELEASED = "released"
 TARGET_STATIONARY = "stationary"
+P3_STATIONARY_SET_INDEX = 10
+
+POSE_PLAN_SCHEMA = "capture_pose_plan_v4"
+CAPTURE_FLANGE_POSE_KEY = "capture_flange_pose_6dof_mm_deg"
+
+
+def default_pose_diversity_requirements():
+    """Frozen minimum geometry for the final 45-event protocol.
+
+    These thresholds are deliberately part of the pose-plan contract.  Changing
+    them after capture would change the experiment, so a different threshold
+    set must be introduced under a new schema instead of editing one JSON file.
+    """
+    return {
+        "schema": "composite_rig_pose_diversity_v1",
+        "joint_duplicate_tolerance_deg": 0.1,
+        "p1_translation_span_xyz_mm": [100.0, 100.0, 80.0],
+        "p1_roll_pitch_span_deg": [15.0, 15.0],
+        "p2_placement_xy_span_mm": [100.0, 100.0],
+        "p2_placement_yaw_span_deg": 20.0,
+        "p2_min_view_translation_mm": 30.0,
+        "p2_min_view_roll_pitch_delta_deg": 10.0,
+        "p3_translation_span_xyz_mm": [80.0, 80.0, 50.0],
+        "p3_roll_pitch_span_deg": [15.0, 15.0],
+    }
 
 
 def _require_nonempty_text(value, label):
@@ -58,10 +83,147 @@ def _validate_capture_joint_waypoint(wp, label):
     return validate_joint_vector(wp.get("capture_joints"), label + ".capture_joints")
 
 
+def _shortest_angle_delta_deg(a, b):
+    delta = abs(float(a) - float(b)) % 360.0
+    return min(delta, 360.0 - delta)
+
+
+def _axis_span(values, axis):
+    axis_values = [float(value[axis]) for value in values]
+    return max(axis_values) - min(axis_values)
+
+
+def _angular_span(values, axis):
+    return max(
+        _shortest_angle_delta_deg(a[axis], b[axis])
+        for a in values for b in values
+    )
+
+
+def _translation_distance_mm(a, b):
+    return math.sqrt(sum((float(a[i]) - float(b[i])) ** 2 for i in range(3)))
+
+
+def _require_minimum(actual, required, label):
+    if float(actual) + 1e-9 < float(required):
+        raise ValueError(
+            "{} is {:.3f}, below required {:.3f}".format(label, actual, required)
+        )
+
+
+def pose_diversity_summary(data):
+    """Return the geometric coverage checked before robot motion."""
+    waypoints = data.get("waypoints", [])
+    by_phase = {}
+    for phase in (PHASE_P1, PHASE_P2, PHASE_P3):
+        by_phase[phase] = [
+            validate_joint_vector(
+                wp.get(CAPTURE_FLANGE_POSE_KEY),
+                "{}.{}".format(wp.get("planned_event_id", "waypoint"),
+                               CAPTURE_FLANGE_POSE_KEY),
+            )
+            for wp in waypoints if wp.get("phase") == phase
+        ]
+    p1 = by_phase[PHASE_P1]
+    p2 = by_phase[PHASE_P2]
+    p3 = by_phase[PHASE_P3]
+    placements = data.get("placements", [])
+    placement_tcps = [
+        validate_joint_vector(
+            placement.get("place_tcp"),
+            "{}.place_tcp".format(placement.get("placement_id", "placement")),
+        )
+        for placement in placements
+    ]
+    p2_pairs = []
+    for placement in placements:
+        placement_id = placement.get("placement_id")
+        views = [
+            wp for wp in waypoints
+            if wp.get("phase") == PHASE_P2
+            and wp.get("placement_id") == placement_id
+        ]
+        if len(views) != 2:
+            continue
+        poses = [validate_joint_vector(
+            wp.get(CAPTURE_FLANGE_POSE_KEY),
+            "{}.{}".format(wp.get("planned_event_id"), CAPTURE_FLANGE_POSE_KEY),
+        ) for wp in views]
+        p2_pairs.append({
+            "placement_id": placement_id,
+            "translation_mm": _translation_distance_mm(poses[0], poses[1]),
+            "roll_pitch_delta_deg": max(
+                _shortest_angle_delta_deg(poses[0][5], poses[1][5]),
+                _shortest_angle_delta_deg(poses[0][4], poses[1][4]),
+            ),
+        })
+    return {
+        "p1_translation_span_xyz_mm": [_axis_span(p1, i) for i in range(3)],
+        "p1_roll_pitch_span_deg": [_angular_span(p1, 5), _angular_span(p1, 4)],
+        "p2_placement_xy_span_mm": [
+            _axis_span(placement_tcps, 0), _axis_span(placement_tcps, 1)],
+        "p2_placement_yaw_span_deg": _angular_span(placement_tcps, 3),
+        "p2_min_view_translation_mm": min(
+            pair["translation_mm"] for pair in p2_pairs),
+        "p2_min_view_roll_pitch_delta_deg": min(
+            pair["roll_pitch_delta_deg"] for pair in p2_pairs),
+        "p2_view_pairs": p2_pairs,
+        "p3_translation_span_xyz_mm": [_axis_span(p3, i) for i in range(3)],
+        "p3_roll_pitch_span_deg": [_angular_span(p3, 5), _angular_span(p3, 4)],
+    }
+
+
+def _validate_pose_diversity(data, waypoints):
+    requirements = data.get("pose_diversity_requirements")
+    expected = default_pose_diversity_requirements()
+    if requirements != expected:
+        raise ValueError(
+            "pose_diversity_requirements must exactly match the frozen {} contract".format(
+                expected["schema"])
+        )
+
+    joints = []
+    for idx, waypoint in enumerate(waypoints):
+        joints.append(_validate_capture_joint_waypoint(
+            waypoint, "waypoints[{}]".format(idx)))
+        validate_joint_vector(
+            waypoint.get(CAPTURE_FLANGE_POSE_KEY),
+            "waypoints[{}].{}".format(idx, CAPTURE_FLANGE_POSE_KEY),
+        )
+    duplicate_tolerance = float(requirements["joint_duplicate_tolerance_deg"])
+    for left in range(len(joints)):
+        for right in range(left + 1, len(joints)):
+            if max(shortest_joint_error_deg(joints[left], joints[right])) <= duplicate_tolerance:
+                raise ValueError(
+                    "waypoints[{}] and waypoints[{}] repeat the same taught joint pose "
+                    "within {:.3f}deg".format(left, right, duplicate_tolerance)
+                )
+
+    summary = pose_diversity_summary(data)
+    vector_checks = (
+        "p1_translation_span_xyz_mm",
+        "p1_roll_pitch_span_deg",
+        "p2_placement_xy_span_mm",
+        "p3_translation_span_xyz_mm",
+        "p3_roll_pitch_span_deg",
+    )
+    for key in vector_checks:
+        for axis, (actual, required) in enumerate(zip(summary[key], requirements[key])):
+            _require_minimum(actual, required, "{}[{}]".format(key, axis))
+    scalar_checks = (
+        "p2_placement_yaw_span_deg",
+        "p2_min_view_translation_mm",
+        "p2_min_view_roll_pitch_delta_deg",
+    )
+    for key in scalar_checks:
+        _require_minimum(summary[key], requirements[key], key)
+    return summary
+
+
 def _validate_composite_rig_45(data, waypoints):
     """Validate the preregistered 15/20/10 composite-rig capture plan."""
-    if data.get("schema_version") != "capture_pose_plan_v3":
-        raise ValueError("schema_version must be capture_pose_plan_v3")
+    if data.get("schema_version") != POSE_PLAN_SCHEMA:
+        raise ValueError("schema_version must be {}".format(POSE_PLAN_SCHEMA))
     if data.get("template_only") is not False:
         raise ValueError("template_only must be false after all taught poses are filled")
     if data.get(SAFE_MODE_KEY) == SAFE_MODE_Z_LIFT:
@@ -204,6 +366,7 @@ def _validate_composite_rig_45(data, waypoints):
             raise ValueError(
                 "{}.placement_id {!r} is not declared".format(label, placement_id)
             )
+    _validate_pose_diversity(data, waypoints)
     return True
 
 

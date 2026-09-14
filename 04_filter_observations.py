@@ -67,7 +67,7 @@ x_k에 대해
 실행 예
 -------
     python3 04_filter_observations.py \\
-      --session-root data/session04/calib_train \\
+      --session-root data/session02_NOUSE_session04_0814/calib_train \\
       --intrinsics-dir intrinsics
 """
 

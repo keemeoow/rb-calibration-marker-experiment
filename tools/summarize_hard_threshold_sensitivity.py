@@ -13,6 +13,7 @@ import argparse
 import csv
 import json
 import os
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 ROWS = ("A0", "A2", "A3")
 AXES = [
@@ -36,7 +37,7 @@ def fmt(value, digits=4):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--result-dir",
-                        default="ABLATION_TEST_result/session04/outlier_ablation/hard_threshold_sensitivity")
+                        default=f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/outlier_ablation/hard_threshold_sensitivity")
     parser.add_argument("--noise-floor-px", type=float, default=0.0)
     args = parser.parse_args()
 

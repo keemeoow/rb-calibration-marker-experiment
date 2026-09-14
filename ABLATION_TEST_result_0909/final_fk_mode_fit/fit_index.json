@@ -200,7 +200,7 @@
         ],
         "schema": "board_free_fk_cube_alignment_v1"
       },
-      "transforms_file": "ABLATION_TEST_result/final_fk_mode_fit/no_fk/final_transforms_base_frame.json"
+      "transforms_file": "ABLATION_TEST_result_0909/final_fk_mode_fit/no_fk/final_transforms_base_frame.json"
     },
     "fixed_fk": {
       "arm": "fixed_fk",
@@ -401,7 +401,7 @@
         ],
         "schema": "board_free_fk_cube_alignment_v1"
       },
-      "transforms_file": "ABLATION_TEST_result/final_fk_mode_fit/fixed_fk/final_transforms_base_frame.json"
+      "transforms_file": "ABLATION_TEST_result_0909/final_fk_mode_fit/fixed_fk/final_transforms_base_frame.json"
     }
   },
   "note": "corrected-FK 의 최종 행렬은 base arm 과 동일하다. 차이는 corrections 항목의 계수뿐이다."

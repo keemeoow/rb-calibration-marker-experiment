@@ -14,7 +14,7 @@
 현재 비교실험의 canonical 결과는 `session04`다. 
 
 ```text
-ABLATION_TEST_result/session04/
+ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/
 ├── ABLATION_TEST_table1/
 │   ├── ABLATION_TEST_TABLE1_RESULTS.md
 │   ├── ABLATION_TEST_TABLE1_INTERACTIVE.html
@@ -49,7 +49,7 @@ ABLATION_TEST_result/session04/
 
 ## 2. 데이터와 split 계약
 
-- 입력: `data/session04/calib_train`
+- 입력: `data/session02_NOUSE_session04_0814/calib_train`
 - 요청 세트: `0-12`; 표준 frozen-corner 품질 계약을 만족한 세트: `4-12`
 - split seed: `20260731`
 - split: 45 train events / 9 held-out events
@@ -85,7 +85,7 @@ ABLATION_TEST_result/session04/
 - `marker_system_end_to_end`: board-only, cube-only, board+cube를 modality별 초기화부터 분리해 평가한다.
 - `opencv_relative_baseline`: OpenCV PnP 기반 VISION fixed-camera reference baseline이다.
 - `outlier_ablation`: 동일 관측에서 soft-L1과 linear loss를 비교하고, standard/strict 사전 관측 제외 민감도를 동일 held-out에서 검증한다.
-- [`BOARD_CUBE_RELATIVE_POSE.md`](../data/session04/calib_out/verify/board_cube_relative_pose/BOARD_CUBE_RELATIVE_POSE.md): Board/Cube geometry, corner ordering, detector refinement, intrinsic 및 target-dependent PnP 충돌을 진단한다. 여기서 direct-PnP 충돌은 최종 joint calibration 정확도나 외부 GT 오차가 아니다.
+- [`BOARD_CUBE_RELATIVE_POSE.md`](../data/session02_NOUSE_session04_0814/calib_out/verify/board_cube_relative_pose/BOARD_CUBE_RELATIVE_POSE.md): Board/Cube geometry, corner ordering, detector refinement, intrinsic 및 target-dependent PnP 충돌을 진단한다. 여기서 direct-PnP 충돌은 최종 joint calibration 정확도나 외부 GT 오차가 아니다.
 - 모든 카메라 범위 평가는 내부 consistency/transfer 평가이며 독립 외부 GT 정확도가 아니다.
 
 ## 6. 재실행과 검증 원칙
@@ -93,7 +93,7 @@ ABLATION_TEST_result/session04/
 모든 비교 명령에는 다음 공통 인자를 사용한다.
 
 ```text
---root_folder data/session04/calib_train
+--root_folder data/session02_NOUSE_session04_0814/calib_train
 --include_sets 0-12
 --min_train_eih_cube_events 3
 --split_seed 20260731

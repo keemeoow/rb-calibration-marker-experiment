@@ -20,6 +20,7 @@ from typing import Mapping, Optional, Sequence
 import numpy as np
 from scipy.spatial import cKDTree
 from scipy.spatial.transform import Rotation
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 
 MANIFEST_SCHEMA = "external_gt_eval_manifest_v2"
@@ -465,7 +466,7 @@ def write_outputs(result: Mapping, output_dir: str) -> None:
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="Paired hierarchical external-GT evaluation")
     parser.add_argument("--manifest", required=True)
-    parser.add_argument("--output_dir", default="ABLATION_TEST_result/shared/final_external_gt")
+    parser.add_argument("--output_dir", default=f"{ABLATION_RESULT_ROOT}/shared/final_external_gt")
     return parser.parse_args(argv)
 
 

@@ -59,7 +59,7 @@ import numpy as np
 import rtde_control
 import rtde_receive
 from gripper import RobotiqGripper
-from capture_poses import session_path
+from capture_poses import UR3_CAPTURE_DATA_ROOT, session_path
 from session2_sweep import raw_yaw, wrap_pi, build_target, fmt_pose
 
 ROBOT_IP_DEFAULT = "192.168.1.101"
@@ -242,7 +242,7 @@ def main():
     ap.add_argument("--cam-pose", default=str(CAM_POSE_DEFAULT))
     ap.add_argument(
         "--session-poses",
-        default=str(session_path(Path(__file__).resolve().parent / "data", SESSION_ID)),
+        default=str(session_path(UR3_CAPTURE_DATA_ROOT, SESSION_ID)),
     )
     ap.add_argument("--approach-mm", type=float, default=APPROACH_MM_DEFAULT)
     ap.add_argument("--pick-lift-mm", type=float, default=PICK_LIFT_MM_DEFAULT,

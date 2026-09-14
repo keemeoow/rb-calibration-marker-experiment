@@ -15,7 +15,7 @@ COLMAP 같은 별도 정합(SfM/ICP) 알고리즘 없이, fixed_fk 캘리브레�
 기하학적으로 맞다는 뜻이고, 어긋나 보이면 그만큼 오차가 있다는 뜻이다.
 
 사용법:
-  python merge_pointclouds.py --capture ur3_calibration/data/session2_floor_board_dual_cam/capture/001
+  python merge_pointclouds.py --capture ur3_calibration/data/session2_floor_board_dual_cam_0909/capture/001
   python merge_pointclouds.py --capture ... --out my_scene.ply --stride 2
 """
 
@@ -100,7 +100,7 @@ def write_ply(path: Path, points: np.ndarray, colors: np.ndarray):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--capture", required=True, help="예: ur3_calibration/data/session2.../capture/001")
+    ap.add_argument("--capture", required=True, help="예: ur3_calibration/data/session2_floor_board_dual_cam_0909/capture/001")
     ap.add_argument("--fit", default=str(FIT_PATH_DEFAULT))
     ap.add_argument("--intrinsics-dir", default=str(INTRINSICS_DIR_DEFAULT))
     ap.add_argument("--out", default=str(Path(__file__).resolve().parent / "merged_scene.ply"))

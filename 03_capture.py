@@ -27,21 +27,17 @@
 측정값은 여기서 픽셀로만 저장되고, 자세 추정은 04/05단계에서 한다. 이 단계에서
 검출한 마커 pose는 **진단용**이며 캘리브레이션에 쓰이지 않는다.
 
-두 가지 촬영 모드
------------------
-composite_rig_45_v2 (최종 프로토콜)
+유일한 촬영 모드
+----------------
+composite_rig_45_v2
     사전 검증된 pose plan을 로봇 서버로 보내고 P1 15 / P2 20 / P3 10, 합 45개
     planned event를 순서대로 자동 촬영한다. 마커 품질은 기록만 하고, 전송/동기
     실패만 같은 event ID로 재시도한다. 품질을 이유로 재촬영하면 표적이 잘 보이는
     자세만 남아 표본이 편향되므로 일부러 분리해 둔 것이다.
 
-legacy
-    로봇이 큐브를 놓고 `set`을 실행해 set 기준 자세를 저장한 뒤, 같은 set에서
-    그리퍼 카메라를 여러 자세로 옮기며 촬영한다.
-
 입력 / 처리 / 출력
 ------------------
-입력: 02단계의 intrinsics/, 카메라들, 큐브/보드, 로봇 서버, (선택) waypoint 파일.
+입력: 02단계의 intrinsics/, 카메라들, composite rig, 로봇 서버, 검증된 waypoint 파일.
 처리: 이벤트마다 모든 카메라를 동시에 그랩하고 로봇/릴리스 상태를 함께 기록하며,
       영상 해시로 전송 무결성을 검사한다.
 출력: RGB-D 영상, meta.json(이벤트별 자세·set·검출 진단), 기록된 waypoint,
@@ -73,8 +69,7 @@ import를 main() 안에 두는 이유: pyrealsense2와 로봇 서버 의존성�
 """
 
 def main() -> None:
-    # capture_pipeline/capture.py 의 main() 을 그대로 실행한다.
-    # (지연 import: pyrealsense2 / 로봇 서버 의존성을 실행 시점까지 미룬다)
+    # 내부 구현은 모듈로 유지하되, 최종 protocol만 이 진입점에서 허용한다.
     from capture_pipeline.capture import main as run
     run()
 

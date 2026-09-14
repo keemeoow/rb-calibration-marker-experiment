@@ -28,7 +28,7 @@
 
 ## 1. 방식 판정 — 위치 단위 leave-one-out 13 fold
 
-`ABLATION_TEST_result/D1_session02_fkmodes/` (`CP_D1_fk_correction_2x2.py`, 같은 backend·같은 solver
+`ABLATION_TEST_result_0909/D1_session02_fkmodes/` (`CP_D1_fk_correction_2x2.py`, 같은 backend·같은 solver
 설정·같은 예측 mask). 한 위치를 통째로 빼고(그 위치의 board 관측까지) 나머지 12곳으로만
 맞춘 뒤, 빼둔 위치의 큐브 중심을 예측한다. 보정 계수도 train 위치에서만 학습한다.
 
@@ -144,12 +144,12 @@ held-out 이득은 −0.93 mm (t=−1.84) 수준이니 "확실한 이득" 이 �
 PYTHONPATH= python CP_D1_fk_correction_2x2.py \
     --root_folder data/session02/calib_train --intrinsics_dir intrinsics \
     --calib_dir data/session02/calib_out \
-    --out_dir ABLATION_TEST_result/D1_session02_fkmodes --lambdas 0 --folds all
+    --out_dir ABLATION_TEST_result_0909/D1_session02_fkmodes --lambdas 0 --folds all
 
 # 두 방식의 전체 데이터 fit (약 1.5분)
 PYTHONPATH= python CP_final_fk_mode_fit.py \
     --root_folder data/session02/calib_train --intrinsics_dir intrinsics \
-    --calib_dir data/session02/calib_out --out_dir ABLATION_TEST_result/final_fk_mode_fit
+    --calib_dir data/session02/calib_out --out_dir ABLATION_TEST_result_0909/final_fk_mode_fit
 
 # 최종 채택 행렬 (약 20초)
 PYTHONPATH= python Step3_calibration.py \

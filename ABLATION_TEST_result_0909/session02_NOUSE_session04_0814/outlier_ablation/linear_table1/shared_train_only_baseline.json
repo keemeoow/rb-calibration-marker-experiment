@@ -1,6 +1,6 @@
 {
   "artifact_schema": "table1_shared_train_only_baseline_v2",
-  "dataset_root": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session04/calib_train",
+  "dataset_root": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session02_NOUSE_session04_0814/calib_train",
   "intrinsics_dir": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/intrinsics",
   "eligible_set_ids": [
     4,
@@ -3713,7 +3713,7 @@
   "cube_config_source": "config_py:CubeConfig",
   "source_data_provenance": {
     "meta_json": {
-      "path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session04/calib_train/meta.json",
+      "path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session02_NOUSE_session04_0814/calib_train/meta.json",
       "sha256": "0740c75897408e7c913bcbcaf66dee63dd79abbf56470855e3d846037c74b1cd"
     },
     "intrinsics": {
@@ -3885,7 +3885,7 @@
       }
     },
     "observation_manifest": {
-      "path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session04/calib_out/capture_filter/Step2b_observation_manifest.json",
+      "path": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session02_NOUSE_session04_0814/calib_out/capture_filter/Step2b_observation_manifest.json",
       "sha256": "bb864bc3149afadb2c7f4d9991c939493c6fe55662c595e02df621b745737ea7",
       "policy": "standard"
     }

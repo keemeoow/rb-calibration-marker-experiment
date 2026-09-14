@@ -17,6 +17,7 @@ from waypoint_safety import (
     PHASE_P1,
     PHASE_P2,
     PHASE_P3,
+    P3_STATIONARY_SET_INDEX,
     SAFE_EMPTY_KEY,
     SAFE_GRIPPED_KEY,
     SAFE_MODE_KEY,
@@ -1025,7 +1026,7 @@ def _run_auto_composite_45(rb, conn, data, speed, confirm=True):
             'release_state': release_state,
         }
         result = _capture_at_pose(
-            rb, conn, wp, 9, None, None,
+            rb, conn, wp, P3_STATIONARY_SET_INDEX, None, None,
             cube_gripped=False, capture_block=wp['capture_block'], grasp_id=10,
             confirm=confirm, safe_joints=safe_empty, safe_kind='empty',
             label=wp['planned_event_id'], protocol_context=context,
@@ -1922,6 +1923,7 @@ def main():
                         "pose_index": len(capture_poses),
                         "capture_joints": get_joints(),
                         "capture_tcp": get_tcp(),
+                        "capture_flange_pose_6dof_mm_deg": get_flange_pose(),
                         "cube_center_6dof": get_cube_center(),
                     }
                     capture_poses.append(pose)
@@ -1958,6 +1960,7 @@ def main():
                         "pose_index": len(grip_poses),
                         "capture_joints": get_joints(),
                         "capture_tcp": get_tcp(),
+                        "capture_flange_pose_6dof_mm_deg": get_flange_pose(),
                         "cube_center_6dof": get_cube_center(),
                     }
                     grip_poses.append(pose)

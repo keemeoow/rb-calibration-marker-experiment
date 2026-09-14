@@ -8,8 +8,8 @@ calibration_pipeline.reprojection.solve_corner_reprojection for the joint
 bundle adjustment). What is genuinely different here, and why:
 
 1. No meta.json for this dataset. Zeus's session1 capture
-   (zeus_gello_calibration/data/session1_handheld_fixed_cam/capture/<idx:03d>/)
-   was written by capture_session.py directly as one folder per pose with
+   (zeus_gello_calibration/data/session1_handheld_fixed_cam_0909/capture/<idx:03d>/)
+   was written by the retired legacy collector as one folder per pose with
    cam_<label>.png files + robot.json -- there is no 05_calibrate.py-style
    meta.json describing captures/cams/set_index. calibration_pipeline's own
    cube detector (cube_detection.detect_corner_observations, reached via
@@ -24,7 +24,7 @@ bundle adjustment). What is genuinely different here, and why:
    labels: "039422061216", "fixed2", "fixed3", "gripper". Three of those
    ("fixed2"/"fixed3"/"gripper") are Zeus's own RealSense units, whose serials
    and gripper-camera role are recorded in Zeus's own intrinsics/device_map.json
-   (mirrors capture_session.py::load_camera_labels's own label derivation:
+   (mirrors the legacy collector's camera-label derivation:
    sort non-gripper serials by serial_to_idx to get fixed1/2/3, remaining
    serial is "gripper"). The fourth label, "039422061216", is NOT one of
    Zeus's 4 registered serials -- already root-caused (see task instructions
@@ -102,8 +102,8 @@ NOT_GRIPPER_SENTINEL = -1  # no local cam id equals this -> all 4 cams treated
 def resolve_zeus_camera_serials(device_map_path: Path) -> dict:
     """label -> serial for Zeus's own 3 cameras (fixed2/fixed3/gripper).
 
-    Reproduces capture_session.py::load_camera_labels exactly (same sort-by-
-    idx rule), so the labels recorded in this session's folders decode to the
+    Reproduces the retired collector's label mapping (same sort-by-idx rule),
+    so the labels recorded in this session's folders decode to the
     same serials/cameras that were physically connected when it was captured.
     """
     dm = json.loads(device_map_path.read_text())
@@ -250,7 +250,7 @@ def estimate_grasp_offset_one_camera(cube_obs_c, robot_T, K_map, D_map, cam_idx)
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--session-root", default=str(
-        REPO_ROOT / "zeus_gello_calibration" / "data" / "session1_handheld_fixed_cam"))
+        REPO_ROOT / "zeus_gello_calibration" / "data" / "session1_handheld_fixed_cam_0909"))
     ap.add_argument("--zeus-intrinsics-dir", default=str(REPO_ROOT / "intrinsics"))
     ap.add_argument("--ur3-intrinsics-dir", default=str(REPO_ROOT / "ur3_calibration" / "intrinsics"))
     ap.add_argument("--device-map", default=str(REPO_ROOT / "intrinsics" / "device_map.json"))

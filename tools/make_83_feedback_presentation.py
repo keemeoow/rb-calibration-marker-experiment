@@ -56,28 +56,29 @@ from tools.make_calibration_result_presentation import (  # noqa: E402
     table,
     text_w,
 )
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 OUT_PDF = ROOT / "캘리브레이션_8-3_피드백_해결_시각화_발표자료.pdf"
-OUT_PNG_DIR = ROOT / "ABLATION_TEST_result/session04/feedback_resolution_slides"
-STEP2B_OVERLAY = ROOT / "data/session04/calib_out/capture_filter/Step2b_review_overlay.jpg"
+OUT_PNG_DIR = ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/feedback_resolution_slides"
+STEP2B_OVERLAY = ROOT / "data/session02_NOUSE_session04_0814/calib_out/capture_filter/Step2b_review_overlay.jpg"
 REDETECTION_OVERLAY = (
-    ROOT / "data/session04/calib_out/verify/cube_observation_quality/"
+    ROOT / "data/session02_NOUSE_session04_0814/calib_out/verify/cube_observation_quality/"
     "redetection_recovered_core_overlay.png"
 )
 CUBE_MODEL_OVERLAY = (
-    ROOT / "data/session04/calib_out/verify/0826_cube_model_validation/"
+    ROOT / "data/session02_NOUSE_session04_0814/calib_out/verify/0826_cube_model_validation/"
     "cube_model_overlay_event00000.png"
 )
 BOARD_CUBE_OVERLAY = (
-    ROOT / "data/session04/calib_out/verify/board_cube_relative_pose/"
+    ROOT / "data/session02_NOUSE_session04_0814/calib_out/verify/board_cube_relative_pose/"
     "camera1_camera3_board_cube_overlay.png"
 )
 ROBOT_BASE_POINTCLOUD = (
-    ROOT / "ABLATION_TEST_result/session04/robot_base_pointcloud/"
+    ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/robot_base_pointcloud/"
     "robot_base_pointcloud_A2_event0054.png"
 )
 ROBOT_BASE_POINTCLOUD_JSON = (
-    ROOT / "ABLATION_TEST_result/session04/robot_base_pointcloud/"
+    ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/robot_base_pointcloud/"
     "robot_base_pointcloud_diagnostic.json"
 )
 

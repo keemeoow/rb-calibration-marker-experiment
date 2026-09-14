@@ -23,6 +23,6 @@ def test_zeus_data_root_accepts_only_itself_and_descendants() -> None:
     assert require_zeus_data_path(capture) == capture
 
     with pytest.raises(ValueError, match="must be inside"):
-        require_zeus_data_path(ROOT / "data" / "session05")
+        require_zeus_data_path(ROOT / "data")
     with pytest.raises(ValueError, match="must be inside"):
-        require_zeus_data_path(ROOT / "zeus_gello_calibration" / "other_data")
+        require_zeus_data_path(ROOT / "ur3_calibration" / "data")

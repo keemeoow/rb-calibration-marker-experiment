@@ -5,8 +5,8 @@
 ## 바로가기
 
 - [논문 스토리라인 기준 문서](RESEARCH.md)
-- [Session04 canonical 결과 인덱스](ABLATION_TEST_result/README.md)
-- [Session04 Board–Cube systematic error 진단](data/session04/calib_out/verify/board_cube_relative_pose/BOARD_CUBE_RELATIVE_POSE.md)
+- [Session04 canonical 결과 인덱스](ABLATION_TEST_result_0909/README.md)
+- [Session04 Board–Cube systematic error 진단](data/session02_NOUSE_session04_0814/calib_out/verify/board_cube_relative_pose/BOARD_CUBE_RELATIVE_POSE.md)
 - [문서 지도](#문서-지도)
 - [1. 가장 짧은 실행 순서](#1-가장-짧은-실행-순서)
 - [2. 시스템과 좌표계](#2-시스템과-좌표계)
@@ -34,10 +34,10 @@
 | 실행·데이터·코드 계약 | `README.md` | 사람이 편집하는 저장소 진입점 |
 | 논문 기여도·스토리라인 | `RESEARCH.md` | 초기 기여도와 실제 데이터 기반 수정 사항을 함께 관리하는 최상위 서사 기준 |
 | 수식·방법·논문 서술 | `CALIBRATION_EXPLANATION_LATEX.md` | 사람이 편집하는 이론 및 paper-ready 문서 |
-| Session04 결과 | `ABLATION_TEST_result/README.md` | 결과 인덱스; `ABLATION_TEST_TABLE1_RESULTS.md`와 `ABLATION_TEST_TABLE1_INTERACTIVE.html`은 생성기로 갱신 |
+| Session04 결과 | `ABLATION_TEST_result_0909/README.md` | 결과 인덱스; `ABLATION_TEST_TABLE1_RESULTS.md`와 `ABLATION_TEST_TABLE1_INTERACTIVE.html`은 생성기로 갱신 |
 | 추가 진단 실험 | `ADD_EXPERIMENTS_SUMMARY.md` | outlier, corner, FK, OpenCV, point-cloud 실험을 한 표로 정리 |
 | Simulation | `Simulation/README.md` | 실행 진입점; backend 통합 계획은 `Simulation/MIGRATION_PLAN.md`, 결과는 `SIM_RESULTS.md`와 `results/` |
-| Capture·검출 검증 | `data/session04/calib_out/capture_filter/CAPTURE_FILTER.md` 및 `data/session04/calib_out/verify/` | 데이터와 함께 보존하는 생성·검증 보고서; Board–Cube 계통오차 기준 문서는 `board_cube_relative_pose/BOARD_CUBE_RELATIVE_POSE.md` |
+| Capture·검출 검증 | `data/session02_NOUSE_session04_0814/calib_out/capture_filter/CAPTURE_FILTER.md` 및 `data/session02_NOUSE_session04_0814/calib_out/verify/` | 데이터와 함께 보존하는 생성·검증 보고서; Board–Cube 계통오차 기준 문서는 `board_cube_relative_pose/BOARD_CUBE_RELATIVE_POSE.md` |
 
 ## 1. 가장 짧은 실행 순서
 
@@ -45,11 +45,11 @@ Session04 내부 결과를 재생성하려면 다음을 순서대로 실행한�
 `--calib_dir`, `--out_dir`, `--observation-manifest` 등은 모두 `--root_folder`에서 유도된다.
 
 ```bash
-COMMON="--root_folder data/session04/calib_train --include_sets 0-12 \
+COMMON="--root_folder data/session02_NOUSE_session04_0814/calib_train --include_sets 0-12 \
   --min_train_eih_cube_events 3 --split_seed 20260731 --observation-filter-policy standard"
 
 python3 05_calibrate.py                 $COMMON --num_inits 3
-python3 06_make_report.py --root_folder data/session04/calib_train
+python3 06_make_report.py --root_folder data/session02_NOUSE_session04_0814/calib_train
 ```
 
 두 명령으로 calibration과 상세 결과/전체 행렬 출력이 끝난다. Cross-target,
@@ -64,28 +64,22 @@ python3 02_calibrate_intrinsics.py \
   --intr_dir intrinsics \
   --save_images
 
-# 2. cube/board 영상, depth, robot FK 동시 캡처
-python3 03_capture.py \
-  --data_root zeus_gello_calibration/data \
-  --intrinsics_dir intrinsics \
-  --use_robot \
-  --robot_ip 192.168.0.23 \
-  --robot_port 12348 \
-  --show
+# 2. 촬영은 아래 단일 문서의 최종 45-event 명령을 그대로 사용
+# zeus_gello_calibration/PIPELINE.md
 
 # 2b. board/cube geometry와 native-pixel corner를 SHA-256 manifest로 고정
 python3 04_filter_observations.py \
-  --session-root zeus_gello_calibration/data/sessionNN/calib_train \
+  --session-root data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics-dir intrinsics
 
 # 3. A/B 비교실험 실행
 python3 05_calibrate.py \
-  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
-  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/ABLATION_TEST_table1
 ```
 
 Shared Train-only Baseline만 확인하려면 05번에 `--baseline_only`를 추가한다. 전체 Table 1 실행에도 같은 baseline 코드가 포함되므로 보통은 05번을 한 번만 실행하면 된다.
@@ -145,7 +139,7 @@ $$
 비교실험의 필수 입력은 다음과 같다.
 
 ```text
-zeus_gello_calibration/data/sessionNN/calib_train/
+data/session<NN>_<설명>_<MMDD>/calib_train/
 ├── meta.json
 ├── pose_convention_manifest.json  # 기록 frame이 섞인 세션만 필요
 └── ... RGB/depth images
@@ -153,6 +147,34 @@ zeus_gello_calibration/data/sessionNN/calib_train/
 intrinsics/
 └── cam*.npz
 ```
+
+#### 폴더 이름 규칙 (예외 없음)
+
+촬영 데이터는 **어느 루트에서 찍든 그 루트의 `data/` 안에 순차로** 쌓이고,
+폴더 이름에는 예외 없이 촬영 날짜 `_MMDD` 가 붙는다. 결과는 전부 날짜가 박힌
+`ABLATION_TEST_result_<MMDD>/` 아래에 세션별로 들어간다.
+
+```text
+zeus_gello_calibration/data/session<NN>_<설명>_<MMDD>/   # 03_capture.py (composite rig)
+ur3_calibration/data/session<N>_<설명>_<MMDD>/           # UR3 리그 촬영 스크립트
+data/session<NN>_<설명>_<MMDD>/                          # 파이프라인 입력 데이터셋 (아카이브/변환본)
+ABLATION_TEST_result_<MMDD>/<세션명>/                    # 그 세션으로 낸 결과
+```
+
+세션 번호는 각 `data/` 안에서 순차로만 올라가고 재사용하지 않는다.
+
+같은 구성을 다른 날 다시 찍거나 다시 계산해도 이름만으로 구분되도록 날짜를 박는다.
+위치와 무관하게 전체 세션 목록은 [`data/INDEX.md`](data/INDEX.md) 에 모아 뒀다.
+
+경로를 새로 만드는 코드는 날짜를 직접 적지 말고 아래 단일 출처를 쓴다.
+
+| 대상 | 단일 출처 |
+|---|---|
+| 촬영 폴더 | [`capture_pipeline/paths.py`](capture_pipeline/paths.py) — `CAPTURE_DATA_ROOT`, `session_folder_name()`, `resolve_dated_dir()` |
+| 세션 할당 | [`capture_pipeline/session.py`](capture_pipeline/session.py) — `allocate_next_capture_session(label=...)` |
+| 결과 폴더 | [`calibration_pipeline/result_paths.py`](calibration_pipeline/result_paths.py) — `ABLATION_RESULT_ROOT` |
+
+`ABLATION_TEST_RESULT_ROOT` 환경변수를 주면 결과 루트를 특정 날짜로 고정할 수 있다.
 
 ### 3.3 04 촬영 후 관측 고정
 
@@ -165,11 +187,11 @@ RGB에서 ChArUco corner를 다시 검출한다.
 
 ```bash
 python3 04_filter_observations.py \
-  --session-root data/session04/calib_train \
+  --session-root data/session02_NOUSE_session04_0814/calib_train \
   --intrinsics-dir intrinsics
 ```
 
-기본 출력은 `data/session04/calib_out/capture_filter/`이다. 이 디렉터리의
+기본 출력은 `data/session02_NOUSE_session04_0814/calib_out/capture_filter/`이다. 이 디렉터리의
 `CAPTURE_FILTER.md`에 event별 선택/제외 이유와 재촬영 후보가 정리되고,
 `Step2b_review_overlay.jpg`에서 recovered/quarantine/rejected 관측을 확인할 수
 있다. `Step2b_observation_manifest.json`은 native-pixel 2D corner, 대응 3D corner,
@@ -184,7 +206,7 @@ Cube의 기본 AprilTag 검출은 `CORNER_REFINE_APRILTAG`를 사용한다. refi
 다음 옵션을 추가한다.
 
 ```bash
---observation-manifest data/session04/calib_out/capture_filter/Step2b_observation_manifest.json \
+--observation-manifest data/session02_NOUSE_session04_0814/calib_out/capture_filter/Step2b_observation_manifest.json \
 --observation-filter-policy standard
 ```
 
@@ -197,7 +219,7 @@ Session04 영상과 corner-ID topology에는 가로 checker square가 11개이�
 ChArUco corner column이 10개다. 275 mm가 흰 여백을 제외한 checker pattern의
 전체 폭이므로 `275/11=25 mm`, 즉 `square_length_m=0.025`와 일치한다.
 `--align-board-metric-scale`은 실측값이 아닌 데이터 기반 추정값을 사용하는
-**별도 진단 전용 옵션**이다. 공식 `ABLATION_TEST_result/sessionNN` 실행에는 넣지 않으며,
+**별도 진단 전용 옵션**이다. 공식 `ABLATION_TEST_result_0909/sessionNN` 실행에는 넣지 않으며,
 canonical Markdown/HTML 생성기도 scale 정렬 결과를 거부한다. 실물 치수를 측정하고
 사용자가 명시적으로 승인하기 전에는 config나 공식 결과에 반영하지 않는다.
 
@@ -492,11 +514,11 @@ B2/B3는 all-marker shared initializer에서 시작한 뒤 residual과 변수를
 
 ```bash
 python3 tools/compare_markers.py \
-  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
-  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir ABLATION_TEST_result/sessionNN/marker_system_end_to_end
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/marker_system_end_to_end
 ```
 
 | 시스템 | 초기화에 허용되는 marker | 최종 목적함수 marker | 최종 자유변수 |
@@ -517,12 +539,12 @@ ablation 관측으로는 사용하지만, 최종 heldout 또는 External GT rank
 
 ```bash
 python3 tools/evaluate_cross_target.py \
-  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
-  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --table1_result ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
-  --out_dir ABLATION_TEST_result/sessionNN/cross_target_evaluation
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --table1_result ABLATION_TEST_result_0909/sessionNN/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/cross_target_evaluation
 ```
 
 현재 cross-target artifact는 board/cube 값을 모두 보존할 수 있지만, 자동 생성되는
@@ -605,7 +627,7 @@ Board heldout, board/cube pooled overall, 별도 camera-scope 순위표는 최�
 
 ## 13. 현재 session04 결과와 비교별 해석
 
-Canonical 결과 인덱스는 [ABLATION_TEST_result/README.md](ABLATION_TEST_result/README.md), 상세 자동 생성 보고서는 [ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md](ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md)다. 결과 문서는 A0~A5, B1~B3 한 벌만 사용하며, heldout과 External GT 평가는 항상 cube target으로 통일한다.
+Canonical 결과 인덱스는 [ABLATION_TEST_result_0909/README.md](ABLATION_TEST_result_0909/README.md), 상세 자동 생성 보고서는 [ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md](ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md)다. 결과 문서는 A0~A5, B1~B3 한 벌만 사용하며, heldout과 External GT 평가는 항상 cube target으로 통일한다.
 
 핵심 요약은 다음과 같다.
 
@@ -621,7 +643,7 @@ Canonical 결과 인덱스는 [ABLATION_TEST_result/README.md](ABLATION_TEST_res
 ### 14.1 Table 1 원시 출력
 
 ```text
-ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1/
+ABLATION_TEST_result_0909/sessionNN/ABLATION_TEST_table1/
 ├── shared_train_only_baseline.json
 ├── shared_board_free_fk_cube.json
 ├── ABLATION_TEST_table1_methods.json
@@ -640,7 +662,7 @@ ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1/
 ### 14.2 보조 평가 출력
 
 ```text
-ABLATION_TEST_result/sessionNN/
+ABLATION_TEST_result_0909/sessionNN/
 ├── cross_target_evaluation/
 │   ├── cross_target_evaluation.json
 │   └── cross_target_evaluation.csv
@@ -712,94 +734,94 @@ Markdown/HTML은 새 JSON/CSV만 입력으로 사용해 다시 생성한다. 이
 ```bash
 # 선택: Shared Baseline (동일 초기값)만 먼저 생성
 python3 05_calibrate.py \
-  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
-  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1 \
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/ABLATION_TEST_table1 \
   --baseline_only
 
 # A0~A5/B1~B3 최종 9행 실행
 python3 05_calibrate.py \
-  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --num_inits 3 \
-  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/ABLATION_TEST_table1
 
 # 상세 calibration 결과와 모든 행렬 출력
 python3 06_make_report.py \
-  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
-  --table1 ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
-  --out_dir ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
+  --table1 ABLATION_TEST_result_0909/sessionNN/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/ABLATION_TEST_table1
 
 # 선택 평가: 저장된 모든 방법의 외부-GT 전 board/cube 내부 평가
 python3 tools/evaluate_cross_target.py \
-  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
-  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --table1_result ABLATION_TEST_result/sessionNN/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
-  --out_dir ABLATION_TEST_result/sessionNN/cross_target_evaluation
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --table1_result ABLATION_TEST_result_0909/sessionNN/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/cross_target_evaluation
 
 # 선택 평가: marker modality별 end-to-end 비교
 python3 tools/compare_markers.py \
-  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
-  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir ABLATION_TEST_result/sessionNN/marker_system_end_to_end
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/marker_system_end_to_end
 
 # 선택 평가: OpenCV PnP 독립 VISION relative-pose 기준선
 python3 tools/opencv_baseline.py \
-  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
-  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir ABLATION_TEST_result/sessionNN/opencv_relative_baseline
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/opencv_relative_baseline
 
 # 독립 robot task trial 수집 후 success/contact-error 평가
 python3 -m calibration_pipeline.task_trial \
   --manifest protocol_templates/robot_task_trial_manifest_<날짜>.json \
-  --output_dir ABLATION_TEST_result/sessionNN/robot_task_trial
+  --output_dir ABLATION_TEST_result_0909/sessionNN/robot_task_trial
 
 # Outlier soft-weighting 대조: 같은 관측을 linear loss로 재실행
 python3 05_calibrate.py \
-  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --num_inits 3 \
   --loss linear \
-  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir ABLATION_TEST_result/sessionNN/outlier_ablation/linear_table1
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/outlier_ablation/linear_table1
 python3 tools/evaluate_cross_target.py \
-  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --loss linear \
-  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --table1_result ABLATION_TEST_result/sessionNN/outlier_ablation/linear_table1/ABLATION_TEST_table1_methods.json \
-  --out_dir ABLATION_TEST_result/sessionNN/outlier_ablation/linear_cross_target
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --table1_result ABLATION_TEST_result_0909/sessionNN/outlier_ablation/linear_table1/ABLATION_TEST_table1_methods.json \
+  --out_dir ABLATION_TEST_result_0909/sessionNN/outlier_ablation/linear_cross_target
 python3 tools/summarize_outlier_ablation.py
 
 # Hard rejection 민감도: strict 관측 정책으로 재보정 후 동일 held-out 비교
 python3 05_calibrate.py \
-  --root_folder zeus_gello_calibration/data/sessionNN/calib_train \
+  --root_folder data/session<NN>_<설명>_<MMDD>/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --num_inits 3 \
-  --observation-manifest zeus_gello_calibration/data/sessionNN/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --observation-manifest data/session<NN>_<설명>_<MMDD>/calib_out/capture_filter/Step2b_observation_manifest.json \
   --observation-filter-policy strict \
-  --out_dir ABLATION_TEST_result/sessionNN/outlier_ablation/strict_table1
+  --out_dir ABLATION_TEST_result_0909/sessionNN/outlier_ablation/strict_table1
 python3 tools/summarize_hard_rejection_ablation.py
 
 # 선택 확장 평가의 기존 통합 Markdown/HTML 재생성 및 동기화 검증
@@ -812,15 +834,15 @@ python3 tools/verify_camera_scope_evaluation.py
 
 현재 canonical session04 결과는 다음에서 확인한다.
 
-- [Session04 결과 인덱스](ABLATION_TEST_result/README.md)
-- [모든 행·seed의 calibration 행렬 JSON](ABLATION_TEST_result/session04/ABLATION_TEST_table1/calibration_matrices.json)
-- [Table 1 결과 및 평가 계약](ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md)
+- [Session04 결과 인덱스](ABLATION_TEST_result_0909/README.md)
+- [모든 행·seed의 calibration 행렬 JSON](ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/calibration_matrices.json)
+- [Table 1 결과 및 평가 계약](ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md)
 - [추가 진단 실험 단일 요약표](ADD_EXPERIMENTS_SUMMARY.md)
-- [Interactive 결과](ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_INTERACTIVE.html)
-- [OpenCV VISION reference baseline](ABLATION_TEST_result/session04/opencv_relative_baseline/OPENCV_RELATIVE_BASELINE.md)
-- [Soft-L1 vs linear outlier loss 대조](ABLATION_TEST_result/session04/outlier_ablation/OUTLIER_LOSS_ABLATION.md)
-- [Standard vs strict hard-rejection 민감도](ABLATION_TEST_result/session04/outlier_ablation/HARD_REJECTION_ABLATION.md)
-- [Corner refinement와 weighting 대조](ABLATION_TEST_result/session04/corner_weighting_ablation/CORNER_WEIGHTING_ABLATION.md)
+- [Interactive 결과](ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_INTERACTIVE.html)
+- [OpenCV VISION reference baseline](ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/opencv_relative_baseline/OPENCV_RELATIVE_BASELINE.md)
+- [Soft-L1 vs linear outlier loss 대조](ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/outlier_ablation/OUTLIER_LOSS_ABLATION.md)
+- [Standard vs strict hard-rejection 민감도](ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/outlier_ablation/HARD_REJECTION_ABLATION.md)
+- [Corner refinement와 weighting 대조](ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/corner_weighting_ablation/CORNER_WEIGHTING_ABLATION.md)
 - [순차/통합 및 corrected-FK soft factor 수식 상세](CALIBRATION_EXPLANATION_LATEX.md)
 - [Simulation backend migration 계획](Simulation/MIGRATION_PLAN.md)
 

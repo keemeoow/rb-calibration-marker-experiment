@@ -2,10 +2,11 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 
 ROOT = Path(__file__).resolve().parents[1]
-FINAL_REPORT_DIR = ROOT / "ABLATION_TEST_result/session04/ABLATION_TEST_table1"
+FINAL_REPORT_DIR = ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1"
 
 # Serialized enum values such as ``raw-FK-fixed`` remain compatibility-only
 # identifiers. They must never leak into reader-facing reports or documents.

@@ -4,9 +4,9 @@
   "external_ground_truth_used": false,
   "row": "A4",
   "fixed_inputs": {
-    "root_folder": "data/session04/calib_train",
+    "root_folder": "data/session02_NOUSE_session04_0814/calib_train",
     "intrinsics_dir": "intrinsics",
-    "observation_manifest": "data/session04/calib_out/capture_filter/Step2b_observation_manifest.json",
+    "observation_manifest": "data/session02_NOUSE_session04_0814/calib_out/capture_filter/Step2b_observation_manifest.json",
     "observation_filter_policy": "standard",
     "allow_relocated_session_root": true,
     "include_sets": "0-12",
@@ -40,7 +40,7 @@
       "final_fk_robust_cost_fraction": 0.006539639400745776,
       "mean_nfev": 21.666666666666668,
       "rolled_back_runs": 3,
-      "table1_json": "ABLATION_TEST_result/session04/fk_factor_sensitivity/scale_0.25x/ABLATION_TEST_table1_methods.json"
+      "table1_json": "ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/fk_factor_sensitivity/scale_0.25x/ABLATION_TEST_table1_methods.json"
     },
     {
       "row": "A4",
@@ -62,7 +62,7 @@
       "final_fk_robust_cost_fraction": 0.002721714985493185,
       "mean_nfev": 21.666666666666668,
       "rolled_back_runs": 3,
-      "table1_json": "ABLATION_TEST_result/session04/fk_factor_sensitivity/scale_0.5x/ABLATION_TEST_table1_methods.json"
+      "table1_json": "ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/fk_factor_sensitivity/scale_0.5x/ABLATION_TEST_table1_methods.json"
     },
     {
       "row": "A4",
@@ -84,7 +84,7 @@
       "final_fk_robust_cost_fraction": 0.0012204691783619184,
       "mean_nfev": 21.666666666666668,
       "rolled_back_runs": 3,
-      "table1_json": "ABLATION_TEST_result/session04/fk_factor_sensitivity/scale_1x/ABLATION_TEST_table1_methods.json"
+      "table1_json": "ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/fk_factor_sensitivity/scale_1x/ABLATION_TEST_table1_methods.json"
     },
     {
       "row": "A4",
@@ -106,7 +106,7 @@
       "final_fk_robust_cost_fraction": 0.0004688124692071661,
       "mean_nfev": 22.0,
       "rolled_back_runs": 3,
-      "table1_json": "ABLATION_TEST_result/session04/fk_factor_sensitivity/scale_2x/ABLATION_TEST_table1_methods.json"
+      "table1_json": "ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/fk_factor_sensitivity/scale_2x/ABLATION_TEST_table1_methods.json"
     },
     {
       "row": "A4",
@@ -128,7 +128,7 @@
       "final_fk_robust_cost_fraction": 0.00014050665529395068,
       "mean_nfev": 21.666666666666668,
       "rolled_back_runs": 3,
-      "table1_json": "ABLATION_TEST_result/session04/fk_factor_sensitivity/scale_4x/ABLATION_TEST_table1_methods.json"
+      "table1_json": "ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/fk_factor_sensitivity/scale_4x/ABLATION_TEST_table1_methods.json"
     }
   ]
 }

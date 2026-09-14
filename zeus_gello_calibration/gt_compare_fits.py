@@ -46,6 +46,7 @@ from zeus_gello_calibration.paths import (  # noqa: E402
     ZEUS_DATA_ROOT,
     require_zeus_data_path,
 )
+from capture_pipeline.paths import resolve_dated_dir
 
 def detect_cube_pose_all(frames, K_map, D_map, T_base_cam, T_gripper_cam, T_base_gripper_now,
                          cube_target, reproj_thr_mean_px):
@@ -124,8 +125,9 @@ def main():
     ap.add_argument("--no-preview", action="store_true")
     ap.add_argument(
         "--out-root",
-        default=str(ZEUS_DATA_ROOT / "gt_compare_captures"),
-        help=f"GT capture output (must stay inside {ZEUS_DATA_ROOT})",
+        default=str(resolve_dated_dir("gt_compare_captures", ZEUS_DATA_ROOT)),
+        help=f"GT capture output (must stay inside {ZEUS_DATA_ROOT}; "
+             "이름에 촬영 날짜 _MMDD 가 붙는다)",
     )
     ap.add_argument("--robot-ip", default=ROBOT_IP_DEFAULT)
     ap.add_argument("--robot-port", type=int, default=ROBOT_PORT_DEFAULT)

@@ -6,6 +6,17 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from capture_pipeline.waypoint_safety import (
+    CAPTURE_FLANGE_POSE_KEY,
+    POSE_PLAN_SCHEMA,
+    default_pose_diversity_requirements,
+)
 
 
 PROTOCOL = "composite_rig_45_v2"
@@ -35,6 +46,7 @@ def build_template() -> dict:
             "capture_block": "B_eyetohand",
             "cube_gripped": True,
             "capture_joints": None,
+            CAPTURE_FLANGE_POSE_KEY: None,
         })
         capture_index += 1
 
@@ -51,6 +63,7 @@ def build_template() -> dict:
                 "capture_block": "A_placement",
                 "cube_gripped": False,
                 "capture_joints": None,
+                CAPTURE_FLANGE_POSE_KEY: None,
             })
             capture_index += 1
 
@@ -65,11 +78,12 @@ def build_template() -> dict:
             "capture_block": "A_placement",
             "cube_gripped": False,
             "capture_joints": None,
+            CAPTURE_FLANGE_POSE_KEY: None,
         })
         capture_index += 1
 
     return {
-        "schema_version": "capture_pose_plan_v3",
+        "schema_version": POSE_PLAN_SCHEMA,
         "capture_protocol": PROTOCOL,
         "template_only": True,
         "target_rig_id": "FILL_ME",
@@ -77,6 +91,7 @@ def build_template() -> dict:
         "rig_geometry_sha256": "FILL_ME",
         "pose_convention": "joint_deg; TCP/flange=[x,y,z,rz,ry,rx] mm/deg, RzRyRx",
         "max_transport_attempts_per_event": 3,
+        "pose_diversity_requirements": default_pose_diversity_requirements(),
         "safe_joints_empty": None,
         "safe_joints_gripped": None,
         "placements": placements,

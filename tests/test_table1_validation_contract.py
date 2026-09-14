@@ -17,15 +17,16 @@ from tools.sync_table1_canonical_data import (
     _markdown,
     _method_rows,
 )
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TABLE1_JSON = ROOT / "ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json"
+TABLE1_JSON = ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json"
 CROSS_JSON = (
-    ROOT / "ABLATION_TEST_result/session04/cross_target_evaluation/"
+    ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/cross_target_evaluation/"
     "cross_target_evaluation.json")
 MARKER_JSON = (
-    ROOT / "ABLATION_TEST_result/session04/marker_system_end_to_end/"
+    ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/marker_system_end_to_end/"
     "marker_system_end_to_end.json")
 
 
@@ -200,7 +201,7 @@ def test_pooled_and_equal_weight_agree_only_through_support():
 
 def test_report_uses_cube_only_final_metric_set():
     markdown = (
-        ROOT / "ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md").read_text()
+        ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md").read_text()
 
     assert "Heldout Cube RMSE" in markdown
     assert "ALL Cube RMSE" in markdown
@@ -214,8 +215,8 @@ def test_relocated_manifest_keeps_every_hash_check():
     from calibration_pipeline.observations import _relocation
 
     relocate, recorded_prefix, local_prefix = _relocation(
-        "/Users/woo/Documents/GitHub/Robot-Lab/repo/data/session04/calib_train",
-        "/home/jysim/checkout/repo/data/session04/calib_train")
+        "/Users/woo/Documents/GitHub/Robot-Lab/repo/data/session02_NOUSE_session04_0814/calib_train",
+        "/home/jysim/checkout/repo/data/session02_NOUSE_session04_0814/calib_train")
 
     assert recorded_prefix == "/Users/woo/Documents/GitHub/Robot-Lab"
     assert local_prefix == "/home/jysim/checkout"

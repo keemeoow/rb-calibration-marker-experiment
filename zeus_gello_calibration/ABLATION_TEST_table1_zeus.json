@@ -3,9 +3,9 @@
   "source_data": {
     "root": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/zeus_gello_calibration/data",
     "session_directories": {
-      "p1": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/zeus_gello_calibration/data/session1_handheld_fixed_cam",
-      "p2": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam",
-      "p3": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/zeus_gello_calibration/data/session3_wrist_motion_gripper_cam"
+      "p1": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/zeus_gello_calibration/data/session1_handheld_fixed_cam_0909",
+      "p2": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/zeus_gello_calibration/data/session2_floor_board_dual_cam_0909",
+      "p3": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/zeus_gello_calibration/data/session3_wrist_motion_gripper_cam_0909"
     },
     "observations": {
       "p1_cube": 45,

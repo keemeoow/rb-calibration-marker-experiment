@@ -1116,18 +1116,18 @@ def _write_report(path: Path, payload: dict):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--session-root", default="data/session04/calib_train")
+    parser.add_argument("--session-root", default="data/session02_NOUSE_session04_0814/calib_train")
     parser.add_argument("--intrinsics-dir", default="intrinsics")
     parser.add_argument(
         "--manifest",
-        default=("data/session04/calib_out/capture_filter/"
+        default=("data/session02_NOUSE_session04_0814/calib_out/capture_filter/"
                  "Step2b_observation_manifest.json"))
     parser.add_argument(
         "--observation-filter-policy", choices=("standard", "strict"),
         default="standard")
     parser.add_argument(
         "--output-dir",
-        default=("data/session04/calib_out/verify/"
+        default=("data/session02_NOUSE_session04_0814/calib_out/verify/"
                  "board_cube_relative_pose"))
     parser.add_argument("--split-seed", type=int, default=20260731)
     parser.add_argument("--test-fraction", type=float, default=0.2)

@@ -1,5 +1,5 @@
 {
-  "preregistration": "ABLATION_TEST_result/session04/outlier_ablation/PREREGISTRATION_HARD_THRESHOLD.md",
+  "preregistration": "ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/outlier_ablation/PREREGISTRATION_HARD_THRESHOLD.md",
   "baseline_split": {
     "strategy": "event_grouped_and_set_stratified",
     "seed": 20260731,

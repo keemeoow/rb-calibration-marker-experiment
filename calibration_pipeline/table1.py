@@ -93,6 +93,13 @@ from calibration_pipeline.fk_factor import (
     solve_factorized_fk,
     validate_covariance,
 )
+from capture_pipeline.waypoint_safety import (
+    PHASE_P1,
+    PHASE_P2,
+    PHASE_P3,
+    P3_STATIONARY_SET_INDEX,
+    PROTOCOL_COMPOSITE_RIG_45,
+)
 from calibration_pipeline.path_evaluation import (
     build_frozen_path_evaluation_mask,
     evaluate_paths_with_frozen_mask,
@@ -416,6 +423,148 @@ def build_event_split(observations: Sequence[PixelObs], gripper: int, fraction: 
         "per_set": per_set,
         "dropped_sets": dropped,
     }
+
+
+COMPOSITE_PLACEMENT_SPLIT = "composite_rig_p2_placement_grouped_v1"
+
+
+def capture_protocol_from_meta(meta: Mapping) -> Optional[str]:
+    config = meta.get("capture_config")
+    if isinstance(config, Mapping) and config.get("capture_protocol"):
+        return str(config["capture_protocol"])
+    protocols = {
+        str(capture.get("protocol_version"))
+        for capture in meta.get("captures", [])
+        if capture.get("protocol_version")
+    }
+    if len(protocols) == 1:
+        return protocols.pop()
+    return None
+
+
+def selected_composite_protocol_captures(meta: Mapping) -> List[dict]:
+    """Return one transport-valid attempt for every final planned event."""
+    captures = [
+        capture for capture in meta.get("captures", [])
+        if capture.get("protocol_version") == PROTOCOL_COMPOSITE_RIG_45
+        and capture.get("selected_for_analysis") is True
+    ]
+    planned_ids = [str(capture.get("planned_event_id", "")) for capture in captures]
+    if len(captures) != 45 or len(set(planned_ids)) != 45 or "" in planned_ids:
+        raise RuntimeError(
+            "composite_rig_45 analysis requires exactly one selected transport-valid "
+            "attempt for each of 45 planned events"
+        )
+    expected_phase_counts = {PHASE_P1: 15, PHASE_P2: 20, PHASE_P3: 10}
+    actual_phase_counts = {
+        phase: sum(capture.get("phase") == phase for capture in captures)
+        for phase in expected_phase_counts
+    }
+    if actual_phase_counts != expected_phase_counts:
+        raise RuntimeError(
+            "composite_rig_45 selected phase counts must be 15/20/10; got {}".format(
+                actual_phase_counts)
+        )
+    p3_sets = {get_capture_set_index(capture) for capture in captures
+               if capture.get("phase") == PHASE_P3}
+    if p3_sets != {P3_STATIONARY_SET_INDEX}:
+        raise RuntimeError(
+            "P3 must use independent set_index {}; got {}".format(
+                P3_STATIONARY_SET_INDEX, sorted(
+                    value for value in p3_sets if value is not None))
+        )
+    return sorted(captures, key=lambda capture: int(capture["event_id"]))
+
+
+def build_composite_placement_split(meta: Mapping, fraction: float,
+                                    seed: int) -> dict:
+    """Hold out whole P2 placements; P1/P3 remain calibration-only.
+
+    A placement is the physical target pose.  Its two camera-view events must
+    never cross the train/held-out boundary, even when their event IDs differ.
+    """
+    fraction = float(fraction)
+    if not 0.0 < fraction < 1.0:
+        raise ValueError("test fraction must be strictly between 0 and 1")
+    captures = selected_composite_protocol_captures(meta)
+    p2_by_placement: Dict[str, List[dict]] = defaultdict(list)
+    always_train = []
+    for capture in captures:
+        phase = capture.get("phase")
+        event = int(capture["event_id"])
+        if phase == PHASE_P2:
+            placement_id = str(capture.get("placement_id") or "")
+            if not placement_id:
+                raise RuntimeError("P2 capture lacks placement_id")
+            p2_by_placement[placement_id].append(capture)
+        else:
+            always_train.append(event)
+    if len(p2_by_placement) != 10:
+        raise RuntimeError(
+            "P2 split requires exactly 10 placement groups, got {}".format(
+                len(p2_by_placement))
+        )
+    set_by_placement = {}
+    for placement_id, group in sorted(p2_by_placement.items()):
+        views = {int(capture.get("view_index", -1)) for capture in group}
+        sets = {get_capture_set_index(capture) for capture in group}
+        if len(group) != 2 or views != {0, 1} or len(sets) != 1 or None in sets:
+            raise RuntimeError(
+                "{} must contain views 0 and 1 under one set_index".format(
+                    placement_id)
+            )
+        set_by_placement[placement_id] = int(next(iter(sets)))
+    if len(set(set_by_placement.values())) != 10:
+        raise RuntimeError("each P2 placement must have a distinct set_index")
+
+    placements = sorted(p2_by_placement)
+    rng = np.random.default_rng(int(seed))
+    shuffled = list(placements)
+    rng.shuffle(shuffled)
+    heldout_count = max(1, min(len(placements) - 1,
+                               int(round(fraction * len(placements)))))
+    heldout_placements = set(shuffled[:heldout_count])
+    train_placements = set(placements) - heldout_placements
+    train_events = set(always_train)
+    test_events = set()
+    per_set = {}
+    for placement_id in placements:
+        events = sorted(int(capture["event_id"])
+                        for capture in p2_by_placement[placement_id])
+        role = "heldout" if placement_id in heldout_placements else "train"
+        destination = test_events if role == "heldout" else train_events
+        destination.update(events)
+        per_set[str(set_by_placement[placement_id])] = {
+            "placement_id": placement_id,
+            "split_role": role,
+            "events": events,
+        }
+    if train_events & test_events:
+        raise RuntimeError("placement-grouped split produced event leakage")
+    return {
+        "strategy": COMPOSITE_PLACEMENT_SPLIT,
+        "seed": int(seed),
+        "test_fraction_requested": fraction,
+        "split_unit": "P2 placement_id",
+        "p1_p3_role": "always_train_calibration_only",
+        "eligible_sets": sorted(set_by_placement.values()),
+        "train_events": sorted(train_events),
+        "test_events": sorted(test_events),
+        "train_placement_ids": sorted(train_placements),
+        "heldout_placement_ids": sorted(heldout_placements),
+        "always_train_events": sorted(always_train),
+        "per_set": per_set,
+        "dropped_sets": {},
+    }
+
+
+def build_protocol_event_split(observations: Sequence[PixelObs], meta: Mapping,
+                               gripper: int, fraction: float, seed: int,
+                               min_train_eih_cube_events: int) -> dict:
+    if capture_protocol_from_meta(meta) == PROTOCOL_COMPOSITE_RIG_45:
+        return build_composite_placement_split(meta, fraction, seed)
+    return build_event_split(
+        observations, gripper, fraction, seed, min_train_eih_cube_events)
 
 
 def support_report(observations: Sequence[PixelObs], gripper: int) -> dict:
@@ -1533,6 +1682,15 @@ def prepare_ablation_data(args) -> PreparedAblationData:
     if included_set_indices and not meta.get("captures"):
         raise RuntimeError(
             f"include_sets={args.include_sets!r} did not match any captures")
+    protocol = capture_protocol_from_meta(meta)
+    if protocol == PROTOCOL_COMPOSITE_RIG_45:
+        if included_set_indices:
+            raise RuntimeError(
+                "composite_rig_45 uses a frozen phase-aware population; "
+                "--include_sets is not allowed")
+        selected_captures = selected_composite_protocol_captures(meta)
+        meta = dict(meta)
+        meta["captures"] = selected_captures
     meta, pose_convention = apply_pose_convention_manifest(
         args.root_folder, meta)
     all_cam_ids = sorted({int(ci) for cap in meta.get("captures", [])
@@ -1545,15 +1703,25 @@ def prepare_ablation_data(args) -> PreparedAblationData:
     robot_T = cp.load_robot_poses_from_meta(meta)
     observations, cube_cfg_source, cube_reason = detect_observations(
         args, meta, K_map, D_map, all_cam_ids, gripper)
-    split = build_event_split(
-        observations, gripper, args.test_fraction, args.split_seed,
+    split = build_protocol_event_split(
+        observations, meta, gripper, args.test_fraction, args.split_seed,
         args.min_train_eih_cube_events)
     eligible = set(split["eligible_sets"])
     train_events = set(split["train_events"])
     test_events = set(split["test_events"])
-    pool = [obs for obs in observations if obs.set_idx in eligible]
+    if split["strategy"] == COMPOSITE_PLACEMENT_SPLIT:
+        selected_events = train_events | test_events
+        pool = [obs for obs in observations if int(obs.event) in selected_events]
+    else:
+        pool = [obs for obs in observations if obs.set_idx in eligible]
     train_obs = [obs for obs in pool if int(obs.event) in train_events]
     test_obs = [obs for obs in pool if int(obs.event) in test_events]
+    if split["strategy"] == COMPOSITE_PLACEMENT_SPLIT:
+        raise RuntimeError(
+            "composite_rig_45 placement-grouped split is active, but the final "
+            "common-rig target model is not implemented in 05_calibrate.py yet; "
+            "refusing to run the legacy static-board/per-set-cube model on P1/P2/P3"
+        )
     if bool(getattr(args, "align_board_metric_scale", False)):
         board_metric_scale = estimate_train_board_metric_scale(
             train_obs, gripper, K_map, D_map)
@@ -1913,7 +2081,7 @@ def parse_args(argv=None):
                         help="Default: <session>/calib_out from --root_folder.")
     parser.add_argument(
         "--out_dir",
-        help=("Output directory. Default: ABLATION_TEST_result/<sessionNN>/ABLATION_TEST_table1 "
+        help=("Output directory. Default: ABLATION_TEST_result_<MMDD>/<sessionNN>/ABLATION_TEST_table1 "
               "inferred from --root_folder."),
     )
     parser.add_argument(

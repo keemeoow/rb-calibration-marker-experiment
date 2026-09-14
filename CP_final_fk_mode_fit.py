@@ -23,7 +23,7 @@
   PYTHONPATH= python CP_final_fk_mode_fit.py \
       --root_folder data/session02/calib_train --intrinsics_dir intrinsics \
       --calib_dir data/session02/calib_out \
-      --out_dir ABLATION_TEST_result/final_fk_mode_fit
+      --out_dir ABLATION_TEST_result_<MMDD>/final_fk_mode_fit
 """
 from __future__ import annotations
 
@@ -52,6 +52,7 @@ from calibration_runtime_utils import (
 )
 from calibration_path_evaluation import observation_id
 from calibration_reprojection_backend import SolverOptions, variable_keys
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 
 ARMS = {
@@ -126,7 +127,7 @@ def main() -> None:
     parser.add_argument("--root_folder", default="data/session02/calib_train")
     parser.add_argument("--intrinsics_dir", default="intrinsics")
     parser.add_argument("--calib_dir", default="data/session02/calib_out")
-    parser.add_argument("--out_dir", default="ABLATION_TEST_result/final_fk_mode_fit")
+    parser.add_argument("--out_dir", default=f"{ABLATION_RESULT_ROOT}/final_fk_mode_fit")
     parser.add_argument("--arms", default="no_fk,fixed_fk")
     parser.add_argument("--ref_cam", type=int, default=None,
                         help="상대 외부파라미터 기준 고정 카메라. 기본은 가장 작은 고정 cam id.")

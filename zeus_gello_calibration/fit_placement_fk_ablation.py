@@ -3,7 +3,7 @@
 """zeus_gello_calibration/fit_placement_fk_ablation.py -- no-FK vs fixed-FK 비교.
 
 session1(그리퍼로 큐브를 쥐고 이리저리 움직이며 찍은 16장, capture_replayed/)과
-session2_pick_and_place.py가 남긴 "큐브를 바닥에 놓고 찍은" 15장
+구형 pick-and-place collector가 남긴 "큐브를 바닥에 놓고 찍은" 15장
 (capture_placed/)을 **하나의 pooled fit**으로 같이 넣어서 카메라 extrinsics를
 같이 최적화하고, train reprojection RMSE를 비교한다.
 
@@ -72,7 +72,7 @@ from session2_pick_and_place import (  # noqa: E402
     SESSION2_DIR_DEFAULT, compute_ordered_targets,
 )
 
-SESSION1_DIR_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "data" / "session1_handheld_fixed_cam"
+SESSION1_DIR_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "data" / "session1_handheld_fixed_cam_0909"
 FIT_JSON_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "pass1_grasp_offset_replayed.json"
 SESSION2_EVENT_OFFSET = 1000  # session1과 event id가 안 겹치게 (robot_T 딕셔너리 키 충돌 방지)
 
@@ -168,7 +168,7 @@ def main():
     items = compute_ordered_targets(session2_dir)
     if len(items) != len(s2_indices):
         print(f"[WARN] compute_ordered_targets()가 {len(items)}개, 캡처 폴더가 "
-              f"{len(s2_indices)}개 -- session2_pick_and_place.py 실행 순서와 안 맞을 수 있습니다.")
+              f"{len(s2_indices)}개 -- legacy pick-and-place 실행 순서와 안 맞을 수 있습니다.")
     items_by_index = {idx: items[idx] for idx in s2_indices if idx < len(items)}
 
     K_map, D_map = load_intrinsics_by_label(

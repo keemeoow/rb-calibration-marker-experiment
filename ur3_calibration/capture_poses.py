@@ -28,6 +28,10 @@ from pathlib import Path
 
 import numpy as np
 import rtde_receive
+from capture_pipeline.paths import resolve_dated_dir
+
+#: 이 리그의 촬영 데이터 루트 — 세션 폴더는 전부 여기 순서대로 쌓인다.
+UR3_CAPTURE_DATA_ROOT = Path(__file__).resolve().parent / "data"
 
 ROBOT_IP_DEFAULT = "192.168.1.101"
 
@@ -48,8 +52,12 @@ SESSIONS = {
 
 
 def session_path(out_root: Path, session_id: int) -> Path:
+    # 폴더 이름 규칙(session<NN>_<설명>_<MMDD>)은 capture_pipeline.paths 한 곳에서만
+    # 정한다 — 이어찍기면 기존 폴더, 처음이면 오늘 날짜가 붙은 새 폴더.
     info = SESSIONS[session_id]
-    return out_root / f"session{session_id}_{info['name']}" / "poses.json"
+    session_dir = resolve_dated_dir(
+        f"session{session_id}_{info['name']}", out_root, create=True)
+    return session_dir / "poses.json"
 
 
 def main():
@@ -61,8 +69,8 @@ def main():
     ap.add_argument("--num-poses", type=int, default=15, help="목표 자세 개수 (기본 15)")
     ap.add_argument(
         "--out-root",
-        default=str(Path(__file__).resolve().parent / "data"),
-        help="세션 폴더가 생성될 상위 경로",
+        default=str(UR3_CAPTURE_DATA_ROOT),
+        help="세션 폴더가 생성될 상위 경로 (기본: ur3_calibration/data/)",
     )
     ap.add_argument("--reset", action="store_true", help="기존 세션 파일 비우고 새로 시작")
     args = ap.parse_args()

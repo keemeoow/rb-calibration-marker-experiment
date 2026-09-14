@@ -41,14 +41,15 @@ from tools.make_calibration_result_presentation import (  # noqa: E402
     font,
     rounded,
 )
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 
-DEFAULT_OUT_DIR = ROOT / "ABLATION_TEST_result/session04/robot_base_pointcloud"
-DEFAULT_MATRIX_JSON = ROOT / "ABLATION_TEST_result/session04/ABLATION_TEST_table1/calibration_matrices.json"
+DEFAULT_OUT_DIR = ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/robot_base_pointcloud"
+DEFAULT_MATRIX_JSON = ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/calibration_matrices.json"
 DEFAULT_MANIFEST = (
-    ROOT / "data/session04/calib_out/capture_filter/Step2b_observation_manifest.json"
+    ROOT / "data/session02_NOUSE_session04_0814/calib_out/capture_filter/Step2b_observation_manifest.json"
 )
-DEFAULT_SESSION_ROOT = ROOT / "data/session04/calib_train"
+DEFAULT_SESSION_ROOT = ROOT / "data/session02_NOUSE_session04_0814/calib_train"
 DEFAULT_INTRINSICS = ROOT / "intrinsics"
 
 CAMERA_COLORS = {

@@ -8,6 +8,7 @@ import csv
 import json
 from pathlib import Path
 from statistics import fmean
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 
 METHODS = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
@@ -141,21 +142,21 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--soft_table",
-        default="ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
+        default=f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
     parser.add_argument(
         "--linear_table",
-        default=("ABLATION_TEST_result/session04/outlier_ablation/linear_table1/"
+        default=(f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/outlier_ablation/linear_table1/"
                  "ABLATION_TEST_table1_methods.json"))
     parser.add_argument(
         "--soft_cross",
-        default=("ABLATION_TEST_result/session04/cross_target_evaluation/"
+        default=(f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/cross_target_evaluation/"
                  "cross_target_evaluation.json"))
     parser.add_argument(
         "--linear_cross",
-        default=("ABLATION_TEST_result/session04/outlier_ablation/linear_cross_target/"
+        default=(f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/outlier_ablation/linear_cross_target/"
                  "cross_target_evaluation.json"))
     parser.add_argument(
-        "--out_dir", default="ABLATION_TEST_result/session04/outlier_ablation")
+        "--out_dir", default=f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/outlier_ablation")
     return parser.parse_args()
 
 

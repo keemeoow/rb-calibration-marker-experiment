@@ -13,6 +13,7 @@ from html import escape
 import json
 from pathlib import Path
 from statistics import fmean
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 METHOD_ORDER = ("A0", "A1", "A2", "A3", "A4", "A5", "B1", "B2", "B3")
 # Label-only migrations for numerical artifacts that predate corrected prose.
@@ -351,8 +352,8 @@ def _markdown_data_warnings(data_warnings: dict) -> str:
     lines = [
         "## Current Data Warnings (현재 데이터 경고)",
         "",
-        "> 아래 수치는 기존 `data/session04`를 재평가한 **내부 preflight 결과**다. "
-        "새 `CAPTURE_PROTOCOL.md`의 composite rig 45-event 촬영 결과가 아니므로, "
+        "> 아래 수치는 기존 `data/session02_NOUSE_session04_0814`를 재평가한 **내부 preflight 결과**다. "
+        "새 `zeus_gello_calibration/PIPELINE.md`의 composite rig 45-event 촬영 결과가 아니므로, "
         "최종 논문 수치로 확정하지 않는다.",
         "",
         "| 점검 항목 | 현재 데이터 | 결과 해석에 미치는 영향 |",
@@ -1400,20 +1401,20 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Regenerate current CSV/Markdown/HTML evaluation artifacts")
     parser.add_argument(
-        "--table1", default="ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
+        "--table1", default=f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
     parser.add_argument(
         "--cross", default=(
-            "ABLATION_TEST_result/session04/cross_target_evaluation/"
+            f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/cross_target_evaluation/"
             "cross_target_evaluation.json"))
     parser.add_argument(
         "--marker", default=(
-            "ABLATION_TEST_result/session04/marker_system_end_to_end/"
+            f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/marker_system_end_to_end/"
             "marker_system_end_to_end.json"))
     parser.add_argument(
-        "--late_dir", default="ABLATION_TEST_result/session04/ABLATION_TEST_table1")
+        "--late_dir", default=f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1")
     parser.add_argument(
         "--html",
-        default="ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_INTERACTIVE.html")
+        default=f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_INTERACTIVE.html")
     return parser.parse_args()
 
 

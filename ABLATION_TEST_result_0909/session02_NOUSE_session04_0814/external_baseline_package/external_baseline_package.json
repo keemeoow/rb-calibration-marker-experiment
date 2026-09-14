@@ -5,12 +5,12 @@
   "status": "input_package_ready_adapter_execution_pending",
   "policy": "standard",
   "source_manifest": {
-    "path": "data/session04/calib_out/capture_filter/Step2b_observation_manifest.json",
+    "path": "data/session02_NOUSE_session04_0814/calib_out/capture_filter/Step2b_observation_manifest.json",
     "sha256": "bb864bc3149afadb2c7f4d9991c939493c6fe55662c595e02df621b745737ea7",
     "schema": "post_capture_observation_manifest_v2"
   },
   "source_table1": {
-    "path": "ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json",
+    "path": "ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json",
     "sha256": "f048caac50d5a3ae3e5b7f735cfddd073bdc0cf21be14b6b5fc51249257bb5d9"
   },
   "split": {
@@ -308,9 +308,9 @@
     }
   },
   "files": {
-    "observations_csv": "ABLATION_TEST_result/session04/external_baseline_package/external_baseline_observations.csv",
-    "intrinsics_json": "ABLATION_TEST_result/session04/external_baseline_package/external_baseline_intrinsics.json",
-    "readme": "ABLATION_TEST_result/session04/external_baseline_package/EXTERNAL_BASELINE_PACKAGE.md"
+    "observations_csv": "ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/external_baseline_package/external_baseline_observations.csv",
+    "intrinsics_json": "ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/external_baseline_package/external_baseline_intrinsics.json",
+    "readme": "ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/external_baseline_package/EXTERNAL_BASELINE_PACKAGE.md"
   },
   "source_validation": {
     "images_checked": 81,

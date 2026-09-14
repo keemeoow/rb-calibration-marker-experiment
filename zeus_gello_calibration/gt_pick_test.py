@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """zeus_gello_calibration/gt_pick_test.py -- 외부 GT 큐브 vision 기반 pick 정확도 테스트
 
-session2_pick_and_place.py는 "미리 저장해둔 좌표"로 pick/place했지만, 이건 그
-반대다: targets/gt_cube/ 의 GT 검증용 큐브를 바닥 아무 곳에나 두고, 이
+구형 calibration collector는 "미리 저장해둔 좌표"로 pick/place했지만, 이건 그
+반대인 별도 External GT 도구다. targets/gt_cube/의 검증용 큐브를 바닥 아무 곳에나 두고, 이
 스크립트가 고정 카메라들로 실시간으로 그 큐브를 검출 -> 우리가 fit한
 T_gripper_cube/카메라 extrinsics(fit_grasp_offset.py 결과)로 base 좌표계
 pick 목표를 계산 -> 그 자리로 movel해서 집는다. 그 다음 (물리적으로 눈금이

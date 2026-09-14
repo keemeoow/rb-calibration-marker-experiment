@@ -49,7 +49,7 @@
 구현 위치
 ---------
     calibration_pipeline/report.py
-      main() / parse_args()   - 경로 기본값 해석 (ABLATION_TEST_result/<session>/ABLATION_TEST_table1)
+      main() / parse_args()   - 경로 기본값 해석 (ABLATION_TEST_result_<MMDD>/<session>/ABLATION_TEST_table1)
       write_report()          - 검증 -> 행 요약 -> CSV/JSON 기록
       _validate()             - 위 "무결성 검사"
       _row_summary()          - 행 하나의 수렴·prune·지표 요약

@@ -45,6 +45,7 @@ from zeus_gello_calibration.paths import (  # noqa: E402
     ZEUS_DATA_ROOT,
     require_zeus_data_path,
 )
+from capture_pipeline.paths import resolve_dated_dir  # noqa: E402
 
 ROBOT_IP_DEFAULT = "192.168.0.23"
 ROBOT_PORT_DEFAULT = 12350
@@ -255,7 +256,10 @@ def main():
         data_root = require_zeus_data_path(args.out_root, label="--out-root")
     except ValueError as exc:
         ap.error(str(exc))
-    session_dir = data_root / f"session{args.session}_{info['name']}"
+    # 폴더 이름 규칙(<이름>_<MMDD>)은 capture_pipeline.paths 한 곳에서만 정한다:
+    # 이어찍기면 기존 폴더를, 처음이면 오늘 날짜가 붙은 새 폴더를 준다.
+    session_dir = resolve_dated_dir(
+        f"session{args.session}_{info['name']}", data_root, create=True)
     capture_root = session_dir / "capture"
 
     start_index = 0

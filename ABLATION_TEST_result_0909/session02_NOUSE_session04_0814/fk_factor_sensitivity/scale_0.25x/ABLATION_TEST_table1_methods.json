@@ -1,6 +1,6 @@
 {
   "protocol": {
-    "dataset": "data/session04/calib_train",
+    "dataset": "data/session02_NOUSE_session04_0814/calib_train",
     "intrinsics_dir": "intrinsics",
     "requested_set_filter": "0-12",
     "resolved_set_indices": [
@@ -17,7 +17,7 @@
     "cube_config_source": "config_py:CubeConfig",
     "source_data_provenance": {
       "meta_json": {
-        "path": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/data/session04/calib_train/meta.json",
+        "path": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/data/session02_NOUSE_session04_0814/calib_train/meta.json",
         "sha256": "0740c75897408e7c913bcbcaf66dee63dd79abbf56470855e3d846037c74b1cd"
       },
       "intrinsics": {
@@ -189,7 +189,7 @@
         }
       },
       "observation_manifest": {
-        "path": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/data/session04/calib_out/capture_filter/Step2b_observation_manifest.json",
+        "path": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/data/session02_NOUSE_session04_0814/calib_out/capture_filter/Step2b_observation_manifest.json",
         "sha256": "bb864bc3149afadb2c7f4d9991c939493c6fe55662c595e02df621b745737ea7",
         "policy": "standard"
       }
@@ -1285,7 +1285,7 @@
     },
     "backbone_fk_used_in_all_conditions": true,
     "shared_train_only_baseline": {
-      "path": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/ABLATION_TEST_result/session04/fk_factor_sensitivity/scale_0.25x/shared_train_only_baseline.json",
+      "path": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/fk_factor_sensitivity/scale_0.25x/shared_train_only_baseline.json",
       "schema": "table1_shared_train_only_baseline_v2",
       "sha256": "0996186bc293841f4d8011416528d261bf88975fc45ebb0413838fc9f4524e1f",
       "shared_reference_state_sha256": "29d9c7a6e4573be887269f6a0177670f7ebd5b4a77a2c2a8b84148bd1c60ec01",
@@ -1657,7 +1657,7 @@
       "status": "ok",
       "reason": "",
       "source": "post_capture_frozen_manifest",
-      "manifest_path": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/data/session04/calib_out/capture_filter/Step2b_observation_manifest.json",
+      "manifest_path": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/data/session02_NOUSE_session04_0814/calib_out/capture_filter/Step2b_observation_manifest.json",
       "manifest_sha256": "bb864bc3149afadb2c7f4d9991c939493c6fe55662c595e02df621b745737ea7",
       "manifest_schema": "post_capture_observation_manifest_v2",
       "cube_config_source": "config_py:CubeConfig",
@@ -23694,8 +23694,8 @@
       "n_board_observations": 113,
       "source_hashes_validated": true,
       "session_root_relocated": true,
-      "manifest_recorded_session_root": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session04/calib_train",
-      "local_session_root": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/data/session04/calib_train"
+      "manifest_recorded_session_root": "/Users/woo/Documents/GitHub/Robot-Lab/rb-calibration-marker-experiment/data/session02_NOUSE_session04_0814/calib_train",
+      "local_session_root": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/data/session02_NOUSE_session04_0814/calib_train"
     },
     "freeze_contract": {
       "A0": {
@@ -23872,7 +23872,7 @@
     }
   },
   "shared_fk_cube_artifact": {
-    "path": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/ABLATION_TEST_result/session04/fk_factor_sensitivity/scale_0.25x/shared_board_free_fk_cube.json",
+    "path": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/fk_factor_sensitivity/scale_0.25x/shared_board_free_fk_cube.json",
     "sha256": "c55556f65602ded0adc0900c83eda55514b58375632811b29a64093acc93a05e",
     "consumers": [
       "A4",

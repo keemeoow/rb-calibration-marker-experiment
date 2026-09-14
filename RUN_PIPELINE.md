@@ -13,21 +13,11 @@ Cross-target·marker-system·OpenCV baseline은 calibration 완료에 필요하�
 
 ## 촬영 프로토콜과 현재 구현 상태
 
-최종 비교실험의 촬영 기준은 [CAPTURE_PROTOCOL.md](CAPTURE_PROTOCOL.md) 한 문서로
-고정한다.
-
-새 촬영 데이터는 모두 `zeus_gello_calibration/data/` 아래에 저장한다. 기존
-`data/session04`는 legacy 결과 재현과 진단 입력으로만 유지한다.
-
-| 구분 | 상태 | 사용 범위 |
-| --- | --- | --- |
-| 기존 `03_capture.py` | legacy 구현 | 기존 `data/session04` 재현 및 진단 |
-| 최종 composite-target protocol | capture 통신 구현 완료, pose 티칭·dry run 전 | 새 A0~A5/B1~B3 calibration session |
-
-최종 프로토콜은 board와 cube를 하나의 강체 rig로 만들고, 모든 방법이 같은
-`P1 15 + P2 20 + P3 10 = 45` planned event를 사용한다. 최종 protocol mode에서는
-모든 camera와 robot/release state를 저장하고, marker gate는 진단으로만 사용한다.
-실제 좌표를 채운 pose plan과 rig geometry 검증, 저속 dry run을 통과한 뒤 본 촬영한다.
+새 촬영의 유일한 가이드와 명령은
+[zeus_gello_calibration/PIPELINE.md](zeus_gello_calibration/PIPELINE.md)에 둔다.
+PC 촬영 진입점은 `03_capture.py` 하나이고 새 데이터는 모두
+`zeus_gello_calibration/data/` 아래에 저장한다. 이 문서에서는 촬영 명령을 중복하지
+않으며, 기존 `data/session02_NOUSE_session04_0814`는 과거 결과 재현과 진단 입력으로만 유지한다.
 
 ## 현재 Session04 / legacy 명령 순서
 
@@ -46,35 +36,26 @@ python3 02_calibrate_intrinsics.py \
   --min_views 12 \
   --save_images
 
-# 03 — Legacy RGB-D + robot FK 촬영; 최종 45-event 촬영에는 사용 금지
-python3 03_capture.py \
-  --data_root zeus_gello_calibration/data \
-  --intrinsics_dir intrinsics \
-  --use_robot \
-  --robot_ip 192.168.0.23 \
-  --robot_port 12348 \
-  --show
-
 # 04 — 저장 영상 전체 재검출 및 관측 manifest 고정
 python3 04_filter_observations.py \
-  --session-root data/session04/calib_train \
+  --session-root data/session02_NOUSE_session04_0814/calib_train \
   --intrinsics-dir intrinsics
 
 # 05 — A0~A5/B1~B3 calibration + frame-prune/refit/rollback
 python3 05_calibrate.py \
-  --root_folder data/session04/calib_train \
+  --root_folder data/session02_NOUSE_session04_0814/calib_train \
   --intrinsics_dir intrinsics \
   --include_sets 0-12 \
   --split_seed 20260731 \
   --num_inits 3 \
-  --observation-manifest data/session04/calib_out/capture_filter/Step2b_observation_manifest.json \
-  --out_dir ABLATION_TEST_result/session04/ABLATION_TEST_table1
+  --observation-manifest data/session02_NOUSE_session04_0814/calib_out/capture_filter/Step2b_observation_manifest.json \
+  --out_dir ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1
 
 # 06 — 05 결과만으로 요약 CSV·전체 calibration 행렬 출력
 python3 06_make_report.py \
-  --root_folder data/session04/calib_train \
-  --table1 ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
-  --out_dir ABLATION_TEST_result/session04/ABLATION_TEST_table1
+  --root_folder data/session02_NOUSE_session04_0814/calib_train \
+  --table1 ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json \
+  --out_dir ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1
 ```
 
 ## 단계별 입력 · 과정 · 결과
@@ -83,7 +64,7 @@ python3 06_make_report.py \
 | --- | --- | --- | --- |
 | 01 `export_intrinsics` | 연결된 RealSense, 스트림 설정 | serial 순으로 camera ID를 고정하고 factory intrinsic/extrinsic 및 depth scale을 읽는다 | `intrinsics/device_map.json`, `depth_scales.json`, `cam*.npz` |
 | 02 `calibrate_intrinsics` | 01 결과, ChArUco board | 다양한 위치의 view로 OpenCV color intrinsic calibration을 수행한다 | 갱신된 `cam*.npz`, `factory_backup/`, `charuco_capture/` |
-| 03 `capture` (현재 legacy) | 02 결과, board/cube, 카메라, robot FK | `A_placement/B_eyetohand` block에서 동기화 및 marker quality gate를 통과한 event를 저장한다 | `zeus_gello_calibration/data/sessionNN/calib_train/meta.json`, RGB/depth 이미지 |
+| 03 `capture` (현재 legacy) | 02 결과, board/cube, 카메라, robot FK | `A_placement/B_eyetohand` block에서 동기화 및 marker quality gate를 통과한 event를 저장한다 | `data/session<NN>_<설명>_<MMDD>/calib_train/meta.json`, RGB/depth 이미지 |
 | 04 `filter_observations` | 03 세션, 고정 K/D | 모든 RGB를 다시 검출하고 관측 정책을 적용해 native-pixel corner와 원본 SHA-256을 고정한다 | `Step2b_observation_manifest.json`, QA CSV, overlay, `CAPTURE_FILTER.md` |
 | 05 `calibrate` | 04 manifest, K/D, `meta.json`, robot FK | event 단위 train/held-out 분리, 공통 초기화, 9개 조건 fit, `frame-prune → refit → rollback`, held-out 평가 | `ABLATION_TEST_table1_methods.json`, 두 shared artifact |
 | 06 `make_report` | 05의 `ABLATION_TEST_table1_methods.json` | 재최적화 없이 수렴·오차·prune 결정과 모든 행렬을 정리한다 | `calibration_summary.csv`, `calibration_matrices.json` |
@@ -258,54 +239,16 @@ A4/B1/B2는 반대로 corrected-FK를 soft factor 잔차 블록으로 추가한�
 
 ## 최종 촬영 흐름
 
-최종 protocol mode의 03 단계는 아래 상태 순서를 강제한다.
+최종 protocol의 P1 15 / P2 20 / P3 10 구성, pose JSON 생성·검증, robot server 실행,
+`03_capture.py` 명령, 저장 metadata와 완료 판정은 모두
+[Zeus 최종 촬영 파이프라인](zeus_gello_calibration/PIPELINE.md)을 따른다.
+실제 rig geometry와 45 pose teaching, 새 큐브 grip/place 높이 재실측, 저속 dry run을
+통과하기 전에는 본 촬영을 시작하지 않는다.
 
-| 순서 | Phase | Event 수 | 실행 내용 | 핵심 산출물 |
-| ---: | --- | ---: | --- | --- |
-| 1 | Preflight | 0 | rig geometry, camera ID/intrinsic, 45 pose ID, 저장 공간 검증 | protocol/config/geometry hash |
-| 2 | P1 Moving Rig | 15 | rig를 계속 grasp한 채 `x/y/z + roll/pitch/yaw` 다양성으로 fixed camera 동기 촬영 | still-gripped `T_flange_rig` 입력 |
-| 3 | P2 Pick-and-Place | 20 | 10회 release 후 stationary target을 두 gripper viewpoint에서 fixed+gripper camera 동기 촬영 | 10 placement × 2 views |
-| 4 | P3 Stationary Rig | 10 | rig를 고정하고 robot/gripper camera만 10개 pose로 이동 | eye-in-hand excitation |
-| 5 | Complete | 0 | 45 planned ID, attempt, 실패 상태, hash를 검증하고 완료 상태 기록 | completion manifest |
-
-Release 직전 FK 기록은 P2 metadata이며 별도 capture event로 세지 않는다. Marker/PnP
-실패도 planned event를 교체하는 근거가 아니다. Camera transport·파일 저장·timestamp
-sync 실패만 같은 planned ID로 재시도하고, 분석에는 marker 결과와 무관하게 첫
-transport/sync-valid attempt를 사용한다.
-
-최종 세션에서는 모든 row가 같은 45개 event를 사용한다. A0/B3는 cube를 calibration
-전체에서 masking하고, B2는 board를 masking한다. Heldout, cross-view, External GT는
-모두 cube-only이며, External GT 촬영은 45개 calibration-train event에 포함하지 않는다.
-
-Pose JSON 생성·필드 입력·offline 검증 방법은
-[CAPTURE_PROTOCOL.md](CAPTURE_PROTOCOL.md#8-자동-pose-json-준비와-실행)를 따른다. 검증된
-plan을 사용한 PC 명령은 다음과 같다.
-
-```bash
-python3 03_capture.py \
-  --data_root zeus_gello_calibration/data \
-  --intrinsics_dir intrinsics \
-  --waypoints_file capture_plans/composite_rig_45.json \
-  --use_robot --manual_robot \
-  --robot_ip 192.168.0.23 --robot_port 12348 \
-  --max_capture_span_ms 120 \
-  --show
-```
-
-## 촬영 코드 전환 순서
-
-1. 완료: `server/c1.py`와 `capture_pipeline/capture.py`에 P1/P2/P3 자동 실행,
-   planned event/attempt 분리, release state, all-camera 저장을 구현했다.
-2. 완료: 45-event pose template 생성기와 offline validator를 추가했다.
-3. 다음: `04_filter_observations.py`가 marker 실패 event도 보존하고, detection 결과와 capture
-   validity를 분리한 manifest를 만든다.
-4. 다음: Calibration runtime/schema가 phase, placement, marker mask를 검증하고 A3/A4/A5의
-   VISION/FK/corrected-FK pose 처리 방식을 연결한다.
-5. 다음: Regression test가 정확히 45 ID, `15/20/10` phase count, sync-only retry, A0/B3/B2
-   mask, heldout leakage 금지를 자동 확인한다.
-
-본 촬영 전에는 실제 pose plan offline 검증과 confirm mode 저속 dry run을 통과해야 한다.
-04/05의 phase-aware 처리가 완료되기 전에는 새 세션으로 최종 비교표를 생성하지 않는다.
+현재 final protocol은 03 촬영과 04 frozen-observation 생성까지 실행 가능하다. 05에는
+P2 placement-grouped split과 P3 독립 그룹 검사가 들어갔지만, P1에서 함께 움직이는
+board/cube를 하나의 common-rig pose로 푸는 phase-aware residual 모델은 아직 구현 전이다.
+따라서 `composite_rig_45_v2` 데이터의 05/06은 위 문서의 완료 표시 전까지 실행하지 않는다.
 
 ## 각 calibration 행렬은 언제 나오는가
 
@@ -355,13 +298,13 @@ ABLATION_TEST_table1_methods.json
 
 ```bash
 # 동일 frozen split의 cross-view camera consistency 평가
-python3 tools/evaluate_cross_target.py --root_folder data/session04/calib_train
+python3 tools/evaluate_cross_target.py --root_folder data/session02_NOUSE_session04_0814/calib_train
 
 # board-only / cube-only / both marker-system end-to-end 비교
-python3 tools/compare_markers.py --root_folder data/session04/calib_train
+python3 tools/compare_markers.py --root_folder data/session02_NOUSE_session04_0814/calib_train
 
 # VISION OpenCV fixed-camera relative-pose 기준선
-python3 tools/opencv_baseline.py --root_folder data/session04/calib_train
+python3 tools/opencv_baseline.py --root_folder data/session02_NOUSE_session04_0814/calib_train
 ```
 
 ## 다른 checkout에서 재실행할 때
@@ -382,10 +325,10 @@ stored results`로 중단된다.
 
 ## 현재 Session04 결과 위치
 
-- 모든 행·seed의 정확한 행렬: `ABLATION_TEST_result/session04/ABLATION_TEST_table1/calibration_matrices.json`
-- 행별 수렴·오차·prune 요약: `ABLATION_TEST_result/session04/ABLATION_TEST_table1/calibration_summary.csv`
-- 계산 원본: `ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json`
-- 최종 ABLATION_TEST와 평가지표: `ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md`
+- 모든 행·seed의 정확한 행렬: `ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/calibration_matrices.json`
+- 행별 수렴·오차·prune 요약: `ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/calibration_summary.csv`
+- 계산 원본: `ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json`
+- 최종 ABLATION_TEST와 평가지표: `ABLATION_TEST_result_0909/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_TABLE1_RESULTS.md`
 
 Session04 현재 결과는 9개 행×3개 seed 모두 수렴했다. 최종 표의 Train Cube RMSE와
 heldout은 `cube_evaluation_reprojection`의 cube-only 값으로 통일했으며,

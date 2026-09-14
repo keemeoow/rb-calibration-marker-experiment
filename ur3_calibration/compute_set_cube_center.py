@@ -71,7 +71,7 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from session2_pick_and_place import compute_ordered_targets, load_pose  # noqa: E402
-from capture_poses import session_path  # noqa: E402
+from capture_poses import UR3_CAPTURE_DATA_ROOT, session_path  # noqa: E402
 from convert_to_meta import tcp_pose_to_matrix, matrix_to_pose6_zyx_deg  # noqa: E402
 from calibration_pipeline.schema import RAW_FK_CUBE_CENTER_TO_OBJECT  # noqa: E402
 
@@ -95,7 +95,7 @@ def main():
     }
 
     grasp_pose = load_pose(Path(__file__).resolve().parent / "data" / "grasp_flange_pose.json")
-    session_poses = session_path(Path(__file__).resolve().parent / "data", 2)
+    session_poses = session_path(UR3_CAPTURE_DATA_ROOT, 2)
     items = compute_ordered_targets(session_poses, grasp_pose[3:6], grasp_pose[2])
     assert len(items) == 12
 

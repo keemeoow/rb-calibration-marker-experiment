@@ -5,11 +5,12 @@ import json
 from pathlib import Path
 
 from calibration_pipeline.report import METHOD_ORDER, write_report
+from calibration_pipeline.result_paths import ABLATION_RESULT_ROOT
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SESSION04_TABLE1 = (
-    ROOT / "ABLATION_TEST_result/session04/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
+    ROOT / f"{ABLATION_RESULT_ROOT}/session02_NOUSE_session04_0814/ABLATION_TEST_table1/ABLATION_TEST_table1_methods.json")
 
 
 def test_report_contains_every_final_calibration_matrix(tmp_path):
