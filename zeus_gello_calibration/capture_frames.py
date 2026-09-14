@@ -3,7 +3,8 @@
 """zeus_gello_calibration/capture_frames.py -- 카메라 4대 RGB + depth 를 N장 찍어 저장.
 (외부 GT 촬영용. 로봇은 움직이지 않고, 연결되어 있으면 촬영 순간 pose만 같이 기록.)
 
-저장: <out-root>/<timestamp>/<NNN>/cam_<label>.png, cam_<label>_depth.png, robot.json
+저장: zeus_gello_calibration/data/gt_frames_<MMDD>/<timestamp>/<NNN>/cam_<label>.png, cam_<label>_depth.png, robot.json
+(write_capture 가 data/ 안만 허용하므로 --out-root 도 data/ 안이어야 함)
 
 사용법:
   python capture_frames.py --shots 5                    # Enter 누를 때마다 1장, 5장
@@ -28,7 +29,10 @@ from capture_session import (  # noqa: E402
     connect_cameras, grab_frames, load_camera_labels, read_robot_state, stop_cameras, write_capture,
 )
 
-OUT_ROOT_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "gt_compare_captures"
+from paths import ZEUS_DATA_ROOT  # noqa: E402
+
+# write_capture 가 zeus_gello_calibration/data/ 안만 허용 -- 촬영 데이터 규칙(<이름>_<MMDD>)대로
+OUT_ROOT_DEFAULT = ZEUS_DATA_ROOT / f"gt_frames_{time.strftime('%m%d')}"
 
 
 def main():
