@@ -49,7 +49,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from robot.backends.zeus_client import ZeusClient, ZeusError  # noqa: E402
 
-from capture_session import (  # noqa: E402
+from zeus_gello_calibration.capture_session import (  # noqa: E402
     load_camera_labels, connect_cameras, stop_cameras, LiveView,
     grab_frames, write_capture, read_robot_state,
     ROBOT_IP_DEFAULT, ROBOT_PORT_DEFAULT, DEVICE_MAP_DEFAULT,

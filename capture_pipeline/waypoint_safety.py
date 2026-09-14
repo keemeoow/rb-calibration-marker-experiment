@@ -33,6 +33,8 @@ CAPTURE_PROTOCOL_KEY = "capture_protocol"
 PROTOCOL_PER_SET_AB = "per_set_AB"          # every set: B sweep + A placement
 PROTOCOL_A_SETS_B_STATION = "A_sets_plus_B_station"  # A-only sets, one terminal B station
 PROTOCOL_COMPOSITE_RIG_45 = "composite_rig_45_v2"
+# Existing Zeus P1/P2/P3 poses replayed into one count-flexible session.
+PROTOCOL_SAVED_POSE_REPLAY = "saved_pose_replay_v1"
 CAPTURE_PROTOCOLS = (
     PROTOCOL_PER_SET_AB,
     PROTOCOL_A_SETS_B_STATION,
