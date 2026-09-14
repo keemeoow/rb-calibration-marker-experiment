@@ -22,3 +22,9 @@ data/**/meta.pre_depth_backup.json
 # intrinsics/intrinsics_by_serial/, intrinsics/charuco_intrinsics_report.json
 # Covers both intrinsics/ and data/session*/intrinsics/.
 **/intrinsics/charuco_capture/
+
+# 원격 18bb72e("필요없는 data 정리")에서 정리된 session04 촬영·결과.
+# 로컬 재처리/검증용으로 디스크에는 남겨 두되 git 에는 다시 올리지 않는다.
+# 필요하면 f9d0d4c 이전 히스토리에서 복구할 수 있다.
+data/session02_NOUSE_session04_0814/
+ABLATION_TEST_result_*/session02_NOUSE_session04_0814/
