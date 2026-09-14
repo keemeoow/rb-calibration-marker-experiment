@@ -31,6 +31,7 @@ python ur3_calibration/capture_poses.py --session 1 ...
 | `session02_NOUSE_session04_0814` | 2026-08-14 | 4캠 본 실험 촬영 — ABLATION_TEST table1 의 근거. NOUSE = 개선 프로토콜로 대체됨 | 429 | 239M | `data/session04/` |
 | `session09_ur3_wrist_meta_0909` | 2026-09-09 | UR3 session3 을 calib_train/meta.json 형식으로 변환 (파생) | 61 | 71M | `data/ur3_session3/` |
 | `session10_ur3_handheld_floor_meta_0909` | 2026-09-09 | UR3 session1+2 를 병합·변환 (파생) | 109 | 129M | `data/ur3_session12/` |
+| `session11_zeus_handheld_floor_wrist_meta_0909` | 2026-09-09 | Zeus session1+2+3 (0909 재촬영) 을 병합·변환 (파생, `zeus_gello_calibration/convert_to_meta.py`). 46 events: 16 gripped + 15 placements + 15 wrist board. `intrinsics/` 동봉 (index = LOCAL_CAM_IDS) | 185 | 210M (하드링크) | `zeus_gello_calibration/data/session{1,2,3}_*_0909/` |
 
 `session09`/`session10` 은 새 촬영이 아니라 아래 UR3 세션을 파이프라인이 읽는
 `calib_train/meta.json` 형식으로 변환한 것이다 (`ur3_calibration/convert_to_meta.py`).

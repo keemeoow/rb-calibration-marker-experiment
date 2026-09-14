@@ -1,0 +1,10 @@
+{
+  "note": "Zeus rig, index order = zeus_gello_calibration.fit_grasp_offset.LOCAL_CAM_IDS; cam0 (039422061216) intrinsics come from the UR3 rig's charuco calibration of the same unit",
+  "label_to_idx": {
+    "039422061216": 0,
+    "fixed2": 1,
+    "fixed3": 2,
+    "gripper": 3
+  },
+  "gripper_cam_idx": 3
+}
