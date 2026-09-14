@@ -1,1 +1,7 @@
 ﻿event_id,set_idx,capture_block,priority,reason,board_camera_ids
+17,1,A_placement,high,neither standard core cube nor board observation is usable,
+19,2,A_placement,medium,missing_standard_core_cube; board observation remains usable,cam3
+31,8,A_placement,medium,missing_standard_core_cube; board observation remains usable,cam3
+37,11,A_placement,medium,missing_standard_core_cube; board observation remains usable,cam3
+43,14,A_placement,medium,missing_standard_core_cube; board observation remains usable,cam3
+45,15,A_placement,medium,missing_standard_core_cube; board observation remains usable,cam3

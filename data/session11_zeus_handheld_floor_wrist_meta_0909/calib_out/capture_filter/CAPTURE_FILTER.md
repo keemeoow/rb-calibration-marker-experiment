@@ -1,7 +1,7 @@
 # 04 Post-capture Observation Filter
 
 - Session: `/home/sstone/rb-calibration-marker-experiment/data/session11_zeus_handheld_floor_wrist_meta_0909/calib_train`
-- 생성 시각(UTC): `2026-09-14T07:19:56.901430+00:00`
+- 생성 시각(UTC): `2026-09-14T07:53:59.427080+00:00`
 - 원본 RGB/meta/intrinsics: **수정하지 않음**
 - Calibration 입력: 재검출 결과의 native-pixel 2D corner를 manifest에 고정
 - Cube corner refinement: `apriltag`
@@ -55,60 +55,60 @@ Standard의 recovered/quarantine/rejected cube 관측 48개를 한 장에 모았
 | E14/cam3 | rejected | — | — | — | `no_markers_detected` |
 | E15/cam3 | rejected | — | — | — | `no_markers_detected` |
 | E16/cam1 | quarantine | 3 | +Y | 0.043 px | `noncore_single_marker` |
-| E16/cam3 | quarantine | 0, 1 | +Z | 0.204 px | `noncore_planar_multimarker` |
-| E17/cam3 | quarantine | 0, 1 | +Z | 0.185 px | `noncore_planar_multimarker` |
-| E18/cam1 | quarantine | 3 | +Y | 0.056 px | `noncore_single_marker` |
-| E23/cam3 | quarantine | 0, 1 | +Z | 0.211 px | `noncore_planar_multimarker` |
-| E26/cam0 | quarantine | 0, 1 | +Z | 0.322 px | `noncore_planar_multimarker` |
-| E26/cam3 | quarantine | 0, 1 | +Z | 0.203 px | `noncore_planar_multimarker` |
-| E28/cam1 | quarantine | 2 | +X | 0.017 px | `noncore_single_marker` |
-| E29/cam3 | quarantine | 1, 0 | +Z | 0.184 px | `noncore_planar_multimarker` |
-| E30/cam3 | quarantine | 1, 0 | +Z | 0.197 px | `noncore_planar_multimarker` |
-| E31/cam1 | rejected | — | — | — | `no_markers_detected` |
-| E31/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E31/cam3 | rejected | — | — | — | `no_markers_detected` |
-| E32/cam1 | rejected | — | — | — | `no_markers_detected` |
-| E32/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E32/cam3 | rejected | — | — | — | `no_markers_detected` |
-| E33/cam1 | rejected | — | — | — | `no_markers_detected` |
-| E33/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E33/cam3 | rejected | — | — | — | `no_markers_detected` |
-| E34/cam1 | rejected | — | — | — | `no_markers_detected` |
-| E34/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E34/cam3 | rejected | — | — | — | `no_markers_detected` |
-| E35/cam1 | rejected | — | — | — | `no_markers_detected` |
-| E35/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E35/cam3 | rejected | — | — | — | `no_markers_detected` |
-| E36/cam1 | rejected | — | — | — | `no_markers_detected` |
-| E36/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E36/cam3 | rejected | — | — | — | `no_markers_detected` |
-| E37/cam1 | rejected | — | — | — | `no_markers_detected` |
-| E37/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E37/cam3 | rejected | — | — | — | `no_markers_detected` |
-| E38/cam1 | rejected | — | — | — | `no_markers_detected` |
-| E38/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E38/cam3 | rejected | — | — | — | `no_markers_detected` |
-| E39/cam1 | rejected | — | — | — | `no_markers_detected` |
-| E39/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E39/cam3 | rejected | — | — | — | `no_markers_detected` |
-| E40/cam1 | rejected | — | — | — | `no_markers_detected` |
-| E40/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E40/cam3 | rejected | — | — | — | `no_markers_detected` |
-| E41/cam1 | rejected | — | — | — | `no_markers_detected` |
-| E41/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E41/cam3 | rejected | — | — | — | `no_markers_detected` |
-| E42/cam1 | rejected | — | — | — | `no_markers_detected` |
-| E42/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E42/cam3 | rejected | 2 | +X | 4370.142 px | `pnp_rmse_rejected` |
-| E43/cam1 | rejected | — | — | — | `no_markers_detected` |
-| E43/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E43/cam3 | rejected | — | — | — | `no_markers_detected` |
-| E44/cam1 | rejected | — | — | — | `no_markers_detected` |
-| E44/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E44/cam3 | rejected | — | — | — | `no_markers_detected` |
-| E45/cam1 | rejected | — | — | — | `no_markers_detected` |
-| E45/cam2 | rejected | — | — | — | `no_markers_detected` |
-| E45/cam3 | rejected | — | — | — | `no_markers_detected` |
+| E17/cam3 | quarantine | 0, 1 | +Z | 0.204 px | `noncore_planar_multimarker` |
+| E19/cam3 | quarantine | 0, 1 | +Z | 0.185 px | `noncore_planar_multimarker` |
+| E20/cam1 | quarantine | 3 | +Y | 0.056 px | `noncore_single_marker` |
+| E31/cam3 | quarantine | 0, 1 | +Z | 0.211 px | `noncore_planar_multimarker` |
+| E36/cam0 | quarantine | 0, 1 | +Z | 0.322 px | `noncore_planar_multimarker` |
+| E37/cam3 | quarantine | 0, 1 | +Z | 0.203 px | `noncore_planar_multimarker` |
+| E40/cam1 | quarantine | 2 | +X | 0.017 px | `noncore_single_marker` |
+| E43/cam3 | quarantine | 1, 0 | +Z | 0.184 px | `noncore_planar_multimarker` |
+| E45/cam3 | quarantine | 1, 0 | +Z | 0.197 px | `noncore_planar_multimarker` |
+| E46/cam1 | rejected | — | — | — | `no_markers_detected` |
+| E46/cam2 | rejected | — | — | — | `no_markers_detected` |
+| E46/cam3 | rejected | — | — | — | `no_markers_detected` |
+| E47/cam1 | rejected | — | — | — | `no_markers_detected` |
+| E47/cam2 | rejected | — | — | — | `no_markers_detected` |
+| E47/cam3 | rejected | — | — | — | `no_markers_detected` |
+| E48/cam1 | rejected | — | — | — | `no_markers_detected` |
+| E48/cam2 | rejected | — | — | — | `no_markers_detected` |
+| E48/cam3 | rejected | — | — | — | `no_markers_detected` |
+| E49/cam1 | rejected | — | — | — | `no_markers_detected` |
+| E49/cam2 | rejected | — | — | — | `no_markers_detected` |
+| E49/cam3 | rejected | — | — | — | `no_markers_detected` |
+| E50/cam1 | rejected | — | — | — | `no_markers_detected` |
+| E50/cam2 | rejected | — | — | — | `no_markers_detected` |
+| E50/cam3 | rejected | — | — | — | `no_markers_detected` |
+| E51/cam1 | rejected | — | — | — | `no_markers_detected` |
+| E51/cam2 | rejected | — | — | — | `no_markers_detected` |
+| E51/cam3 | rejected | — | — | — | `no_markers_detected` |
+| E52/cam1 | rejected | — | — | — | `no_markers_detected` |
+| E52/cam2 | rejected | — | — | — | `no_markers_detected` |
+| E52/cam3 | rejected | — | — | — | `no_markers_detected` |
+| E53/cam1 | rejected | — | — | — | `no_markers_detected` |
+| E53/cam2 | rejected | — | — | — | `no_markers_detected` |
+| E53/cam3 | rejected | — | — | — | `no_markers_detected` |
+| E54/cam1 | rejected | — | — | — | `no_markers_detected` |
+| E54/cam2 | rejected | — | — | — | `no_markers_detected` |
+| E54/cam3 | rejected | — | — | — | `no_markers_detected` |
+| E55/cam1 | rejected | — | — | — | `no_markers_detected` |
+| E55/cam2 | rejected | — | — | — | `no_markers_detected` |
+| E55/cam3 | rejected | — | — | — | `no_markers_detected` |
+| E56/cam1 | rejected | — | — | — | `no_markers_detected` |
+| E56/cam2 | rejected | — | — | — | `no_markers_detected` |
+| E56/cam3 | rejected | — | — | — | `no_markers_detected` |
+| E57/cam1 | rejected | — | — | — | `no_markers_detected` |
+| E57/cam2 | rejected | — | — | — | `no_markers_detected` |
+| E57/cam3 | rejected | 2 | +X | 4370.142 px | `pnp_rmse_rejected` |
+| E58/cam1 | rejected | — | — | — | `no_markers_detected` |
+| E58/cam2 | rejected | — | — | — | `no_markers_detected` |
+| E58/cam3 | rejected | — | — | — | `no_markers_detected` |
+| E59/cam1 | rejected | — | — | — | `no_markers_detected` |
+| E59/cam2 | rejected | — | — | — | `no_markers_detected` |
+| E59/cam3 | rejected | — | — | — | `no_markers_detected` |
+| E60/cam1 | rejected | — | — | — | `no_markers_detected` |
+| E60/cam2 | rejected | — | — | — | `no_markers_detected` |
+| E60/cam3 | rejected | — | — | — | `no_markers_detected` |
 
 ## Standard 제외 board 관측
 
@@ -124,8 +124,8 @@ Standard의 recovered/quarantine/rejected cube 관측 48개를 한 장에 모았
 | E08/cam3 | 0 | no_charuco_or_below_4_corners | `no_charuco_or_below_4_corners` |
 | E11/cam3 | 0 | no_charuco_or_below_4_corners | `no_charuco_or_below_4_corners` |
 | E12/cam3 | 0 | no_charuco_or_below_4_corners | `no_charuco_or_below_4_corners` |
-| E16/cam3 | 0 | no_charuco_or_below_4_corners | `no_charuco_or_below_4_corners` |
-| E17/cam1 | 0 | no_charuco_or_below_4_corners | `no_charuco_or_below_4_corners` |
+| E17/cam3 | 0 | no_charuco_or_below_4_corners | `no_charuco_or_below_4_corners` |
+| E18/cam1 | 0 | no_charuco_or_below_4_corners | `no_charuco_or_below_4_corners` |
 
 ## Strict에서 추가 제외되는 관측
 
@@ -135,9 +135,9 @@ Standard는 통과했지만 strict RMSE/inlier/board-corner 기준에서 추가 
 |---|---|---:|---:|---:|---|
 | board | E09/cam3 | 8 | — | — | `charuco_corners_below_12` |
 | board | E15/cam3 | 7 | — | — | `charuco_corners_below_12` |
-| board | E21/cam1 | 8 | — | — | `charuco_corners_below_12` |
-| board | E25/cam2 | 10 | — | — | `charuco_corners_below_12` |
-| board | E31/cam3 | 10 | — | — | `charuco_corners_below_12` |
+| board | E26/cam1 | 8 | — | — | `charuco_corners_below_12` |
+| board | E34/cam2 | 10 | — | — | `charuco_corners_below_12` |
+| board | E46/cam3 | 10 | — | — | `charuco_corners_below_12` |
 
 ## 재촬영 후보
 
@@ -145,58 +145,78 @@ Standard는 통과했지만 strict RMSE/inlier/board-corner 기준에서 추가 
 
 | Event | Set | 우선순위 | 남아 있는 board cameras | 이유 |
 |---:|---:|---|---|---|
-| — | — | — | — | 재촬영 후보 없음 |
+| 17 | 1 | high | — | neither standard core cube nor board observation is usable |
+| 19 | 2 | medium | cam3 | missing_standard_core_cube; board observation remains usable |
+| 31 | 8 | medium | cam3 | missing_standard_core_cube; board observation remains usable |
+| 37 | 11 | medium | cam3 | missing_standard_core_cube; board observation remains usable |
+| 43 | 14 | medium | cam3 | missing_standard_core_cube; board observation remains usable |
+| 45 | 15 | medium | cam3 | missing_standard_core_cube; board observation remains usable |
 
 ## Event별 선택 결과
 
 | Event | Set | Block | Standard | Cube cams | Board cams | Strict |
 |---:|---:|---|---|---|---|---|
-| 00 | 0 | B_eyetohand | selected_cube_and_board | cam0, cam1 | cam0, cam2 | selected_cube_and_board |
-| 01 | 0 | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 02 | 0 | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam2 | selected_cube_and_board |
-| 03 | 0 | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
-| 04 | 0 | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
-| 05 | 0 | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 06 | 0 | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 07 | 0 | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 08 | 0 | B_eyetohand | selected_cube_and_board | cam1, cam2 | cam0, cam2 | selected_cube_and_board |
-| 09 | 0 | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 10 | 0 | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 11 | 0 | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
-| 12 | 0 | B_eyetohand | selected_cube_and_board | cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
-| 13 | 0 | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 14 | 0 | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 15 | 0 | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 00 | None | B_eyetohand | selected_cube_and_board | cam0, cam1 | cam0, cam2 | selected_cube_and_board |
+| 01 | None | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 02 | None | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam2 | selected_cube_and_board |
+| 03 | None | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
+| 04 | None | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
+| 05 | None | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 06 | None | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 07 | None | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 08 | None | B_eyetohand | selected_cube_and_board | cam1, cam2 | cam0, cam2 | selected_cube_and_board |
+| 09 | None | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 10 | None | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 11 | None | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
+| 12 | None | B_eyetohand | selected_cube_and_board | cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
+| 13 | None | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 14 | None | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 15 | None | B_eyetohand | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
 | 16 | 1 | A_placement | selected_cube_and_board | cam0, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
-| 17 | 2 | A_placement | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam2, cam3 | selected_cube_and_board |
-| 18 | 3 | A_placement | selected_cube_and_board | cam0, cam2, cam3 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 19 | 4 | A_placement | selected_cube_and_board | cam0, cam1, cam2, cam3 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 20 | 5 | A_placement | selected_cube_and_board | cam0, cam1, cam2, cam3 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 21 | 6 | A_placement | selected_cube_and_board | cam0, cam1, cam2, cam3 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 22 | 7 | A_placement | selected_cube_and_board | cam0, cam1, cam2, cam3 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 23 | 8 | A_placement | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 24 | 9 | A_placement | selected_cube_and_board | cam0, cam1, cam2, cam3 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 25 | 10 | A_placement | selected_cube_and_board | cam0, cam1, cam2, cam3 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 26 | 11 | A_placement | selected_cube_and_board | cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 27 | 12 | A_placement | selected_cube_and_board | cam0, cam1, cam2, cam3 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 28 | 13 | A_placement | selected_cube_and_board | cam0, cam2, cam3 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 29 | 14 | A_placement | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 30 | 15 | A_placement | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 31 | 0 | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 32 | 0 | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 33 | 0 | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 34 | 0 | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 35 | 0 | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 36 | 0 | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 37 | 0 | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 38 | 0 | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 39 | 0 | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 40 | 0 | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 41 | 0 | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 42 | 0 | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 43 | 0 | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 44 | 0 | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
-| 45 | 0 | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 17 | 1 | A_placement | rejected | — | — | rejected |
+| 18 | 2 | A_placement | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam2 | selected_cube_and_board |
+| 19 | 2 | A_placement | board_only | — | cam3 | board_only |
+| 20 | 3 | A_placement | selected_cube_and_board | cam0, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
+| 21 | 3 | A_placement | selected_cube_and_board | cam3 | cam3 | selected_cube_and_board |
+| 22 | 4 | A_placement | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
+| 23 | 4 | A_placement | selected_cube_and_board | cam3 | cam3 | selected_cube_and_board |
+| 24 | 5 | A_placement | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
+| 25 | 5 | A_placement | selected_cube_and_board | cam3 | cam3 | selected_cube_and_board |
+| 26 | 6 | A_placement | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
+| 27 | 6 | A_placement | selected_cube_and_board | cam3 | cam3 | selected_cube_and_board |
+| 28 | 7 | A_placement | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
+| 29 | 7 | A_placement | selected_cube_and_board | cam3 | cam3 | selected_cube_and_board |
+| 30 | 8 | A_placement | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
+| 31 | 8 | A_placement | board_only | — | cam3 | board_only |
+| 32 | 9 | A_placement | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
+| 33 | 9 | A_placement | selected_cube_and_board | cam3 | cam3 | selected_cube_and_board |
+| 34 | 10 | A_placement | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
+| 35 | 10 | A_placement | selected_cube_and_board | cam3 | cam3 | selected_cube_and_board |
+| 36 | 11 | A_placement | selected_cube_and_board | cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
+| 37 | 11 | A_placement | board_only | — | cam3 | board_only |
+| 38 | 12 | A_placement | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
+| 39 | 12 | A_placement | selected_cube_and_board | cam3 | cam3 | selected_cube_and_board |
+| 40 | 13 | A_placement | selected_cube_and_board | cam0, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
+| 41 | 13 | A_placement | selected_cube_and_board | cam3 | cam3 | selected_cube_and_board |
+| 42 | 14 | A_placement | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
+| 43 | 14 | A_placement | board_only | — | cam3 | board_only |
+| 44 | 15 | A_placement | selected_cube_and_board | cam0, cam1, cam2 | cam0, cam1, cam2 | selected_cube_and_board |
+| 45 | 15 | A_placement | board_only | — | cam3 | board_only |
+| 46 | None | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 47 | None | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 48 | None | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 49 | None | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 50 | None | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 51 | None | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 52 | None | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 53 | None | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 54 | None | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 55 | None | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 56 | None | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 57 | None | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 58 | None | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 59 | None | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
+| 60 | None | A_placement | selected_cube_and_board | cam0 | cam0, cam1, cam2, cam3 | selected_cube_and_board |
 
 ## Calibration에서 frozen manifest 사용
 

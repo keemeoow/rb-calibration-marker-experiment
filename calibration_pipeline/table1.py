@@ -1718,6 +1718,14 @@ def prepare_ablation_data(args) -> PreparedAblationData:
         print(f"[WARN] dropping {len(stray_cube)} cube observations with neither set index nor grasp id "
               f"(events {sorted({int(o.event) for o in stray_cube})[:8]}...)")
         observations = [obs for obs in observations if obs not in stray_cube]
+    include_gripped = bool(getattr(args, "include_gripped_cube", False))
+    if not include_gripped:
+        # manifest 경로에서는 grasp_idx가 실린 채 로드되므로 여기서 확실히 뺀다.
+        n_grasp = sum(1 for obs in observations if obs.grasp_idx is not None)
+        if n_grasp:
+            print(f"[INFO] excluding {n_grasp} gripped-cube (grasp model) observations "
+                  "(pass --include_gripped_cube to keep them)")
+            observations = [obs for obs in observations if obs.grasp_idx is None]
     split = build_protocol_event_split(
         observations, meta, gripper, args.test_fraction, args.split_seed,
         args.min_train_eih_cube_events)
