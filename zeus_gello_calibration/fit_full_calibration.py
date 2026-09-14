@@ -157,9 +157,9 @@ def main():
     s1_root = session1_dir / args.session1_capture_subdir
     s2_root = session2_dir / args.session2_capture_subdir
     s3_root = session3_dir / args.session3_capture_subdir
-    s1_indices = sorted(int(p.name) for p in s1_root.iterdir() if p.is_dir())
-    s2_indices = sorted(int(p.name) for p in s2_root.iterdir() if p.is_dir())
-    s3_indices = sorted(int(p.name) for p in s3_root.iterdir() if p.is_dir())
+    s1_indices = sorted(int(p.name) for p in s1_root.iterdir() if p.is_dir() and p.name.isdigit())
+    s2_indices = sorted(int(p.name) for p in s2_root.iterdir() if p.is_dir() and p.name.isdigit())
+    s3_indices = sorted(int(p.name) for p in s3_root.iterdir() if p.is_dir() and p.name.isdigit())
     print(f"session1: {s1_root} ({len(s1_indices)}개, 고정캠, grasp+FK)")
     print(f"session2: {s2_root} ({len(s2_indices)}개, 고정캠, 조건별)")
     print(f"session3: {s3_root} ({len(s3_indices)}개, 그리퍼캠, eye-in-hand 보드)")

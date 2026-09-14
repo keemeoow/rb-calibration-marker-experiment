@@ -160,8 +160,8 @@ def main():
     session2_dir = Path(args.session2_dir)
     s1_capture_root = session1_dir / args.session1_capture_subdir
     s2_capture_root = session2_dir / args.session2_capture_subdir
-    s1_indices = sorted(int(p.name) for p in s1_capture_root.iterdir() if p.is_dir())
-    s2_indices = sorted(int(p.name) for p in s2_capture_root.iterdir() if p.is_dir())
+    s1_indices = sorted(int(p.name) for p in s1_capture_root.iterdir() if p.is_dir() and p.name.isdigit())
+    s2_indices = sorted(int(p.name) for p in s2_capture_root.iterdir() if p.is_dir() and p.name.isdigit())
     print(f"session1: {s1_capture_root}  ({len(s1_indices)}개, grasp+FK 고정 모델)")
     print(f"session2: {s2_capture_root}  ({len(s2_indices)}개, 조건별로 다르게 다룸)")
 

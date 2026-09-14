@@ -349,6 +349,8 @@ def main():
     ap.add_argument("--out", default=str(REPO_ROOT / "zeus_gello_calibration" / "heldout_and_consistency.json"))
     ap.add_argument("--cube-only", action="store_true",
                     help="보드 관측 전부 제외(session3 미사용 + session2 보드 제외); 통합 2조건만 (독립은 식별 불가)")
+    ap.add_argument("--cube-config", default=None, help="큐브 마커 config JSON (GT 큐브 촬영이면 targets/gt_cube/cube_config.json)")
+    ap.add_argument("--s3-gripper-only", action="store_true", help="session3는 그리퍼캠 관측만 사용")
     args = ap.parse_args()
 
     data = load_all_data(args)

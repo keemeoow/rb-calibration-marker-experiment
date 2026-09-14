@@ -53,12 +53,20 @@ def load_capture(folder: Path):
         p = folder / f"cam_{label}.png"
         frames[label] = (cv2.imread(str(p)) if p.is_file() else None, None)
     robot = json.loads((folder / "robot.json").read_text())
-    return frames, pose6_to_T(robot["pose"])
+    pose = robot.get("pose")
+    if pose is None:
+        # 로봇 미접속 촬영(capture_frames.py --robot 없이): 그리퍼캠은 base 좌표로
+        # 못 옮기므로 제외하고 고정캠만 쓴다.
+        frames["gripper"] = (None, None)
+        return frames, np.eye(4)
+    return frames, pose6_to_T(pose)
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--fits", nargs="+", required=True, help="fit JSON 경로/glob (zeus_gello_calibration 기준)")
+    ap.add_argument("--capture-root", default=str(CAPTURE_ROOT),
+                    help="트라이얼 폴더들의 부모 (기본 gt_compare_captures/; capture_frames.py 결과는 data/gt_frames_<MMDD>/<timestamp>)")
     ap.add_argument("--trial", action="append", default=[], help="<capture_folder>:<x,y,z,rz,ry,rx GT flange pose>")
     ap.add_argument("--list", action="store_true", help="폴더별 검출 xy만 출력 (트라이얼 식별용)")
     ap.add_argument("--per-camera", action="store_true", help="카메라별(단일 PnP) 오차를 따로 출력")
@@ -88,7 +96,7 @@ def main():
     if args.list:
         label0, (Tgc, T_base_cam, T_gripper_cam) = next(iter(fits.items()))
         print(f"[{label0}] 폴더별 검출 큐브 pose (x, y, z, rz):")
-        for folder in sorted(CAPTURE_ROOT.iterdir()):
+        for folder in sorted(Path(args.capture_root).iterdir()):
             if not folder.is_dir():
                 continue
             frames, T_bg = load_capture(folder)
@@ -118,7 +126,7 @@ def main():
             for cam_label in LABELS:
                 rows = []
                 for folder, gt in trials:
-                    frames, T_bg = load_capture(CAPTURE_ROOT / folder)
+                    frames, T_bg = load_capture(Path(args.capture_root) / folder)
                     img = frames.get(cam_label, (None, None))[0]
                     if img is None:
                         continue
@@ -161,7 +169,7 @@ def main():
         tgc_z = float(np.asarray(T_gripper_cube)[2, 3] * 1000.0)
         rows = []
         for folder, gt in trials:
-            frames, T_bg = load_capture(CAPTURE_ROOT / folder)
+            frames, T_bg = load_capture(Path(args.capture_root) / folder)
             T, report = detect_cube_pose_all(frames, K_map, D_map, T_base_cam, T_gripper_cam, T_bg, cube_target, args.reproj_thr_px)
             if T is None:
                 print(f"{label:>22} | {folder:>16} | 검출 실패")

@@ -259,6 +259,8 @@ def main():
     ap.add_argument("--capture-subdir", default="capture",
                     help="session_root 아래 실제 캡처 폴더 이름 (예: capture_replayed)")
     ap.add_argument("--out", default=str(REPO_ROOT / "zeus_gello_calibration" / "pass1_grasp_offset.json"))
+    ap.add_argument("--cube-config", default=None,
+                    help="큐브 마커 config JSON (기본: config.py 메인 큐브). 0914 촬영처럼 GT 큐브로 찍었으면 targets/gt_cube/cube_config.json")
     args = ap.parse_args()
 
     session_root = Path(args.session_root)
@@ -274,7 +276,14 @@ def main():
     meta = build_synthetic_meta(session_root, capture_indices, args.capture_subdir)
     robot_T = load_robot_T(session_root, capture_indices, args.capture_subdir)
 
-    cube_cfg = get_default_cube_config()
+    if args.cube_config:
+        from calibration_pipeline.cube_config import load_cube_config_from_json_file
+        cube_cfg, cube_src = load_cube_config_from_json_file(args.cube_config)
+        if cube_cfg is None:
+            raise SystemExit(f"cube config를 못 읽었습니다: {args.cube_config}")
+        print(f"cube config: {args.cube_config} ({cube_src})")
+    else:
+        cube_cfg = get_default_cube_config()
     cube = AprilTagCubeTarget(cube_cfg)
     all_cam_ids = sorted(LOCAL_CAM_IDS.values())
     observations, diag = load_cube_pixel_observations(

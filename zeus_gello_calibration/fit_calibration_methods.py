@@ -87,6 +87,7 @@ FIT_JSON_DEFAULT = REPO_ROOT / "zeus_gello_calibration" / "pass1_grasp_offset_re
 # 박아서 만들기 때문에(고정캠/그리퍼캠 공용 meta), 그리퍼캠 쪽도 그대로
 # 재사용한다 -- 별도 offset을 또 더하면 이중 offset 버그가 난다.
 SESSION3_EVENT_OFFSET = 2000
+FIT_SUFFIX = ""   # --tag 로 설정; fit_<조건><suffix>.json
 
 
 def export_fit_json(path: Path, T_gripper_cube, T_base_cam: dict, T_gripper_cam=None):
@@ -148,9 +149,9 @@ def load_all_data(args):
     s1_root = session1_dir / args.session1_capture_subdir
     s2_root = session2_dir / args.session2_capture_subdir
     s3_root = session3_dir / args.session3_capture_subdir
-    s1_idx = sorted(int(p.name) for p in s1_root.iterdir() if p.is_dir())
-    s2_idx = sorted(int(p.name) for p in s2_root.iterdir() if p.is_dir())
-    s3_idx = sorted(int(p.name) for p in s3_root.iterdir() if p.is_dir())
+    s1_idx = sorted(int(p.name) for p in s1_root.iterdir() if p.is_dir() and p.name.isdigit())
+    s2_idx = sorted(int(p.name) for p in s2_root.iterdir() if p.is_dir() and p.name.isdigit())
+    s3_idx = sorted(int(p.name) for p in s3_root.iterdir() if p.is_dir() and p.name.isdigit())
     items = compute_ordered_targets(session2_dir)
     items_by_index = {idx: items[idx] for idx in s2_idx if idx < len(items)}
 
@@ -162,7 +163,16 @@ def load_all_data(args):
     fixed_ids = sorted(cam_init)
     all_cam_ids = sorted(set(fixed_ids) | {GRIPPER_LOCAL_ID})
 
-    cube = AprilTagCubeTarget(get_default_cube_config())
+    cube_config_path = getattr(args, "cube_config", None)
+    if cube_config_path:
+        from calibration_pipeline.cube_config import load_cube_config_from_json_file
+        cube_cfg, cube_src = load_cube_config_from_json_file(cube_config_path)
+        if cube_cfg is None:
+            raise SystemExit(f"cube config를 못 읽었습니다: {cube_config_path}")
+        print(f"cube config: {cube_config_path} ({cube_src})")
+        cube = AprilTagCubeTarget(cube_cfg)
+    else:
+        cube = AprilTagCubeTarget(get_default_cube_config())
 
     # session1 (고정캠, grasp+FK) -- 그리퍼캠은 여기선 항상 0검출이라 굳이 안 실음
     meta_s1 = build_synthetic_meta(session1_dir, s1_idx, args.session1_capture_subdir)
@@ -199,6 +209,12 @@ def load_all_data(args):
         str(session3_dir), meta_s3, all_cam_ids, gripper_cam_idx=GRIPPER_LOCAL_ID, image_scale=1.0)
     obs_s3_fixed = [o for o in obs_s3_all if int(o.cam) in cam_init]
     obs_s3_gripper = [o for o in obs_s3_all if int(o.cam) == GRIPPER_LOCAL_ID]
+    if getattr(args, "s3_gripper_only", False):
+        # session3는 그리퍼캠(eye-in-hand) 전용으로만 쓴다 -- 고정캠 보드 관측은
+        # session2 사진에서 이미 들어오므로 여기 고정캠 관측을 뺀다.
+        print(f"[s3-gripper-only] session3 고정캠 보드 관측 {len(obs_s3_fixed)}개 제외")
+        obs_s3_fixed = []
+        obs_s3_all = list(obs_s3_gripper)
     print(f"session3 고정캠 보드 관측치: {len(obs_s3_fixed)}개 (신규 -- 예전엔 빠뜨렸음)")
 
     # session2 사진에도 같은 보드가 그대로 바닥에 있다 (실측: 고정캠 8~60코너,
@@ -426,7 +442,7 @@ def main_cube_only(args, data):
         state, diag, n_obs = solve_unified(data, fk_mode, gtc_init, None)
         results[label] = {"success": diag["success"], "rmse_px": diag["train_reprojection_rmse_px"],
                           "n_corners": diag["n_residuals"] // 2, "n_observations": n_obs}
-        export_fit_json(fit_out_dir / f"fit_{label}.json", state.grasps[0], state.cams, state.gtc)
+        export_fit_json(fit_out_dir / f"fit_{label}{FIT_SUFFIX}.json", state.grasps[0], state.cams, state.gtc)
     results["독립_no-fk_cubeonly"] = {"success": False, "reason": "gripper group not identifiable without board (cube poses free, single parking view)"}
     total_n = len(data["obs_s1"]) + len(data["obs_s2_fixed"]) + len(data["obs_s2_gripper"])
     print(f"{'condition':>24} {'rmse_px':>10} {'n_corners':>10} {'n_obs':>7}")
@@ -458,7 +474,15 @@ def main():
     ap.add_argument("--out", default=str(REPO_ROOT / "zeus_gello_calibration" / "calibration_methods_comparison.json"))
     ap.add_argument("--cube-only", action="store_true",
                     help="보드 관측 전부 제외(session3 미사용 + session2 보드 제외). late_table1 B2(-board) 대응")
+    ap.add_argument("--tag", default="", help="출력 파일 접미사 (예: _0914 -> fit_통합_no-fk_0914.json). 다른 촬영분 결과를 덮어쓰지 않게")
+    ap.add_argument("--cube-config", default=None,
+                    help="큐브 마커 config JSON (기본: config.py 메인 큐브). GT 큐브로 찍은 촬영이면 targets/gt_cube/cube_config.json")
+    ap.add_argument("--s3-gripper-only", action="store_true", help="session3는 그리퍼캠 관측만 사용 (고정캠 보드 관측 제외)")
     args = ap.parse_args()
+    global FIT_SUFFIX
+    FIT_SUFFIX = args.tag
+    if args.tag and args.out == str(REPO_ROOT / "zeus_gello_calibration" / "calibration_methods_comparison.json"):
+        args.out = str(REPO_ROOT / "zeus_gello_calibration" / f"calibration_methods_comparison{args.tag}.json")
 
     data = load_all_data(args)
     K_map, D_map = data["K_map"], data["D_map"]
@@ -477,7 +501,7 @@ def main():
         state, diag, n_obs = solve_unified(data, fk_mode, gtc_init, board_init)
         results[label] = {"success": diag["success"], "rmse_px": diag["train_reprojection_rmse_px"],
                           "n_corners": diag["n_residuals"] // 2, "n_observations": n_obs}
-        export_fit_json(fit_out_dir / f"fit_{label}.json", state.grasps[0], state.cams, state.gtc)
+        export_fit_json(fit_out_dir / f"fit_{label}{FIT_SUFFIX}.json", state.grasps[0], state.cams, state.gtc)
 
     # 진짜 독립: 고정캠 그룹과 그리퍼 그룹을 서로 정보 교환 없이 완전히 따로
     # 캘리브레이션한다 (고정캠은 session1 grasp+FK로, 그리퍼는 session3 board
@@ -488,7 +512,7 @@ def main():
     label2 = "독립_no-fk (진짜 독립, 큐브 pose 비공유)"
     state_fixed, diag_fixed, obs_fixed = solve_parallel_fixed(data)
     state_gripper, diag_gripper, obs_gripper = solve_parallel_gripper(data, gtc_init, board_init)
-    export_fit_json(fit_out_dir / "fit_독립_no-fk.json", state_fixed.grasps[0], state_fixed.cams, state_gripper.gtc)
+    export_fit_json(fit_out_dir / f"fit_독립_no-fk{FIT_SUFFIX}.json", state_fixed.grasps[0], state_fixed.cams, state_gripper.gtc)
     errs_fixed = per_corner_errors(state_fixed, obs_fixed, data["robot_T_s1"], K_map, D_map, -999)
     errs_gripper = per_corner_errors(state_gripper, obs_gripper,
                                      {**data["robot_T_s2_gripper"], **data["robot_T_s3"]},
