@@ -38,7 +38,7 @@ def main():
     ap.add_argument("--device-map", default=str(DEVICE_MAP_DEFAULT))
     ap.add_argument("--robot-ip", default=ROBOT_IP_DEFAULT)
     ap.add_argument("--robot-port", type=int, default=ROBOT_PORT_DEFAULT)
-    ap.add_argument("--no-robot", action="store_true", help="로봇 서버에 접속하지 않음 (pose 기록 생략)")
+    ap.add_argument("--robot", action="store_true", help="로봇 서버에 읽기 전용 접속해서 촬영 순간 pose를 같이 기록 (기본: 접속 안 함)")
     ap.add_argument("--no-cam-reset", action="store_true")
     ap.add_argument("--no-preview", action="store_true")
     args = ap.parse_args()
@@ -52,7 +52,7 @@ def main():
         view.start()
 
     rb = None
-    if not args.no_robot:
+    if args.robot:
         try:
             rb = ZeusClient(args.robot_ip, args.robot_port)
             rb.connect()
@@ -61,16 +61,19 @@ def main():
             print(f"[WARN] 로봇 서버 연결 실패, pose 없이 진행: {exc}")
             rb = None
 
-    print(f"저장 폴더: {out_dir}\n{args.shots}장 촬영. Enter=촬영 / q=종료\n")
+    if view is not None:
+        print(f"저장 폴더: {out_dir}\n{args.shots}장 촬영. **미리보기 창을 클릭한 뒤** SPACE 또는 Enter=촬영 / q 또는 ESC=종료\n")
+    else:
+        print(f"저장 폴더: {out_dir}\n{args.shots}장 촬영. 터미널에서 Enter=촬영 / q=종료\n")
     n = 0
     try:
         while n < args.shots:
             if view is not None:
-                # 미리보기 갱신하면서 키 대기 (SPACE=촬영)
-                key = view.show(wait_ms=30, status=f"[{n}/{args.shots}] SPACE=촬영  q/ESC=종료")
+                # 미리보기 갱신하면서 키 대기 -- 키 입력은 OpenCV 창에 포커스가 있을 때만 잡힘
+                key = view.show(wait_ms=30, status=f"[{n}/{args.shots}] SPACE/Enter=촬영  q/ESC=종료 (창 클릭 후)")
                 if view._closed:
                     break
-                if key != 32:
+                if key not in (32, 13, 10):
                     continue
             else:
                 cmd = input(f"[{n}/{args.shots}] > ").strip().lower()
