@@ -47,7 +47,37 @@ P1 종료 -> 검증된 P2_START_JOINTS 이동
 
 마지막 placement는 다시 집지 않고 그대로 유지한 뒤 P3를 시작한다.
 
-## 3. Robot 서버
+## 3. 해상도별 intrinsics 준비
+
+캡처 해상도마다 intrinsics를 따로 만든다. 현재 `intrinsics/`는 `1280x720@15`이고,
+자동 재촬영도 기본값이 `1280x720@15`다. 해상도를 바꾸면 반드시 새 intrinsic
+폴더를 만들고, 03/04에서 같은 폴더를 사용한다.
+
+```bash
+cd '/home/jysim/*jiwoo/rb-calibration-marker-experiment'
+
+mkdir -p intrinsics_1280x720
+cp intrinsics/device_map.json intrinsics_1280x720/device_map.json
+
+python3 01_export_intrinsics.py \
+  --out_dir intrinsics_1280x720 \
+  --color_w 1280 --color_h 720 --fps 15 \
+  --gripper_serial 752112070297
+
+python3 02_calibrate_intrinsics.py \
+  --intr_dir intrinsics_1280x720 \
+  --min_views 20 \
+  --use_factory_guess
+```
+
+다른 해상도는 폴더명과 `--color_w/--color_h/--fps`만 바꿔 같은 절차를 반복한다.
+02에서는 카메라별로 ChArUco 보드를 화면 중앙/모서리/가까운 거리/먼 거리/기울어진
+각도로 골고루 보여주고, `SPACE`로 20~30장 이상 잡은 뒤 `c` 또는 Enter로 보정한다.
+RealSense RGB-D 캡처는 color와 depth를 같은 해상도로 열기 때문에, 두 스트림이 모두
+지원하는 mode를 고른다. 1920x1080처럼 color-only mode는 현재 파이프라인 그대로는
+depth 동시 저장에 실패할 수 있다.
+
+## 4. Robot 서버
 
 ZEUS PC에서 GELLO teleoperation과 다른 motion client를 모두 종료한다. 그다음 Python 2
 i611 환경에서 다음 서버를 실행한다.
@@ -59,7 +89,7 @@ python ~/zeus_gello.py
 카메라 PC는 기본 `192.168.0.23:12350`으로 연결한다. 비상정지에 손이 닿아야 하며,
 P1 시작 전에 cube가 원본과 같은 `T_flange_cube` 상태로 파지되어 있어야 한다.
 
-## 4. Dry-Run
+## 5. Dry-Run
 
 저장 pose만 읽고 robot과 카메라는 연결하지 않는다.
 
@@ -73,7 +103,7 @@ python3 03_capture.py \
 
 정상 출력은 P1 16, P2 15, P3 15, 총 46 events다.
 
-## 5. 저속 Robot 검증
+## 6. 저속 Robot 검증
 
 카메라와 파일 저장 없이 각 단계에서 Enter를 받아 robot 동작을 검증한다. 이 명령도
 P2에서 실제 gripper open/close와 pick/place를 수행하므로 cube를 파지한 상태로 시작한다.
@@ -91,7 +121,7 @@ python3 03_capture.py \
 P1/P2/P3 모든 pose에서 joint limit, cable, camera, table, target 충돌과 실제 cube
 접촉 높이를 확인한다. 하나라도 맞지 않으면 `--no-step`을 실행하지 않는다.
 
-## 6. 스텝별 시험 촬영
+## 7. 스텝별 시험 촬영
 
 저속 robot 검증을 통과한 뒤 카메라 4대와 저장까지 한 단계씩 확인한다.
 
@@ -99,8 +129,10 @@ P1/P2/P3 모든 pose에서 joint limit, cable, camera, table, target 충돌과 �
 python3 03_capture.py \
   --saved-pose-replay --all-phases \
   --data-root '/home/jysim/*jiwoo/rb-calibration-marker-experiment/zeus_gello_calibration/data' \
+  --device-map intrinsics_1280x720/device_map.json \
   --session-label zeus_saved_pose_step_check \
-  --execute \
+  --width 1280 --height 720 --fps 15 \
+  --execute --no-cam-reset \
   --jnt-speed 3 \
   --p2-move-speed 10 \
   --p2-descend-speed 5
@@ -108,26 +140,30 @@ python3 03_capture.py \
 
 중간에 `q`를 입력하면 이미 촬영한 데이터는 `incomplete` session으로 보존된다.
 
-## 7. 연속 자동 촬영
+## 8. 연속 자동 촬영
 
-5~6절을 실제 hardware에서 모두 통과한 뒤 실행한다. 시작 직전에 `go`를 한 번
+6~7절을 실제 hardware에서 모두 통과한 뒤 실행한다. 시작 직전에 `go`를 한 번
 입력하면 event별 입력 없이 P1 -> P2 -> P3를 연속 실행한다.
 
 ```bash
 python3 03_capture.py \
   --saved-pose-replay --all-phases \
   --data-root '/home/jysim/*jiwoo/rb-calibration-marker-experiment/zeus_gello_calibration/data' \
+  --device-map intrinsics_1280x720/device_map.json \
   --session-label zeus_saved_pose_replay \
-  --execute --no-step \
+  --width 1280 --height 720 --fps 15 \
+  --execute --no-step --no-cam-reset \
   --jnt-speed 3 \
   --p2-move-speed 10 \
   --p2-descend-speed 5
 ```
 
 속도는 검증된 뒤에만 올린다. `overlap=0`이 기본이므로 각 pose에서 완전히 정지한 뒤
-촬영한다.
+촬영한다. 통합 촬영은 한 USB controller의 여러 카메라를 동시에 reset하지 않도록
+hardware reset을 기본 생략한다. 장애 복구가 꼭 필요할 때만 `--cam-reset`으로 한 대씩
+순차 reset한다.
 
-## 8. 단일 Session 결과
+## 9. 단일 Session 결과
 
 실제 촬영을 시작할 때 기존 session을 덮어쓰지 않고 다음 번호를 자동 할당한다.
 
@@ -145,7 +181,8 @@ zeus_gello_calibration/data/
 ```
 
 `meta.json`에는 phase, source pose 경로, 실제 flange pose/joints, gripper state,
-placement ID, set index, 카메라별 RGB-D 경로가 저장된다. 완료 판정은 다음과 같다.
+placement ID, set index, 카메라별 RGB-D 경로, `capture_config.camera_stream`의
+실제 캡처 해상도가 저장된다. 완료 판정은 다음과 같다.
 
 ```text
 capture_protocol = saved_pose_replay_v1
@@ -155,14 +192,14 @@ missing_planned_event_ids = []
 status = complete
 ```
 
-## 9. 촬영 후 처리
+## 10. 촬영 후 처리
 
 실제 생성된 session의 `calib_train`을 지정한다.
 
 ```bash
 python3 04_filter_observations.py \
   --session-root zeus_gello_calibration/data/session<NN>_zeus_saved_pose_replay_<MMDD>/calib_train \
-  --intrinsics-dir intrinsics
+  --intrinsics-dir intrinsics_1280x720
 ```
 
 04는 가변 event 수를 `capture_config.expected_event_count`에서 읽고 P1의 gripped cube

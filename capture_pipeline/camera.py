@@ -22,11 +22,9 @@ rebuilds the pipeline, and retries up to 3 times. Warmup uses a longer
 10-second timeout to tolerate slow first-frame delivery on multi-camera
 USB hubs.
 
-Use `RealSenseCamera.reset_all_devices()` once at process startup to
-hardware-reset every connected RealSense before opening pipelines —
-this clears bad state left over from a prior crash/segfault and is
-especially important for D435 on chained USB hubs, which otherwise
-hangs in `pipeline.start()` with "Frame didn't arrive within 10000".
+Use `RealSenseCamera.reset_all_devices()` only when recovery from a prior
+camera failure is required. It resets devices sequentially because resetting
+several cameras on one xHCI controller at once can stall endpoint teardown.
 """
 
 import threading
@@ -211,45 +209,51 @@ class RealSenseCamera:
 
     @staticmethod
     def reset_all_devices(wait_s: float = 6.0) -> None:
-        """Hardware-reset every connected RealSense and wait for USB re-enumeration.
+        """Hardware-reset each RealSense and wait for it to re-enumerate.
 
-        Call once at process startup before opening any pipeline. Required after
-        a prior crash/segfault left a device in a bad state — RealSense Viewer
-        masks this by resetting on open, but pyrealsense2 pipelines do not.
+        Devices are reset one at a time. Issuing hardware_reset() to every
+        camera before waiting can overload endpoint teardown on a shared USB
+        controller and make the entire xHCI host stop responding.
         """
         try:
-            ctx = rs.context()
-            devs_before = list(ctx.query_devices())
+            devs_before = list(rs.context().query_devices())
             serials_before = [
                 d.get_info(rs.camera_info.serial_number) for d in devs_before
             ]
-            for dev in devs_before:
-                try:
-                    dev.hardware_reset()
-                except Exception:
-                    pass
-            print(f"[INFO] Hardware-reset {len(serials_before)} RealSense device(s); "
-                  f"waiting for re-enumeration...")
         except Exception as e:
             print(f"[WARN] reset_all_devices: enumerate/reset failed: {e}")
             return
 
-        deadline = time.time() + wait_s
-        while time.time() < deadline:
-            time.sleep(0.5)
+        print(f"[INFO] Sequentially hardware-resetting {len(serials_before)} "
+              "RealSense device(s)...")
+        for serial in serials_before:
             try:
-                serials_now = [
-                    d.get_info(rs.camera_info.serial_number)
+                current = {
+                    d.get_info(rs.camera_info.serial_number): d
                     for d in rs.context().query_devices()
-                ]
-                if all(s in serials_now for s in serials_before):
-                    time.sleep(1.0)  # extra settle time for stereo modules (D435)
-                    print(f"[INFO] All {len(serials_before)} device(s) re-enumerated.")
-                    return
-            except Exception:
+                }
+                current[serial].hardware_reset()
+            except Exception as exc:
+                print(f"[WARN] reset_all_devices: {serial} reset failed: {exc}")
                 continue
-        print("[WARN] reset_all_devices: timeout waiting for re-enumeration; "
-              "continuing anyway.")
+
+            deadline = time.time() + wait_s
+            while time.time() < deadline:
+                time.sleep(0.5)
+                try:
+                    serials_now = {
+                        d.get_info(rs.camera_info.serial_number)
+                        for d in rs.context().query_devices()
+                    }
+                    if serial in serials_now:
+                        time.sleep(1.0)
+                        print(f"[INFO] RealSense {serial} re-enumerated.")
+                        break
+                except Exception:
+                    continue
+            else:
+                print(f"[WARN] reset_all_devices: timeout waiting for {serial}; "
+                      "continuing with the remaining devices.")
 
     def start(self, max_attempts: int = 3, warmup_timeout_ms: int = 10000):
         last_err = None
