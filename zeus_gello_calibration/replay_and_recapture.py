@@ -553,8 +553,12 @@ def run_combined_replay(rb, cams, labels, view, data_root: Path,
             {
                 "color_w": int(args.width),
                 "color_h": int(args.height),
-                "depth_w": int(args.width),
-                "depth_h": int(args.height),
+                "depth_w": int(
+                    args.depth_width if args.depth_width is not None else args.width
+                ),
+                "depth_h": int(
+                    args.depth_height if args.depth_height is not None else args.height
+                ),
                 "fps": int(args.fps),
             },
         )
@@ -748,6 +752,8 @@ def main():
     ap.add_argument("--overlap", type=float, default=OVERLAP_DEFAULT)
     ap.add_argument("--width", type=int, default=CAM_WIDTH, help="RealSense color/depth width")
     ap.add_argument("--height", type=int, default=CAM_HEIGHT, help="RealSense color/depth height")
+    ap.add_argument("--depth-width", type=int, default=None, help="RealSense depth width")
+    ap.add_argument("--depth-height", type=int, default=None, help="RealSense depth height")
     ap.add_argument("--fps", type=int, default=CAM_FPS, help="RealSense stream FPS")
     ap.add_argument("--p2-approach-mm", type=float, default=P2_APPROACH_MM_DEFAULT)
     ap.add_argument("--p2-move-speed", type=float, default=P2_MOVE_SPEED_DEFAULT)
@@ -803,8 +809,18 @@ def main():
         data_root = require_zeus_data_path(args.data_root, label="--data-root")
     except ValueError as exc:
         ap.error(str(exc))
-    if args.width <= 0 or args.height <= 0 or args.fps <= 0:
-        ap.error("--width, --height, --fps 값은 모두 양수여야 합니다.")
+    if (args.depth_width is None) != (args.depth_height is None):
+        ap.error("--depth-width와 --depth-height는 함께 지정해야 합니다.")
+    if (
+        args.width <= 0 or args.height <= 0 or args.fps <= 0
+        or (args.depth_width is not None and args.depth_width <= 0)
+        or (args.depth_height is not None and args.depth_height <= 0)
+    ):
+        ap.error("--width, --height, --depth-width, --depth-height, --fps 값은 모두 양수여야 합니다.")
+    depth_width = int(args.depth_width) if args.depth_width is not None else int(args.width)
+    depth_height = int(args.depth_height) if args.depth_height is not None else int(args.height)
+    args.depth_width = depth_width
+    args.depth_height = depth_height
 
     if args.all_phases:
         if args.session_dir is not None:
@@ -846,7 +862,8 @@ def main():
         else:
             labels = load_camera_labels(Path(args.device_map))
             validate_intrinsics_stream(
-                Path(args.device_map), args.width, args.height, args.fps
+                Path(args.device_map), args.width, args.height, args.fps,
+                depth_width=depth_width, depth_height=depth_height,
             )
             skip_camera_reset = args.no_cam_reset or not args.cam_reset
             if skip_camera_reset:
@@ -857,6 +874,8 @@ def main():
                 width=args.width,
                 height=args.height,
                 fps=args.fps,
+                depth_width=depth_width,
+                depth_height=depth_height,
             )
             if not args.no_preview:
                 view = LiveView(
@@ -971,7 +990,8 @@ def main():
     else:
         labels = load_camera_labels(Path(args.device_map))
         validate_intrinsics_stream(
-            Path(args.device_map), args.width, args.height, args.fps
+            Path(args.device_map), args.width, args.height, args.fps,
+            depth_width=depth_width, depth_height=depth_height,
         )
         cams, used_labels = connect_cameras(
             labels,
@@ -979,6 +999,8 @@ def main():
             width=args.width,
             height=args.height,
             fps=args.fps,
+            depth_width=depth_width,
+            depth_height=depth_height,
         )
         if not args.no_preview:
             view = LiveView(cams, used_labels, window_name="replay_and_recapture (q/ESC=닫기)")

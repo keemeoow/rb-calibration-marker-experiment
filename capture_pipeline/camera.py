@@ -45,6 +45,8 @@ class RealSenseCamera:
         width: int = 1280,
         height: int = 720,
         fps: int = 15,
+        depth_width: Optional[int] = None,
+        depth_height: Optional[int] = None,
         use_color: bool = True,
         use_depth: bool = False,
         align_depth_to_color: bool = True,
@@ -59,6 +61,10 @@ class RealSenseCamera:
         self.serial = serial
         self.width = int(width)
         self.height = int(height)
+        self.color_width = int(width)
+        self.color_height = int(height)
+        self.depth_width = int(depth_width) if depth_width is not None else self.color_width
+        self.depth_height = int(depth_height) if depth_height is not None else self.color_height
         self.fps = int(fps)
         self.use_color = bool(use_color)
         self.use_depth = bool(use_depth)
@@ -91,9 +97,21 @@ class RealSenseCamera:
         self.cfg.enable_device(self.serial)
 
         if self.use_color:
-            self.cfg.enable_stream(rs.stream.color, self.width, self.height, rs.format.bgr8, self.fps)
+            self.cfg.enable_stream(
+                rs.stream.color,
+                self.color_width,
+                self.color_height,
+                rs.format.bgr8,
+                self.fps,
+            )
         if self.use_depth:
-            self.cfg.enable_stream(rs.stream.depth, self.width, self.height, rs.format.z16, self.fps)
+            self.cfg.enable_stream(
+                rs.stream.depth,
+                self.depth_width,
+                self.depth_height,
+                rs.format.z16,
+                self.fps,
+            )
 
         self.align = (
             rs.align(rs.stream.color)

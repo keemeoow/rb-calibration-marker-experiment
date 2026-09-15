@@ -88,9 +88,18 @@ def load_camera_labels(device_map_path: Path) -> dict:
     return labels
 
 
-def validate_intrinsics_stream(device_map_path: Path, width: int, height: int, fps: int) -> None:
+def validate_intrinsics_stream(
+    device_map_path: Path,
+    width: int,
+    height: int,
+    fps: int,
+    depth_width: int | None = None,
+    depth_height: int | None = None,
+) -> None:
     """Fail fast when the selected device_map belongs to a different resolution."""
     intrinsics_dir = device_map_path.parent
+    expected_depth_width = int(depth_width) if depth_width is not None else int(width)
+    expected_depth_height = int(depth_height) if depth_height is not None else int(height)
     if not intrinsics_dir.is_dir():
         return
     try:
@@ -108,9 +117,13 @@ def validate_intrinsics_stream(device_map_path: Path, width: int, height: int, f
         data = np.load(npz_path, allow_pickle=True)
         iw = int(data["color_w"])
         ih = int(data["color_h"])
+        dw = int(data["depth_w"]) if "depth_w" in data.files else iw
+        dh = int(data["depth_h"]) if "depth_h" in data.files else ih
         ifps = int(data["fps"])
         if (iw, ih, ifps) != (int(width), int(height), int(fps)):
-            mismatches.append((idx, iw, ih, ifps))
+            mismatches.append((idx, "color", iw, ih, ifps))
+        if (dw, dh, ifps) != (expected_depth_width, expected_depth_height, int(fps)):
+            mismatches.append((idx, "depth", dw, dh, ifps))
 
     if missing:
         print(
@@ -119,11 +132,12 @@ def validate_intrinsics_stream(device_map_path: Path, width: int, height: int, f
         )
     if mismatches:
         lines = [
-            f"cam{idx}: intrinsics {iw}x{ih}@{ifps}"
-            for idx, iw, ih, ifps in mismatches
+            f"cam{idx} {stream}: intrinsics {iw}x{ih}@{ifps}"
+            for idx, stream, iw, ih, ifps in mismatches
         ]
         raise RuntimeError(
-            f"캡처 설정 {int(width)}x{int(height)}@{int(fps)}와 "
+            f"캡처 설정 color {int(width)}x{int(height)}@{int(fps)}, "
+            f"depth {expected_depth_width}x{expected_depth_height}@{int(fps)}와 "
             f"{intrinsics_dir}의 intrinsics 해상도가 다릅니다.\n"
             + "\n".join(lines)
         )
@@ -135,6 +149,8 @@ def connect_cameras(
     width: int = CAM_WIDTH,
     height: int = CAM_HEIGHT,
     fps: int = CAM_FPS,
+    depth_width: int | None = None,
+    depth_height: int | None = None,
 ):
     if RealSenseCamera is None:
         raise RuntimeError(
@@ -156,7 +172,13 @@ def connect_cameras(
     if missing:
         print(f"[WARN] device_map.json에 등록된 카메라가 지금 안 보입니다(연결 확인 필요): {sorted(missing)}")
 
-    print(f"카메라 {len(devices)}대 발견 ({int(width)}x{int(height)}@{int(fps)}):")
+    actual_depth_width = int(depth_width) if depth_width is not None else int(width)
+    actual_depth_height = int(depth_height) if depth_height is not None else int(height)
+    print(
+        f"카메라 {len(devices)}대 발견 "
+        f"(color {int(width)}x{int(height)}@{int(fps)}, "
+        f"depth {actual_depth_width}x{actual_depth_height}@{int(fps)}):"
+    )
     cams = {}
     used_labels = {}
     for serial, name in devices.items():
@@ -164,6 +186,8 @@ def connect_cameras(
         used_labels[serial] = label
         print(f"  {serial}  {name}  -> {label}")
         cam = RealSenseCamera(serial, width=width, height=height, fps=fps,
+                               depth_width=actual_depth_width,
+                               depth_height=actual_depth_height,
                                use_color=True, use_depth=True, align_depth_to_color=True,
                                lock_color_exposure=False)
         cam.start()
@@ -295,6 +319,8 @@ def main():
     ap.add_argument("--num-poses", type=int, default=15, help="목표 촬영 개수 (기본 15)")
     ap.add_argument("--width", type=int, default=CAM_WIDTH, help="RealSense color/depth width")
     ap.add_argument("--height", type=int, default=CAM_HEIGHT, help="RealSense color/depth height")
+    ap.add_argument("--depth-width", type=int, default=None, help="RealSense depth width")
+    ap.add_argument("--depth-height", type=int, default=None, help="RealSense depth height")
     ap.add_argument("--fps", type=int, default=CAM_FPS, help="RealSense stream FPS")
     ap.add_argument("--reset", action="store_true", help="기존 세션 폴더 있어도 처음부터(0번)")
     ap.add_argument("--no-cam-reset", action="store_true", help="카메라 시작 전 하드웨어 리셋 생략")
@@ -325,8 +351,17 @@ def main():
     print("다른 터미널에서 GELLO 텔레옵이 이미 돌고 있어야 합니다 (이 스크립트는 로봇을 움직이지 않음).\n")
 
     labels = load_camera_labels(Path(args.device_map))
+    if (args.depth_width is None) != (args.depth_height is None):
+        ap.error("--depth-width와 --depth-height는 함께 지정해야 합니다.")
+    if (
+        args.width <= 0 or args.height <= 0 or args.fps <= 0
+        or (args.depth_width is not None and args.depth_width <= 0)
+        or (args.depth_height is not None and args.depth_height <= 0)
+    ):
+        ap.error("--width, --height, --depth-width, --depth-height, --fps 값은 모두 양수여야 합니다.")
     validate_intrinsics_stream(
-        Path(args.device_map), args.width, args.height, args.fps
+        Path(args.device_map), args.width, args.height, args.fps,
+        depth_width=args.depth_width, depth_height=args.depth_height,
     )
     cams, used_labels = connect_cameras(
         labels,
@@ -334,6 +369,8 @@ def main():
         width=args.width,
         height=args.height,
         fps=args.fps,
+        depth_width=args.depth_width,
+        depth_height=args.depth_height,
     )
     view = None
     if not args.no_preview:

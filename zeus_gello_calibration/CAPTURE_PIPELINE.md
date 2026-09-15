@@ -50,32 +50,38 @@ P1 종료 -> 검증된 P2_START_JOINTS 이동
 ## 3. 해상도별 intrinsics 준비
 
 캡처 해상도마다 intrinsics를 따로 만든다. 현재 `intrinsics/`는 `1280x720@15`이고,
-자동 재촬영도 기본값이 `1280x720@15`다. 해상도를 바꾸면 반드시 새 intrinsic
-폴더를 만들고, 03/04에서 같은 폴더를 사용한다.
+자동 재촬영 기본값도 `1280x720@15`다. 더 높은 color 해상도로 촬영하려면
+`color 1920x1080 + depth 1280x720 @15` 조합을 먼저 시도한다. 해상도를 바꾸면
+반드시 새 intrinsic 폴더를 만들고, 03/04에서 같은 폴더를 사용한다.
 
 ```bash
 cd '/home/jysim/*jiwoo/rb-calibration-marker-experiment'
 
-mkdir -p intrinsics_1280x720
-cp intrinsics/device_map.json intrinsics_1280x720/device_map.json
+rs-enumerate-devices -s
+
+mkdir -p intrinsics_1920x1080_rgbd720
+cp intrinsics/device_map.json intrinsics_1920x1080_rgbd720/device_map.json
 
 python3 01_export_intrinsics.py \
-  --out_dir intrinsics_1280x720 \
-  --color_w 1280 --color_h 720 --fps 15 \
+  --out_dir intrinsics_1920x1080_rgbd720 \
+  --color_w 1920 --color_h 1080 \
+  --depth_w 1280 --depth_h 720 \
+  --fps 15 \
   --gripper_serial 752112070297
 
 python3 02_calibrate_intrinsics.py \
-  --intr_dir intrinsics_1280x720 \
+  --intr_dir intrinsics_1920x1080_rgbd720 \
   --min_views 20 \
   --use_factory_guess
 ```
 
-다른 해상도는 폴더명과 `--color_w/--color_h/--fps`만 바꿔 같은 절차를 반복한다.
+다른 해상도는 폴더명과 `--color_w/--color_h/--depth_w/--depth_h/--fps`를 바꿔
+같은 절차를 반복한다.
 02에서는 카메라별로 ChArUco 보드를 화면 중앙/모서리/가까운 거리/먼 거리/기울어진
 각도로 골고루 보여주고, `SPACE`로 20~30장 이상 잡은 뒤 `c` 또는 Enter로 보정한다.
-RealSense RGB-D 캡처는 color와 depth를 같은 해상도로 열기 때문에, 두 스트림이 모두
-지원하는 mode를 고른다. 1920x1080처럼 color-only mode는 현재 파이프라인 그대로는
-depth 동시 저장에 실패할 수 있다.
+고해상도 모드에서는 02가 `1920x1080` color intrinsic을 보정하고, depth는
+`1280x720` raw stream을 color frame에 align해 저장한다. 4대 동시 USB bandwidth가
+부족하면 `1280x720@15` 기본 경로로 되돌린다.
 
 ## 4. Robot 서버
 
@@ -129,9 +135,11 @@ P1/P2/P3 모든 pose에서 joint limit, cable, camera, table, target 충돌과 �
 python3 03_capture.py \
   --saved-pose-replay --all-phases \
   --data-root '/home/jysim/*jiwoo/rb-calibration-marker-experiment/zeus_gello_calibration/data' \
-  --device-map intrinsics_1280x720/device_map.json \
-  --session-label zeus_saved_pose_step_check \
-  --width 1280 --height 720 --fps 15 \
+  --device-map intrinsics_1920x1080_rgbd720/device_map.json \
+  --session-label zeus_saved_pose_step_check_1920 \
+  --width 1920 --height 1080 \
+  --depth-width 1280 --depth-height 720 \
+  --fps 15 \
   --execute --no-cam-reset \
   --jnt-speed 3 \
   --p2-move-speed 10 \
@@ -149,9 +157,11 @@ python3 03_capture.py \
 python3 03_capture.py \
   --saved-pose-replay --all-phases \
   --data-root '/home/jysim/*jiwoo/rb-calibration-marker-experiment/zeus_gello_calibration/data' \
-  --device-map intrinsics_1280x720/device_map.json \
-  --session-label zeus_saved_pose_replay \
-  --width 1280 --height 720 --fps 15 \
+  --device-map intrinsics_1920x1080_rgbd720/device_map.json \
+  --session-label zeus_saved_pose_replay_1920 \
+  --width 1920 --height 1080 \
+  --depth-width 1280 --depth-height 720 \
+  --fps 15 \
   --execute --no-step --no-cam-reset \
   --jnt-speed 3 \
   --p2-move-speed 10 \
@@ -169,7 +179,7 @@ hardware reset을 기본 생략한다. 장애 복구가 꼭 필요할 때만 `--
 
 ```text
 zeus_gello_calibration/data/
-└── session<NN>_zeus_saved_pose_replay_<MMDD>/
+└── session<NN>_zeus_saved_pose_replay_1920_<MMDD>/
     ├── session_manifest.json
     ├── calib_train/
     │   ├── events/000 ... 045/
@@ -198,8 +208,8 @@ status = complete
 
 ```bash
 python3 04_filter_observations.py \
-  --session-root zeus_gello_calibration/data/session<NN>_zeus_saved_pose_replay_<MMDD>/calib_train \
-  --intrinsics-dir intrinsics_1280x720
+  --session-root zeus_gello_calibration/data/session<NN>_zeus_saved_pose_replay_1920_<MMDD>/calib_train \
+  --intrinsics-dir intrinsics_1920x1080_rgbd720
 ```
 
 04는 가변 event 수를 `capture_config.expected_event_count`에서 읽고 P1의 gripped cube
