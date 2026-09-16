@@ -2,7 +2,7 @@
 연결된 모든 RealSense 카메라의 factory intrinsics를 저장한다.
  - Saves per-camera npz (K, D, depth_scale, etc.)
  - Saves device_map.json with serial -> cam_idx mapping
- * 그리퍼 카메라 사용시 : User must label which cam_idx is the gripper camera
+ * 그리퍼 카메라는 여기서 지정하지 않는다. 기존 device_map.json의 gripper 값은 그대로 유지한다.
 
 명령어:
 python3 01_export_intrinsics.py \
@@ -11,8 +11,7 @@ python3 01_export_intrinsics.py \
 --color_h 1080 \
 --depth_w 1280 \
 --depth_h 720 \
---fps 15 \
---gripper_serial 752112070297
+--fps 15
 
 결과물:
   intrinsics/
@@ -45,8 +44,6 @@ def main():
     parser.add_argument("--depth_w", type=int, default=None)
     parser.add_argument("--depth_h", type=int, default=None)
     parser.add_argument("--fps", type=int, default=15)
-    parser.add_argument("--gripper_serial", type=str, default=None,
-                        help="Serial number of the gripper camera (optional, for labeling)")
     args = parser.parse_args()
     if (args.depth_w is None) != (args.depth_h is None):
         parser.error("--depth_w and --depth_h must be supplied together")
@@ -88,12 +85,6 @@ def main():
     for x in detected:
         print(f"  serial={x['serial']}  name={x['name']}")
 
-    if args.gripper_serial and args.gripper_serial not in detected_serials:
-        raise SystemExit(
-            f"[ERROR] Gripper serial {args.gripper_serial} is not connected. "
-            "Check rs-enumerate-devices -s and the physical gripper camera before exporting."
-        )
-
     # ****** device map 생성/업데이트 (serial -> cam_idx)
     existing_map = None
     if os.path.exists(map_path):
@@ -113,12 +104,10 @@ def main():
         serial_to_idx = {s: i for i, s in enumerate(detected_serials_sorted)}
         print("[INFO] Created new device_map.json (sorted by serial)")
 
-    # ****** 그리퍼카메라 인덱스 설정 (사용자 입력 또는 기존 맵에서 유지)
-    gripper_serial = args.gripper_serial
+    # ****** 그리퍼카메라 인덱스: 지정하지 않고 기존 맵의 값만 유지
+    gripper_serial = None
     gripper_cam_idx = None
-    if gripper_serial and gripper_serial in serial_to_idx:
-        gripper_cam_idx = serial_to_idx[gripper_serial]
-    elif existing_map is not None:
+    if existing_map is not None:
         gripper_cam_idx = existing_map.get("gripper_cam_idx")
         gripper_serial = existing_map.get("gripper_serial")
     if gripper_cam_idx is not None:
@@ -137,7 +126,13 @@ def main():
     print(f"[SAVE] {map_path}")
 
     # ****** 각 장치의 intrinsics 읽어서 저장
-    depth_scales = {"updated_at_epoch": time.time(), "serial_to_depth_scale_m_per_unit": {}}
+    # 이번에 연결되지 않은 카메라의 기존 depth scale은 유지한다 (카메라를 나눠 연결하는 경우).
+    previous_scales = {}
+    if os.path.exists(scales_path):
+        with open(scales_path, "r") as f:
+            previous_scales = json.load(f).get("serial_to_depth_scale_m_per_unit", {})
+    depth_scales = {"updated_at_epoch": time.time(),
+                    "serial_to_depth_scale_m_per_unit": dict(previous_scales)}
     idx_serial_pairs = sorted([(serial_to_idx[s], s) for s in detected_serials], key=lambda x: x[0])
 
     print(

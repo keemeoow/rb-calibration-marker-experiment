@@ -107,8 +107,7 @@ python3 01_export_intrinsics.py \
   --out_dir intrinsics_1920x1080_rgbd720 \
   --color_w 1920 --color_h 1080 \
   --depth_w 1280 --depth_h 720 \
-  --fps 15 \
-  --gripper_serial 136622073980
+  --fps 15
 
 python3 02_calibrate_intrinsics.py \
   --intr_dir intrinsics_1920x1080_rgbd720 \
@@ -158,8 +157,34 @@ python3 02_calibrate_intrinsics.py \
 
 보정 결과는 기존처럼 `cam*.npz`의 `color_K/color_D`에 저장하며 최초 값은
 `factory_backup/`에 보관한다. `charuco_intrinsics_report.json`에는 지정한 보드,
-이미지별 검출 결과/제외 이유, 사용 장수, RMS를 기록한다. 후처리에서 시리얼과
+이미지별 검출 결과/제외 이유, 사용 장수, RMS를 기록한다. 기본 후처리는 시리얼과
 해상도가 다른 이미지를 혼합하거나 이미지 크기를 자동 변환하지 않는다.
+
+#### 두 해상도를 모두 찍었다면: 합쳐서 보정 (권장)
+
+1280x720 color는 1920x1080을 정확히 1.5배 줄인 같은 화각이다 (공장 K도 정확히
+1.5배). 그런데 해상도별로 따로 보정하면 주점(cx, cy)이 사진 조합에 따라 ±8~16 px
+흔들려서, 두 결과가 1.5배 관계에서 최대 18 px(1280 기준) 어긋났다 (2026-09-16 촬영).
+두 폴더 사진을 합쳐 한 번에 보정하면 두 폴더의 K가 정확히 1.5배, D가 동일하게
+기록되고, 주점 불확실 범위가 ±2~3 px로 줄어든다. 사진별 재투영 오차는 따로 보정한
+것과 차이가 0.02 px 이하다.
+
+```bash
+python3 02_calibrate_intrinsics.py \
+  --intr_dir intrinsics_1280x720 \
+  --joint_intr_dir intrinsics_1920x1080_rgbd720 \
+  --from_images --use_factory_guess --zero_tangent \
+  --board 9x6_id90
+```
+
+- 카메라는 시리얼로 짝짓는다 (두 폴더의 `cam` 번호가 달라도 된다).
+- 두 폴더의 공장 K가 해상도 비율로 정확히 비례하지 않으면 (크롭 스트림 등) 그 카메라는
+  `joint_unavailable`로 건너뛰고 두 폴더 모두 기존 값을 유지한다.
+- `cam*.npz`와 `charuco_intrinsics_report.json`을 **두 폴더 모두** 새로 쓴다. RMS는
+  폴더마다 자기 해상도 픽셀 기준이고, `joint` 항목에 상대 폴더와 합친 RMS를 남긴다.
+- `--zero_tangent`는 접선 왜곡 p1, p2를 0으로 고정한다. p1/p2는 주점과 서로 보상하며
+  함께 흔들리는데, 이 렌즈들에서는 고정해도 검증 오차가 같거나 약간 낮았다.
+- `--min_views`는 두 폴더를 합친 장수에 적용한다.
 
 legacy 배치는 보드 정의 JSON의 `legacy_pattern`이 정한다. `--squares_x`,
 `--legacy_pattern`/`--no-legacy_pattern` 등 개별 옵션은 보드 정의 위에 덮어쓰는
@@ -179,9 +204,9 @@ legacy 여부를 바꾼 배치의 코너 수를 함께 보여주므로, 정의�
 촬영 시작 전에 오류로 중단한다. `gripper_cam_idx`가 비어 있으면 모두 FIXED로
 표시되며 원본 촬영/intrinsic 보정은 가능하지만 `03` 전에 역할을 지정해야 한다.
 
-`rs-enumerate-devices -s`에서 실제 카메라 4대와 그리퍼 시리얼을 먼저 확인한다.
-예시의 그리퍼 시리얼이 현재 장치와 다르면 `--gripper_serial`을 실제 시리얼로
-바꾼다. 장치 시리얼이 바뀌었으면 빈 새 폴더에 `01`을 실행해 새 맵을 만들고,
+`rs-enumerate-devices -s`에서 실제 카메라 시리얼을 먼저 확인한다. `01`은 그리퍼
+카메라를 지정하지 않으며, 기존 `device_map.json`의 `gripper_cam_idx`/`gripper_serial`
+값만 그대로 유지한다. 장치 시리얼이 바뀌었으면 빈 새 폴더에 `01`을 실행해 새 맵을 만들고,
 실물 카메라와 `cam_idx`의 관계를 확인한다. 이전 `device_map.json`을 복사하면
 `01`이 새 시리얼을 자동 추가해 `cam4` 이상이 생성될 수 있다.
 

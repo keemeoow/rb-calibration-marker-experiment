@@ -1,8 +1,13 @@
 {
-  "calibrated_at": "2026-09-16 21:54:03",
+  "calibrated_at": "2026-09-16 23:20:09",
   "mode": "from_images",
   "opencv": "4.13.0",
   "dist_model": "brown_conrady5",
+  "calib_flags": {
+    "use_factory_guess": true,
+    "fix_aspect": false,
+    "zero_tangent": false
+  },
   "board": {
     "squares_x": 9,
     "squares_y": 6,
@@ -536,6 +541,381 @@
         },
         {
           "file": "cam2/view_1789563217272890465.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        }
+      ]
+    },
+    "3": {
+      "serial": "039422061216",
+      "is_gripper": false,
+      "status": "written",
+      "rms_px": 0.4719950849698602,
+      "num_views_used": 21,
+      "num_views_total": 25,
+      "num_dropped": 4,
+      "K": [
+        [
+          914.211409900428,
+          0.0,
+          651.6142841175133
+        ],
+        [
+          0.0,
+          916.8143719529352,
+          366.6844563207385
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "D": [
+        0.1753985996424456,
+        -0.5825541174938557,
+        -0.00011532598466059538,
+        -0.000253962712458829,
+        0.599401740039915
+      ],
+      "factory_K": [
+        [
+          915.5872802734375,
+          0.0,
+          650.846923828125
+        ],
+        [
+          0.0,
+          913.1966552734375,
+          366.21295166015625
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "factory_D": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "num_images": 25,
+      "image_observations": [
+        {
+          "file": "cam3/view_1789568101169629182.png",
+          "charuco_corners": 39,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568103314209607.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568108848058038.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568111954493671.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568114318929040.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568118798330120.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568121049380768.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568123376449599.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568125584483365.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568130137782141.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568132135439725.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568134674393904.png",
+          "charuco_corners": 39,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568137694122584.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568139863257975.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568141205995452.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568142883892468.png",
+          "charuco_corners": 34,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568144784501720.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568149809427930.png",
+          "charuco_corners": 39,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568158259459922.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568161103626415.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568167256988423.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568170546195237.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568181219022218.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568183695538925.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam3/view_1789568186178316259.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        }
+      ]
+    },
+    "4": {
+      "serial": "752112070297",
+      "is_gripper": false,
+      "status": "written",
+      "rms_px": 0.3995383051403015,
+      "num_views_used": 23,
+      "num_views_total": 26,
+      "num_dropped": 3,
+      "K": [
+        [
+          922.5094004453484,
+          0.0,
+          650.181560888032
+        ],
+        [
+          0.0,
+          923.8767819775159,
+          351.9844427714905
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "D": [
+        0.15536857314213687,
+        -0.4955759182353534,
+        -0.0013852776444589763,
+        0.0005549323493783525,
+        0.4903092496847818
+      ],
+      "factory_K": [
+        [
+          922.5552368164062,
+          0.0,
+          649.5128784179688
+        ],
+        [
+          0.0,
+          922.7881469726562,
+          355.9135437011719
+        ],
+        [
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "factory_D": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "num_images": 26,
+      "image_observations": [
+        {
+          "file": "cam4/view_1789568296440873517.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568302453248520.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568307602318025.png",
+          "charuco_corners": 39,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568311252552013.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568313485018330.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568322172858809.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568324151902439.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568326441239345.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568329131359415.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568338672084753.png",
+          "charuco_corners": 38,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568342752829659.png",
+          "charuco_corners": 37,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568344932358441.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568347592614837.png",
+          "charuco_corners": 39,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568350997250471.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568353991361701.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568355861937099.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568357846396679.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568360539817758.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568362523562561.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568364001522787.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568371414349882.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568375205432755.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568378121292301.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568380120402807.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568383801371718.png",
+          "charuco_corners": 40,
+          "status": "detected"
+        },
+        {
+          "file": "cam4/view_1789568390282235406.png",
           "charuco_corners": 40,
           "status": "detected"
         }

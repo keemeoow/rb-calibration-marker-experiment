@@ -147,6 +147,22 @@ def _projected_boards(K, count=14):
         yield cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
 
 
+def test_raw_manifest_accepts_newly_added_cameras(tmp_path):
+    images = IntrinsicsImages(tmp_path, {"A": 0}, create=True)
+    images.check_camera(0, "A", 64, 48, 15, create=True)
+    images.capture(0, np.zeros((48, 64, 3), dtype=np.uint8))
+    extended = IntrinsicsImages(tmp_path, {"A": 0, "C": 1}, create=True)
+    extended.check_camera(1, "C", 64, 48, 15, create=True)
+    assert extended.count(0) == 1
+    assert IntrinsicsImages(tmp_path, {"A": 0, "C": 1}).manifest["serial_to_idx"] == {"A": 0, "C": 1}
+    with pytest.raises(ValueError, match="mapping"):
+        IntrinsicsImages(tmp_path, {"A": 1, "C": 0})
+    with pytest.raises(ValueError, match="mapping"):
+        IntrinsicsImages(tmp_path, {"C": 1})
+    with pytest.raises(ValueError, match="mapping"):
+        IntrinsicsImages(tmp_path, {"A": 0, "C": 1, "D": 1})
+
+
 def test_offline_corrects_definition_without_recapture_or_camera_access(tmp_path, monkeypatch):
     mapping = {"camera-A": 0}
     K = _intrinsics(tmp_path, mapping)

@@ -14,8 +14,17 @@ class IntrinsicsImages:
         mapping = {str(s): int(i) for s, i in serial_to_idx.items()}
         if self.manifest_path.exists():
             self.manifest = json.loads(self.manifest_path.read_text(encoding="utf-8"))
-            if self.manifest.get("version") != 1 or self.manifest.get("serial_to_idx") != mapping:
+            saved = self.manifest.get("serial_to_idx") or {}
+            # 새로 연결된 카메라가 device_map에 추가된 경우만 허용: 기존 serial->idx는 그대로여야 한다.
+            if (self.manifest.get("version") != 1
+                    or any(mapping.get(s) != i for s, i in saved.items())
+                    or len(set(mapping.values())) != len(mapping)):
                 raise ValueError("Raw image camera mapping does not match --intr_dir")
+            added = {s: i for s, i in mapping.items() if s not in saved}
+            if added:
+                self.manifest["serial_to_idx"] = {**saved, **added}
+                if create:
+                    self._save()
         elif create:
             if self.directory.exists() and any(self.directory.iterdir()):
                 raise ValueError("Nonempty --images_dir has no capture_manifest.json")
