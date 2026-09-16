@@ -1,0 +1,27 @@
+{
+  "captured_at": "2026-09-16 21:40:57",
+  "mode": "capture_only",
+  "opencv": "4.13.0",
+  "dist_model": null,
+  "board": null,
+  "board_source": null,
+  "board_topology": null,
+  "cameras": {
+    "0": {
+      "serial": "136622073980",
+      "status": "done",
+      "num_images": 20
+    },
+    "1": {
+      "serial": "319522062138",
+      "status": "done",
+      "num_images": 26
+    },
+    "2": {
+      "serial": "912322060991",
+      "status": "done",
+      "num_images": 21
+    }
+  },
+  "images_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1280x720/raw_capture"
+}

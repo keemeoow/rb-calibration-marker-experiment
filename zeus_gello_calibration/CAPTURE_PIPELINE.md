@@ -118,30 +118,38 @@ python3 02_calibrate_intrinsics.py \
 ### 3.2. 보드 정의 확인 후 저장 이미지로 보정
 
 `--from_images`는 RealSense 연결이나 미리보기 창 없이 저장한 이미지로 보정한다.
-보드 정의를 바꿔 재실행할 수 있다. 아래는 현재 보드 후보의 예시이므로 실제
-원본 패턴의 칸 수, dictionary, 시작 ID를 확인한 값으로 지정한다.
+보드 정의를 바꿔 재실행할 수 있다.
 
-보드의 공통 기본 정의는 `calibration_pipeline/config.py`의
-`CharucoBoardConfig`에 있다 (11x7, 25/18 mm, `DICT_4X4_250`, 시작 ID 5).
-아래 6x9 / 시작 ID 90 정의는 공통 기본값을 바꾸지 않고, 이 intrinsic 후처리
-명령의 옵션으로만 덮어쓴다. `--capture_only`에서는 어느 정의도 검출에 사용하지
-않으며, 촬영 전에 보드 정의를 확정하거나 수정할 필요가 없다.
+물리 보드는 [`targets/charuco_boards/`](../targets/charuco_boards/)에 보드마다 JSON
+한 개로 정의하고 `--board <이름>`으로 고른다. 칸 수·크기·dictionary·시작 ID·
+legacy 배치를 명령줄에 매번 옮겨 적지 않는다. 등록된 보드는
+`python3 02_calibrate_intrinsics.py --list_boards`로 확인한다. `--board`를 생략하면
+`calibration_pipeline/config.py`의 `CharucoBoardConfig` 기본 보드(11x7, 시작 ID 5)를
+쓴다. `--capture_only`에서는 보드 정의를 아예 읽지 않으므로 촬영 전에 보드를
+확정할 필요가 없다.
 
-| 항목 | 후처리 보드 옵션 |
+이 intrinsic 촬영에 쓴 보드는 `9x6_id90`이다.
+
+| 항목 | `--board 9x6_id90` |
 | --- | --- |
-| 체커 칸 수 | 가로 6 x 세로 9 (내부 코너 수가 아닌 칸 수) |
+| 체커 칸 수 | **가로 9 x 세로 6** (OpenCV `squares_x`x`squares_y`, 내부 코너 수가 아닌 칸 수) |
 | 체커 한 칸 / 마커 한 변 | 25 mm / 18 mm |
 | Dictionary | `DICT_4X4_250` |
 | 시작 마커 ID | 90 (27개 마커: ID 90~116) |
-| 패턴 크기 / 내부 코너 수 | 여백 제외 150 x 225 mm / 40개 |
+| 배치 | **legacy** (OpenCV 4.6 이전, 좌상단 칸이 검정) |
+| 패턴 크기 / 내부 코너 수 | 여백 제외 225 x 150 mm / 40개 |
+
+> **인쇄물 캡션의 `6x9`를 그대로 옮기면 안 된다.** 캡션은 행x열 표기이고 OpenCV는
+> 열x행이다. 또 세로 칸 수가 짝수라 legacy 여부로 코너 배치가 갈린다. 둘 중 하나만
+> 틀려도 마커는 27/27 전부 검출되는데 ChArUco 코너가 0개로 나와 모든 프레임이
+> 거부된다 (2026-09-15 1280x720 촬영에서 실제로 발생). 새 보드를 등록할 때는
+> 사진에서 가로/세로 칸을 직접 세고 좌상단 칸 색을 확인한다.
 
 ```bash
 python3 02_calibrate_intrinsics.py \
   --intr_dir intrinsics_1280x720 \
   --from_images --min_views 12 --use_factory_guess \
-  --squares_x 6 --squares_y 9 \
-  --square_len_m 0.025 --marker_len_m 0.018 \
-  --dictionary DICT_4X4_250 --marker_id_start 90
+  --board 9x6_id90
 ```
 
 1920도 `--intr_dir`를 `intrinsics_1920x1080_rgbd720`으로 바꿔 같은 보드 옵션으로
@@ -153,9 +161,16 @@ python3 02_calibrate_intrinsics.py \
 이미지별 검출 결과/제외 이유, 사용 장수, RMS를 기록한다. 후처리에서 시리얼과
 해상도가 다른 이미지를 혼합하거나 이미지 크기를 자동 변환하지 않는다.
 
-구형 짝수 행 보드는 `--legacy_pattern`을 추가한다. 실시간 검출/보정이 필요한
-경우 두 모드 옵션을 모두 생략하면 기존 방식으로 실행되며, 그 모드에서 거부된
-프레임은 `charuco_capture/camN/diagnostics/`에 원본과 `[DIAG]` 정보를 저장한다.
+legacy 배치는 보드 정의 JSON의 `legacy_pattern`이 정한다. `--squares_x`,
+`--legacy_pattern`/`--no-legacy_pattern` 등 개별 옵션은 보드 정의 위에 덮어쓰는
+일회성 실험용이며, 덮어쓴 값은 리포트의 `board_source`에 `+override(...)`로 남는다.
+실제 보드가 바뀌었다면 옵션 대신 JSON을 새로 만든다.
+
+실시간 검출/보정이 필요한 경우 두 모드 옵션을 모두 생략하면 기존 방식으로
+실행되며, 그 모드에서 거부된 프레임은 `charuco_capture/camN/diagnostics/`에 원본과
+`[DIAG]` 정보를 저장한다. `[DIAG] layout ...` 줄은 가로/세로를 뒤집은 배치와
+legacy 여부를 바꾼 배치의 코너 수를 함께 보여주므로, 정의가 틀렸을 때 어느 쪽이
+맞는지 바로 드러난다.
 
 ### 3.3. 카메라 확인
 
@@ -262,6 +277,10 @@ python3 03_capture.py \
   --p2-move-speed 10 \
   --p2-descend-speed 5
 ```
+
+장면의 ChArUco 보드가 기본 보드(`11x7_id5`)가 아니면 `--board <이름>`을 추가한다.
+촬영 중에는 보드를 검출하지 않지만 `meta.json`의 `charuco_board_config`에 그대로
+기록되고, 04/05가 그 값으로 이미지를 해석한다. 시작 로그의 `[BOARD]` 줄로 확인한다.
 
 속도는 검증된 뒤에만 올린다. `overlap=0`이 기본이므로 각 pose에서 완전히 정지한 뒤
 촬영한다. 통합 촬영은 한 USB controller의 여러 카메라를 동시에 reset하지 않도록

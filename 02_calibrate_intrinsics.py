@@ -37,8 +37,9 @@ OpenCV가 돌려주는 RMS는 위 합을 corner 수로 나눈 뒤 제곱근을 �
 
 입력 / 처리 / 출력
 ------------------
-입력: 01단계의 intrinsics/, 연결된 카메라, config.py의 CharucoBoardConfig
-      (기본 11x7, square 25mm, marker 18mm, DICT_4X4_250).
+입력: 01단계의 intrinsics/, 연결된 카메라, --board 로 고른 보드 정의
+      (targets/charuco_boards/*.json, --list_boards 로 확인).
+      생략하면 config.py 의 CharucoBoardConfig 기본 보드(11x7, id 5..42).
 처리: 카메라를 하나씩 열어 뷰를 모으거나 저장 이미지를 읽고 cv2.calibrateCamera를 돌린다.
       --capture_only는 raw_capture/에 원본과 manifest만 저장하며 보정하지 않는다.
 출력: cam{idx}.npz의 color_K/color_D만 교체. 원본은 factory_backup/에 보관.

@@ -11,8 +11,8 @@ depth 관련 필드(depth_K, depth_scale, R_depth_to_color 등)와 해상도/시
 전제조건:
   - 먼저 01_export_intrinsics.py 를 실행해 device_map.json 과 cam{idx}.npz
     (depth 필드 포함)를 만들어 두어야 한다.
-  - config.py 의 CharucoBoardConfig 가 실제 인쇄된 보드와 일치해야 한다
-    (기본: 11x7, square 25mm, marker 18mm, DICT_4X4_250, marker_id_start=5).
+  - --board 로 고른 보드 정의(targets/charuco_boards/*.json)가 실제 인쇄된 보드와
+    일치해야 한다. 생략하면 config.py 의 CharucoBoardConfig 기본 보드를 쓴다.
 
 동작:
   1) device_map.json 로드 (serial -> cam_idx, gripper_cam_idx)
@@ -34,7 +34,8 @@ depth 관련 필드(depth_K, depth_scale, R_depth_to_color 등)와 해상도/시
   q     : 전체 중단 (이미 저장된 이미지와 이전 카메라 보정은 유지)
 
 명령어 예시:
-  python3 02_calibrate_intrinsics.py --intr_dir ./intrinsics
+  python3 02_calibrate_intrinsics.py --list_boards
+  python3 02_calibrate_intrinsics.py --intr_dir ./intrinsics --board 9x6_id90
 """
 
 import os
@@ -47,34 +48,50 @@ import numpy as np
 import cv2
 
 from calibration_pipeline.charuco import CharucoTarget
-from calibration_pipeline.config import CharucoBoardConfig
+from calibration_pipeline.board_config import (
+    charuco_board_dir, charuco_config_to_dict, charuco_topology,
+    describe_charuco_config, list_charuco_boards, resolve_charuco_config,
+)
 from capture_pipeline.intrinsics_images import (
     IntrinsicsImages, collect_raw_for_camera, load_image_views,
 )
 
 
-def _make_intrinsics_target(cfg, legacy_pattern=False):
-    target = CharucoTarget(cfg)
-    if legacy_pattern:
-        if not hasattr(target.board, "setLegacyPattern"):
-            raise RuntimeError("This OpenCV build does not support --legacy_pattern")
-        target.board.setLegacyPattern(True)
-        if target.charuco_detector is not None:
-            target.charuco_detector.setBoard(target.board)
-    return target
+def _make_intrinsics_target(cfg, legacy_pattern=None):
+    """Build the detector for ``cfg``.
+
+    ``legacy_pattern`` is an optional override kept for callers that probe
+    alternate layouts; normally the flag travels on the board definition
+    itself (targets/charuco_boards/*.json -> CharucoBoardConfig.legacy_pattern).
+    """
+    if legacy_pattern is not None:
+        cfg = replace(cfg, legacy_pattern=bool(legacy_pattern))
+    return CharucoTarget(cfg)
+
+
+def _print_board_catalog():
+    names = list_charuco_boards()
+    if not names:
+        print(f"[INFO] 등록된 보드 정의 없음: {charuco_board_dir()}")
+        return
+    print(f"[INFO] 보드 정의 디렉터리: {charuco_board_dir()}")
+    for name in names:
+        cfg, source = resolve_charuco_config(name)
+        print(f"  --board {name}")
+        print(f"      {describe_charuco_config(cfg)}")
+        print(f"      {source}")
 
 
 def _intrinsics_board_config(target):
-    cfg = target.cfg
-    return {
-        "squares_x": cfg.squares_x, "squares_y": cfg.squares_y,
-        "square_length_m": cfg.square_length_m,
-        "marker_length_m": cfg.marker_length_m,
-        "dictionary": cfg.dictionary_name,
-        "marker_id_start": cfg.marker_id_start,
-        "legacy_pattern": (bool(target.board.getLegacyPattern())
-                           if hasattr(target.board, "getLegacyPattern") else False),
-    }
+    """Board definition as stored in the report, read back off the built board
+    so a report can never disagree with what actually did the detecting."""
+    config = charuco_config_to_dict(target.cfg)
+    config["dictionary"] = config.pop("dictionary_name")
+    config["legacy_pattern"] = (
+        bool(target.board.getLegacyPattern())
+        if hasattr(target.board, "getLegacyPattern")
+        else bool(getattr(target.cfg, "legacy_pattern", False)))
+    return config
 
 
 def _diagnose_rejected_grab(color, target, n_corners, min_corners, cam_idx, save_dir):
@@ -123,10 +140,10 @@ def _diagnose_rejected_grab(color, target, n_corners, min_corners, cam_idx, save
                     or legacy != board_config["legacy_pattern"]
                 ):
                     flags = f"--squares_x {sx} --squares_y {sy}"
-                    if legacy:
-                        flags += " --legacy_pattern"
+                    flags += " --legacy_pattern" if legacy else " --no-legacy_pattern"
                     print(f"[DIAG] 검출 가능한 배치 후보: {flags}. "
-                          "원본 인쇄물과 일치하는지 확인 후 재실행하세요.")
+                          "원본 인쇄물과 일치하면 targets/charuco_boards/ 의 보드 정의 JSON 을 "
+                          "고치거나 새로 만든 뒤 --board 로 재실행하세요.")
 
     if save_dir:
         diagnostic_dir = os.path.join(save_dir, "diagnostics")
@@ -437,16 +454,27 @@ def main():
                         help="fx/fy 비율 고정 (CALIB_FIX_ASPECT_RATIO)")
     parser.add_argument("--use_factory_guess", action="store_true",
                         help="factory K를 초기 추정값으로 사용 (수렴 안정화)")
-    # 보드 설정 override (기본은 config.py CharucoBoardConfig)
+    # 어떤 보드를 썼는지는 targets/charuco_boards/*.json 이 단일 소스다.
+    parser.add_argument("--board", type=str, default=None,
+                        help="사용할 ChArUco 보드 정의. targets/charuco_boards/ 의 이름"
+                             f" ({', '.join(list_charuco_boards()) or '없음'}) 또는 JSON 경로."
+                             " 생략하면 config.py 기본 보드")
+    parser.add_argument("--list_boards", action="store_true",
+                        help="등록된 보드 정의를 출력하고 종료")
+    # 일회성 실험용 개별 override. 실제 보드가 바뀌었다면 JSON 을 새로 만들 것.
     parser.add_argument("--squares_x", type=int, default=None)
     parser.add_argument("--squares_y", type=int, default=None)
     parser.add_argument("--square_len_m", type=float, default=None)
     parser.add_argument("--marker_len_m", type=float, default=None)
     parser.add_argument("--dictionary", type=str, default=None)
     parser.add_argument("--marker_id_start", type=int, default=None)
-    parser.add_argument("--legacy_pattern", action="store_true",
-                        help="OpenCV 4.6 이전의 짝수 행 ChArUco 인쇄 배치 사용")
+    parser.add_argument("--legacy_pattern", action=argparse.BooleanOptionalAction,
+                        default=None,
+                        help="OpenCV 4.6 이전의 짝수 행 ChArUco 인쇄 배치 (기본: 보드 정의값)")
     args = parser.parse_args()
+    if args.list_boards:
+        _print_board_catalog()
+        return
     if args.capture_only and not args.save_images:
         parser.error("--capture_only requires image saving; remove --no-save_images")
     if args.images_dir and not (args.capture_only or args.from_images):
@@ -467,29 +495,31 @@ def main():
         print("[ERROR] device_map.json 에 serial_to_idx 가 비어있음.")
         return
 
-    # 보드 설정 구성
-    cfg = CharucoBoardConfig()
-    if args.squares_x is not None:
-        cfg.squares_x = args.squares_x
-    if args.squares_y is not None:
-        cfg.squares_y = args.squares_y
-    if args.square_len_m is not None:
-        cfg.square_length_m = args.square_len_m
-    if args.marker_len_m is not None:
-        cfg.marker_length_m = args.marker_len_m
-    if args.dictionary is not None:
-        cfg.dictionary_name = args.dictionary
-    if args.marker_id_start is not None:
-        cfg.marker_id_start = args.marker_id_start
-    target = None
+    # 보드 설정 구성: 정의 파일 -> 개별 override. RAW 촬영은 보드와 무관해야 하므로
+    # 보드 인자를 아예 해석하지 않는다 (잘못된 보드 정의로 촬영이 막히면 안 됨).
+    cfg = board_source = target = None
     if args.capture_only:
         print("[INFO] RAW capture only: 보드 검출과 최소 코너/장수 조건 없이 원본만 저장합니다.")
     else:
-        target = _make_intrinsics_target(cfg, legacy_pattern=args.legacy_pattern)
-        print(f"[INFO] ChArUco board: {cfg.squares_x}x{cfg.squares_y}  "
-              f"square={cfg.square_length_m*1000:.0f}mm marker={cfg.marker_length_m*1000:.0f}mm  "
-              f"dict={cfg.dictionary_name} id_start={cfg.marker_id_start} "
-              f"legacy={args.legacy_pattern}")
+        try:
+            cfg, board_source = resolve_charuco_config(args.board, {
+                "squares_x": args.squares_x,
+                "squares_y": args.squares_y,
+                "square_length_m": args.square_len_m,
+                "marker_length_m": args.marker_len_m,
+                "dictionary_name": args.dictionary,
+                "marker_id_start": args.marker_id_start,
+                "legacy_pattern": args.legacy_pattern,
+            })
+        except (FileNotFoundError, ValueError) as error:
+            print(f"[ERROR] {error}")
+            return
+        print(f"[INFO] ChArUco board source: {board_source}")
+        print(f"[INFO] ChArUco board: {describe_charuco_config(cfg)}")
+        if charuco_topology(cfg)["legacy_pattern_matters"]:
+            print("[INFO] squares_y 가 짝수라 legacy 여부로 결과가 갈립니다. 인쇄물 좌상단 칸이 "
+                  "검정이면 legacy_pattern=true 입니다.")
+        target = _make_intrinsics_target(cfg)
 
     # 보정 flags
     flags = 0
@@ -553,6 +583,8 @@ def main():
         "opencv": cv2.__version__,
         "dist_model": None if args.capture_only else "rational8" if args.rational else "brown_conrady5",
         "board": None if args.capture_only else _intrinsics_board_config(target),
+        "board_source": board_source,
+        "board_topology": None if cfg is None else charuco_topology(cfg),
         "cameras": {},
     }
     if images is not None:

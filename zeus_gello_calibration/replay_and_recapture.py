@@ -64,12 +64,11 @@ from robot.backends.zeus_client import ZeusClient  # noqa: E402
 from capture_pipeline.robot import euler_deg_to_matrix  # noqa: E402
 from capture_pipeline.session import allocate_next_capture_session  # noqa: E402
 from capture_pipeline.waypoint_safety import PROTOCOL_SAVED_POSE_REPLAY  # noqa: E402
-from calibration_pipeline.board_config import charuco_config_to_dict  # noqa: E402
-from calibration_pipeline.config import (  # noqa: E402
-    get_default_charuco_board_config,
-    get_default_charuco_board_config_source,
-    get_default_cube_config,
+from calibration_pipeline.board_config import (  # noqa: E402
+    charuco_config_to_dict, describe_charuco_config, list_charuco_boards,
+    resolve_charuco_config,
 )
+from calibration_pipeline.config import get_default_cube_config  # noqa: E402
 from calibration_pipeline.cube_config import cube_config_to_dict  # noqa: E402
 
 from zeus_gello_calibration.capture_session import (  # noqa: E402
@@ -276,9 +275,13 @@ def _camera_mapping(device_map_path: Path, labels: dict) -> tuple[dict, int]:
 
 def _initial_combined_meta(capture_root: Path, events: list[dict],
                            label_to_idx: dict, gripper_cam_idx: int,
-                           source_dirs: dict, camera_stream: dict) -> dict:
+                           source_dirs: dict, camera_stream: dict,
+                           board: str | None = None) -> dict:
     cube_config = cube_config_to_dict(get_default_cube_config())
-    board_config = charuco_config_to_dict(get_default_charuco_board_config())
+    # 촬영 중 검출은 하지 않지만 후단(04/05)이 이 값으로 이미지를 해석하므로
+    # 실제로 찍은 보드를 기록해야 한다.
+    board_cfg, board_source = resolve_charuco_config(board)
+    board_config = charuco_config_to_dict(board_cfg)
     return {
         "root_folder": str(capture_root.resolve()),
         "capture_protocol": COMBINED_REPLAY_PROTOCOL,
@@ -288,7 +291,7 @@ def _initial_combined_meta(capture_root: Path, events: list[dict],
         "n_fixed_cams": max(0, len(label_to_idx) - 1),
         "cube_config_source": "code_default:get_default_cube_config",
         "cube_config": cube_config,
-        "charuco_board_config_source": get_default_charuco_board_config_source(),
+        "charuco_board_config_source": board_source,
         "charuco_board_config": board_config,
         "capture_config": {
             "schema_version": "saved_pose_replay_capture_config_v1",
@@ -561,6 +564,7 @@ def run_combined_replay(rb, cams, labels, view, data_root: Path,
                 ),
                 "fps": int(args.fps),
             },
+            board=getattr(args, "board", None),
         )
         _write_combined_progress(capture_root, meta, events, "in_progress")
         _update_allocated_session_manifest(
@@ -755,6 +759,10 @@ def main():
     ap.add_argument("--depth-width", type=int, default=None, help="RealSense depth width")
     ap.add_argument("--depth-height", type=int, default=None, help="RealSense depth height")
     ap.add_argument("--fps", type=int, default=CAM_FPS, help="RealSense stream FPS")
+    ap.add_argument("--board", default=None,
+                    help="장면에 둔 ChArUco 보드 정의. targets/charuco_boards/ 의 이름"
+                         f" ({', '.join(list_charuco_boards()) or '없음'}) 또는 JSON 경로."
+                         " 생략하면 config.py 기본 보드. meta.json 에 그대로 기록된다")
     ap.add_argument("--p2-approach-mm", type=float, default=P2_APPROACH_MM_DEFAULT)
     ap.add_argument("--p2-move-speed", type=float, default=P2_MOVE_SPEED_DEFAULT)
     ap.add_argument("--p2-descend-speed", type=float, default=P2_DESCEND_SPEED_DEFAULT)
@@ -783,6 +791,11 @@ def main():
                          "값 6개를 직접 주거나(J1..J6), 값 없이 --regrasp-joints만 주면 "
                          "REGRASP_JOINTS_DEFAULT[세션번호]를 씀")
     args = ap.parse_args()
+    try:
+        board_cfg, board_source = resolve_charuco_config(args.board)
+    except (FileNotFoundError, ValueError) as error:
+        ap.error(str(error))
+    print(f"[BOARD] {board_source}: {describe_charuco_config(board_cfg)}")
 
     if args.session == 2 and args.execute:
         ap.error(
