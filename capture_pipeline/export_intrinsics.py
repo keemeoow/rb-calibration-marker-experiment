@@ -88,6 +88,12 @@ def main():
     for x in detected:
         print(f"  serial={x['serial']}  name={x['name']}")
 
+    if args.gripper_serial and args.gripper_serial not in detected_serials:
+        raise SystemExit(
+            f"[ERROR] Gripper serial {args.gripper_serial} is not connected. "
+            "Check rs-enumerate-devices -s and the physical gripper camera before exporting."
+        )
+
     # ****** device map 생성/업데이트 (serial -> cam_idx)
     existing_map = None
     if os.path.exists(map_path):

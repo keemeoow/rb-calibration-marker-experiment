@@ -22,12 +22,16 @@ depth 관련 필드(depth_K, depth_scale, R_depth_to_color 등)와 해상도/시
   4) intrinsics/cam{idx}.npz 의 color_K/color_D 교체 (factory 값은 백업 보존)
   5) intrinsics/charuco_intrinsics_report.json 리포트 저장
 
+--capture_only: 보드 검출 없이 SPACE마다 raw_capture/에 원본 PNG와 카메라 정보를 저장.
+--from_images: 카메라 없이 raw_capture/를 읽고 현재 지정한 보드 정의로 보정.
+--images_dir: 다른 이미지 수집 폴더를 선택 (기본: intr_dir/raw_capture).
+
 키 조작 (카메라별 수집 중):
   SPACE : 현재 프레임 그랩
   u     : 마지막 그랩 취소(undo)
   c/Enter: 이 카메라 수집 종료 -> 다음 카메라 촬영
   s     : 이 카메라 건너뛰기 (factory 값 유지)
-  q     : 전체 중단 (아무것도 쓰지 않음)
+  q     : 전체 중단 (이미 저장된 이미지와 이전 카메라 보정은 유지)
 
 명령어 예시:
   python3 02_calibrate_intrinsics.py --intr_dir ./intrinsics
@@ -37,12 +41,105 @@ import os
 import json
 import time
 import argparse
+from dataclasses import replace
 
 import numpy as np
 import cv2
 
 from calibration_pipeline.charuco import CharucoTarget
 from calibration_pipeline.config import CharucoBoardConfig
+from capture_pipeline.intrinsics_images import (
+    IntrinsicsImages, collect_raw_for_camera, load_image_views,
+)
+
+
+def _make_intrinsics_target(cfg, legacy_pattern=False):
+    target = CharucoTarget(cfg)
+    if legacy_pattern:
+        if not hasattr(target.board, "setLegacyPattern"):
+            raise RuntimeError("This OpenCV build does not support --legacy_pattern")
+        target.board.setLegacyPattern(True)
+        if target.charuco_detector is not None:
+            target.charuco_detector.setBoard(target.board)
+    return target
+
+
+def _intrinsics_board_config(target):
+    cfg = target.cfg
+    return {
+        "squares_x": cfg.squares_x, "squares_y": cfg.squares_y,
+        "square_length_m": cfg.square_length_m,
+        "marker_length_m": cfg.marker_length_m,
+        "dictionary": cfg.dictionary_name,
+        "marker_id_start": cfg.marker_id_start,
+        "legacy_pattern": (bool(target.board.getLegacyPattern())
+                           if hasattr(target.board, "getLegacyPattern") else False),
+    }
+
+
+def _diagnose_rejected_grab(color, target, n_corners, min_corners, cam_idx, save_dir):
+    gray = cv2.cvtColor(color, cv2.COLOR_BGR2GRAY)
+    if target.detector is not None:
+        _, raw_ids, rejected = target.detector.detectMarkers(gray)
+    else:
+        _, raw_ids, rejected = cv2.aruco.detectMarkers(
+            gray, target.dictionary, parameters=target.det_params)
+    raw_ids = [] if raw_ids is None else sorted(int(i) for i in raw_ids.reshape(-1))
+    matched_ids = sorted(set(raw_ids) & target.board_id_set)
+    board_config = _intrinsics_board_config(target)
+    diagnostic = {
+        "opencv": cv2.__version__, "cam_idx": int(cam_idx),
+        "board": board_config, "charuco_corners": int(n_corners),
+        "raw_marker_ids": raw_ids, "matching_marker_ids": matched_ids,
+        "rejected_marker_candidates": len(rejected), "layout_candidates": [],
+    }
+    print(f"[DIAG] raw ArUco IDs={raw_ids}; matching board IDs={matched_ids}; "
+          f"expected IDs={int(target.board_ids[0])}..{int(target.board_ids[-1])}")
+    if not raw_ids:
+        print("[DIAG] 이 dictionary로 디코딩된 마커가 없습니다. 원본 진단 이미지에서 "
+              "마커 종류, 크기, 선명도, 반사를 확인하세요.")
+    elif not matched_ids:
+        print("[DIAG] 검출 ID가 설정된 보드 범위 밖입니다. dictionary와 시작 ID를 확인하세요.")
+
+    # Probe alternate layouts only on a rejected keypress; never change the capture target.
+    if len(matched_ids) >= 2:
+        cfg = target.cfg
+        sizes = dict.fromkeys([(cfg.squares_x, cfg.squares_y), (cfg.squares_y, cfg.squares_x)])
+        for sx, sy in sizes:
+            legacy_options = [False, True] if sy % 2 == 0 else [False]
+            for legacy in legacy_options:
+                candidate = {"squares_x": sx, "squares_y": sy, "legacy_pattern": legacy}
+                try:
+                    probe = _make_intrinsics_target(
+                        replace(cfg, squares_x=sx, squares_y=sy), legacy_pattern=legacy)
+                    candidate["charuco_corners"] = int(probe.detect(color)[2])
+                except (cv2.error, RuntimeError, ValueError) as error:
+                    candidate.update(charuco_corners=0, error=str(error))
+                diagnostic["layout_candidates"].append(candidate)
+                print(f"[DIAG] layout {sx}x{sy}, legacy={legacy}: "
+                      f"charuco corners={candidate['charuco_corners']}")
+                if candidate["charuco_corners"] >= min_corners and (
+                    sx != cfg.squares_x or sy != cfg.squares_y
+                    or legacy != board_config["legacy_pattern"]
+                ):
+                    flags = f"--squares_x {sx} --squares_y {sy}"
+                    if legacy:
+                        flags += " --legacy_pattern"
+                    print(f"[DIAG] 검출 가능한 배치 후보: {flags}. "
+                          "원본 인쇄물과 일치하는지 확인 후 재실행하세요.")
+
+    if save_dir:
+        diagnostic_dir = os.path.join(save_dir, "diagnostics")
+        os.makedirs(diagnostic_dir, exist_ok=True)
+        stem = os.path.join(diagnostic_dir, f"rejected_{time.time_ns()}")
+        if not cv2.imwrite(stem + ".png", color):
+            raise OSError(f"Could not write {stem}.png")
+        with open(stem + ".json", "w", encoding="utf-8") as stream:
+            json.dump(diagnostic, stream, indent=2)
+        print(f"[DIAG] 원본 이미지: {os.path.abspath(stem + '.png')}")
+        print(f"[DIAG] 검출 정보: {os.path.abspath(stem + '.json')}")
+    return diagnostic
+
 
 # ---------------------------------------------------------------------------
 # 보정 헬퍼
@@ -152,7 +249,7 @@ def calibrate_intrinsics(board, accepted, image_size, flags, K0=None, D0=None):
 # 라이브 수집 (카메라 1대)
 # ---------------------------------------------------------------------------
 def _draw_overlay(vis, coverage, n_accepted, sharp, blur_thr,
-                  n_corners, cov_cols, cov_rows):
+                  n_corners, cov_cols, cov_rows, n_markers=0):
     h, w = vis.shape[:2]
 
     # 커버리지 그리드
@@ -172,7 +269,8 @@ def _draw_overlay(vis, coverage, n_accepted, sharp, blur_thr,
     sharp_ok = sharp >= blur_thr
     lines = [
         f"cam views: {n_accepted}   coverage: {covered}/{total_cells} cells",
-        f"charuco corners: {n_corners}   sharp: {sharp:.0f} ({'OK' if sharp_ok else 'BLUR'})",
+        f"board markers: {n_markers}   charuco corners: {n_corners}   "
+        f"sharp: {sharp:.0f} ({'OK' if sharp_ok else 'BLUR'})",
         f"[SPACE]grab [u]undo [c]done [s]skip [q]quit",
     ]
     y = 22
@@ -228,7 +326,8 @@ def collect_for_camera(cam, target, cam_idx, is_gripper, args, save_dir):
         do_grab = False
 
         _draw_overlay(vis, coverage, len(accepted), sharp,
-                      args.blur_thresh, n_corners, args.cov_cols, args.cov_rows)
+                      args.blur_thresh, n_corners, args.cov_cols, args.cov_rows,
+                      n_markers=0 if m_id is None else len(m_id))
         cv2.imshow(win, vis)
 
         key = cv2.waitKey(1) & 0xFF
@@ -258,6 +357,11 @@ def collect_for_camera(cam, target, cam_idx, is_gripper, args, save_dir):
             else:
                 print(f"[cam{cam_idx}] 그랩 불가: charuco 코너 {n_corners} < "
                       f"{args.min_corners} (보드를 더 잘 보이게)")
+                try:
+                    _diagnose_rejected_grab(
+                        color, target, n_corners, args.min_corners, cam_idx, save_dir)
+                except (cv2.error, OSError, RuntimeError, ValueError) as error:
+                    print(f"[WARN] 그랩 실패 진단 저장 중 오류: {error}")
 
         if do_grab:
             accepted.append((ch_c, ch_id))
@@ -306,10 +410,17 @@ def overwrite_color_intrinsics(npz_path, backup_dir, K, D, result, serial):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="ChArUco 기반 color intrinsics 재캘리브레이션 (01 결과에 덮어쓰기)")
+        description="Intrinsic용 원본 RGB 촬영 및 저장 이미지/실시간 ChArUco 보정")
     parser.add_argument("--intr_dir", type=str, default="intrinsics")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--capture_only", action="store_true",
+                      help="보드 검출/보정 없이 SPACE마다 원본 RGB 저장")
+    mode.add_argument("--from_images", action="store_true",
+                      help="카메라 없이 저장된 원본 이미지로 보정")
+    parser.add_argument("--images_dir", type=str, default=None,
+                        help="원본 이미지 폴더 (기본: intr_dir/raw_capture)")
     parser.add_argument("--min_views", type=int, default=12,
-                        help="보정에 필요한 최소 수집 장수 (미만이면 건너뜀)")
+                        help="보정에 필요한 최소 검출 장수 (capture_only에서는 적용 안 함)")
     parser.add_argument("--min_corners", type=int, default=8,
                         help="한 프레임을 그랩하기 위한 최소 charuco 코너 수")
     parser.add_argument("--blur_thresh", type=float, default=60.0,
@@ -317,9 +428,9 @@ def main():
     parser.add_argument("--cov_cols", type=int, default=4)
     parser.add_argument("--cov_rows", type=int, default=3)
     parser.add_argument("--save_images", action=argparse.BooleanOptionalAction, default=True,
-                        help="수집 프레임을 intr_dir/charuco_capture/cam{idx}/ 에 저장")
-    parser.add_argument("--reset_devices", action=argparse.BooleanOptionalAction, default=True,
-                        help="시작 시 모든 RealSense 하드웨어 리셋")
+                        help="실시간 보정 프레임을 charuco_capture/에 저장 (capture_only는 항상 저장)")
+    parser.add_argument("--reset_devices", action=argparse.BooleanOptionalAction, default=False,
+                        help="시작 시 모든 RealSense 하드웨어 리셋 (기본: 리셋 안 함)")
     parser.add_argument("--rational", action="store_true",
                         help="8-계수 CALIB_RATIONAL_MODEL 사용 (기본: 5-계수 Brown-Conrady)")
     parser.add_argument("--fix_aspect", action="store_true",
@@ -333,19 +444,18 @@ def main():
     parser.add_argument("--marker_len_m", type=float, default=None)
     parser.add_argument("--dictionary", type=str, default=None)
     parser.add_argument("--marker_id_start", type=int, default=None)
+    parser.add_argument("--legacy_pattern", action="store_true",
+                        help="OpenCV 4.6 이전의 짝수 행 ChArUco 인쇄 배치 사용")
     args = parser.parse_args()
-
-    try:
-        from capture_pipeline.camera import RealSenseCamera
-    except ModuleNotFoundError as error:
-        if error.name == "pyrealsense2":
-            raise SystemExit(
-                "[ERROR] pyrealsense2가 없습니다. RealSense Python 환경에서 "
-                "02번을 실행하세요.") from error
-        raise
+    if args.capture_only and not args.save_images:
+        parser.error("--capture_only requires image saving; remove --no-save_images")
+    if args.images_dir and not (args.capture_only or args.from_images):
+        parser.error("--images_dir requires --capture_only or --from_images")
 
     intr_dir = args.intr_dir
     map_path = os.path.join(intr_dir, "device_map.json")
+    print(f"[INFO] Intrinsics directory: {os.path.abspath(intr_dir)}")
+    print(f"[INFO] Device map: {os.path.abspath(map_path)}")
     if not os.path.exists(map_path):
         print(f"[ERROR] {map_path} 없음. 먼저 01_export_intrinsics.py 를 실행하세요.")
         return
@@ -371,10 +481,15 @@ def main():
         cfg.dictionary_name = args.dictionary
     if args.marker_id_start is not None:
         cfg.marker_id_start = args.marker_id_start
-    target = CharucoTarget(cfg)
-    print(f"[INFO] ChArUco board: {cfg.squares_x}x{cfg.squares_y}  "
-          f"square={cfg.square_length_m*1000:.0f}mm marker={cfg.marker_length_m*1000:.0f}mm  "
-          f"dict={cfg.dictionary_name} id_start={cfg.marker_id_start}")
+    target = None
+    if args.capture_only:
+        print("[INFO] RAW capture only: 보드 검출과 최소 코너/장수 조건 없이 원본만 저장합니다.")
+    else:
+        target = _make_intrinsics_target(cfg, legacy_pattern=args.legacy_pattern)
+        print(f"[INFO] ChArUco board: {cfg.squares_x}x{cfg.squares_y}  "
+              f"square={cfg.square_length_m*1000:.0f}mm marker={cfg.marker_length_m*1000:.0f}mm  "
+              f"dict={cfg.dictionary_name} id_start={cfg.marker_id_start} "
+              f"legacy={args.legacy_pattern}")
 
     # 보정 flags
     flags = 0
@@ -382,13 +497,33 @@ def main():
         flags |= cv2.CALIB_RATIONAL_MODEL
     if args.fix_aspect:
         flags |= cv2.CALIB_FIX_ASPECT_RATIO
-    print(f"[INFO] dist model: {'RATIONAL(8)' if args.rational else 'BROWN-CONRADY(5)'}  "
-          f"OpenCV {cv2.__version__}")
+    if not args.capture_only:
+        print(f"[INFO] dist model: {'RATIONAL(8)' if args.rational else 'BROWN-CONRADY(5)'}  "
+              f"OpenCV {cv2.__version__}")
 
-    if args.reset_devices:
-        RealSenseCamera.reset_all_devices()
-
-    connected = RealSenseCamera.list_devices()  # {serial: name}
+    if args.from_images:
+        connected = serial_to_idx
+    else:
+        try:
+            from capture_pipeline.camera import RealSenseCamera
+        except ModuleNotFoundError as error:
+            if error.name == "pyrealsense2":
+                raise SystemExit(
+                    "[ERROR] pyrealsense2가 없습니다. 촬영은 RealSense Python 환경에서, "
+                    "저장 이미지 보정은 --from_images로 실행하세요.") from error
+            raise
+        if args.reset_devices:
+            RealSenseCamera.reset_all_devices()
+        connected = RealSenseCamera.list_devices()  # {serial: name}
+        unknown_serials = sorted(set(connected) - set(serial_to_idx))
+        if unknown_serials:
+            raise SystemExit(
+                f"[ERROR] Connected cameras missing from {map_path}: {unknown_serials}. "
+                "Use the same --intr_dir as the 01 --out_dir; the selected device map is stale."
+            )
+        missing_serials = sorted(set(serial_to_idx) - set(connected))
+        if missing_serials:
+            print(f"[WARN] 맵에 있으나 연결되지 않은 카메라: {missing_serials}")
     idx_pairs = sorted(
         [(int(serial_to_idx[s]), s) for s in connected if s in serial_to_idx],
         key=lambda x: x[0],
@@ -396,21 +531,32 @@ def main():
     if not idx_pairs:
         print("[ERROR] device_map 에 매핑된 연결 카메라가 없음.")
         return
-    print(f"[INFO] 재보정 대상 {len(idx_pairs)}대: "
+    print(f"[INFO] {'촬영' if args.capture_only else '재보정'} 대상 {len(idx_pairs)}대: "
           + ", ".join(f"cam{i}({'GRIP' if i == gripper_cam_idx else 'FIX'})" for i, _ in idx_pairs))
+    if gripper_cam_idx is None:
+        print("[WARN] gripper_cam_idx가 비어 있어 모두 FIXED로 표시됩니다. "
+              "intrinsic 보정은 가능하지만 03 실행 전 그리퍼 카메라 지정이 필요합니다.")
+
+    images = None
+    if args.capture_only or args.from_images:
+        images_dir = args.images_dir or os.path.join(intr_dir, "raw_capture")
+        try:
+            images = IntrinsicsImages(images_dir, serial_to_idx, create=args.capture_only)
+        except ValueError as error:
+            raise SystemExit(f"[ERROR] {error}") from error
+        print(f"[INFO] Raw images: {images.directory}")
 
     backup_dir = os.path.join(intr_dir, "factory_backup")
     report = {
-        "calibrated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        ("captured_at" if args.capture_only else "calibrated_at"): time.strftime("%Y-%m-%d %H:%M:%S"),
+        "mode": "capture_only" if args.capture_only else "from_images" if args.from_images else "live",
         "opencv": cv2.__version__,
-        "dist_model": "rational8" if args.rational else "brown_conrady5",
-        "board": {
-            "squares_x": cfg.squares_x, "squares_y": cfg.squares_y,
-            "square_length_m": cfg.square_length_m, "marker_length_m": cfg.marker_length_m,
-            "dictionary": cfg.dictionary_name, "marker_id_start": cfg.marker_id_start,
-        },
+        "dist_model": None if args.capture_only else "rational8" if args.rational else "brown_conrady5",
+        "board": None if args.capture_only else _intrinsics_board_config(target),
         "cameras": {},
     }
+    if images is not None:
+        report["images_dir"] = str(images.directory)
 
     aborted = False
     for cam_idx, serial in idx_pairs:
@@ -420,30 +566,63 @@ def main():
             report["cameras"][str(cam_idx)] = {"serial": serial, "status": "no_npz"}
             continue
 
-        d0 = np.load(npz_path, allow_pickle=True)
+        with np.load(npz_path, allow_pickle=True) as archive:
+            d0 = dict(archive)
+        if str(d0["serial"]) != serial:
+            raise SystemExit(
+                f"[ERROR] {npz_path} serial={d0['serial']} does not match "
+                f"device_map serial={serial}. Use the matching 01 output directory."
+            )
         w = int(d0["color_w"]); h = int(d0["color_h"]); fps = int(d0["fps"])
-        factory_K = np.asarray(d0["color_K"], dtype=np.float64)
+        factory_K = np.asarray(d0.get("factory_color_K", d0["color_K"]), dtype=np.float64)
+        factory_D = np.asarray(d0.get("factory_color_D", d0["color_D"]), dtype=np.float64)
         is_gripper = (cam_idx == gripper_cam_idx)
 
         print(f"\n{'='*64}\n[cam{cam_idx}] serial={serial}  {w}x{h}@{fps}  "
               f"{'GRIPPER' if is_gripper else 'FIXED'}\n{'='*64}")
 
-        cam = RealSenseCamera(serial, width=w, height=h, fps=fps,
-                              use_color=True, use_depth=False)
-        try:
-            cam.start()
-        except Exception as e:
-            print(f"[WARN] cam{cam_idx} 시작 실패: {e} -> 건너뜀")
-            report["cameras"][str(cam_idx)] = {"serial": serial, "status": "start_failed"}
-            continue
+        if images is not None:
+            try:
+                images.check_camera(cam_idx, serial, w, h, fps, create=args.capture_only)
+            except ValueError as error:
+                raise SystemExit(f"[ERROR] {error}") from error
 
-        save_dir = (os.path.join(intr_dir, "charuco_capture", f"cam{cam_idx}")
-                    if args.save_images else None)
-        try:
-            status, accepted, image_size = collect_for_camera(
-                cam, target, cam_idx, is_gripper, args, save_dir)
-        finally:
-            cam.stop()
+        source_info = {}
+        if args.from_images:
+            accepted, details = load_image_views(images, cam_idx, target, args.min_corners)
+            image_size, status = (w, h), "done"
+            source_info = {"num_images": images.count(cam_idx), "image_observations": details}
+            print(f"[cam{cam_idx}] 저장 이미지 {images.count(cam_idx)}장 중 "
+                  f"보드 검출 {len(accepted)}장")
+        else:
+            cam = RealSenseCamera(serial, width=w, height=h, fps=fps,
+                                  use_color=True, use_depth=False)
+            try:
+                cam.start(max_attempts=1)
+            except Exception as e:
+                print(f"[WARN] cam{cam_idx} 시작 실패: {e} -> 건너뜀")
+                report["cameras"][str(cam_idx)] = {"serial": serial, "status": "start_failed"}
+                continue
+
+            save_dir = (os.path.join(intr_dir, "charuco_capture", f"cam{cam_idx}")
+                        if args.save_images else None)
+            try:
+                if args.capture_only:
+                    status = collect_raw_for_camera(cam, images, cam_idx)
+                else:
+                    status, accepted, image_size = collect_for_camera(
+                        cam, target, cam_idx, is_gripper, args, save_dir)
+            finally:
+                cam.stop()
+
+        if args.capture_only:
+            report["cameras"][str(cam_idx)] = {
+                "serial": serial, "status": status, "num_images": images.count(cam_idx),
+            }
+            if status == "abort":
+                aborted = True
+                break
+            continue
 
         if status == "abort":
             print("[INFO] 사용자 중단(q). 지금까지 쓴 것 외에는 변경 없음.")
@@ -459,18 +638,23 @@ def main():
             print(f"[cam{cam_idx}] 수집 {len(accepted)} < min_views {args.min_views} "
                   f"-> 보정 생략, factory 유지.")
             report["cameras"][str(cam_idx)] = {
-                "serial": serial, "status": "too_few_views", "num_views": len(accepted)}
+                "serial": serial, "status": "too_few_views", "num_views": len(accepted), **source_info}
             continue
 
         if image_size is None:
             image_size = (w, h)
 
         K0 = factory_K if args.use_factory_guess else None
-        result = calibrate_intrinsics(target.board, accepted, image_size, flags, K0=K0)
+        try:
+            result = calibrate_intrinsics(target.board, accepted, image_size, flags, K0=K0)
+        except cv2.error as error:
+            print(f"[WARN] cam{cam_idx} 보정 오류: {error}")
+            source_info["error"] = str(error)
+            result = None
         if result is None:
             print(f"[cam{cam_idx}] 보정 실패 (유효 뷰 부족).")
             report["cameras"][str(cam_idx)] = {
-                "serial": serial, "status": "calib_failed", "num_views": len(accepted)}
+                "serial": serial, "status": "calib_failed", "num_views": len(accepted), **source_info}
             continue
 
         K, D = result["K"], result["D"]
@@ -492,10 +676,23 @@ def main():
             "num_views_total": result["n_total"], "num_dropped": result["n_dropped"],
             "K": np.asarray(K).tolist(), "D": np.asarray(D).flatten().tolist(),
             "factory_K": factory_K.tolist(),
-            "factory_D": np.asarray(d0["color_D"]).flatten().tolist(),
+            "factory_D": factory_D.flatten().tolist(),
+            **source_info,
         }
 
-    cv2.destroyAllWindows()
+    if not args.from_images:
+        cv2.destroyAllWindows()
+
+    if args.capture_only:
+        report_path = images.directory / "capture_report.json"
+        with report_path.open("w", encoding="utf-8") as stream:
+            json.dump(report, stream, indent=2)
+        for cam_idx, _ in idx_pairs:
+            print(f"[RAW] cam{cam_idx}: {images.count(cam_idx)}장")
+        print(f"[SAVE] {images.manifest_path}")
+        print(f"[DONE] RAW 촬영 {'중단' if aborted else '완료'}. 저장 이미지 유지. "
+              "나중에 --from_images와 보드 옵션으로 intrinsic을 계산하세요.")
+        return
 
     if not aborted:
         report_path = os.path.join(intr_dir, "charuco_intrinsics_report.json")
