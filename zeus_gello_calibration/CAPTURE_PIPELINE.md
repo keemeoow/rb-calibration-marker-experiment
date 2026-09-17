@@ -178,8 +178,24 @@ python3 02_calibrate_intrinsics.py \
   --intr_dir intrinsics_1920x1080_rgbd720 \
   --joint_intr_dir intrinsics_1280x720 intrinsics_848x480_rgbd720 intrinsics_640x360_rgbd720 \
   --from_images --use_factory_guess --zero_tangent \
-  --board 9x6_id90
+  --board 9x6_id90 --views_per_folder 18
 ```
+
+2026-09-17 최종값은 위 명령(`--views_per_folder 18`)으로 만들었다. 카메라 × 해상도마다
+사진 수와 다양성을 같게 맞추기 위한 옵션이다.
+
+- 카메라마다 각 폴더에서 명백한 실패 사진(예비 보정의 뷰 오차가 폴더 중앙값의 3배 초과)을
+  뺀 뒤, 보드 위치·크기·기울기 다양성이 최대인 N장만 고른다. 거리 스케일이 고정이라 같은
+  입력이면 항상 같은 사진을 고른다.
+- 모든 폴더가 정확히 N장을 쓰도록 이상치 재제거는 하지 않는다.
+- 고르지 않은 사진은 리포트 `image_observations`에 `not_selected_for_balance`
+  (또는 `rejected_gross_error`)로 남고, npz에는 `charuco_balance_views_per_folder`가 기록된다.
+- N장이 안 되는 폴더가 하나라도 있으면 그 카메라는 모든 폴더에서 건너뛴다
+  (`too_few_views_for_balance`). N은 가장 적은 폴더·카메라의 검출 장수 이하로 준다
+  (2026-09-17 기준 cam3 848x480의 18장).
+- 전체 사진으로 합친 결과와의 차이는 초점 −6.4~−0.3 px, 주점 −3.2~+2.3 px(1920 기준)이고,
+  검출된 모든 사진의 오차는 같다 (1920 환산 0.73 / 0.73 / 0.75 / 0.91 px,
+  1920 / 1280 / 848 / 640 순).
 
 - `--intr_dir`가 기준 좌표계다. 가장 높은 해상도를 준다. 다른 폴더의 코너는 공장 K
   관계(배율 + 잘림 오프셋)로 기준 픽셀로 환산한다.

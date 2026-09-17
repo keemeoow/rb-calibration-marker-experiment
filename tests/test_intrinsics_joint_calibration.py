@@ -221,3 +221,85 @@ def test_joint_rejects_duplicate_folders(tmp_path, monkeypatch, dirs):
     with pytest.raises(SystemExit, match="같습니다"):
         _run(monkeypatch, "--intr_dir", base, "--joint_intr_dir", *paths, "--from_images",
              "--board", "9x6_id90")
+
+
+# --- --views_per_folder: 폴더마다 같은 장수, 최대 다양성 -----------------------------
+
+def test_farthest_point_order_is_deterministic_and_spread():
+    rng = np.random.default_rng(0)
+    cluster = rng.normal([0.5, 0.5, 0.3, 0.0, 0.0], [0.01, 0.01, 0.002, 1.0, 1.0], (20, 5))
+    extremes = np.array([[0.1, 0.5, 0.3, 0, 0], [0.9, 0.5, 0.3, 0, 0],
+                         [0.5, 0.5, 0.3, 60, 0], [0.5, 0.5, 0.3, 0, -60]])
+    desc = np.vstack([cluster, extremes])
+    picked = app._farthest_point_order(desc, 5)
+    assert picked == app._farthest_point_order(desc, 5)
+    assert set(range(20, 24)) <= set(picked), "양끝 사진이 먼저 뽑혀야 한다"
+    assert app._farthest_point_order(desc[:3], 10) == [0, 1, 2]
+
+
+def test_views_per_folder_uses_exactly_n_from_every_folder(tmp_path, monkeypatch):
+    base = _make(tmp_path, "i1920", 1)
+    others = [_make(tmp_path, "i1280", 2), _make(tmp_path, "i848", 3, frames=8)]
+    _run(monkeypatch, "--intr_dir", base, "--joint_intr_dir", *others, "--from_images",
+         "--use_factory_guess", "--zero_tangent", "--board", "9x6_id90",
+         "--views_per_folder", "6", "--min_views", "8")
+
+    with np.load(base / "cam0.npz") as b:
+        K_base = b["color_K"]
+        assert int(b["charuco_balance_views_per_folder"]) == 6
+    for folder in [base, *others]:
+        report = _report(folder)
+        assert report["calib_flags"]["views_per_folder"] == 6
+        camera = report["cameras"]["0"]
+        assert camera["status"] == "written"
+        assert camera["num_views_used"] == camera["num_views_total"] == 6
+        assert camera["balance"]["views_per_folder"] == 6
+        statuses = [o["status"] for o in camera["image_observations"]]
+        assert statuses.count("detected") == 6
+        assert statuses.count("not_selected_for_balance") == len(statuses) - 6
+        assert all(m["num_views_used"] == 6 for m in camera["joint"]["members"])
+        with np.load(folder / "cam0.npz") as z:
+            np.testing.assert_allclose(
+                z["color_K"], app._map_K(K_base, app._stream_map(K1920, z["factory_color_K"])),
+                atol=1e-9)
+
+
+def test_balance_drops_gross_failures_before_choosing():
+    size, K = STREAMS["i1280"]
+    board = CharucoTarget(resolve_charuco_config("9x6_id90")[0])
+    accepted = []
+    for frame in _render(K, size, _poses(9, 4)):
+        corners, ids = board.detect(frame)[:2]
+        accepted.append((corners, ids))
+    rng = np.random.default_rng(1)
+    broken = accepted[3][0] + rng.normal(0, 15, accepted[3][0].shape).astype(np.float32)
+    accepted[3] = (broken, accepted[3][1])
+    keep, dropped = app._balance_views(board.board, accepted, [0] * 9, 6, size, 0,
+                                       K.copy(), K, ["i1280"])
+    assert dropped[3] == "rejected_gross_error"
+    assert 3 not in keep and len(keep) == 6
+    assert sorted(dropped) == sorted(set(range(9)) - set(keep))
+
+
+def test_views_per_folder_skips_camera_when_a_folder_is_short(tmp_path, monkeypatch):
+    base = _make(tmp_path, "i1280", 1)
+    short = _make(tmp_path, "i1920", 2, frames=5)
+    before = {p: p.read_bytes() for p in (base / "cam0.npz", short / "cam0.npz")}
+    _run(monkeypatch, "--intr_dir", base, "--joint_intr_dir", short, "--from_images",
+         "--board", "9x6_id90", "--views_per_folder", "6", "--min_views", "8")
+    camera = _report(base)["cameras"]["0"]
+    assert camera["status"] == "too_few_views_for_balance"
+    assert "i1920: 5장" in camera["error"]
+    assert before == {p: p.read_bytes() for p in before}
+    assert "장수 맞춤 불가" in _report(short)["cameras"]["0"]["joint_unavailable"]
+
+
+@pytest.mark.parametrize("extra, message", [
+    (["--views_per_folder", "6"], "requires --from_images"),
+    (["--from_images", "--views_per_folder", "3"], "at least 4"),
+])
+def test_views_per_folder_cli_validation(tmp_path, monkeypatch, capsys, extra, message):
+    monkeypatch.setattr(sys, "argv", ["02", "--intr_dir", str(tmp_path), *extra])
+    with pytest.raises(SystemExit):
+        app.main()
+    assert message in capsys.readouterr().err
