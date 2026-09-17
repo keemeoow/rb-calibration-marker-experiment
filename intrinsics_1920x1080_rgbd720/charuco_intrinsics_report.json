@@ -1,12 +1,12 @@
 {
-  "calibrated_at": "2026-09-16 23:31:21",
+  "calibrated_at": "2026-09-17 14:00:16",
   "mode": "from_images",
   "opencv": "4.13.0",
   "dist_model": "brown_conrady5",
   "calib_flags": {
     "use_factory_guess": true,
     "fix_aspect": false,
-    "zero_tangent": false
+    "zero_tangent": true
   },
   "board": {
     "squares_x": 9,
@@ -35,20 +35,20 @@
       "serial": "136622073980",
       "is_gripper": true,
       "status": "written",
-      "rms_px": 0.6402273221095393,
-      "num_views_used": 27,
+      "rms_px": 0.6607198120860205,
+      "num_views_used": 28,
       "num_views_total": 32,
-      "num_dropped": 5,
+      "num_dropped": 4,
       "K": [
         [
-          1359.9729713665952,
+          1364.0834109998755,
           0.0,
-          961.0324298120928
+          965.4306869171128
         ],
         [
           0.0,
-          1365.388377729476,
-          580.8103287211106
+          1368.6088028633728,
+          575.3517457267118
         ],
         [
           0.0,
@@ -57,11 +57,11 @@
         ]
       ],
       "D": [
-        0.14301840296108143,
-        -0.43949270110126676,
-        0.0016851630570700635,
-        -0.0004997772566476761,
-        0.37197041983770945
+        0.16429118007369867,
+        -0.5046238761714248,
+        0.0,
+        0.0,
+        0.4447494192470339
       ],
       "factory_K": [
         [
@@ -87,6 +87,65 @@
         0.0,
         0.0
       ],
+      "joint": {
+        "base_intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1920x1080_rgbd720",
+        "map_from_base": {
+          "scale": 1.0,
+          "offset_px": [
+            0.0,
+            0.0
+          ]
+        },
+        "rms_px_pooled": 0.6807987943431661,
+        "num_views_used_pooled": 95,
+        "num_views_total_pooled": 110,
+        "members": [
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1920x1080_rgbd720",
+            "cam_idx": 0,
+            "color_size": [
+              1920,
+              1080
+            ],
+            "rms_px": 0.6607198120860205,
+            "num_views_used": 28,
+            "num_views_total": 32
+          },
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1280x720",
+            "cam_idx": 0,
+            "color_size": [
+              1280,
+              720
+            ],
+            "rms_px": 0.3728453979851701,
+            "num_views_used": 18,
+            "num_views_total": 20
+          },
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_848x480_rgbd720",
+            "cam_idx": 0,
+            "color_size": [
+              848,
+              480
+            ],
+            "rms_px": 0.30652029355105626,
+            "num_views_used": 28,
+            "num_views_total": 33
+          },
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_640x360_rgbd720",
+            "cam_idx": 0,
+            "color_size": [
+              640,
+              360
+            ],
+            "rms_px": 0.25987501418364445,
+            "num_views_used": 21,
+            "num_views_total": 25
+          }
+        ]
+      },
       "num_images": 32,
       "image_observations": [
         {
@@ -255,20 +314,20 @@
       "serial": "319522062138",
       "is_gripper": false,
       "status": "written",
-      "rms_px": 0.6666418541706749,
-      "num_views_used": 25,
+      "rms_px": 0.7034799695099133,
+      "num_views_used": 27,
       "num_views_total": 29,
-      "num_dropped": 4,
+      "num_dropped": 2,
       "K": [
         [
-          1363.2057963361838,
+          1366.2681696508614,
           0.0,
-          942.8079534781236
+          936.4780782157054
         ],
         [
           0.0,
-          1364.3643814900827,
-          564.5770784732593
+          1369.8651544730187,
+          563.067868686921
         ],
         [
           0.0,
@@ -277,11 +336,11 @@
         ]
       ],
       "D": [
-        0.13480289879947885,
-        -0.3614168640777286,
-        -0.00019014668973745826,
-        0.0010882931980927444,
-        0.23163120368025444
+        0.1364909723950043,
+        -0.4013878626890577,
+        0.0,
+        0.0,
+        0.34333505951867205
       ],
       "factory_K": [
         [
@@ -307,6 +366,65 @@
         0.0,
         0.0
       ],
+      "joint": {
+        "base_intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1920x1080_rgbd720",
+        "map_from_base": {
+          "scale": 1.0,
+          "offset_px": [
+            0.0,
+            0.0
+          ]
+        },
+        "rms_px_pooled": 0.771897498016969,
+        "num_views_used_pooled": 99,
+        "num_views_total_pooled": 112,
+        "members": [
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1920x1080_rgbd720",
+            "cam_idx": 1,
+            "color_size": [
+              1920,
+              1080
+            ],
+            "rms_px": 0.7034799695099133,
+            "num_views_used": 27,
+            "num_views_total": 29
+          },
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1280x720",
+            "cam_idx": 1,
+            "color_size": [
+              1280,
+              720
+            ],
+            "rms_px": 0.4588400015553646,
+            "num_views_used": 22,
+            "num_views_total": 26
+          },
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_848x480_rgbd720",
+            "cam_idx": 1,
+            "color_size": [
+              848,
+              480
+            ],
+            "rms_px": 0.3338106590691089,
+            "num_views_used": 21,
+            "num_views_total": 25
+          },
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_640x360_rgbd720",
+            "cam_idx": 1,
+            "color_size": [
+              640,
+              360
+            ],
+            "rms_px": 0.3005977740832027,
+            "num_views_used": 29,
+            "num_views_total": 32
+          }
+        ]
+      },
       "num_images": 30,
       "image_observations": [
         {
@@ -465,20 +583,20 @@
       "serial": "912322060991",
       "is_gripper": false,
       "status": "written",
-      "rms_px": 0.6670273845086883,
-      "num_views_used": 25,
+      "rms_px": 0.6827651639744893,
+      "num_views_used": 23,
       "num_views_total": 27,
-      "num_dropped": 2,
+      "num_dropped": 4,
       "K": [
         [
-          1379.1912421040884,
+          1385.9596020773504,
           0.0,
-          967.526587830267
+          967.8858639002827
         ],
         [
           0.0,
-          1390.8121188298364,
-          543.4166488341175
+          1387.2956832350935,
+          544.1516530321694
         ],
         [
           0.0,
@@ -487,11 +605,11 @@
         ]
       ],
       "D": [
-        0.17256259511778033,
-        -0.5262811761038919,
-        -0.0008734501447392766,
-        -0.0005796282416844908,
-        0.41657250223072845
+        0.1528901931164589,
+        -0.40225658447266194,
+        0.0,
+        0.0,
+        0.19611544632221664
       ],
       "factory_K": [
         [
@@ -517,6 +635,65 @@
         0.0,
         0.0
       ],
+      "joint": {
+        "base_intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1920x1080_rgbd720",
+        "map_from_base": {
+          "scale": 1.0,
+          "offset_px": [
+            0.0,
+            0.0
+          ]
+        },
+        "rms_px_pooled": 0.6636816989283514,
+        "num_views_used_pooled": 91,
+        "num_views_total_pooled": 106,
+        "members": [
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1920x1080_rgbd720",
+            "cam_idx": 2,
+            "color_size": [
+              1920,
+              1080
+            ],
+            "rms_px": 0.6827651639744893,
+            "num_views_used": 23,
+            "num_views_total": 27
+          },
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1280x720",
+            "cam_idx": 2,
+            "color_size": [
+              1280,
+              720
+            ],
+            "rms_px": 0.4524616765577287,
+            "num_views_used": 18,
+            "num_views_total": 19
+          },
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_848x480_rgbd720",
+            "cam_idx": 2,
+            "color_size": [
+              848,
+              480
+            ],
+            "rms_px": 0.2635214821434289,
+            "num_views_used": 22,
+            "num_views_total": 29
+          },
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_640x360_rgbd720",
+            "cam_idx": 2,
+            "color_size": [
+              640,
+              360
+            ],
+            "rms_px": 0.2302197343122188,
+            "num_views_used": 28,
+            "num_views_total": 31
+          }
+        ]
+      },
       "num_images": 27,
       "image_observations": [
         {
@@ -660,20 +837,20 @@
       "serial": "039422061216",
       "is_gripper": false,
       "status": "written",
-      "rms_px": 0.6644447685644745,
+      "rms_px": 0.6801772843884316,
       "num_views_used": 19,
       "num_views_total": 22,
       "num_dropped": 3,
       "K": [
         [
-          1383.2500407532966,
+          1374.0678588051596,
           0.0,
-          977.0547776686054
+          977.2320818641939
         ],
         [
           0.0,
-          1382.4851470927795,
-          541.3752444805567
+          1375.698902979315,
+          553.5653533064702
         ],
         [
           0.0,
@@ -682,11 +859,11 @@
         ]
       ],
       "D": [
-        0.1608412012215637,
-        -0.41422339235424105,
-        -0.0035142396267888545,
-        -0.0009282912481045986,
-        0.23303557465428096
+        0.16601456645447477,
+        -0.5039851192016386,
+        0.0,
+        0.0,
+        0.4387443533301758
       ],
       "factory_K": [
         [
@@ -712,6 +889,65 @@
         0.0,
         0.0
       ],
+      "joint": {
+        "base_intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1920x1080_rgbd720",
+        "map_from_base": {
+          "scale": 1.0,
+          "offset_px": [
+            0.0,
+            0.0
+          ]
+        },
+        "rms_px_pooled": 0.705130623597635,
+        "num_views_used_pooled": 76,
+        "num_views_total_pooled": 90,
+        "members": [
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1920x1080_rgbd720",
+            "cam_idx": 3,
+            "color_size": [
+              1920,
+              1080
+            ],
+            "rms_px": 0.6801772843884316,
+            "num_views_used": 19,
+            "num_views_total": 22
+          },
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1280x720",
+            "cam_idx": 3,
+            "color_size": [
+              1280,
+              720
+            ],
+            "rms_px": 0.47915326715129086,
+            "num_views_used": 21,
+            "num_views_total": 25
+          },
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_848x480_rgbd720",
+            "cam_idx": 3,
+            "color_size": [
+              848,
+              480
+            ],
+            "rms_px": 0.3183563358683354,
+            "num_views_used": 15,
+            "num_views_total": 18
+          },
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_640x360_rgbd720",
+            "cam_idx": 3,
+            "color_size": [
+              640,
+              360
+            ],
+            "rms_px": 0.2353331961181938,
+            "num_views_used": 21,
+            "num_views_total": 25
+          }
+        ]
+      },
       "num_images": 24,
       "image_observations": [
         {
@@ -840,20 +1076,20 @@
       "serial": "752112070297",
       "is_gripper": false,
       "status": "written",
-      "rms_px": 0.6352032617703781,
-      "num_views_used": 30,
+      "rms_px": 0.6308982078588602,
+      "num_views_used": 27,
       "num_views_total": 34,
-      "num_dropped": 4,
+      "num_dropped": 7,
       "K": [
         [
-          1393.9326182268965,
+          1385.3773285450602,
           0.0,
-          982.9768370940454
+          978.3032371426257
         ],
         [
           0.0,
-          1392.3407619454022,
-          510.30480496416516
+          1385.0736504027211,
+          530.325838269078
         ],
         [
           0.0,
@@ -862,11 +1098,11 @@
         ]
       ],
       "D": [
-        0.14948274205171463,
-        -0.421098940326138,
-        -0.006254882890301248,
-        0.0007064356496220712,
-        0.3219137227593005
+        0.14811085947371866,
+        -0.43786723426883495,
+        0.0,
+        0.0,
+        0.3682340261141446
       ],
       "factory_K": [
         [
@@ -892,6 +1128,65 @@
         0.0,
         0.0
       ],
+      "joint": {
+        "base_intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1920x1080_rgbd720",
+        "map_from_base": {
+          "scale": 1.0,
+          "offset_px": [
+            0.0,
+            0.0
+          ]
+        },
+        "rms_px_pooled": 0.6955702528948398,
+        "num_views_used_pooled": 96,
+        "num_views_total_pooled": 114,
+        "members": [
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1920x1080_rgbd720",
+            "cam_idx": 4,
+            "color_size": [
+              1920,
+              1080
+            ],
+            "rms_px": 0.6308982078588602,
+            "num_views_used": 27,
+            "num_views_total": 34
+          },
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1280x720",
+            "cam_idx": 4,
+            "color_size": [
+              1280,
+              720
+            ],
+            "rms_px": 0.41734463076255146,
+            "num_views_used": 24,
+            "num_views_total": 26
+          },
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_848x480_rgbd720",
+            "cam_idx": 4,
+            "color_size": [
+              848,
+              480
+            ],
+            "rms_px": 0.2615131057114162,
+            "num_views_used": 23,
+            "num_views_total": 28
+          },
+          {
+            "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_640x360_rgbd720",
+            "cam_idx": 4,
+            "color_size": [
+              640,
+              360
+            ],
+            "rms_px": 0.3060262308819397,
+            "num_views_used": 22,
+            "num_views_total": 26
+          }
+        ]
+      },
       "num_images": 34,
       "image_observations": [
         {
@@ -1067,5 +1362,19 @@
       ]
     }
   },
-  "images_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1920x1080_rgbd720/raw_capture"
+  "images_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1920x1080_rgbd720/raw_capture",
+  "joint_with": [
+    {
+      "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1280x720",
+      "images_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_1280x720/raw_capture"
+    },
+    {
+      "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_848x480_rgbd720",
+      "images_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_848x480_rgbd720/raw_capture"
+    },
+    {
+      "intr_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_640x360_rgbd720",
+      "images_dir": "/home/jysim/*jiwoo/rb-calibration-marker-experiment/intrinsics_640x360_rgbd720/raw_capture"
+    }
+  ]
 }
